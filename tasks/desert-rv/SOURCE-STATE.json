@@ -83,8 +83,8 @@
     },
     {
       "path": "tasks/desert-rv/scripts/test_verify_evidence.py",
-      "sha256": "d28aa1aed596e25401c76d59a3fd13f9902224e94be6bfb1cb5de22c6f9d51df",
-      "size": 15949
+      "sha256": "1e8542402563cf6c6b0230a2ab7b66bae08e55c3363019435f6fff0fb9be7017",
+      "size": 17054
     },
     {
       "path": "tasks/desert-rv/scripts/update_source_state.py",
@@ -4203,8 +4203,8 @@
     },
     {
       "path": "tasks/desert-rv/unity/Assets/DesertRV/Tests/EditMode/NailRigOwnershipTests.cs",
-      "sha256": "f2d99e3e1c6ab7d8bb18cc768f7e9bac91d39dcdbd6d0a380e7ba90430c34846",
-      "size": 9590
+      "sha256": "102f8b9d32ba741af7c3c26cebde68d3f937a7681423ac74a277961d99cba36d",
+      "size": 9583
     },
     {
       "path": "tasks/desert-rv/unity/Assets/DesertRV/Tests/EditMode/NailRigOwnershipTests.cs.meta",
@@ -4348,13 +4348,13 @@
     },
     {
       "path": "tasks/desert-rv/unity/Packages/manifest.json",
-      "sha256": "9e9b4451ef0794393210bfd5ff61a68fa4e6787a67511158176db2e81d05a608",
-      "size": 374
+      "sha256": "930ca8fcba88a8a35319eee9a5a62882633cd026d2c5bf8ff8dc9e2c10deb8f0",
+      "size": 514
     },
     {
       "path": "tasks/desert-rv/unity/Packages/packages-lock.json",
-      "sha256": "cb5f3d5e845ae3a51c2f00a4d48b06fd3360c7f4313aabda8f16742fbf1c91cc",
-      "size": 4591
+      "sha256": "384d89273ce2266897a6cce8f348f8d20bfd58f59506ec713a4831abdae8eb74",
+      "size": 5389
     },
     {
       "path": "tasks/desert-rv/unity/ProjectSettings/AudioManager.asset",

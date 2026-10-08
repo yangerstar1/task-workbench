@@ -247,6 +247,23 @@ class TestPresentationBuiltinModules(unittest.TestCase):
             self.assertNotIn('url', locked[name], name)
 
 
+class TestResolvedEditorPackages(unittest.TestCase):
+    def test_pinned_editor_core_and_platform_dependencies(self):
+        manifest=evidence.read_json(evidence.PROJECT/'Packages/manifest.json')['dependencies']
+        locked=evidence.read_json(evidence.PROJECT/'Packages/packages-lock.json')['dependencies']
+        self.assertEqual(manifest['com.unity.test-framework'],'1.6.0')
+        for name,version in [('com.unity.test-framework','1.6.0'),('com.unity.ext.nunit','2.0.5')]:
+            self.assertEqual(locked[name]['version'],version)
+            self.assertEqual(locked[name]['source'],'builtin')
+            self.assertNotIn('url',locked[name])
+        for name in ['com.unity.sdk.linux-arm64','com.unity.sdk.linux-x86_64','com.unity.toolchain.linux-x86_64-linux']:
+            self.assertEqual(manifest[name],'1.1.0')
+            self.assertEqual(locked[name]['version'],'1.1.0')
+            self.assertEqual(locked[name]['depth'],0)
+            self.assertEqual(locked[name]['url'],'https://packages.unity.com')
+        self.assertEqual(locked['com.unity.sysroot.base']['version'],'1.1.0')
+
+
 class TestSeparateModeInventories(unittest.TestCase):
     def test_separate_reviewed_inventories(self):
         edits = evidence.expected_cases('editmode')

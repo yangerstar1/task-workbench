@@ -123,8 +123,8 @@ namespace DesertRV.Tests
             {
                 object[] args={f.Skin,f.Rig.transform,null,null};
                 Assert.That(Helper.GetMethod("TryGetAnimationTargets").Invoke(null,args),Is.True);
-                var targets=(Transform[])args[2];Assert.That(targets,Does.Contain(f.Skin.transform));Assert.That(targets,Does.Contain(f.Bones[0]));
-                Assert.That(targets,Does.Not.Contain(f.Bones[2]));Assert.That(targets.Length,Is.EqualTo(2));
+                var targets=(Transform[])args[2];Assert.That(targets,Has.Member(f.Skin.transform));Assert.That(targets,Has.Member(f.Bones[0]));
+                Assert.That(targets,Has.No.Member(f.Bones[2]));Assert.That(targets.Length,Is.EqualTo(2));
             }
         }
     }
