@@ -103,6 +103,21 @@ if min(checks['death_upper_lower_paw_height_separation'].values())<.045:errors.a
 if abs(checks['death_torso_contact_z'])>.012:errors.append('Death torso is not resting on the floor')
 if max(checks['death_relaxed_paw_heights'].values())>.28:errors.append('Death legs remain rigidly raised')
 if sampled['Death'][-1]['max_z']>rest_width+.035:errors.append('Death exceeds anatomical side-lying height')
+# Direct worst-depth summary, with actual evaluated mesh/vertex/bone evidence.
+worst_index=min(range(len(sampled['Death'])),key=lambda i:sampled['Death'][i]['min_z'])
+rig.animation_data.action=bpy.data.actions['Death'];scene.frame_set(worst_index+1)
+worst_mesh=None
+for obj in [body]+details:
+    ev=obj.evaluated_get(bpy.context.evaluated_depsgraph_get());me=ev.to_mesh()
+    index=min(range(len(me.vertices)),key=lambda i:(ev.matrix_world@me.vertices[i].co).z);position=ev.matrix_world@me.vertices[index].co
+    if worst_mesh is None or position.z<worst_mesh['world_xyz_m'][2]:
+        names={g.index:g.name for g in obj.vertex_groups}
+        worst_mesh={'mesh':obj.name,'vertex':index,'world_xyz_m':list(position),'weights':{names[g.group]:g.weight for g in obj.data.vertices[index].groups}}
+    ev.to_mesh_clear()
+summary={'scope':SCOPE,'maximum_penetration_m':max(0,-sampled['Death'][worst_index]['min_z']),'minimum_z_m':sampled['Death'][worst_index]['min_z'],'worst_seconds':worst_index/P['fps'],'worst_evaluated_vertex':worst_mesh,'end_minimum_z_m':sampled['Death'][-1]['min_z'],'shoulder_support':patches['shoulder'],'pelvis_support':patches['pelvis'],'visual_approval':False}
+(OUT/'death-diagnostic-summary.json').write_text(json.dumps(summary,indent=2))
+checks['death_penetration_summary']=summary
+rig.animation_data.action=bpy.data.actions['Death'];scene.frame_set(clips['Death']['frame_end'])
 # Synthetic default crossfade + a visible supported compression after landing.
 # These clips disclose the real visual jump/gap for review; they are not Unity verification.
 interrupts={}

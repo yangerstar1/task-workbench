@@ -16,7 +16,8 @@
     }
   },
   "parameters_sha256": "b8b86c81e4043e7385cec478faf917df76ec89916d01d5296ab28dc6a0be11d4",
-  "preceding_death_diagnostic_commit": "b4890c1bd41aaa8ae5b32836ebc2acf90db1d380",
-  "preceding_death_diagnostic_run": 37835159890,
-  "pose_revision": "trunk_supported_oblique_side_v3"
+  "preceding_death_diagnostic_commit": "3764a22a69bd951b925078b78a216cf8e1247f31",
+  "preceding_death_diagnostic_run": 37840535651,
+  "pose_revision": "trunk_supported_oblique_side_v3",
+  "contact_revision": "head_axis_feedback_and_proximal_clearance_v4"
 }

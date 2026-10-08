@@ -95,4 +95,14 @@ class CandidateContract(unittest.TestCase):
         overlay=(H/'support_overlay.py').read_text()
         self.assertIn('DIAGNOSTIC_TRANSPARENT_',overlay);self.assertIn('for obj,materials in saved:',overlay)
         self.assertIn('death-support-overlay-',(H/'package_review.py').read_text())
+    def test_head_correction_uses_measured_axis_search(self):
+        text=(H/'death_contact.py').read_text()
+        self.assertIn('def relax_head(',text);self.assertIn('best_z=self.head_minimum()',text)
+        self.assertNotIn('neck.rotation_euler.z=max(-.12',text)
+        self.assertIn('self.pole_baselines',text);self.assertIn("('angle',0,sign)",text)
+        self.assertIn('self.initial_roll-.28',text)
+    def test_actual_depth_summary_is_mandatory(self):
+        text=(H/'validate_asset.py').read_text()
+        self.assertIn('death-diagnostic-summary.json',text);self.assertIn('maximum_penetration_m',text)
+        self.assertIn('worst_evaluated_vertex',text);self.assertIn('worst_seconds',text)
 if __name__=='__main__':unittest.main()

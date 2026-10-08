@@ -1,3 +1,13 @@
+# Death precision correction: head-axis feedback and hidden shoulder collision
+
+Actual support diagnostic 37840535651 kept the improved low side-lying appearance, but its worst exported penetration was 203.8mm at 1.02s on the lower jaw. The former hardcoded negative neck-Z response was the wrong sign after side-roll. Read-only GLB axis probes found positive local neck-Z raises the jaw. They also exposed a separate hidden 150mm proximal fore_upper.L skin penetration and its joint origin 15mm below the floor; raising the mouth alone would not fix that second problem.
+
+This revision uses evaluated-geometry feedback to test both rotation signs on neck/head axes, within bounded relaxation angles. It resolves proximal shoulder geometry through bounded limb bend-plane rotation/reach changes; only when necessary, it tests a small side-roll change while restoring the same shoulder/pelvis support targets. The basic accepted-direction low side-lying pose and the mesh are retained; no disconnected bone-root translation, mesh squash, or whole-body downward offset is used to fake clearance. A small chest rotation can broaden the true shoulder patch, whose third point previously missed the original 30mm line by only 0.352mm. All original thresholds remain.
+
+`death-diagnostic-summary.json` directly states maximum penetration in metres, worst time, evaluated mesh/vertex/bone weights, endpoint depth, and both support patches. It should be read before any technical-pass claim. The same finite Death-only visual scope remains NOT_FULL. Head, hidden shoulder surface and the three-point shoulder patch must all be inspected in the actual new artifact; this source revision has no native or visual approval yet.
+
+---
+
 # Death: separate genuine shoulder and pelvis support candidate
 
 The previous visually rejected pose touched the floor with a limb-root point while trunk-dominant skin remained 153–184mm above it. Read-only actual GLB reconstruction also found an 8.64mm penetration at 0.95s on Skin vertex 4581, weighted 88.85% hind_upper.L and 11.15% pelvis. These are evidence of a bad support definition and an insufficient proximal-joint contact response, not a reason to relax the 4mm threshold.

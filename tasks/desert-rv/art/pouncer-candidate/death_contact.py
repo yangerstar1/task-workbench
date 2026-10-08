@@ -1,7 +1,7 @@
 """Author Death joint contacts before baking. Never clamp output vertices or images.
 All geometry and non-Death actions remain untouched. Unsolved contact fails validation.
 """
-from mathutils import Vector, Matrix
+from mathutils import Vector, Matrix, Quaternion
 import bpy
 import math
 from death_support import TrunkSupport
@@ -50,21 +50,78 @@ class DeathContactSolver:
         # Coordinate-search the actual offending muscle surface, rather than assuming
         # that raising a pole always raises a proximal cap behind the hip pivot.
         pre,side=key.split('.');pole=self.rig.pose.bones[pre+'_pole.'+side]
-        target=self.rig.pose.bones[pre+'_target.'+side]
-        initial=pole.location.copy();initial_target=target.location.copy();best=(initial.copy(),initial_target.copy());best_z=self.region_minimum(key)
+        target=self.rig.pose.bones[pre+'_target.'+side];ik=self.rig.pose.bones[pre+'_lower.'+side].constraints['AuthoringFootLock']
+        initial=pole.location.copy();initial_target=target.location.copy();initial_angle=ik.pole_angle;best=(initial.copy(),initial_target.copy(),initial_angle);best_z=self.region_minimum(key)
         step=max(.015,min(.07,2*depth))
         # Let the bulky proximal muscle rotate clear; a pole alone cannot change reach direction.
-        candidates=[('pole',axis,sign) for axis in range(3) for sign in (-1,1)]+[('target',axis,sign) for axis in (0,1) for sign in (-1,1)]
+        candidates=[('pole',axis,sign) for axis in range(3) for sign in (-1,1)]+[('target',axis,sign) for axis in (0,1) for sign in (-1,1)]+[('angle',0,sign) for sign in (-1,1)]
         for kind,axis,sign in candidates:
-            cp=initial.copy();ct=initial_target.copy()
+            cp=initial.copy();ct=initial_target.copy();angle=initial_angle
             if kind=='pole':cp[axis]+=sign*step
-            else:ct[axis]+=sign*step
+            elif kind=='target':ct[axis]+=sign*step
+            else:angle+=sign*(.08 if depth>.008 else .04)
+            if abs(angle-self.pole_baselines[key])>1.0:continue
             if (cp-self.references[key][0]).length>.35 or (ct-self.references[key][1]).length>.18:continue
-            pole.location=cp;target.location=ct;self.align_paws();z=self.region_minimum(key)
-            if z>best_z+.00005:best_z=z;best=(cp.copy(),ct.copy())
-        pole.location=best[0];target.location=best[1];self.align_paws()
+            pole.location=cp;target.location=ct;ik.pole_angle=angle;self.align_paws();z=self.region_minimum(key)
+            if z>best_z+.00005:best_z=z;best=(cp.copy(),ct.copy(),angle)
+        pole.location=best[0];target.location=best[1];ik.pole_angle=best[2];self.align_paws()
+    def head_minimum(self):
+        deps=bpy.context.evaluated_depsgraph_get();ev=self.body.evaluated_get(deps);mesh=ev.to_mesh()
+        low=min((ev.matrix_world@mesh.vertices[i].co).z for i in self.head);ev.to_mesh_clear()
+        for obj in self.details:
+            if obj.get('bind_bone') not in ('head','jaw'):continue
+            ev=obj.evaluated_get(deps);mesh=ev.to_mesh();low=min(low,min((ev.matrix_world@v.co).z for v in mesh.vertices));ev.to_mesh_clear()
+        return low
+    def relax_head(self,depth):
+        # Measure both signs in evaluated geometry. The former hardcoded negative Z
+        # response was experimentally shown to push this rolled neck DOWN.
+        start={n:self.rig.pose.bones[n].rotation_euler.to_quaternion() for n in ('neck','head')}
+        best_z=self.head_minimum();best=None;step=max(.01,min(.06,depth/.80))
+        for name in ('neck','head'):
+            pb=self.rig.pose.bones[name]
+            for axis in (Vector((1,0,0)),Vector((0,0,1))):
+                for sign in (-1,1):
+                    q=start[name] @ Quaternion(axis,sign*step)
+                    if q.rotation_difference(self.angular_references[name]).angle>.50:continue
+                    pb.rotation_euler=q.to_euler('XYZ');bpy.context.view_layer.update();low=self.head_minimum()
+                    if low>best_z+.00005:best_z=low;best=(name,q.copy())
+                    pb.rotation_euler=start[name].to_euler('XYZ');bpy.context.view_layer.update()
+        if best:self.rig.pose.bones[best[0]].rotation_euler=best[1].to_euler('XYZ')
+        bpy.context.view_layer.update()
+    def broaden_shoulder(self):
+        patch=self.support.inspect()['shoulder']
+        if patch['vertices_within_30mm']>=3:return
+        pb=self.rig.pose.bones['chest'];start=pb.rotation_euler.to_quaternion();best=start.copy()
+        best_width=patch['witnesses'][2]['world_xyz_m'][2]-patch['minimum_z']
+        for axis in (Vector((1,0,0)),Vector((0,0,1))):
+            for sign in (-1,1):
+                q=start @ Quaternion(axis,sign*.008)
+                if q.rotation_difference(self.angular_references['chest']).angle>.060:continue
+                pb.rotation_euler=q.to_euler('XYZ');self.align_paws();candidate=self.support.inspect()['shoulder']
+                width=candidate['witnesses'][2]['world_xyz_m'][2]-candidate['minimum_z']
+                if width<best_width-.00005:best_width=width;best=q.copy()
+        pb.rotation_euler=best.to_euler('XYZ');self.align_paws()
+    def yield_girdle_roll(self,targets):
+        # A below-floor joint origin cannot be fixed by wrist/pole rotation alone.
+        # Test small rigid side-roll changes while restoring the mean two-patch support.
+        pb=self.rig.pose.bones['visual_body'];loc=pb.location.copy();rot=pb.rotation_euler.copy()
+        initial=self.measure();best_score=min(initial['limbs'].values());best=(loc.copy(),rot.copy())
+        for delta in (-.020,.020):
+            candidate=rot.copy();candidate.y+=delta
+            if not self.initial_roll-.28<=candidate.y<=self.initial_roll+.04:continue
+            pb.location=loc;pb.rotation_euler=candidate;self.align_paws();m=self.measure()
+            pb.location.z+=sum(targets[k]-m['support_patches'][k]['minimum_z'] for k in targets)/len(targets)
+            self.align_paws();m=self.measure();score=min(m['limbs'].values())
+            if score>best_score+.0002:best_score=score;best=(pb.location.copy(),candidate.copy())
+        pb.location=best[0];pb.rotation_euler=best[1];self.align_paws()
     def solve(self,u):
+        if not hasattr(self,'pole_baselines'):
+            self.pole_baselines={key:self.rig.pose.bones[key.split('.')[0]+'_lower.'+key.split('.')[1]].constraints['AuthoringFootLock'].pole_angle for key in self.legs}
+        for key,angle in self.pole_baselines.items():
+            self.rig.pose.bones[key.split('.')[0]+'_lower.'+key.split('.')[1]].constraints['AuthoringFootLock'].pole_angle=angle
         t=max(0,min(1,(u-.18)/.52));self.relax=t*t*(3-2*t)
+        self.angular_references={n:self.rig.pose.bones[n].rotation_euler.to_quaternion() for n in ('neck','head','chest')}
+        self.initial_roll=self.rig.pose.bones['visual_body'].rotation_euler.y
         self.references={}
         for key in self.legs:
             pre,side=key.split('.');self.references[key]=(self.rig.pose.bones[pre+'_pole.'+side].location.copy(),self.rig.pose.bones[pre+'_target.'+side].location.copy())
@@ -75,7 +132,8 @@ class DeathContactSolver:
         for iteration in range(32):
             self.align_paws();m=self.measure()
             errors={k:m['support_patches'][k]['minimum_z']-targets[k] for k in targets}
-            if max(abs(e) for e in errors.values())<.001 and m['minimum_z']>=-.0008:break
+            patch_ok=all(p['vertices_within_30mm']>=max(3,math.ceil(p['vertices']*.02)) and p['q05_z']<=.040 for p in m['support_patches'].values())
+            if max(abs(e) for e in errors.values())<.001 and m['minimum_z']>=-.0008 and patch_ok:break
             if settle>0:
                 a=m['support_patches']['shoulder'];b=m['support_patches']['pelvis']
                 ya=a['lowest_world_xyz_m'][1];yb=b['lowest_world_xyz_m'][1]
@@ -89,8 +147,11 @@ class DeathContactSolver:
                 pre,side=key.split('.');target_bone=self.rig.pose.bones[pre+'_target.'+side]
                 if m['feet'][key]<.0005:target_bone.location.z+=.75*(.0005-m['feet'][key])
                 if m['limbs'][key]<-.0005 and m['feet'][key]>=-.0005:self.yield_joint(key,-m['limbs'][key])
-            if m['head_min_z']<-.0005:
-                neck=self.rig.pose.bones['neck'];neck.rotation_euler.z=max(-.12,neck.rotation_euler.z-.70*(.0005-m['head_min_z'])/.60)
+            m=self.measure()
+            if settle>.70 and min(m['limbs'].values())<-.008:self.yield_girdle_roll(targets)
+            if settle>.95 and not patch_ok:self.broaden_shoulder()
+            m=self.measure()
+            if m['head_min_z']<-.0005:self.relax_head(-m['head_min_z'])
             bpy.context.view_layer.update()
             steps.append({'iteration':iteration,'support_errors':errors,'minimum_z':m['minimum_z']})
         self.align_paws();final=self.measure()
