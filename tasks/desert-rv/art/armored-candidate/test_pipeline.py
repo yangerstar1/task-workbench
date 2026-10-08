@@ -9,8 +9,8 @@ class PipelineTests(unittest.TestCase):
     def test_all_python_parses(self):
         for path in HERE.glob('*.py'):ast.parse(path.read_text())
     def test_expected_outputs_unique_and_bounded(self):
-        self.assertEqual(len(package_evidence.expected('static')),58)
-        self.assertEqual(len(package_evidence.expected('motion')),84)
+        self.assertEqual(len(package_evidence.expected('static')),62)
+        self.assertEqual(len(package_evidence.expected('motion')),86)
         for phase in ('static','motion'):
             names=package_evidence.expected(phase); self.assertEqual(len(names),len(set(names)))
             self.assertFalse(any('..' in name or name.startswith('/') for name in names))

@@ -10,9 +10,9 @@ P=json.loads((HERE/'parameters.json').read_text())
 def sha(path):return hashlib.sha256(path.read_bytes()).hexdigest()
 def expected(phase):
     if phase=='static':
-        return ['bulwark-basecolor.png','bulwark-orm.png','bulwark-static-review.blend','static-checks.json','fps-visibility.json']+[f'review/static-{i:02}.png' for i in range(8)]+['review/static-weakpoint-open.png']+fps_files(P)
+        return ['binding-contract.json','bulwark-basecolor.png','bulwark-orm.png','bulwark-static-review.blend','static-checks.json','fps-visibility.json']+[f'review/static-{i:02}.png' for i in range(8)]+['review/static-weakpoint-open.png']+fps_files(P)
     names=list(P['clips'])+[f'SYNTHETIC_Interrupt_{x}' for x in (.07,.42,.91)]
-    return ['bulwark-basecolor.png','bulwark-orm.png','bulwark-review.blend','bulwark-candidate.glb','bulwark-candidate.fbx','evaluated-validation.json','clip-manifest.json','output-sha256.json']+[f'review/{n}.mp4' for n in names]+[f'review/{n}-{f:.2f}.png' for n in names for f in (0,.25,.5,.75,1)]+[f'review/turntable-{i:02}.png' for i in range(16)]
+    return ['binding-contract.json','bulwark-basecolor.png','bulwark-orm.png','bulwark-review.blend','bulwark-candidate.glb','bulwark-candidate.fbx','bulwark-animations.fbx','evaluated-validation.json','clip-manifest.json','output-sha256.json']+[f'review/{n}.mp4' for n in names]+[f'review/{n}-{f:.2f}.png' for n in names for f in (0,.25,.5,.75,1)]+[f'review/turntable-{i:02}.png' for i in range(16)]
 def main():
     ap=argparse.ArgumentParser(); ap.add_argument('--root',required=True); ap.add_argument('--phase',choices=['static','motion'],required=True); a=ap.parse_args()
     root=Path(a.root).resolve(); phase=a.phase
@@ -71,6 +71,8 @@ def main():
                 if name=='output-sha256.json':continue
                 if (src/name).is_file() and recorded.get(name)!=sha(src/name):errors.append('generator checksum mismatch '+name)
     except (OSError,ValueError,KeyError) as exc:errors.append('missing/invalid technical report: '+str(exc))
+    binding=json.loads((src/'binding-contract.json').read_text()) if (src/'binding-contract.json').is_file() else {}
+    if binding.get('failures') or binding.get('status')!='source_graph_checked_import_unverified':errors.append('invalid presentation binding contract')
     # Only explicit own sources/provenance/logs are bundled; no ref directory or broad source glob.
     shutil.copyfile(root/'provenance.json',dst/'provenance.json')
     shutil.copyfile(root/'blender-upstream.sha256',dst/'blender-upstream.sha256')

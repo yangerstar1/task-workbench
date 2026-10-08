@@ -1,5 +1,5 @@
 {
-  "candidate": "scrapyard-bulwark-v002",
+  "candidate": "scrapyard-bulwark-v003",
   "status": "source_only_unrendered_unapproved",
   "blender": "4.2.3",
   "unity": "6000.3.19f1",
@@ -45,7 +45,7 @@
     "walk_exceptions": "Returning home 2m/s or blocked tangent .6x requires speed synchronization; current runtime lacks parameterized playback",
     "timeout_note": "runtime uses attackClock > 1.2; clip must loop or motor/state transition requires tested bounded overrun handling"
   },
-  "gate_open_radians": 1.9198621771937625,
+  "gate_open_radians": 2.443460952792061,
   "fps_evidence": {
     "eye_height_m": 1.65,
     "vertical_fov_degrees": 60,
@@ -73,6 +73,41 @@
     "minimum_open_visible_samples": 8,
     "maximum_closed_visible_samples": 2,
     "minimum_open_visible_area_px": 64,
-    "minimum_open_visible_height_px": 8
+    "minimum_open_visible_height_px": 8,
+    "closed_front_angles_degrees": [
+      0,
+      45,
+      315
+    ]
+  },
+  "presentation_contract": {
+    "body_renderer": "Bulwark_Body",
+    "weak_point_root": "WeakPointAssembly",
+    "core_renderer": "Core_Renderer",
+    "material_slot": 0,
+    "plate_pivots": [
+      "ArmorPlate_L_Pivot",
+      "ArmorPlate_R_Pivot"
+    ],
+    "plate_renderers": [
+      "ArmorPlate_L_Renderer",
+      "ArmorPlate_R_Renderer"
+    ],
+    "unity_open_euler_intent": [
+      [
+        0,
+        0,
+        -140
+      ],
+      [
+        0,
+        0,
+        140
+      ]
+    ],
+    "animation_owner": "runtime_only_unkeyed_branch",
+    "renderer_budget": 4,
+    "material_budget": 2,
+    "fbx_model_animations": false
   }
 }

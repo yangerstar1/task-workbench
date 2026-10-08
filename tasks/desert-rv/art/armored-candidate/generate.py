@@ -9,6 +9,7 @@ from mathutils import Vector, Matrix
 HERE=Path(__file__).resolve().parent
 sys.path.insert(0,str(HERE))
 import motion
+import cavity_geometry
 from artifact_io import fresh_output
 P=json.loads((HERE/'parameters.json').read_text())
 p=argparse.ArgumentParser(); p.add_argument('--output',required=True); p.add_argument('--phase',choices=['static','motion'],required=True)
@@ -90,27 +91,25 @@ for s in (-1,1):
     loft('RamCuttingRidge',[(s*.37,-1.02,.63,.058,.06),(s*.40,-1.35,.51,.061,.05),(s*.37,-1.55,.45,.022,.022)],'ram',2,6)
     loft('EyeRecess',[(s*.44,-.89,.76,.10,.043),(s*.46,-1.03,.735,.085,.032)],'ram',7,8)
     loft('AmberEye',[(s*.473,-.92,.775,.025,.022),(s*.478,-1.005,.755,.025,.019)],'ram',4,8)
-def slab(name,outline,thickness,bone,tile,axis=(0,0,1)):
-    # Thin closed metal sheet, outlined in XYZ, thickness directed in Z.
-    verts=[(x+axis[0]*dz,y+axis[1]*dz,z+axis[2]*dz) for dz in (-thickness/2,thickness/2) for x,y,z in outline]; n=len(outline)
-    faces=[tuple(reversed(range(n))),tuple(n+i for i in range(n))]+[(i,(i+1)%n,(i+1)%n+n,i+n) for i in range(n)]
-    return mesh(name,verts,faces,bone,tile)
-# Raised rear organ sits ABOVE the old thorax. It is a recovery-state signal, not a
-# separate hitbox: current gameplay is whole-body vulnerability for two seconds.
-loft('RearVentSocket',[(0,.57,.84,.25,.06),(0,.83,.86,.36,.06),(0,1.13,.87,.32,.055)],'body',7,12)
-for dx in (-.205,0,.205):
-    loft('WeakpointTissue_'+str(dx),[(dx,.70,.985,.080,.085),(dx,.90,1.005,.100,.125),(dx,1.14,.995,.086,.105)],'body',4,12)
-for side,s in motion.SIDES:
-    # Front-mounted VERTICAL hinges swing doors laterally and forward; they cannot
-    # remain like the old awning directly over the tissue in a rear FPS sightline.
-    bn='gate.'+side
-    loft('HingedSideShield_'+side,[(s*.50,.38,.93,.040,.20),(s*.54,.76,.94,.050,.235),(s*.48,1.19,.93,.045,.22)],bn,1,8)
-    # Rear shutters meet with a small overlap, hiding the orange when closed.
-    # The top flange covers the bay in high/FPS views and moves away with the same hinge.
-    slab('RearShutter_'+side,[(s*-.015,1.19,.74),(s*.52,1.19,.74),(s*.52,1.19,1.175),(s*-.015,1.19,1.175)],.025,bn,1,axis=(0,1,0))
-    slab('HatchTopFlange_'+side,[(s*-.015,.54,1.18),(s*.51,.54,1.18),(s*.53,1.20,1.18),(s*-.015,1.20,1.18)],.032,bn,0)
-    strut('VerticalHinge_'+side,(s*.50,.38,.73),(s*.50,.38,1.17),.035,.035,bn,2,10)
-    for y in (.64,.94):strut('DoorRivet_'+side+str(y),(s*.57,y,.96),(s*.59,y,.96),.025,.025,bn,5,8)
+# Fitted posterior cavity: an oval closed rim with a real front wall and bottom.
+# No tall rectangular freight box, open front, exposed rods, or fake hit marker.
+verts,faces=cavity_geometry.bowl_wall(); mesh('ClosedCavityRim',verts,faces,'body',2)
+verts,faces=cavity_geometry.bowl_floor(); mesh('CavityBottom',verts,faces,'body',7)
+verts,faces=cavity_geometry.core_disk()
+core=mesh('Core_Renderer',verts,faces,'body',4); core['presentation_part']='core'
+core_closed=bpy.data.materials.new('Core_Closed'); core_closed.use_nodes=True
+core_closed.node_tree.nodes['Principled BSDF'].inputs['Base Color'].default_value=(.27,.095,.027,1)
+core_closed.node_tree.nodes['Principled BSDF'].inputs['Roughness'].default_value=.63
+core_open=core_closed.copy(); core_open.name='Core_Open'
+core_open.node_tree.nodes['Principled BSDF'].inputs['Base Color'].default_value=(.85,.255,.025,1)
+core_open.node_tree.nodes['Principled BSDF'].inputs['Emission Color'].default_value=(.12,.025,.002,1)
+core_open.node_tree.nodes['Principled BSDF'].inputs['Emission Strength'].default_value=1
+core.data.materials.clear(); core.data.materials.append(core_closed)
+plate_objects={}
+for side,sign in motion.SIDES:
+    # Two shallow curved half-shells continue the old overlapping dorsal silhouette.
+    verts,faces=cavity_geometry.cover(sign)
+    plate=mesh('ArmorPlate_'+side+'_Renderer',verts,faces,'body',1); plate['presentation_part']='plate'; plate_objects[side]=plate
 # Four wide load-bearing legs with contrasting recessed linkages and bevel-shaped greaves.
 rest={}
 for k in motion.LEGS:
@@ -130,17 +129,17 @@ def bone(n,h,t,parent=None):
     if parent:b.parent=rig.data.edit_bones[parent]
 bone('root',(0,0,0),(0,0,.2)); bone('body',(0,0,.69),(0,0,1.0),'root')
 bone('ram',(0,-.79,.66),(0,-1.15,.66),'body')
-for side,s in motion.SIDES: bone('gate.'+side,(s*.50,.38,.95),(s*.50,.38,1.15),'body')
 for k,(h,n,f) in rest.items():
     bone('upper.'+k,h,n,'body'); bone('lower.'+k,n,f,'upper.'+k); bone('foot.'+k,f,motion.add(f,(0,-.2,0)),'lower.'+k)
 bpy.ops.object.mode_set(mode='OBJECT')
-for o in assets:
+body_assets=[o for o in assets if not o.get('presentation_part')]
+for o in body_assets:
     o.parent=rig; g=o.vertex_groups.new(name=o['bone']); g.add(list(range(len(o.data.vertices))),1,'REPLACE'); mod=o.modifiers.new('Deform','ARMATURE'); mod.object=rig
 # One skinned renderer and one atlas material, not one draw call per armor fragment.
 bpy.ops.object.select_all(action='DESELECT')
-for o in assets:o.select_set(True)
-bpy.context.view_layer.objects.active=assets[0]; bpy.ops.object.join()
-combined=bpy.context.object; combined.name='Bulwark_OneAtlas_SkinnedMesh'; assets=[combined]
+for o in body_assets:o.select_set(True)
+bpy.context.view_layer.objects.active=body_assets[0]; bpy.ops.object.join()
+combined=bpy.context.object; combined.name='Bulwark_Body'; assets=[combined,core]+list(plate_objects.values())
 # Joining same-material objects can retain duplicate material slots; remap deterministically.
 for poly in combined.data.polygons:poly.material_index=0
 while len(combined.data.materials)>1:combined.data.materials.pop(index=len(combined.data.materials)-1)
@@ -148,13 +147,30 @@ sole_indices={k:[] for k in motion.LEGS}
 for k in motion.LEGS:
     gi=combined.vertex_groups['foot.'+k].index
     sole_indices[k]=[v.index for v in combined.data.vertices if any(g.group==gi and g.weight>.99 for g in v.groups)]
+# Dedicated unkeyed presentation branch, carrier body bone may move the whole assembly.
+assembly=bpy.data.objects.new('WeakPointAssembly',None); scene.collection.objects.link(assembly)
+assembly.parent=rig; assembly.parent_type='BONE'; assembly.parent_bone='body'; bpy.context.view_layer.update(); assembly.matrix_world=Matrix.Identity(4)
+core.parent=assembly; core.matrix_world=Matrix.Identity(4)
+pivots={}
+for side,sign in motion.SIDES:
+    pivot=bpy.data.objects.new('ArmorPlate_'+side+'_Pivot',None); scene.collection.objects.link(pivot); pivot.parent=assembly; pivot.location=(sign*.48,.78,.86)
+    pivot.rotation_mode='XYZ'; plate=plate_objects[side]; plate.parent=pivot
+    plate.matrix_parent_inverse=Matrix.Identity(4); plate.location=-pivot.location
+    pivots[side]=pivot
+presentation_nodes=[assembly]+list(pivots.values())
+def set_presentation(exposed):
+    # Review-only emulation of WeakPointExposed. Never insert animation keys here.
+    core.data.materials[0]=core_open if exposed else core_closed
+    for side,sign in motion.SIDES:pivots[side].rotation_euler=(0,sign*P['gate_open_radians'] if exposed else 0,0)
+    bpy.context.view_layer.update()
+set_presentation(False)
 for pb in rig.pose.bones: pb.rotation_mode='QUATERNION'
 rest_matrices={b.name:b.matrix_local.copy() for b in rig.data.bones}
 def translate(z): return Matrix.Translation((0,0,z))
 def apply_pose(pose):
     rig.pose.bones['root'].matrix=rest_matrices['root']; z=pose['z']
     rig.pose.bones['body'].matrix=translate(z)@rest_matrices['body']; bpy.context.view_layer.update()
-    for name,angle,axis in [('ram',pose['ram'],'X')]+[('gate.'+side,-s*pose['gate'],'Z') for side,s in motion.SIDES]:
+    for name,angle,axis in [('ram',pose['ram'],'X')]:
         pivot=rest_matrices[name].translation
         rig.pose.bones[name].matrix=translate(z)@Matrix.Translation(pivot)@Matrix.Rotation(angle,4,axis)@Matrix.Translation(-pivot)@rest_matrices[name]
     for k in motion.LEGS:
@@ -167,6 +183,7 @@ def apply_pose(pose):
             bpy.context.view_layer.update()
         m=rest_matrices['foot.'+k].copy(); m.translation=f; rig.pose.bones['foot.'+k].matrix=m
     bpy.context.view_layer.update()
+exec(compile((HERE/'binding_contract.py').read_text(),str(HERE/'binding_contract.py'),'exec'))
 # Neutral studio only. No private source image enters any generated output.
 scene.render.engine='CYCLES'; scene.cycles.samples=24; scene.cycles.use_denoising=True; scene.view_settings.view_transform='AgX'; scene.world.color=(.18,.18,.18)
 scene.render.resolution_x=960; scene.render.resolution_y=540; scene.render.resolution_percentage=100
@@ -184,12 +201,13 @@ def bounds():
     for obj in assets:
         ob=obj.evaluated_get(deps); me=ob.to_mesh(); verts.extend(ob.matrix_world@v.co for v in me.vertices); ob.to_mesh_clear()
     return verts
-def validate_frame(label):
+def validate_frame(label,require_full_body=True):
     vs=bounds(); min_z=min(v.z for v in vs); clip=[world_to_camera_view(scene,cam,v) for v in vs]
     errors=[]
     if min_z< -P['floor_penetration_limit_m']: errors.append('floor penetration')
-    if any(v.z<=0 or min(v.x,v.y)<.035 or max(v.x,v.y)>.965 for v in clip): errors.append('camera clipping')
-    return {'errors':errors,'label':label,'min_z':min_z,'screen_min':[min(v.x for v in clip),min(v.y for v in clip)],'screen_max':[max(v.x for v in clip),max(v.y for v in clip)]}
+    body_clipped=any(v.z<=0 or min(v.x,v.y)<.035 or max(v.x,v.y)>.965 for v in clip)
+    if require_full_body and body_clipped: errors.append('camera clipping')
+    return {'errors':errors,'whole_body_clipped_diagnostic':body_clipped,'whole_body_required':require_full_body,'label':label,'min_z':min_z,'screen_min':[min(v.x for v in clip),min(v.y for v in clip)],'screen_max':[max(v.x for v in clip),max(v.y for v in clip)]}
 def still(path):
     scene.render.image_settings.file_format='PNG'; scene.render.filepath=str(path); bpy.ops.render.render(write_still=True)
 apply_pose(motion.sample('Idle',0)); camera(0)
@@ -198,7 +216,7 @@ if args.phase=='static':
     checks=[]
     for i in range(8):
         camera(math.tau*i/8); checks.append(validate_frame('static-'+str(i))); still(review/f'static-{i:02}.png')
-    apply_pose(motion.sample('Recover',0)); camera(math.pi*.68); checks.append(validate_frame('open-weakpoint')); still(review/'static-weakpoint-open.png')
+    apply_pose(motion.sample('Recover',0)); set_presentation(True); camera(math.pi*.68); checks.append(validate_frame('open-weakpoint')); still(review/'static-weakpoint-open.png')
     bpy.ops.wm.save_as_mainfile(filepath=str(OUT/'bulwark-static-review.blend'))
     exec(compile((HERE/'fps_evidence.py').read_text(),str(HERE/'fps_evidence.py'),'exec'))
     (OUT/'static-checks.json').write_text(json.dumps(checks,indent=2)); sys.exit(1 if any(c['errors'] for c in checks) else 0)

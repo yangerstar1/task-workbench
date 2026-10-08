@@ -9,21 +9,23 @@ cam.data.sensor_fit='HORIZONTAL'; aspect=scene.render.resolution_x/scene.render.
 cam.data.angle=2*math.atan(math.tan(math.radians(F['vertical_fov_degrees'])/2)*aspect)
 viewpoints=[(a,d) for a in F['rear_angles_degrees'] for d in F['distances_m']]+[(a,F['side_boundary_distance_m']) for a in F['side_boundary_angles_degrees']]
 states=[('closed','Idle',0)]+[(f'recover-{t:.2f}','Recover',t) for t in F['recover_seconds']]
+viewpoints += [(a,4) for a in F['closed_front_angles_degrees']]
 for angle,distance in viewpoints:
     a=math.radians(angle)
     # Identical physical viewpoint and aim point for every state in this pair/group.
     cam.location=(distance*math.sin(a),-distance*math.cos(a),eye)
     cam.rotation_euler=(Vector((0,.75,.85))-cam.location).to_track_quat('-Z','Y').to_euler()
-    for state,clip,t in states:
-        apply_pose(motion.sample(clip,t)); bpy.context.view_layer.update()
-        label=f'fps-{angle:03d}-{distance}m-{state}'; row=validate_frame(label)
+    for state,clip,t in (states[:1] if angle in F['closed_front_angles_degrees'] else states):
+        apply_pose(motion.sample(clip,t)); set_presentation(clip=='Recover'); bpy.context.view_layer.update()
+        label=f'fps-{angle:03d}-{distance}m-{state}'; row=validate_frame(label,require_full_body=False)
         # Ray-grid in the projection of the actual tagged tissue geometry. The
         # nearest evaluated surface must be tagged tissue, so doors/body occlude it.
-        deps=bpy.context.evaluated_depsgraph_get(); obj=combined.evaluated_get(deps); me=obj.to_mesh()
+        deps=bpy.context.evaluated_depsgraph_get(); obj=core.evaluated_get(deps); me=obj.to_mesh()
         tag=me.attributes.get('weakpoint_face')
-        if tag is None:raise RuntimeError('Weakpoint face evidence attribute lost on join/evaluation')
-        points=[obj.matrix_world@me.vertices[i].co for poly in me.polygons if tag.data[poly.index].value for i in poly.vertices]
+        if tag is None:raise RuntimeError('Core evidence attribute missing')
+        points=[obj.matrix_world@me.vertices[i].co for poly in me.polygons  for i in poly.vertices]
         projected=[world_to_camera_view(scene,cam,v) for v in points]
+        if any(v.z<=0 or min(v.x,v.y)<.035 or max(v.x,v.y)>.965 for v in projected):row['errors'].append('core target outside safe viewport')
         xmin=max(0,min(v.x for v in projected)); xmax=min(1,max(v.x for v in projected)); ymin=max(0,min(v.y for v in projected)); ymax=min(1,max(v.y for v in projected))
         frame=cam.data.view_frame(scene=scene); local_min=Vector((min(v.x for v in frame),min(v.y for v in frame),frame[0].z)); local_max=Vector((max(v.x for v in frame),max(v.y for v in frame),frame[0].z))
         visible=[]; grid_x=32; grid_y=24
@@ -33,7 +35,7 @@ for angle,distance in viewpoints:
                 local=Vector((local_min.x+(local_max.x-local_min.x)*u,local_min.y+(local_max.y-local_min.y)*v,local_min.z))
                 direction=(cam.matrix_world.to_3x3()@local).normalized()
                 hit,loc,normal,index,hit_obj,_=scene.ray_cast(deps,cam.location,direction,distance=20)
-                if hit and hit_obj.original==combined and index>=0 and tag.data[index].value:visible.append((u,v))
+                if hit and hit_obj.original==core and index>=0:visible.append((u,v))
         obj.to_mesh_clear()
         if state=='closed' and len(visible)>F['maximum_closed_visible_samples']:row['errors'].append('closed armor leaks visible tissue')
         if state!='closed' and len(visible)<F['minimum_open_visible_samples']:row['errors'].append('open bay insufficient visible ray samples')

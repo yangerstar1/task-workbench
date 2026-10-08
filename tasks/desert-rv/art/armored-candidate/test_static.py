@@ -1,4 +1,6 @@
 """Runs with standard Python only. Does not import bpy, execute Blender, or validate appearance."""
+from collections import Counter
+import cavity_geometry
 import ast, hashlib, json, math, unittest, tempfile
 from artifact_io import fresh_output
 from pathlib import Path
@@ -101,10 +103,27 @@ class SourceTests(unittest.TestCase):
         from evidence_layout import fps_files
         f=P['fps_evidence']; self.assertEqual(f['eye_height_m'],1.65); self.assertEqual(f['distances_m'],[2,4,6])
         self.assertEqual(f['gameplay_rule'],'whole_body_vulnerable_during_recover_no_directional_hit_cone')
-        self.assertEqual(len(fps_files(P)),44); self.assertEqual(len(set(fps_files(P))),44)
+        self.assertEqual(len(fps_files(P)),47); self.assertEqual(len(set(fps_files(P))),47)
         self.assertEqual(f['recover_seconds'],[0,1,1.95]); self.assertGreater(P['gate_open_radians'],math.pi/2)
         text=(HERE/'generate.py').read_text(); self.assertNotIn('math.sin(x',text)
-        self.assertIn("'gate.'+side,-s*pose['gate'],'Z'",text)
+        self.assertNotIn("bone('gate.'",text)
+    def test_shared_cavity_topology(self):
+        for verts,faces in (cavity_geometry.bowl_wall(),cavity_geometry.bowl_floor(),cavity_geometry.core_disk(),cavity_geometry.cover(1),cavity_geometry.cover(-1)):
+            edges=Counter(tuple(sorted((a,b))) for face in faces for a,b in zip(face,face[1:]+face[:1]))
+            self.assertTrue(all(count==2 for count in edges.values()),edges)
+            self.assertTrue(all(0<=i<len(verts) for face in faces for i in face))
+        wall,_=cavity_geometry.bowl_wall(); floor,_=cavity_geometry.bowl_floor()
+        # The full outer bottom ring shares the floor top, closing front/side/rear underside.
+        for a,b in zip(wall[96:128],floor[:32]):self.assertEqual(a,b)
+        self.assertLessEqual(max(v[2] for v in cavity_geometry.cover(1)[0]),1.05)
+    def test_presentation_ownership_contract(self):
+        c=P['presentation_contract']; self.assertEqual(c['material_slot'],0); self.assertEqual(len(c['plate_pivots']),2)
+        self.assertEqual(c['animation_owner'],'runtime_only_unkeyed_branch')
+        source=(HERE/'generate.py').read_text(); begin=source.index('def set_presentation'); end=source.index('set_presentation(False)',begin)
+        self.assertNotIn('keyframe_insert',source[begin:end]); self.assertNotIn("bone('gate.",source)
+        self.assertIn('require_full_body=False',(HERE/'fps_evidence.py').read_text())
+        self.assertIn('core target outside safe viewport',(HERE/'fps_evidence.py').read_text())
+        self.assertIn('bake_anim=False',(HERE/'animate.py').read_text())
     def test_source_manifest(self):
         manifest=json.loads((HERE/'source-manifest.json').read_text())
         for name,digest in manifest['sha256'].items(): self.assertEqual(hashlib.sha256((HERE/name).read_bytes()).hexdigest(),digest)

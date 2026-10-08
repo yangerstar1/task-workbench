@@ -1,21 +1,23 @@
 {
-  "candidate": "scrapyard-bulwark-v002",
+  "candidate": "scrapyard-bulwark-v003",
   "status": "source_only_unrendered_unapproved",
   "source_origin": "original procedural authorship",
   "third_party_assets": [],
   "sha256": {
-    "README.md": "099a0623b6183e1234a59661d1140db2718e31f38d722d557473a6a1fe2aec20",
-    "parameters.json": "02913316f01fafbe2c14d10f944dabb83276d67baf8ab8ff9c4d879f2714c376",
+    "README.md": "67fa070d2fe8b257afcba37a544343833f60f67bb1cc3c632bb3e3a3cc6308ed",
+    "parameters.json": "6e7bd9eea7a5d18b9afd87ac290ebccd5e1b204d314924628da11e61f4237287",
     "motion.py": "2852443caff1767545e204fdab3d2dd132d14d398e6217009364dc42bcc8416c",
-    "generate.py": "7d6c909caa11b469ed8f1ee972b5435a191c3709478763e3ff3c5f0ad2ed9eb5",
-    "animate.py": "39e194f4c52c3d4ac3ffaa620da6fccbce3d27669c11f8168ab10961c2e42f22",
-    "test_static.py": "acc1966c677c7b9de578873fd930a374b22092498c6919ecc760f30cb05a76dd",
+    "generate.py": "f2fa475c2a968acba9e318436f8e9dd48e940c4b15f35cf7727af10986f32ee3",
+    "animate.py": "159564c94eb0780bba0d0638d415aaa6e4e6a0a9b5f0ee3a98e6d3066563e339",
+    "test_static.py": "ff32b5b6deb6e4fb3530febfb2b573091206bf8f0553c2c143863dfeec446a55",
     "artifact_io.py": "3a088520d8162c1beaa2c4fcf32275f8041e05db323344b1d82a1b263787a144",
     "validate_runtime_contract.py": "a2d91b8bc8f947168778cfc4f9ffc4fbc3e92cb6e8a68b7e7131bad3c8d106da",
-    "package_evidence.py": "6ada47fe1f26f58eec1a32c16fe7e54767fc342260fe14b171a82f2f99cd39bc",
+    "package_evidence.py": "d755caf2cd1b584a54183bf3bde0c5b21ac2cf16d668842266b9c005f1346e63",
     "write_provenance.py": "af2c297a8dfeacdc85833b9d1d2b1daa58ee355b494594272643159d15e088ea",
-    "test_pipeline.py": "9f08e87413c21905de00e112e72ff823aa559786fcd0fbc0ffe375f643cc03eb",
-    "fps_evidence.py": "1f8b3b3cded1466cf5089e4a2357d985140c3d9de92c84afa858771368879e5b",
-    "evidence_layout.py": "023baa909e5379b598775fc7533dc5b035370a4d47bc9251e4ae351d970d58ef"
+    "test_pipeline.py": "67b7573118165929464503b5bb54695fdf19cfecc07bc5894c8392874cdcba14",
+    "fps_evidence.py": "f336fd58a9726e14d03810e3e784aed518be1d0d3b2be56fa424eead66ccac14",
+    "evidence_layout.py": "6f4e1d32cc0f7c872697b8ccf5b789a2b16846bd11f2c51d243dd2c912e9214c",
+    "binding_contract.py": "c9eea0fa52490b47c3d36fc8df2b9662da67326755c5a932ca1704a16e360ff9",
+    "cavity_geometry.py": "c58030b6b9f77b9cacf5c944c816a5918484c4da49c1d9d877dfb36bba7a18d3"
   }
 }
