@@ -1,5 +1,19 @@
 # Desert RV CI proof
 
+## Verified run: 2026-10-08
+
+The [first Actions run](https://github.com/yangerstar1/task-workbench/actions/runs/37761201389)
+passed all four native tests and built the ARM64 IL2CPP APK from commit
+`b63d73cdf8dc1fe6cd91a8f7b53acb9acd2b45b4`. Downloaded bytes, receipts and
+AArch64 ELF headers were independently verified. The reviewed outputs are archived
+in [unity-proof-v0.0.1](https://github.com/yangerstar1/task-workbench/releases/tag/unity-proof-v0.0.1).
+This archival was explicit, not an automatic step of the read-only workflow below.
+The development APK has not been installed or device-tested and is not a finished game.
+Both disposable CI jobs used repository secrets without another interactive login;
+no indefinite authentication guarantee is implied.
+
+## Original proof scope
+
 An original, disposable Unity **6000.3.19f1** project that tests the free,
 standard GitHub-hosted Ubuntu → GameCI → Android path. It contains no Desert RV
 game source, models, textures, audio, recovered data, or credentials.
