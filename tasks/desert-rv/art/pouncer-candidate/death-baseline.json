@@ -7,7 +7,17 @@
   "blend_sha256": "68c9b7f4af17d3e02b585b2d709ccced5a18815a364a2e4ec3c9ee2d37a309a4",
   "definition_change": "Authorized after numerical proof: proximal shoulder/hip muscle surfaces may be upper-limb weighted. The former >=60% trunk-only rule excluded real shoulder bulk and forced it through the floor. Global 4mm penetration tolerance is unchanged.",
   "extra_global_pitch_degrees": -5.0,
-  "neck_local_delta_x_radians": 0.10,
+  "neck_local_delta_x_radians": 0.1,
   "neck_local_delta_z_radians": -0.55,
-  "scope": "DEATH_TECHNICAL_FIRST_NOT_FULL"
+  "scope": "DEATH_TECHNICAL_FIRST_NOT_FULL",
+  "continuous_control_times": [
+    0,
+    0.3,
+    0.6,
+    0.9,
+    1.2,
+    1.44,
+    1.8
+  ],
+  "path_revision": "synchronized_short_arc_pre_contact_v2"
 }

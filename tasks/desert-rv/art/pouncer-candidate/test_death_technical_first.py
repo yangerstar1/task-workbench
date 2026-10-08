@@ -35,4 +35,17 @@ class TechnicalFirst(unittest.TestCase):
         s=(H/'death_repose.py').read_text();p=json.loads((H/'parameters.json').read_text())
         self.assertEqual(p['clips']['Death'],1.8);self.assertEqual(p['fps'],100)
         self.assertIn("worst['z']<-.004",s);self.assertIn('range(361)',s);self.assertIn('if max(roots)>1e-6',s)
+    def test_continuous_joint_path_precedes_contact(self):
+        b=json.loads((H/'death-baseline.json').read_text());times=b['continuous_control_times']
+        self.assertEqual(times,sorted(set(times)));self.assertEqual(times[0],0);self.assertEqual(times[-1],1.8)
+        source=(H/'death_repose.py').read_text()
+        self.assertLess(source.index('controls.append'),source.index('physical_support_translation_z'))
+        self.assertIn("quat.to_euler('XYZ',old_euler)",source);self.assertIn('q1.make_compatible(q0)',source)
+    def test_native_and_both_serialized_gates_are_required(self):
+        source=(H/'death_repose.py').read_text();verify=(H/'verify_serialized_death.py').read_text()
+        self.assertIn('DEATH_NATIVE_SOURCE_PASS_PENDING_IMPORTS',source)
+        self.assertIn("bpy.ops.import_scene.gltf",verify);self.assertIn('bpy.ops.import_scene.fbx',verify)
+        self.assertIn("=={'glb','fbx'}",verify);self.assertIn('range(361)',verify)
+        workflow=(H.parents[3]/'.github/workflows/desert-rv-pouncer-art.yml').read_text()
+        self.assertIn("steps.glb_import.outcome == 'success'",workflow);self.assertIn("steps.fbx_import.outcome == 'success'",workflow)
 if __name__=='__main__':unittest.main()

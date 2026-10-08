@@ -69,6 +69,16 @@ jobs:
           printf '%s\n' "$GITHUB_SHA" > output/pouncer-candidate/source-commit.txt
           cp tasks/desert-rv/art/pouncer-candidate/death-baseline.json output/pouncer-candidate/
           blender --background --factory-startup --threads 4 --python-exit-code 1 --python tasks/desert-rv/art/pouncer-candidate/death_repose.py -- --phase technical --input baseline/pouncer-candidate.blend --output output/pouncer-candidate
+      - name: Reimport actual GLB and sample all Death meshes at200Hz
+        id: glb_import
+        if: always() && steps.technical.outcome == 'success'
+        timeout-minutes: 5
+        run: blender --background --factory-startup --threads 4 --python-exit-code 1 --python tasks/desert-rv/art/pouncer-candidate/verify_serialized_death.py -- --format glb --output output/pouncer-candidate
+      - name: Independently reimport actual FBX and sample all Death meshes at200Hz
+        id: fbx_import
+        if: always() && steps.technical.outcome == 'success'
+        timeout-minutes: 5
+        run: blender --background --factory-startup --threads 4 --python-exit-code 1 --python tasks/desert-rv/art/pouncer-candidate/verify_serialized_death.py -- --format fbx --output output/pouncer-candidate
       - name: Hash native technical output, including failure reports
         if: always()
         run: python3 tasks/desert-rv/art/pouncer-candidate/package_technical_first.py output/pouncer-candidate technical
@@ -88,7 +98,7 @@ jobs:
           retention-days: 30
       - name: Exactly four opaque stills of the exact passing native candidate
         id: opaque
-        if: success() && inputs.render_after_pass && steps.technical.outcome == 'success'
+        if: success() && inputs.render_after_pass && steps.technical.outcome == 'success' && steps.glb_import.outcome == 'success' && steps.fbx_import.outcome == 'success'
         timeout-minutes: 8
         run: |
           blender --background --factory-startup --threads 4 --python-exit-code 1 --python tasks/desert-rv/art/pouncer-candidate/death_repose.py -- --phase opaque --input output/pouncer-candidate/pouncer-candidate.blend --output output/pouncer-candidate

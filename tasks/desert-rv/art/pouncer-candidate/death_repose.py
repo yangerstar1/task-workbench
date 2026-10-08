@@ -49,18 +49,52 @@ def evaluated():
         ev.to_mesh_clear()
     return low,body_coords
 
-def write_pose_key(action,frame,basis):
+def write_pose_key(action,frame,basis,previous,branch_audit):
     rig.animation_data.action=action
     for pb in rig.pose.bones:
-        pb.rotation_mode='XYZ';pb.matrix_basis=basis[pb.name]
+        loc,quat,scale=basis[pb.name].decompose();pb.rotation_mode='XYZ'
+        raw=quat.to_euler('XYZ')
+        if pb.name in previous:
+            old_euler,old_quat=previous[pb.name];quat.make_compatible(old_quat)
+            chosen=quat.to_euler('XYZ',old_euler)
+            row=branch_audit.setdefault(pb.name,{'max_raw_euler_step_degrees':0,'max_compatible_euler_step_degrees':0,'max_short_arc_quaternion_step_degrees':0,'large_raw_branch_events':[]})
+            raw_step=max(abs(raw[i]-old_euler[i]) for i in range(3));compatible_step=max(abs(chosen[i]-old_euler[i]) for i in range(3))
+            row['max_raw_euler_step_degrees']=max(row['max_raw_euler_step_degrees'],math.degrees(raw_step))
+            row['max_compatible_euler_step_degrees']=max(row['max_compatible_euler_step_degrees'],math.degrees(compatible_step))
+            row['max_short_arc_quaternion_step_degrees']=max(row['max_short_arc_quaternion_step_degrees'],math.degrees(quat.rotation_difference(old_quat).angle))
+            if raw_step>math.pi/2:row['large_raw_branch_events'].append({'frame':frame,'raw_xyz':list(raw),'compatible_xyz':list(chosen),'previous_xyz':list(old_euler)})
+        else:chosen=raw
+        pb.location=loc;pb.rotation_euler=chosen;pb.scale=scale
+        previous[pb.name]=(chosen.copy(),quat.copy())
         for path in ('location','rotation_euler','scale'):pb.keyframe_insert(path,frame=frame,group=pb.name)
+
+def audit_transform_samples(action,times):
+    result=[];rig.animation_data.action=action
+    for time in times:
+        frame=1+time*100;scene.frame_set(int(frame),subframe=frame-int(frame));low,_=evaluated()
+        result.append({'seconds':time,'minimum':low,'bones':{pb.name:{'location':list(pb.location),'euler_xyz':list(pb.rotation_euler),'quaternion':list(pb.rotation_euler.to_quaternion()),'scale':list(pb.scale),'matrix_basis':[list(row) for row in pb.matrix_basis]} for pb in rig.pose.bones}})
+    return result
 
 if args.phase=='technical':
     geometry_before=geometry_hash();other_before={n:action_hash(bpy.data.actions[n]) for n in P['clips'] if n!='Death'}
     original=bpy.data.actions['Death'];poses=[];placement=[];end=181
+    audit_times=(.81,.815,.82,1.26,1.27,1.275,1.28,1.285,1.29,1.30)
+    baseline_audit=audit_transform_samples(original,audit_times)
+    # Capture sparse coherent poses, not the old per-frame search's unrelated solutions.
+    # Interpolate all joints synchronously BEFORE contact placement, never smooth an
+    # already-grounded output curve and hope it remains above the floor.
+    times=BASE['continuous_control_times'];controls=[]
+    for time in times:
+        rig.animation_data.action=original;scene.frame_set(1+round(time*100))
+        controls.append({pb.name:pb.matrix_basis.decompose() for pb in rig.pose.bones})
+    rig.animation_data.action=None
     for frame in range(1,end+1):
-        rig.animation_data.action=original;scene.frame_set(frame);basis={pb.name:pb.matrix_basis.copy() for pb in rig.pose.bones};rig.animation_data.action=None
-        for pb in rig.pose.bones:pb.matrix_basis=basis[pb.name]
+        time=(frame-1)/100
+        segment=next((i for i in range(len(times)-1) if times[i]<=time<times[i+1]),len(times)-2)
+        fraction=max(0,min(1,(time-times[segment])/(times[segment+1]-times[segment])));weight=fraction*fraction*(3-2*fraction)
+        for pb in rig.pose.bones:
+            l0,q0,s0=controls[segment][pb.name];l1,q1,s1=controls[segment+1][pb.name];q1=q1.copy();q1.make_compatible(q0)
+            pb.matrix_basis=Matrix.LocRotScale(l0.lerp(l1,weight),q0.slerp(q1,weight),s0.lerp(s1,weight))
         u=(frame-1)/(end-1);t=max(0,min(1,(u-.10)/.70));q=t*t*(3-2*t)
         neck=rig.pose.bones['neck'];nq=neck.rotation_euler.to_quaternion() @ Quaternion((1,0,0),BASE['neck_local_delta_x_radians']*q) @ Quaternion((0,0,1),BASE['neck_local_delta_z_radians']*q);neck.rotation_euler=nq.to_euler('XYZ')
         bpy.context.view_layer.update()
@@ -76,7 +110,8 @@ if args.phase=='technical':
         pb.matrix_basis=pb.bone.matrix_local.inverted()@pb.parent.bone.matrix_local@pb.parent.matrix.inverted()@desired
         bpy.context.view_layer.update();poses.append({bone.name:bone.matrix_basis.copy() for bone in rig.pose.bones});placement.append({'seconds':(frame-1)/100,'extra_pitch_degrees':BASE['extra_global_pitch_degrees']*q,'physical_support_translation_z':dz,'visual_world_origin':list(pb.matrix.translation)})
     original.name='RetiredBaselineDeath';new=bpy.data.actions.new('Death');new.use_fake_user=True
-    for frame,basis in enumerate(poses,1):write_pose_key(new,frame,basis)
+    previous={};branch_audit={}
+    for frame,basis in enumerate(poses,1):write_pose_key(new,frame,basis,previous,branch_audit)
     for fc in new.fcurves:
         for k in fc.keyframe_points:k.interpolation='LINEAR'
     for track in rig.animation_data.nla_tracks:
@@ -84,6 +119,9 @@ if args.phase=='technical':
             for strip in list(track.strips):track.strips.remove(strip)
             track.strips.new('Death',1,new);track.mute=True
     rig.animation_data.action=new;bpy.data.actions.remove(original)
+    candidate_audit=audit_transform_samples(new,audit_times)
+    (OUT/'rotation-branch-audit.json').write_text(json.dumps(branch_audit,indent=2))
+    (OUT/'critical-transform-audit.json').write_text(json.dumps({'baseline':baseline_audit,'continuous_candidate':candidate_audit},indent=2))
     rows=[];roots=[]
     # Re-evaluate baked poses at 200 Hz, including mid-keyframe samples.
     for sample in range(361):
@@ -117,7 +155,7 @@ if args.phase=='technical':
     rig.animation_data.action=None
     bpy.ops.export_scene.gltf(filepath=str(OUT/'pouncer-candidate.glb'),export_format='GLB',use_selection=True,export_animation_mode='NLA_TRACKS',export_nla_strips=True,export_anim_slide_to_zero=True,export_yup=True)
     for track in rig.animation_data.nla_tracks:track.mute=True
-    bpy.ops.export_scene.fbx(filepath=str(OUT/'pouncer-candidate.fbx'),use_selection=True,add_leaf_bones=False,bake_anim=True,bake_anim_use_all_actions=True,bake_anim_use_nla_strips=False,axis_forward='-Z',axis_up='Y',path_mode='COPY',embed_textures=True)
+    bpy.ops.export_scene.fbx(filepath=str(OUT/'pouncer-candidate.fbx'),use_selection=True,add_leaf_bones=False,bake_anim=True,bake_anim_use_all_actions=True,bake_anim_use_nla_strips=False,bake_anim_simplify_factor=0.0,axis_forward='-Z',axis_up='Y',path_mode='COPY',embed_textures=True)
     for name in P['clips']:
         for fc in bpy.data.actions[name].fcurves:
             for k in fc.keyframe_points:k.co.x+=1;k.handle_left.x+=1;k.handle_right.x+=1
@@ -130,7 +168,7 @@ if args.phase=='technical':
             if name not in times or abs(times[name]['start'])>1e-6 or abs(times[name]['end']-duration)>1e-6:errors.append(format+' '+name+' timing mismatch')
     rig.animation_data.action=new;scene.frame_set(181)
     bpy.ops.wm.save_as_mainfile(filepath=str(OUT/'pouncer-candidate.blend'))
-    report={'scope':'DEATH_TECHNICAL_FIRST_NOT_FULL','status':'DEATH_TECHNICAL_PASS_NOT_FULL' if not errors else 'DEATH_TECHNICAL_FAIL','errors':errors,'visual_review':'NOT_RUN','visual_approval':False,'definition_change':BASE['definition_change'],'baseline':BASE,'geometry_weights_rig_unchanged':geometry_before==geometry_hash(),'non_death_actions_unchanged':other_before=={n:action_hash(bpy.data.actions[n]) for n in other_before},'maximum_penetration_m':max(0,-worst['z']),'worst_sample':worst,'end_minimum_z':rows[-1]['z'],'support_regions':patches,'former_trunk_only_filter_reported_not_used':former_filter_report,'max_visual_translation_per10ms':max_step,'final_hold_error':hold,'serialized_times':serialized,'candidate_blend_sha256':hashlib.sha256((OUT/'pouncer-candidate.blend').read_bytes()).hexdigest()}
+    report={'scope':'DEATH_TECHNICAL_FIRST_NOT_FULL','status':'DEATH_NATIVE_SOURCE_PASS_PENDING_IMPORTS' if not errors else 'DEATH_TECHNICAL_FAIL','errors':errors,'source_native_pass':not errors,'visual_review':'NOT_RUN','visual_approval':False,'definition_change':BASE['definition_change'],'baseline':BASE,'geometry_weights_rig_unchanged':geometry_before==geometry_hash(),'non_death_actions_unchanged':other_before=={n:action_hash(bpy.data.actions[n]) for n in other_before},'maximum_penetration_m':max(0,-worst['z']),'worst_sample':worst,'end_minimum_z':rows[-1]['z'],'support_regions':patches,'former_trunk_only_filter_reported_not_used':former_filter_report,'max_visual_translation_per10ms':max_step,'final_hold_error':hold,'serialized_times':serialized,'candidate_blend_sha256':hashlib.sha256((OUT/'pouncer-candidate.blend').read_bytes()).hexdigest()}
     (OUT/'technical-gate.json').write_text(json.dumps(report,indent=2));(OUT/'death-200hz-samples.json').write_text(json.dumps(rows,indent=2));(OUT/'death-placement.json').write_text(json.dumps(placement,indent=2))
     print(json.dumps({'status':report['status'],'maximum_penetration_m':report['maximum_penetration_m'],'worst_seconds':worst['seconds'],'errors':errors}),flush=True)
     if errors:raise RuntimeError('; '.join(errors))

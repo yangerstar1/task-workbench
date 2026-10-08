@@ -1,3 +1,15 @@
+# Death continuity correction: shared joint path and explicit rotation branches
+
+The first technical-first run correctly refused to render. It found a 477.7mm hind-paw plunge at a half-keyframe and a genuine 74.83mm rigid translation jump in10ms. The same exported GLB at1.275s, using shortest-arc quaternion interpolation, is only -2.58mm; its100Hz endpoints are near+1mm. This exposes a native rotation-representation/interpolation problem, separate from the real18.52-degree visual-body and19.64-degree hind-hip jumps between1.27 and1.28s inherited from unrelated per-frame search outcomes.
+
+This revision does not smooth an already-grounded result or add a large global lift. It constructs one synchronized local joint path from coherent baseline control poses at0,.30,.60,.90,1.20,1.44,1.80s, using hemisphere-compatible shortest-arc quaternion interpolation and a shared continuous blend parameter. Actual all-mesh contact placement happens AFTER that joint path is evaluated. A read-only FK probe predicted a maximum11.18mm translation per10ms, below the unchanged30mm limit; this remains mathematical evidence, not native approval.
+
+When baking, each quaternion is converted to XYZ Euler using the previous frame's compatible Euler representation explicitly, rather than allowing independent matrix decomposition branches. Native audit files record raw versus compatible branch changes and full local transforms around0.81–0.82 and1.27–1.29s. Gameplay root,1.8s duration,4mm penetration limit, new physically correct anatomical support definition and protected non-Death actions remain unchanged.
+
+The gate is now three-way: the authored .blend at200Hz, a clean native import of actual GLB at200Hz, and an independent clean native import of actual FBX at200Hz. A native-source pass is only PENDING_IMPORTS until both serialized imports pass. All three report worst depth and time. Any failure blocks every image; only the exact final passing candidate can render the same four opaque stills. No other visual scope has been added.
+
+---
+
 # Death technical-first: physically correct proximal anatomy
 
 This entry point supersedes the earlier iterative Death render loop below. It uses the exact already-examined native baseline from run 37844163484, artifact 11579478380, pinned by source SHA and blend SHA256 in death-baseline.json. No new sculpt, external mesh, weights, materials or other action is created or changed. Baseline expiry/mismatch is a hard blocker, not permission to substitute another file.
