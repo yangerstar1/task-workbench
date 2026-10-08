@@ -111,7 +111,7 @@ def glove(side,center):
    for j in range(5):
     r=radii[k]*(1-.10*j/4); bits.append(ellipsoid(a.lerp(b,j/4),(r,r*.92,r*.96)))
  # Distinct thumb emerges above the palm across a visible web-space.
- path=[c+Vector((s*.045,-.022,.018)),c+Vector((s*.035,-.035,.045)),c+Vector((-s*.002,-.020,.039))]
+ path=[c+Vector((s*.045,-.022,.018)),c+Vector((s*.032,-.029,.037)),c+Vector((-s*.012,.014,.030))] if side=='L' else [c+Vector((s*.045,-.022,.018)),c+Vector((s*.035,-.035,.045)),c+Vector((-s*.002,-.020,.039))]
  finger_paths[(side,4)]=path
  for k,(a,b) in enumerate(zip(path,path[1:])):
   for j in range(6):bits.append(ellipsoid(a.lerp(b,j/5),(.0115-k*.001,.0105,.0108)))
@@ -131,11 +131,12 @@ def glove(side,center):
   cube('Knuckle_Leather_'+side+'_'+str(idx),c+Vector((s*.059,.007,z)),(.004,.019,.013),rubber,.0018,hands)
   cyl('Finger_Seam_'+side+'_'+str(idx),c+Vector((s*.058,-.001,z-.005)),c+Vector((s*.058,.015,z-.005)),.0008,seam,8,hands)
  # Tapered, continuous sleeve reaching back/down far beyond the game viewport.
- start=c+Vector((s*.035,-.080,-.105)); end=c+Vector((-.22,-.46,-.72))
+ start=c+Vector((s*.035,-.080,-.105)); elbow=c+Vector((s*.035-.145,-.18,-.39)); end=c+Vector((-.30,-.40,-.67))
  direction=(end-start).normalized(); axis=direction.cross(Vector((1,0,0))).normalized(); cross=direction.cross(axis).normalized()
  vs=[]; fs=[]; rings=9; sides=24
  for row in range(rings):
-  t=row/(rings-1); center=start.lerp(end,t); radius=.033+.019*t
+  t=row/(rings-1); center=start.lerp(elbow,t*2) if t<=.5 else elbow.lerp(end,(t-.5)*2); radius=.033+.019*t
+  direction=(elbow-start).normalized() if t<.5 else (end-elbow).normalized();axis=direction.cross(Vector((1,0,0))).normalized();cross=direction.cross(axis).normalized()
   for j in range(sides):
    a=j*math.tau/sides; v=center+axis*math.cos(a)*radius+cross*math.sin(a)*radius*.86; vs.append(v)
  for row in range(rings-1):
@@ -151,7 +152,7 @@ def bone(name,a,b,parent=None):
  bone_defs[name]=(Vector(a),Vector(b)); return e
 bone('root',(0,0,-.35),(0,0,-.25)); bone('IncomingOffset',(0,0,0),(0,.1,0),'root'); bone('LeftReloadOffset',(0,0,0),(0,.1,0),'root'); bone('weapon',(0,-.15,.03),(0,.12,.03),'root'); bone('magazine',(0,-.1,-.18),(0,.15,-.15),'weapon'); bone('trigger',(0,-.092,-.01),(0,-.097,-.045),'weapon'); bone('follower',(0,-.155,-.178),(0,-.125,-.175),'magazine'); bone('loaded_nails',(0,.13,-.14),(0,.16,-.137),'magazine'); bone('reload_strip',(0,.13,-.14),(0,.16,-.137),'IncomingOffset'); bone('safety_tip',(0,.32,.072),(0,.35,.072),'weapon'); bone('Muzzle',(0,.35,.072),(0,.385,.072),'weapon')
 for side,c in [('R',Vector((0,-.151,-.065))),('L',Vector((0,.13,-.023)))]:
- s=1 if side=='R' else -1; bone('arm.'+side,c+Vector((s*.035,-.11,-.12)),c,'LeftReloadOffset' if side=='L' else 'root'); bone('hand.'+side,c,c+Vector((0,.045,0)),'arm.'+side)
+ s=1 if side=='R' else -1; bone('upperarm.'+side,c+Vector((-.30,-.40,-.67)),c+Vector((s*.035-.145,-.18,-.39)),'root'); bone('forearm.'+side,c+Vector((s*.035-.145,-.18,-.39)),c+Vector((s*.035,-.080,-.105)),'upperarm.'+side); bone('arm.'+side,c+Vector((s*.035,-.11,-.12)),c,'LeftReloadOffset' if side=='L' else 'root'); bone('hand.'+side,c,c+Vector((0,.045,0)),'arm.'+side)
  for idx in range(5):
   p=finger_paths[(side,idx)]
   for j,(a,b) in enumerate(zip(p,p[1:])):bone('finger%d.%d.%s'%(idx,j,side),a,b,'hand.'+side if j==0 else 'finger%d.%d.%s'%(idx,j-1,side))
@@ -166,12 +167,11 @@ def skin(o,weights):
  mod=o.modifiers.new('Skin','ARMATURE'); mod.object=rig; o.parent=rig
 for o in gun:skin(o,['safety_tip' if o==safety_tip else 'loaded_nails' if o in nail_objs else 'reload_strip' if o in strip_objs else 'follower' if o==follower else 'magazine' if o in mag_objs else 'trigger' if o==trigger else 'weapon'])
 for o in hands:
- side='R' if '_R' in o.name else 'L'; names=['hand.'+side,'arm.'+side]+[n for n in bone_defs if n.startswith('finger') and n.endswith(side)] if o in [right,left] else ['hand.'+side,'root'] if o.name.startswith('Forearm_') else ['hand.'+side]; skin(o,names)
+ side='R' if '_R' in o.name else 'L'; names=['hand.'+side,'arm.'+side]+[n for n in bone_defs if n.startswith('finger') and n.endswith(side)] if o in [right,left] else ['forearm.'+side,'upperarm.'+side] if o.name.startswith('Forearm_') else ['hand.'+side]; skin(o,names)
  if o.name.startswith('Forearm_'):
-  c=bone_defs['hand.'+side][0]; sign=1 if side=='R' else -1; start=c+Vector((sign*.035,-.080,-.105)); end=c+Vector((-.22,-.46,-.72)); span=end-start
   for v in o.data.vertices:
-   t=max(0,min(1,((o.matrix_world@v.co)-start).dot(span)/span.length_squared)); t=t*t*(3-2*t)
-   o.vertex_groups['hand.'+side].add([v.index],1-t,'REPLACE'); o.vertex_groups['root'].add([v.index],t,'REPLACE')
+   row=v.index//24; w=1.0 if row<4 else .5 if row==4 else 0.0
+   o.vertex_groups['forearm.'+side].add([v.index],w,'REPLACE');o.vertex_groups['upperarm.'+side].add([v.index],1-w,'REPLACE')
 # Anatomical skin partition: the continuous palm/wrist follows hand only.
 # Localized finger chains blend at their own roots; arm.L/R never influences
 # the glove, avoiding the R5 arm-stationary/hand-rotated split deformation.
@@ -191,6 +191,15 @@ for side,obj in [('R',right),('L',left)]:
    names=[n for n in bone_defs if n.startswith('finger%d.'%digit) and n.endswith(side)]
    nearest=sorted((distance_seg(p,*bone_defs[n]),n) for n in names)[:2]; values=[1/max(d,.004)**2 for d,n in nearest]; total=sum(values)
    for (_,name),value in zip(nearest,values):obj.vertex_groups[name].add([vertex.index],amount*value/total,'REPLACE')
+# Fixed-length upper-arm / forearm IK reaches the wrist without stretching.
+wrist_targets={}; wrist_tips={}
+for side,c in [('R',Vector((0,-.151,-.065))),('L',Vector((0,.13,-.023)))]:
+ sign=1 if side=='R' else -1; wrist=bpy.data.objects.new('WristTarget.'+side,None);scene.collection.objects.link(wrist)
+ wrist.parent=rig;wrist.parent_type='BONE';wrist.parent_bone='hand.'+side;bpy.context.view_layer.update();wrist.matrix_world.translation=c+Vector((sign*.035,-.080,-.105))
+ tip=bpy.data.objects.new('WristTip.'+side,None);scene.collection.objects.link(tip);tip.parent=rig;tip.parent_type='BONE';tip.parent_bone='forearm.'+side;bpy.context.view_layer.update();tip.matrix_world.translation=c+Vector((sign*.035,-.080,-.105));wrist_tips[side]=tip
+ wrist_targets[side]=wrist
+ con=rig.pose.bones['forearm.'+side].constraints.new('IK');con.name='Rigid_Length_Arm_Reach';con.target=wrist;con.chain_count=2;con.use_stretch=False;con.use_rotation=False
+ rig.pose.bones['forearm.'+side].ik_stretch=0;rig.pose.bones['upperarm.'+side].ik_stretch=0
 # Pinch IK changes the fingers' pose for strip carry and follower operation.
 # Targets are explicit opposing surfaces; constraints are sampled by exporters.
 ik_controls=[]; contact_targets={}
@@ -199,7 +208,7 @@ for phase,parent,center in [('strip','reload_strip',(0,.223,-.106)),('follower',
   pos=Vector(center)+Vector(offset); target=bpy.data.objects.new('IK_'+phase+'_'+str(digit),None); scene.collection.objects.link(target)
   target.parent=rig; target.parent_type='BONE'; target.parent_bone=parent; bpy.context.view_layer.update(); target.matrix_world.translation=pos
   name='finger%d.%d.L'%(digit,1 if digit==4 else 2)
-  con=rig.pose.bones[name].constraints.new('IK'); con.name='Pinch_'+phase; con.target=target; con.chain_count=2 if digit==4 else 3; con.use_rotation=False; con.influence=0
+  con=rig.pose.bones[name].constraints.new('IK'); con.name='Pinch_'+phase; con.target=target; con.chain_count=2 if digit==4 else 3; con.use_rotation=False;con.use_stretch=False; con.influence=0
   ik_controls.append((phase,con)); contact_targets[(phase,digit)]=(name,target)
 # Stable bone-relative authoring anchors. Contact verification is sampled and reported,
 # never interpreted as a mesh-intersection or art-quality pass.
@@ -207,6 +216,7 @@ anchors={}
 for name,pos,parent in [('Grip',(0,-.15,-.07),'weapon'),('Trigger',(0,-.095,-.03),'weapon'),('Magazine',(0,.13,-.023),'magazine')]:
  ob=bpy.data.objects.new(name,None); scene.collection.objects.link(ob); ob.empty_display_type='SPHERE'; ob.empty_display_size=.006; ob.location=pos; skinparent=rig.data.bones[parent].matrix_local
  ob.parent=rig; ob.parent_type='BONE'; ob.parent_bone=parent; ob.matrix_world.translation=Vector(pos); anchors[name]=ob
+anchors.update({'WristTarget.'+side:obj for side,obj in wrist_targets.items()});anchors.update({'WristTip.'+side:obj for side,obj in wrist_tips.items()})
 # Bone local locations are converted from requested world-space deltas.
 def key(name,frame,delta=(0,0,0),rot=(0,0,0)):
  p=rig.pose.bones[name]; basis=rig.data.bones[name].matrix_local.to_3x3(); p.location=basis.inverted()@Vector(delta); p.rotation_mode='XYZ'; p.rotation_euler=rot; p.keyframe_insert('location',frame=frame); p.keyframe_insert('rotation_euler',frame=frame)
@@ -214,7 +224,7 @@ clips={}
 for clip,end in [('Idle',121),('Fire',14.2),('Reload',100)]:
  action=bpy.data.actions.new(clip); rig.animation_data_create(); rig.animation_data.action=action
  for n in bone_defs:
-  if n not in ['IncomingOffset','LeftReloadOffset','Muzzle']:key(n,1); key(n,end)
+  if n not in ['IncomingOffset','LeftReloadOffset','Muzzle','forearm.L','forearm.R','upperarm.L','upperarm.R']:key(n,1); key(n,end)
  for phase,con in ik_controls:
   con.influence=0; con.keyframe_insert('influence',frame=1); con.keyframe_insert('influence',frame=end)
  if clip=='Idle':
@@ -228,11 +238,10 @@ for clip,end in [('Idle',121),('Fire',14.2),('Reload',100)]:
   strip_path=[(1,(-.12,-.10,-.24)),(35,(-.12,-.10,-.24)),(48,(-.10,0,.075)),(60,(0,0,.045)),(68,(0,0,0)),(100,(0,0,0))]
   for f,d in strip_path:key('reload_strip',f,d)
   hand_path=[(1,(0,0,0)),(12,(.015,-.310,-.155)),(23,(.015,-.365,-.161)),
-   (35,(-.120,-.032,-.302)),(48,(-.100,.068,.013)),(60,(0,.068,-.017)),(68,(0,.068,-.062)),
+   (35,(-.140,-.032,-.307)),(48,(-.120,.068,.008)),(60,(-.020,.068,-.022)),(68,(-.020,.068,-.067)),
    (73,(-.06,0,.015)),(82,(.015,-.365,-.161)),(91,(.015,-.310,-.155)),(100,(0,0,0))]
   for f,d in hand_path:key('arm.L',f,d)
-  # Pronate the palm over the slot: palm/non-pinching fingers stay above rails.
-  for f,a in [(1,0),(23,0),(35,math.pi),(68,math.pi),(78,0),(100,0)]:key('hand.L',f,rot=(a,0,0))
+  # Keep a neutral wrist; the palm stays outside the left rail, not flipped through the barrel.
   for phase,con in ik_controls:
    keys=[(1,0),(30,0),(35,1),(68,1),(73,0),(100,0)] if phase=='strip' else [(1,0),(8,0),(12,1),(23,1),(28,0),(77,0),(82,1),(91,1),(96,0),(100,0)]
    for frame,value in keys:con.influence=value; con.keyframe_insert('influence',frame=frame)
@@ -278,7 +287,7 @@ for label,objs,budget in [('weapon',gun,[8000,12000]),('hands',hands,[10000,1600
 # These measure kinematic alignment, NOT triangle penetration or anatomical quality.
 contact_report=[]
 rig.animation_data.action=bpy.data.actions['Reload']
-for phase,frames,target,ref in [('pull_follower',range(12,24),'follower',(.015,-.18,-.178)),('carry_and_seat_strip',range(35,69),'reload_strip',(0,.198,-.085)),('release_follower',range(82,92),'follower',(.015,-.18,-.178))]:
+for phase,frames,target,ref in [('pull_follower',range(12,24),'follower',(.015,-.18,-.178)),('carry_and_seat_strip',range(35,69),'reload_strip',(-.020,.198,-.090)),('release_follower',range(82,92),'follower',(.015,-.18,-.178))]:
  errors=[]; fingertip_errors=[]
  for frame in frames:
   scene.frame_set(frame); bpy.context.view_layer.update()
@@ -296,7 +305,7 @@ validation['muzzle']={'node':'Muzzle','parent':rig.data.bones['Muzzle'].parent.n
 (OUT/'clip-manifest.json').write_text(json.dumps(clips,indent=2))
 # Unity bridge contract: count/offset application occurs after Animator evaluation.
 # No authored animation curves target the two offset bones or visibility carriers.
-contract={'muzzle':{'node':'Muzzle','parent_bone':'weapon','source_head_xyz':[0,.35,.072],'source_tail_xyz':[0,.385,.072],'source_forward_axis':'+Y','bone_local_forward_axis':[0,1,0],'unity_note':'Use actual imported Muzzle position; local +Y is the bone forward axis. Do not assume Transform.forward.'},'incoming_binding':{'mode':'skinned','same_rig_required':True,'positive_weight_bones_must_descend_from':'IncomingOffset','renderer_transform_may_be_at_rig_root':True,'never_reparent_skinned_mesh':True},'capacity':12,'loaded_nodes':['LoadedNail_%02d'%i for i in range(12)],'incoming_nodes':['IncomingNail_%02d'%i for i in range(12)],'incoming_offset':'IncomingOffset','left_reload_offset':'LeftReloadOffset','source_pitch_xyz':list(NAIL_PITCH),'source_axes':'+Y muzzle, +Z up','derive_imported_pitch':'Use transformed source vector or verify imported adjacent nail origins; do not assume Unity axes.','count_snapshot':['ReloadPresented.Epoch','ReloadPresented.Sequence','LoadedBefore','PlannedAdded'],'loaded_visible':'prefix[0,LoadedBefore) until authoritative completion; then prefix[0,actualLoaded)','incoming_visible':'prefix[0,PlannedAdded), frames 35..100; hidden on cancel/complete','offset':'LoadedBefore * source_pitch; IncomingOffset throughout reload; LeftReloadOffset blends 30..35, holds35..68, fades68..73','animation_events':[],'commit':'Game commits once at 1.65s; physical seating frame68 does not allow early fire','preview':{'loaded_before':3,'planned_added':5}}
+contract={'arm_reach':{'solver':'fixed-length two-bone IK after Animator and count offsets','left':['upperarm.L','forearm.L','WristTip.L','WristTarget.L'],'right':['upperarm.R','forearm.R','WristTip.R','WristTarget.R'],'axes':'Calibrate actual imported segment vectors and bind rotations; never assume Unity local forward','pose_authority':'Animator base then count carriers then arm rotations only; hand chain remains Animator/count-owned','fixed_lengths_source':{side:{'upperarm':rig.data.bones['upperarm.'+side].length,'forearm':rig.data.bones['forearm.'+side].length} for side in ['L','R']},'allow_stretch':False,'unity_runtime_verification':'REQUIRED; Blender constraints are baked, not imported live'},'muzzle':{'node':'Muzzle','parent_bone':'weapon','source_head_xyz':[0,.35,.072],'source_tail_xyz':[0,.385,.072],'source_forward_axis':'+Y','bone_local_forward_axis':[0,1,0],'unity_note':'Use actual imported Muzzle position; local +Y is the bone forward axis. Do not assume Transform.forward.'},'incoming_binding':{'mode':'skinned','same_rig_required':True,'positive_weight_bones_must_descend_from':'IncomingOffset','renderer_transform_may_be_at_rig_root':True,'never_reparent_skinned_mesh':True},'capacity':12,'loaded_nodes':['LoadedNail_%02d'%i for i in range(12)],'incoming_nodes':['IncomingNail_%02d'%i for i in range(12)],'incoming_offset':'IncomingOffset','left_reload_offset':'LeftReloadOffset','source_pitch_xyz':list(NAIL_PITCH),'source_axes':'+Y muzzle, +Z up','derive_imported_pitch':'Use transformed source vector or verify imported adjacent nail origins; do not assume Unity axes.','count_snapshot':['ReloadPresented.Epoch','ReloadPresented.Sequence','LoadedBefore','PlannedAdded'],'loaded_visible':'prefix[0,LoadedBefore) until authoritative completion; then prefix[0,actualLoaded)','incoming_visible':'prefix[0,PlannedAdded), frames 35..100; hidden on cancel/complete','offset':'LoadedBefore * source_pitch; IncomingOffset throughout reload; LeftReloadOffset blends 30..35, holds35..68, fades68..73','animation_events':[],'commit':'Game commits once at 1.65s; physical seating frame68 does not allow early fire','preview':{'loaded_before':3,'planned_added':5}}
 (OUT/'weapon-presentation-contract.json').write_text(json.dumps(contract,indent=2))
 def preview_pose(clip,frame,loaded_before=3,planned_added=5):
  scene.frame_set(frame)
@@ -374,11 +383,26 @@ for before,added in [(0,12),(3,5),(11,1)]:
   preview_pose('Reload',frame,before,added); hand_tree=evaluated_bvh(left)
   blocked=[surface_evidence(left,obj) for obj in [*filter(lambda o:o!=follower,mag_objs),right]]
   validation['loading_surface_samples'].append({'loaded_before':before,'added':added,'frame':frame,'intersections':[b for b in blocked if b['triangle_pairs']>0]})
+# Whole-reload reach/length/seam proof, for all three ammo-count cases.
+validation['arm_reach_samples']=[]
+for before,added in [(0,12),(3,5),(11,1)]:
+ for frame in range(1,101):
+  preview_pose('Reload',frame,before,added)
+  for side in ['L','R']:
+   pb=rig.pose.bones['forearm.'+side]; up=rig.pose.bones['upperarm.'+side]; target=wrist_targets[side].matrix_world.translation
+   tail=rig.matrix_world@pb.tail; shoulder=rig.matrix_world@up.head
+   rest=rig.data.bones['forearm.'+side].length; maximum=rest+rig.data.bones['upperarm.'+side].length
+   sleeve=next(o for o in hands if o.name=='Forearm_'+side); ev=sleeve.evaluated_get(bpy.context.evaluated_depsgraph_get()); mesh=ev.to_mesh()
+   try:seam=sum((ev.matrix_world@mesh.vertices[i].co for i in range(24)),Vector())/24
+   finally:ev.to_mesh_clear()
+   validation['arm_reach_samples'].append({'loaded_before':before,'added':added,'frame':frame,'side':side,'forearm_length_error_m':abs((pb.tail-pb.head).length-rest),'wrist_ik_error_m':(tail-target).length,'sleeve_wrist_gap_m':(seam-target).length,'target_reach_m':(target-shoulder).length,'maximum_rigid_reach_m':maximum})
+reach_failed=any(v['forearm_length_error_m']>.0001 or v['wrist_ik_error_m']>.003 or v['sleeve_wrist_gap_m']>.003 or v['target_reach_m']>v['maximum_rigid_reach_m']+.003 for v in validation['arm_reach_samples'])
+fingertip_failed=any(c['max_fingertip_IK_error_m']>.002 for c in validation['reload_mechanism']['reference_contact_samples'])
 if CONTACT_ONLY:
- diagnostic={'scope':'reload-contact-diagnostic','full_asset_validation':False,'approved':False,'sample_count':len(validation['loading_surface_samples']),'failed_samples':sum(bool(s['intersections']) for s in validation['loading_surface_samples'])}
+ diagnostic={'scope':'reload-contact-diagnostic','full_asset_validation':False,'approved':False,'sample_count':len(validation['loading_surface_samples']),'failed_samples':sum(bool(s['intersections']) for s in validation['loading_surface_samples']),'arm_reach_failed':reach_failed,'fingertip_contact_failed':fingertip_failed,'independent_visual_review':'required; no hand/arm distortion allowed'}
  (OUT/'contact-diagnostic.json').write_text(json.dumps(diagnostic,indent=2));(OUT/'validation.json').write_text(json.dumps(validation,indent=2))
  (OUT/'SHA256SUMS').write_text('\n'.join(hashlib.sha256(p.read_bytes()).hexdigest()+'  '+p.name for p in sorted(OUT.iterdir()) if delivered_file(p))+'\n')
- raise SystemExit(1 if diagnostic['failed_samples'] else 0)
+ raise SystemExit(1 if diagnostic['failed_samples'] or reach_failed or fingertip_failed else 0)
 rig.animation_data.action=bpy.data.actions['Idle']; preview_pose('Idle',1); scene.cycles.samples=24
 # Preserve useful partial evidence before potentially failing image readback.
 (OUT/'validation.json').write_text(json.dumps(validation,indent=2)); bpy.ops.wm.save_as_mainfile(filepath=str(OUT/'weapon_hands.blend'))

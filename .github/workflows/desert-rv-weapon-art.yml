@@ -56,6 +56,11 @@ jobs:
             ffmpeg -y -framerate 60 -i "weapon-output/frames_${action}/%04d.png" -c:v libx264 -crf 19 -pix_fmt yuv420p "weapon-output/side_${action}.mp4"
           done
           python tasks/desert-rv/art/weapon-candidate/package_evidence.py weapon-output
+      - name: Seal delivered file hashes after process exit
+        if: always()
+        shell: bash
+        run: |
+          python3 tasks/desert-rv/art/weapon-candidate/seal_artifacts.py weapon-output
       - name: Upload candidate for strict visual review
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2

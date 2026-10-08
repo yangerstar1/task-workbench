@@ -19,7 +19,7 @@ class Contracts(unittest.TestCase):
  def test_fresh_strip_and_fixed_magazine(self):
   s=(ROOT/'build_weapon.py').read_text();self.assertIn("'magazine_detaches':False",s);self.assertIn("'new_nails_count':12",s);self.assertIn("constraints.new('IK')",s)
  def test_no_animation_ammo_visibility_scaling(self):
-  s=(ROOT/'build_weapon.py').read_text();self.assertNotIn('key_scale(',s);self.assertNotIn('.0001',s);self.assertIn("if n not in ['IncomingOffset','LeftReloadOffset','Muzzle']",s)
+  s=(ROOT/'build_weapon.py').read_text();self.assertNotIn('key_scale(',s);self.assertNotIn('.scale=(.0001',s);self.assertIn("if n not in ['IncomingOffset','LeftReloadOffset','Muzzle','forearm.L','forearm.R','upperarm.L','upperarm.R']",s)
  def test_no_external_art_or_game_events(self):
   s=(ROOT/'build_weapon.py').read_text(); self.assertNotIn('https://',s); self.assertIn("'gameplay_events':[]",s)
 class FramingRegression(unittest.TestCase):
@@ -88,6 +88,10 @@ class ArtifactGateRegression(unittest.TestCase):
   s=(ROOT/'build_weapon.py').read_text();self.assertIn("kwargs['force_keep']=False",s);self.assertIn('bake_anim_use_all_bones=False',s)
  def test_muzzle_and_skin_contract_are_explicit(self):
   s=(ROOT/'build_weapon.py').read_text();self.assertIn("bone('Muzzle',(0,.35,.072),(0,.385,.072),'weapon')",s);self.assertIn('use_armature_deform_only=False',s);self.assertIn('export_def_bones=False',s);self.assertIn("'renderer_reparented':False",s);self.assertIn('max_inside_vertex_depth_m',s)
+ def test_rigid_two_bone_arm_and_no_flip(self):
+  s=(ROOT/'build_weapon.py').read_text();self.assertIn("con.name='Rigid_Length_Arm_Reach'",s);self.assertNotIn("constraints.new('STRETCH_TO')",s);self.assertIn('con.use_stretch=False',s);self.assertIn('sleeve_wrist_gap_m',s);self.assertIn('range(1,101)',s);self.assertNotIn('(35,math.pi)',s)
+ def test_hash_seal_after_producer_exit(self):
+  s=(ROOT.parents[3]/'.github/workflows/desert-rv-weapon-art.yml').read_text();self.assertLess(s.index('Generate export'),s.index('Seal delivered'));self.assertLess(s.index('Seal delivered'),s.index('Upload candidate'));self.assertIn('seal_artifacts.py weapon-output',s)
  def test_fbx_single_export_path(self):
   s=(ROOT/'build_weapon.py').read_text();self.assertIn('bake_anim_use_all_actions=False,bake_anim_use_nla_strips=True',s)
 if __name__=='__main__':unittest.main()
