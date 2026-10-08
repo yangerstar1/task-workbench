@@ -1,0 +1,50 @@
+{
+  "source_commit": "4521975dc47d914959e274a197224d0af7a47b04",
+  "source_manifest_sha256": "83a68739963727908fe037908e3f7255a3fa6e6c3a72359f789262ed7a7de4bf",
+  "source_files": {
+    "README.md": "67fa070d2fe8b257afcba37a544343833f60f67bb1cc3c632bb3e3a3cc6308ed",
+    "parameters.json": "6e7bd9eea7a5d18b9afd87ac290ebccd5e1b204d314924628da11e61f4237287",
+    "motion.py": "2852443caff1767545e204fdab3d2dd132d14d398e6217009364dc42bcc8416c",
+    "generate.py": "f2fa475c2a968acba9e318436f8e9dd48e940c4b15f35cf7727af10986f32ee3",
+    "animate.py": "159564c94eb0780bba0d0638d415aaa6e4e6a0a9b5f0ee3a98e6d3066563e339",
+    "test_static.py": "ff32b5b6deb6e4fb3530febfb2b573091206bf8f0553c2c143863dfeec446a55",
+    "artifact_io.py": "3a088520d8162c1beaa2c4fcf32275f8041e05db323344b1d82a1b263787a144",
+    "validate_runtime_contract.py": "a2d91b8bc8f947168778cfc4f9ffc4fbc3e92cb6e8a68b7e7131bad3c8d106da",
+    "package_evidence.py": "d755caf2cd1b584a54183bf3bde0c5b21ac2cf16d668842266b9c005f1346e63",
+    "write_provenance.py": "af2c297a8dfeacdc85833b9d1d2b1daa58ee355b494594272643159d15e088ea",
+    "test_pipeline.py": "67b7573118165929464503b5bb54695fdf19cfecc07bc5894c8392874cdcba14",
+    "fps_evidence.py": "f336fd58a9726e14d03810e3e784aed518be1d0d3b2be56fa424eead66ccac14",
+    "evidence_layout.py": "6f4e1d32cc0f7c872697b8ccf5b789a2b16846bd11f2c51d243dd2c912e9214c",
+    "binding_contract.py": "c9eea0fa52490b47c3d36fc8df2b9662da67326755c5a932ca1704a16e360ff9",
+    "cavity_geometry.py": "c58030b6b9f77b9cacf5c944c816a5918484c4da49c1d9d877dfb36bba7a18d3"
+  },
+  "reused_run_id": "37827225328",
+  "reused_artifact_id": "11576761904",
+  "reused_zip_sha256": "fc9921770e8abd626c29910768fdb0f5f8f74d3fae20b88bc3ebf627b33001fa",
+  "reused_clips": {
+    "Idle": {
+      "review/Idle.mp4": "f299b322b060e9e83e682c75ce97b6d7f7c680553eafcde2d09ed9a0565ec016",
+      "review/Idle-0.50.png": "626544876f0c3a02b9c845c65dd4f62464a8d98e8ce4adbaa2af74081e31b9e7",
+      "review/Idle-0.25.png": "7dff792ce58fa43d805f896b0f3f138b9ae9c530a0ad78778ab5ed64d1e7ca8c",
+      "review/Idle-0.75.png": "48ce87e20c9bf0f4adbbc220aaee2f31e7ea7215d9c2cda818d7ac96788059cc",
+      "review/Idle-1.00.png": "d524675ba28abc606ffd219441762df50530cb4f70779ccd9cde922b02136213",
+      "review/Idle-0.00.png": "0bddd28f1cb76becca37fe2ac407622a9b449ba5855067f35f47ab474fb4cc64"
+    },
+    "Walk": {
+      "review/Walk.mp4": "a984ad03cafa2b691619a313b2bc785124a3fa297cc556c6ad139494a43d96bd",
+      "review/Walk-0.75.png": "754a1adbcc3912bfd5eef3b0c889aceb2c95e07d87dd5a27e954601bb5cc0de8",
+      "review/Walk-0.50.png": "cc1ee14bb934d592075dd51f038582270127f7d8e568e77ba5043edd2b0e1b83",
+      "review/Walk-1.00.png": "2ec0980a81212ee1361892af58d44970b3eb66b44fc5eed75c4202054cfa25f9",
+      "review/Walk-0.00.png": "46f1b1cbd648d5db3be4f1951db039a8ce8a833420aed6259661400b8d6a57de",
+      "review/Walk-0.25.png": "fe834ce3d0f62f4f32a2c19f8a2b041ab89f8bda8677e56330c2470830b18fdb"
+    },
+    "Windup": {
+      "review/Windup.mp4": "eba6a5db2b6607cf769c0ba9d0f24d88a608ce1d72353e4a219c6cf5ebebd5ab",
+      "review/Windup-0.75.png": "d67ab83ee15a35466b3cfde6454f7bb4b2a19663dd7e486c88f2f0a3603996fc",
+      "review/Windup-1.00.png": "e0516015447f91620cc191667e5adc71a80c753cda11a4ca58ed0c033e2b31ab",
+      "review/Windup-0.00.png": "faad48bb940815ed6b03389ce02d9c98be7f4564916f53e79f075d97a0284d1e",
+      "review/Windup-0.25.png": "0887a0dd7779efab85e1f58a3e7c4a9cd55a59eb7cf3fbf76e5085ffe9ad7458",
+      "review/Windup-0.50.png": "b037b9ea6e0fe139e3a6062ebf7b1faf6260e5ebcd5e14a55361b886e19739a1"
+    }
+  }
+}

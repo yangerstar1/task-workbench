@@ -1,0 +1,75 @@
+name: Desert RV armored technical-first evidence
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: desert-rv-armored-technical
+  cancel-in-progress: false
+jobs:
+  technical:
+    if: github.actor == github.repository_owner && github.event_name == 'workflow_dispatch' && github.event.repository.private == false && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+          lfs: false
+      - name: Bind isolated technical run and verify immutable source
+        shell: bash
+        run: |
+          set -euo pipefail
+          ROOT="$RUNNER_TEMP/armored-technical-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+          test ! -e "$ROOT"
+          mkdir -p "$ROOT"
+          printf 'ART_ROOT=%s\n' "$ROOT" >> "$GITHUB_ENV"
+          printf '%s\n' "$GITHUB_SHA" > "$ROOT/execution-commit.txt"
+          python3 tasks/desert-rv/art/armored-candidate/validate_runtime_contract.py --actor tasks/desert-rv/unity/Assets/DesertRV/Runtime/BeastActor.cs
+      - name: Install official checksum-verified Blender
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends libxkbcommon0 libsm6 libxi6 libxrender1 libxxf86vm1 libgl1 ffmpeg
+          mkdir -p "$RUNNER_TEMP/armored-blender"
+          cd "$RUNNER_TEMP/armored-blender"
+          base=https://download.blender.org/release/Blender4.2
+          curl --fail --location --retry 3 --max-time 180 "$base/blender-4.2.3-linux-x64.tar.xz" -o blender-4.2.3-linux-x64.tar.xz
+          curl --fail --location --retry 3 --max-time 60 "$base/blender-4.2.3.sha256" -o upstream.sha256
+          grep -E '[ *]blender-4\.2\.3-linux-x64\.tar\.xz$' upstream.sha256 > selected.sha256
+          test "$(wc -l < selected.sha256)" -eq 1
+          sha256sum --check selected.sha256
+          cp selected.sha256 "$ART_ROOT/blender-upstream.sha256"
+          tar -xf blender-4.2.3-linux-x64.tar.xz
+          echo "$RUNNER_TEMP/armored-blender/blender-4.2.3-linux-x64" >> "$GITHUB_PATH"
+      - name: Run static executor and VFR fixture checks
+        run: python3 tasks/desert-rv/art/armored-staged/test_staged.py
+      - name: Validate original 60Hz motion and export without rendering
+        shell: bash
+        run: |
+          set -uo pipefail
+          set +e
+          timeout --signal=TERM --kill-after=30s 12m blender --background --factory-startup --threads 4 --python-exit-code 1 --python tasks/desert-rv/art/armored-staged/staged.py -- --stage technical --output "$ART_ROOT/technical" 2>&1 | tee "$ART_ROOT/technical.log"
+          statuses=("${PIPESTATUS[@]}")
+          code=${statuses[0]}
+          if [[ "${statuses[1]}" != 0 ]]; then code=${statuses[1]}; fi
+          printf '%s\n' "$code" > "$ART_ROOT/technical.exit"
+          exit "$code"
+      - name: Upload technical or explicitly partial evidence only
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: armored-technical-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            ${{ env.ART_ROOT }}/technical/*.json
+            ${{ env.ART_ROOT }}/technical/*.glb
+            ${{ env.ART_ROOT }}/technical/*.fbx
+            ${{ env.ART_ROOT }}/technical/*.blend
+            ${{ env.ART_ROOT }}/technical/*.png
+            ${{ env.ART_ROOT }}/technical.log
+            ${{ env.ART_ROOT }}/technical.exit
+            ${{ env.ART_ROOT }}/execution-commit.txt
+            ${{ env.ART_ROOT }}/blender-upstream.sha256
+          if-no-files-found: error
+          retention-days: 14

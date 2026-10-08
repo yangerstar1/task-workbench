@@ -1,0 +1,11 @@
+{
+  "kind": "execution_only_original_art_unchanged",
+  "sha256": {
+    "plan.py": "24a9045e360242014e877c23be325cf19f4d829e9bc869f99151c5b1354ca6eb",
+    "staged.py": "606ddf1f6d886222dadde82e7c582dc81168297510d59aa86b8a97a9a3d67d37",
+    "assemble.py": "9b9b3e1b7740505bbbc16d0fc1ee50a65e67557532e9fec3372b37123113b41c",
+    "test_staged.py": "e9e8db530a43f86e58f231485ef43599581e6583de987f48e0f1d6614da7014c",
+    "README.md": "e769a999e804738b274a9eb89979813de59ea8fc6452afbc7e5d66ac9bda6e13",
+    "art-lock.json": "c702f2c7f123475703102fe211b878e83912ccda7bb6ec3f6e08cbba962dc549"
+  }
+}
