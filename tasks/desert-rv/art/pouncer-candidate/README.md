@@ -1,3 +1,15 @@
+# Import verifier correction: official display-shape provenance
+
+Run37853106290 passed source native200Hz and FBX reimport, but the GLB verifier sampled an importer-created display helper atz=-1m. The actual serialized GLB contains27 mesh nodes, all skin0, and no extra icosphere geometry. This is not a reason to ignore a real mesh with a particular name.
+
+The exact official Blender v4.2.3 importer source creates a unit-radius display shape at the origin when disable_bone_shape is false, puts it in the hidden-render glTF_not_exported collection, and assigns it to pose-bone custom_shape. Source: https://github.com/blender/blender/blob/v4.2.3/scripts/addons_core/io_scene_gltf2/blender/imp/gltf2_blender_node.py#L133-L152 and #L239-L247; source blob6074461f275c78f656856721873e0ff61e357dd2.
+
+The verifier now first records actual serialized nodes and the default native-import objects, including collection visibility, armature modifiers and concrete custom_shape users. Any extra mesh must be proven to be a non-source hidden display shape, otherwise verification fails. It then starts a clean scene and uses the documented disable_bone_shape=True switch to prevent display-shape creation. The final mesh set must match the serialized nodes exactly, preserving every source skin/armature link. ALL meshes in that final scene are collision sampled; none is omitted by name or visibility.
+
+This minimal verifier change does not touch Death, any asset, a motion curve, the4mm threshold, or the three-way technical gate. glb-import-provenance.json provides the native evidence chain. Still no visual or production approval.
+
+---
+
 # Death continuity correction: shared joint path and explicit rotation branches
 
 The first technical-first run correctly refused to render. It found a 477.7mm hind-paw plunge at a half-keyframe and a genuine 74.83mm rigid translation jump in10ms. The same exported GLB at1.275s, using shortest-arc quaternion interpolation, is only -2.58mm; its100Hz endpoints are near+1mm. This exposes a native rotation-representation/interpolation problem, separate from the real18.52-degree visual-body and19.64-degree hind-hip jumps between1.27 and1.28s inherited from unrelated per-frame search outcomes.

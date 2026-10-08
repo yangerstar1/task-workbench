@@ -48,4 +48,12 @@ class TechnicalFirst(unittest.TestCase):
         self.assertIn("=={'glb','fbx'}",verify);self.assertIn('range(361)',verify)
         workflow=(H.parents[3]/'.github/workflows/desert-rv-pouncer-art.yml').read_text()
         self.assertIn("steps.glb_import.outcome == 'success'",workflow);self.assertIn("steps.fbx_import.outcome == 'success'",workflow)
+    def test_importer_helper_handling_is_provenance_based(self):
+        source=(H/'verify_serialized_death.py').read_text()
+        self.assertIn('disable_bone_shape=True',source);self.assertIn('len(source_nodes)!=27',source)
+        self.assertIn('confirmed_importer_only_display_shape',source)
+        self.assertIn("{o.name for o in actual}!=expected",source)
+        self.assertIn('custom_shape_users',source);self.assertIn('Final imported mesh set',source)
+        self.assertNotIn("obj.name=='Icosphere'",source);self.assertNotIn("obj.name != 'Icosphere'",source)
+        self.assertIn("meshes=[o for o in scene.objects if o.type=='MESH']",source)
 if __name__=='__main__':unittest.main()
