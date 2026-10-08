@@ -45,7 +45,7 @@ class CandidateContract(unittest.TestCase):
         self.assertEqual(opened['boundary_edge_count'],3);self.assertIsNone(opened['orientable_genus_if_closed'])
     def test_death_requires_torso_and_relaxed_legs(self):
         source=(H/'animate.py').read_text(); validate=(H/'validate_asset.py').read_text()
-        self.assertIn('Solve contact against the side of the actual torso',source)
+        self.assertIn('death_solver.solve(u)',source)
         self.assertIn('death_torso_contact_z',validate);self.assertIn('death_relaxed_paw_heights',validate)
         self.assertIn("topology['nonmanifold_vertex_count']",validate)
     def test_transition_probes_precede_asset_export(self):
@@ -59,4 +59,17 @@ class CandidateContract(unittest.TestCase):
         self.assertIn('export_anim_slide_to_zero=True',source);self.assertIn('key.co.x-=1',source)
         self.assertIn("strip.action_frame_start=0",source)
         self.assertIn('inspect_glb,inspect_fbx',validate);self.assertIn('serialized_animation_times',validate)
+    def test_death_only_change_boundary(self):
+        import hashlib
+        boundary=json.loads((H/'death-change-boundary.json').read_text())
+        for info in boundary['unchanged_regions'].values():
+            text=(H/info['file']).read_text().split(info['start_marker'],1)[1].split(info['end_marker'],1)[0]
+            self.assertEqual(hashlib.sha256(text.encode()).hexdigest(),info['sha256'])
+        self.assertEqual(hashlib.sha256((H/'parameters.json').read_bytes()).hexdigest(),boundary['parameters_sha256'])
+    def test_diagnostic_scope_cannot_look_like_full_review(self):
+        source=(H/'generate.py').read_text();animate=(H/'animate.py').read_text();workflow=(H.parents[3]/'.github/workflows/desert-rv-pouncer-art.yml').read_text()
+        self.assertIn('DEATH_DIAGNOSTIC_NOT_FULL',source);self.assertIn("'full_motion_visual_review':'NOT_RUN'",source)
+        self.assertIn("render_clips={'Death':clips['Death']}",animate)
+        self.assertIn('default: death-diagnostic',workflow);self.assertIn("if: inputs.scope == 'full'",workflow)
+        self.assertIn('death-near-',animate);self.assertIn('death_diagnostic_technical_pass',(H/'validate_asset.py').read_text())
 if __name__=='__main__':unittest.main()

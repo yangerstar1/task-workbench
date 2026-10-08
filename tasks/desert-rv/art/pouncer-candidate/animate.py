@@ -1,6 +1,8 @@
 """Executed after R2 sculpt build. IK controls are authoring-only; export is baked."""
 import collections
 import struct
+from death_contact import DeathContactSolver
+death_solver=DeathContactSolver(body,details,rig,leg_chains,P['clips']['Death'])
 
 # Calibrate each original limb's pole angle against its known rest elbow/knee.
 for key,pts in leg_chains.items():
@@ -96,19 +98,8 @@ def author_pose(name,u):
             paw=rig.pose.bones[pre+'_paw.'+side]; world_rest=rig.data.bones[paw.name].matrix_local.to_3x3().to_4x4(); world_rest.translation=paw.head; paw.matrix=world_rest
     bpy.context.view_layer.update()
     if name=='Death':
-        # Solve contact against the side of the actual torso, not the lowest dangling claw.
-        torso=[i for i,v in enumerate(body.data.vertices) if -.65<v.co.y<.77 and v.co.z>.50]
-        settle=max(0,min(1,(u-.20)/.40)); settle=settle*settle*(3-2*settle)
-        for iteration in range(4):
-            ev=body.evaluated_get(bpy.context.evaluated_depsgraph_get()); me=ev.to_mesh()
-            low=min((ev.matrix_world@me.vertices[i].co).z for i in torso); ev.to_mesh_clear()
-            if abs(low)<.0005:break
-            visual.location.z-=low*settle; bpy.context.view_layer.update()
-            if settle<.999:break
-        for key in leg_chains:
-            pre,side=key.split('.')
-            paw=rig.pose.bones[pre+'_paw.'+side]; rest=rig.data.bones[paw.name].matrix_local.to_3x3().to_4x4(); rest.translation=paw.head; paw.matrix=rest
-        bpy.context.view_layer.update()
+        death_solver.solve(u)
+        return flight
     b=bounds()
     # Explicit collision correction keeps the 4mm rejection threshold unchanged.
     if b['min_z']<-.001:
@@ -156,6 +147,7 @@ for name,seconds in P['clips'].items():
             pb.keyframe_insert('location',frame=frame,group=pb.name); pb.keyframe_insert('rotation_euler',frame=frame,group=pb.name); pb.keyframe_insert('scale',frame=frame,group=pb.name)
     for fc in action.fcurves:
         for kp in fc.keyframe_points:kp.interpolation='LINEAR'
+(OUT/'death-contact-solver.json').write_text(json.dumps(death_solver.rows,indent=2))
 # Remove authoring constraints completely before export, preventing doubled IK evaluation.
 for pb in rig.pose.bones:
     for con in list(pb.constraints):pb.constraints.remove(con)
@@ -231,9 +223,11 @@ scene.render.resolution_x=960; scene.render.resolution_y=540
 review=OUT/'review'; review.mkdir(exist_ok=True); scene.render.image_settings.file_format='PNG'
 from bpy_extras.object_utils import world_to_camera_view
 render_manifest=[]; framing_failures=[]
-for name,meta in {**clips,**preview_clips}.items():
+render_clips={'Death':clips['Death']} if args.scope=='death-diagnostic' else {**clips,**preview_clips}
+render_fps=30 if args.scope=='death-diagnostic' else 15
+for name,meta in render_clips.items():
     rig.animation_data.action=bpy.data.actions[name]; folder=review/name; folder.mkdir(exist_ok=True)
-    frames=sorted({1+round(i*P['fps']/15) for i in range(math.ceil((meta['frame_end']-1)/P['fps']*15)+1) if 1+round(i*P['fps']/15)<=meta['frame_end']})
+    frames=sorted({1+round(i*P['fps']/render_fps) for i in range(math.ceil((meta['frame_end']-1)/P['fps']*render_fps)+1) if 1+round(i*P['fps']/render_fps)<=meta['frame_end']})
     if frames[-1]!=meta['frame_end']:frames.append(meta['frame_end'])
     for index,frame in enumerate(frames):
         scene.frame_set(frame)
@@ -245,6 +239,13 @@ for name,meta in {**clips,**preview_clips}.items():
         if min(framing['min_x'],framing['min_y'])<.02 or max(framing['max_x'],framing['max_y'])>.98:framing_failures.append({'clip':name,'frame':frame,'bounds':framing})
         render_manifest.append({'clip':name,'png':f'{name}/{index:04}.png','source_frame':frame,'source_time_seconds':(frame-1)/P['fps'],'screen_bounds':framing})
         scene.render.filepath=str(folder/f'{index:04}.png'); bpy.ops.render.render(write_still=True)
+if args.scope=='death-diagnostic':
+    # Near-ground witness views cover the actual R3 failure interval, not only a rest pose.
+    cam.location=(6,-.12,1.2);cam.rotation_euler=(Vector((0,-.12,.22))-cam.location).to_track_quat('-Z','Y').to_euler();cam.data.ortho_scale=3.2
+    rig.animation_data.action=bpy.data.actions['Death']
+    for ms in (750,900,950,1000,1070,1150,1200,1300,1600,1800):
+        scene.frame_set(1+round(ms/1000*P['fps']));scene.render.filepath=str(review/f'death-near-{ms:04}.png');bpy.ops.render.render(write_still=True)
+    cam.data.ortho_scale=4.35
 # Two opposing three-quarter death stills expose torso support and relaxed limbs.
 rig.animation_data.action=bpy.data.actions['Death']; scene.frame_set(clips['Death']['frame_end'])
 for index in (3,7):

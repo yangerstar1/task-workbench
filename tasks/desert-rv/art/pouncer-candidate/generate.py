@@ -14,8 +14,11 @@ P=json.loads((HERE/'parameters.json').read_text())
 sys.path.insert(0,str(HERE))
 from geometry_frames import transport_frames
 from topology_report import inspect_mesh
-p=argparse.ArgumentParser(); p.add_argument('--output',required=True); p.add_argument('--phase',choices=['static','motion'],required=True)
+p=argparse.ArgumentParser(); p.add_argument('--output',required=True); p.add_argument('--phase',choices=['static','motion'],required=True); p.add_argument('--scope',choices=['full','death-diagnostic'],default='full')
 args=p.parse_args(sys.argv[sys.argv.index('--')+1:]); OUT=Path(args.output).resolve(); OUT.mkdir(parents=True,exist_ok=True)
+SCOPE='DEATH_DIAGNOSTIC_NOT_FULL' if args.scope=='death-diagnostic' else 'FULL_CANDIDATE_REVIEW_NOT_APPROVED'
+(OUT/'review-scope.json').write_text(json.dumps({'scope':SCOPE,'full_motion_visual_review':'NOT_RUN' if args.scope=='death-diagnostic' else 'REQUIRED','render_fps':30 if args.scope=='death-diagnostic' else 15},indent=2))
+print('SCOPE='+SCOPE,flush=True)
 bpy.ops.object.select_all(action='SELECT'); bpy.ops.object.delete(use_global=False)
 random.seed(P['seed']); scene=bpy.context.scene
 scene.unit_settings.system='METRIC'; scene.unit_settings.scale_length=1; scene.render.fps=P['fps']

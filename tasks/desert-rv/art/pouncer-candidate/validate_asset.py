@@ -54,6 +54,7 @@ for name,meta in clips.items():
             baked_gait.append({'frame':frame,'time':(frame-1)/P['fps'],'feet':feet})
     sampled[name]=rows
     if min(r['min_z'] for r in rows)<-.004:errors.append(name+' penetrates floor >4mm')
+(OUT/'death-baked-bounds.json').write_text(json.dumps([{'source_frame':i+1,'seconds':i/P['fps'],**row} for i,row in enumerate(sampled['Death'])],indent=2))
 checks['motion_bounds_m']={n:{'minimum_z':min(r['min_z'] for r in rows),'max_floor_gap':max(r['min_z'] for r in rows),'start_z':rows[0]['min_z'],'end_z':rows[-1]['min_z']} for n,rows in sampled.items()}
 for name in ('Idle','Walk','Windup','Attack','Recover','Hit','Death'):
     if any(abs(sampled[name][i]['min_z'])>.02 for i in (0,-1)):errors.append(name+' endpoint lacks ground contact')
@@ -121,5 +122,5 @@ checks['attack_maximum_added_clearance_m']=clearance['maximum_added_lift_m']
 if checks['all_attack_frames_quaternion_crossfade_min_z']<-.004:errors.append('An actual source Attack quaternion crossfade still penetrates the ground >4mm')
 (OUT/'interrupt-manifest.json').write_text(json.dumps(interrupts,indent=2))
 rig.animation_data.action=bpy.data.actions['Idle']; scene.frame_set(1)
-report={'status':'technical_pass' if not errors else 'technical_fail','visual_approval':False,'revision':3,'checks':checks,'errors':errors,'review_required':['all eight silhouette views','brow, jaw separation, shoulder and narrow waist','no hock tunnel','UV base-color parity in Unity','diagonal support and contact load in Walk','Windup compresses rather than rises','all-frame Attack framing and bite clarity','real Unity interrupted transitions before adopting asset']}
+report={'scope':SCOPE,'full_motion_visual_review':'NOT_RUN' if args.scope=='death-diagnostic' else 'REQUIRED','status':('death_diagnostic_technical_pass' if args.scope=='death-diagnostic' else 'technical_pass') if not errors else 'technical_fail','visual_approval':False,'revision':3,'checks':checks,'errors':errors,'review_required':['all eight silhouette views','brow, jaw separation, shoulder and narrow waist','no hock tunnel','UV base-color parity in Unity','diagonal support and contact load in Walk','Windup compresses rather than rises','all-frame Attack framing and bite clarity','real Unity interrupted transitions before adopting asset']}
 (OUT/'validation.json').write_text(json.dumps(report,indent=2)); validation_errors=errors

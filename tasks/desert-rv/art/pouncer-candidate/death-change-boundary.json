@@ -1,0 +1,19 @@
+{
+  "preceding_source_commit": "78947d714ce9fb0ea6f2afdfa81633a8cf71697b",
+  "scope": "Death-only source authoring and diagnostic pipeline; no Unity changes",
+  "unchanged_regions": {
+    "geometry_materials_and_rig": {
+      "file": "generate.py",
+      "start_marker": "parts=[]",
+      "end_marker": "rig['candidate_status']",
+      "sha256": "85ef56bf060d54d7eaae2357524df3ba069c2af27270e933650256fd45955a95"
+    },
+    "non_death_motion_branches": {
+      "file": "animate.py",
+      "start_marker": "    if name=='Idle':",
+      "end_marker": "    elif name=='Death':",
+      "sha256": "f7eace8649adf7ffaf833370a5212b65e2bb407a98fcef6e95bbce50fa3170b3"
+    }
+  },
+  "parameters_sha256": "b8b86c81e4043e7385cec478faf917df76ec89916d01d5296ab28dc6a0be11d4"
+}

@@ -1,3 +1,19 @@
+# Pouncer R3 Death-only repair candidate
+
+SCOPE=DEATH_DIAGNOSTIC_NOT_FULL when using the default manual workflow input. No asset approval is granted. The accepted-for-Unity-candidate R3 shape, materials and non-Death actions are unchanged. The exact preceding source SHA and unchanged-region hashes are recorded in death-change-boundary.json.
+
+## Exact R3 failure and repair
+
+Read-only reconstruction of the actual exported R3 GLB locates worst penetration at 1.07 seconds: Claw.005 vertex 71, fully weighted to hind_paw.L, at -18.155mm. At the last pose, three claws on that same paw are at approximately 4/20/36mm instead of a common plane. The previous script aligned paw orientation, then changed IK targets/poles again. That final change re-tilted the paw and disturbed shoulder/torso contact. The actual end torso contact was still +50.225mm.
+
+Death now has one coupled authoring solver: update the torso contact target, correct each offending foot or joint individually, evaluate IK, then compute paw local basis from its final evaluated parent. Repeat to convergence and end with paw orientation and contact measurement, with no later target changes. It records every iteration in death-contact-solver.json. It does not clamp vertices, move rendered images, or globally drop the exported output onto the floor. A failed solve still fails the unchanged 4mm penetration and 12mm torso-contact gates.
+
+## Bounded diagnostic
+
+Manual input scope=death-diagnostic still builds the real asset, seven exported animations, materials and serialized GLB/FBX timing/structure checks. It renders only the full Death at 30fps, opposing rest views, and ten near-ground stills covering 0.75–1.80 seconds including the measured 1.07-second failure. review-scope.json and validation.json identify DEATH_DIAGNOSTIC_NOT_FULL; full-motion visual review is NOT_RUN, even if its technical checks pass. No accepted flag is written. scope=full restores complete static and motion rendering. Nothing is automatically installed in a game scene. Full Unity animation, contact and interrupted-transition validation remains required.
+
+---
+
 # Original pouncer candidate R3
 
 UNREVIEWED. R1 was rejected after actual render review. R3 continues the controlled-section anatomical construction, not a recolor or a triangle-count claim. No official game scene, RV, Unity import manifest or runtime script is changed. All generation and rendering run only on GitHub Actions.

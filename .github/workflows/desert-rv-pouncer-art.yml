@@ -1,6 +1,16 @@
 name: Desert RV original pouncer candidate
+run-name: Pouncer ${{ inputs.scope }} · ${{ github.sha }}
 on:
   workflow_dispatch:
+    inputs:
+      scope:
+        description: 'Death diagnostic is not a complete motion review or asset approval'
+        required: true
+        default: death-diagnostic
+        type: choice
+        options:
+          - death-diagnostic
+          - full
 permissions:
   contents: read
 concurrency:
@@ -10,7 +20,7 @@ jobs:
   candidate:
     if: github.actor == github.repository_owner && github.event_name == 'workflow_dispatch' && github.event.repository.private == false && github.ref == 'refs/heads/main'
     runs-on: ubuntu-24.04
-    timeout-minutes: 120
+    timeout-minutes: ${{ inputs.scope == 'death-diagnostic' && 60 || 120 }}
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
@@ -34,7 +44,17 @@ jobs:
           sha256sum --check selected.sha256
           tar -xf blender-4.2.3-linux-x64.tar.xz
           echo "$RUNNER_TEMP/blender/blender-4.2.3-linux-x64" >> "$GITHUB_PATH"
+      - name: Prepare bounded candidate scope
+        env:
+          REVIEW_SCOPE: ${{ inputs.scope }}
+        run: |
+          set -euo pipefail
+          case "$REVIEW_SCOPE" in death-diagnostic|full) ;; *) exit 2;; esac
+          mkdir -p output/pouncer-candidate
+          cp "$RUNNER_TEMP/blender/selected.sha256" output/pouncer-candidate/blender-upstream.sha256
+          printf '%s\n' "$GITHUB_SHA" > output/pouncer-candidate/source-commit.txt
       - name: Generate and render eight static review views first
+        if: inputs.scope == 'full'
         shell: bash
         run: |
           set -euo pipefail
@@ -44,6 +64,7 @@ jobs:
           blender --background --factory-startup --threads 4 --python-exit-code 1 --python tasks/desert-rv/art/pouncer-candidate/generate.py -- --output output/pouncer-candidate --phase static
           python3 tasks/desert-rv/art/pouncer-candidate/package_review.py output/pouncer-candidate
       - name: Upload early static review before animation work
+        if: inputs.scope == 'full'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: pouncer-static-r3-${{ github.run_id }}
@@ -57,8 +78,11 @@ jobs:
             output/pouncer-candidate/source-commit.txt
           if-no-files-found: error
           retention-days: 30
-      - name: Author and render full motion after static upload
-        run: blender --background --factory-startup --threads 4 --python-exit-code 1 --python tasks/desert-rv/art/pouncer-candidate/generate.py -- --output output/pouncer-candidate --phase motion
+      - name: Generate export and verify all structure; render only requested scope
+        timeout-minutes: ${{ inputs.scope == 'death-diagnostic' && 50 || 110 }}
+        env:
+          REVIEW_SCOPE: ${{ inputs.scope }}
+        run: blender --background --factory-startup --threads 4 --python-exit-code 1 --python tasks/desert-rv/art/pouncer-candidate/generate.py -- --output output/pouncer-candidate --phase motion --scope "$REVIEW_SCOPE"
       - name: Encode motion videos, contact sheets, and hashes
         if: always()
         run: python3 tasks/desert-rv/art/pouncer-candidate/package_review.py output/pouncer-candidate
@@ -66,7 +90,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: pouncer-original-r3-${{ github.run_id }}
+          name: pouncer-${{ inputs.scope }}-${{ github.run_id }}
           path: |
             output/pouncer-candidate/*.blend
             output/pouncer-candidate/*.glb
@@ -78,6 +102,7 @@ jobs:
             output/pouncer-candidate/SHA256SUMS
             output/pouncer-candidate/review/*.mp4
             output/pouncer-candidate/review/death-rest-*.png
+            output/pouncer-candidate/review/death-near-*.png
             output/pouncer-candidate/review/*-contact-sheet.jpg
             output/pouncer-candidate/review/turntable-*.png
           if-no-files-found: error
