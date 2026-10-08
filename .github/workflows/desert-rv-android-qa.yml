@@ -1,0 +1,60 @@
+name: Desert RV original APK translated Android evidence
+on:
+  workflow_dispatch:
+    inputs:
+      source_run_id:
+        description: Reviewed successful Android build run ID
+        required: true
+        default: '37796490106'
+        type: string
+      mode:
+        description: Capture first; input-check requires reviewed screenshot coordinates
+        required: true
+        default: capture-only
+        type: choice
+        options: [capture-only, input-check]
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: desert-rv-android-qa
+  cancel-in-progress: false
+jobs:
+  evidence:
+    if: >-
+      github.repository == 'yangerstar1/task-workbench' &&
+      github.event.repository.private == false &&
+      github.event.repository.fork == false &&
+      github.ref == 'refs/heads/main' &&
+      github.actor == 'yangerstar1' &&
+      github.triggering_actor == 'yangerstar1'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    env:
+      QA_MODE: ${{ inputs.mode }}
+      SOURCE_RUN_ID: ${{ inputs.source_run_id }}
+      QA_OUT: ${{ github.workspace }}/android-qa-evidence
+      QA_WORK: ${{ runner.temp }}/desert-rv-android-qa
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+          lfs: false
+      - name: Test verifier without an emulator
+        run: python3 tasks/desert-rv/qa/android/test_qa.py
+      - name: Verify source run and retrieve exact reviewed APK
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 tasks/desert-rv/qa/android/qa.py source
+      - name: Capture bounded translated Android execution
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash tasks/desert-rv/qa/android/run.sh
+      - name: Upload evidence, including blockers (never game acceptance)
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: desert-rv-android-qa-${{ github.run_id }}-${{ github.run_attempt }}
+          path: android-qa-evidence/
+          if-no-files-found: warn
+          retention-days: 7

@@ -1,0 +1,16 @@
+{
+  "37796490106": {
+    "runId": "37796490106",
+    "runAttempt": "1",
+    "commit": "6dc675517db262c72dcb8c1507239d4bf10acc5d",
+    "apkSha256": "98b52328a37c8ea2579c7a1c3761a0451bcf7b7bf183b696564a6f9310409f32",
+    "apkBytes": 99286039,
+    "artifactId": 11563140608,
+    "artifactName": "desert-rv-traversal-harness-android-37796490106-1",
+    "receiptSha256": "bf7a5e6f5aad79047c0e256c43db033f8cce14f1b977351aba0fbb652b76f2b3",
+    "artifactZipSha256": "7b3d0aea280b186fe46e0a21271ba100f562c504fd20eefd2840f772b6d308fa",
+    "artifactZipBytes": 97641799,
+    "packageName": "com.desertrv.traversal.dev",
+    "receiptBoundary": "Published sanitized receipt bytes only; original native receipt bytes unavailable"
+  }
+}

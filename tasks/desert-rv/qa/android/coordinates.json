@@ -1,0 +1,6 @@
+{
+  "status": "unobserved",
+  "apkSha256": "98b52328a37c8ea2579c7a1c3761a0451bcf7b7bf183b696564a6f9310409f32",
+  "reason": "Capture both screen sizes, review real screenshot pixels, then commit bounded coordinates and source PNG hashes. Do not guess controls.",
+  "screens": {}
+}
