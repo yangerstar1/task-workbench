@@ -1,0 +1,176 @@
+"""Executed after R2 sculpt build. IK controls are authoring-only; export is baked."""
+import collections
+import struct
+
+# Calibrate each original limb's pole angle against its known rest elbow/knee.
+for key,pts in leg_chains.items():
+    pre,side=key.split('.'); con=rig.pose.bones[pre+'_lower.'+side].constraints['AuthoringFootLock']; con.influence=1
+    best=(1e9,0)
+    for index in range(16):
+        angle=index*math.tau/16; con.pole_angle=angle; bpy.context.view_layer.update()
+        error=(rig.pose.bones[pre+'_upper.'+side].tail-pts[1]).length
+        if error<best[0]:best=(error,angle)
+    con.pole_angle=best[1]; con.influence=0
+
+
+def set_target(key,position):
+    pre,side=key.split('.'); pb=rig.pose.bones[pre+'_target.'+side]
+    # Targets have +Y local axes matching world, parent root is stationary.
+    pb.location=Vector(position)-bones[pb.name][0]
+
+
+def bounds(meshes=None):
+    deps=bpy.context.evaluated_depsgraph_get(); coords=[]
+    for obj in meshes or [body]+details:
+        ev=obj.evaluated_get(deps); me=ev.to_mesh(); coords.extend(ev.matrix_world@v.co for v in me.vertices); ev.to_mesh_clear()
+    return {'min_z':min(v.z for v in coords),'max_z':max(v.z for v in coords),'min_y':min(v.y for v in coords),'max_y':max(v.y for v in coords)}
+
+
+def author_pose(name,u):
+    for pb in rig.pose.bones:
+        pb.rotation_mode='XYZ'; pb.rotation_euler=(0,0,0); pb.location=(0,0,0); pb.scale=(1,1,1)
+    for key in leg_chains:
+        pre,side=key.split('.'); rig.pose.bones[pre+'_lower.'+side].constraints['AuthoringFootLock'].influence=1 if name in ('Idle','Walk','Windup','Recover','Hit') or (name=='Attack' and (u<.12 or u>.82)) else 0
+    def rot(n,xyz):rig.pose.bones[n].rotation_euler=xyz
+    visual=rig.pose.bones['visual_body']; flight=False
+    if name=='Idle':
+        rot('chest',(.010*math.sin(math.tau*u),0,0)); rot('head',(0,.018*math.sin(math.tau*u),0))
+    elif name=='Walk':
+        cycle=P['gait']['cycle_seconds']; speed=2.7; duty=.5; travel=speed*cycle*duty
+        visual.location.z=-.02+.012*math.cos(4*math.pi*u)
+        rot('spine',(0,.017*math.sin(math.tau*u),0))
+        for key,pts in leg_chains.items():
+            pre,side=key.split('.'); offset=0 if key in ('fore.L','hind.R') else .5
+            phase=(u+offset)%1; center=-.38 if pre=='fore' else .60
+            target=pts[2].copy()
+            if phase<duty:
+                target.y=center-travel/2+speed*phase*cycle
+            else:
+                t=(phase-duty)/(1-duty); eased=t*t*(3-2*t)
+                target.y=center+travel/2-travel*eased; target.z+=.12*math.sin(math.pi*t)
+            set_target(key,target)
+    elif name=='Windup':
+        q=u*u*(3-2*u); visual.location=(0,.035*q,-.10*q)
+        rot('neck',(-.15*q,0,0)); rot('head',(.10*q,0,0))
+    elif name=='Attack':
+        if u<.12:
+            q=1-u/.12; visual.location=(0,.035*q,-.10*q); rot('neck',(-.15*q,0,0)); rot('head',(.10*q,0,0))
+        elif u<.82:
+            t=(u-.12)/.70; hump=math.sin(math.pi*t)
+            visual.location=(0,-.18*hump,.27*hump)
+            rot('visual_body',(-.12*math.sin(math.tau*t),0,0)); flight=True
+            rot('neck',(.14*hump,0,0)); rot('head',(-.16*hump,0,0)); rot('jaw',(.60*math.sin(math.pi*min(1,t*1.5)),0,0))
+            for side in ('L','R'):
+                rot('fore_upper.'+side,(-.32*hump,0,0)); rot('fore_lower.'+side,(.15*hump,0,0)); rot('hind_upper.'+side,(.35*hump,0,0)); rot('hind_lower.'+side,(-.40*hump,0,0))
+        else:
+            t=(u-.82)/.18; compression=.07*math.sin(math.pi*t)
+            visual.location=(0,0,-compression); rot('neck',(.06*math.sin(math.pi*t),0,0))
+    elif name=='Recover':
+        # Stronger absorbing compression, restrained head shake, stable finish.
+        q=math.sin(math.pi*min(1,u*1.7))*(1-u)
+        visual.location=(0,.025*q,-.075*q)
+        rot('head',(.13*q,0,.12*q)); rot('neck',(-.07*q,0,0))
+    elif name=='Hit':
+        q=math.sin(math.pi*u); visual.location=(.055*q,.085*q,-.045*q)
+        rot('head',(-.20*q,0,.23*q)); rot('neck',(-.10*q,0,-.10*q))
+    elif name=='Death':
+        t=min(1,u/.76); q=t*t*(3-2*t); visual.location=(.14*q,0,-.30*q); rot('visual_body',(.04*q,1.48*q,0)); rot('head',(.24*q,0,.13*q)); rot('neck',(.13*q,0,0))
+        for side in ('L','R'):
+            rot('fore_upper.'+side,(.48*q,0,.10*q)); rot('fore_lower.'+side,(-.68*q,0,0)); rot('hind_upper.'+side,(-.40*q,0,0)); rot('hind_lower.'+side,(.57*q,0,0))
+    for i in range(3):rot('tail'+str(i),(0,0,-.09 if name=='Death' else .02*math.sin(u*math.tau+i*.4)))
+    bpy.context.view_layer.update()
+    # Keep IK-controlled paws at their rest world orientation, never paddle with the wrist.
+    for key in leg_chains:
+        pre,side=key.split('.'); con=rig.pose.bones[pre+'_lower.'+side].constraints['AuthoringFootLock']
+        if con.influence:
+            paw=rig.pose.bones[pre+'_paw.'+side]; world_rest=rig.data.bones[paw.name].matrix_local.to_3x3().to_4x4(); world_rest.translation=paw.head; paw.matrix=world_rest
+    bpy.context.view_layer.update()
+    b=bounds()
+    # Collision correction is explicit and measured, not a permissive pass threshold.
+    # Death body is ground-solved. A leap can rise, but no mesh may go below the floor.
+    if name=='Death' or b['min_z']<-.001:
+        correction=-b['min_z']
+        if name!='Death' and not flight:
+            # Move support targets with the skeleton, then reevaluate IK.
+            for key in leg_chains:
+                pre,side=key.split('.'); rig.pose.bones[pre+'_target.'+side].location.z+=correction
+        visual.location.z+=correction; bpy.context.view_layer.update()
+    return flight
+
+# Bake evaluated local matrices, NOT raw IK rotation channels.
+clips={}; gait_samples=[]; motion_bounds={}; authored_poses={}
+for name,seconds in P['clips'].items():
+    end=round(seconds*P['fps'])+1
+    clips[name]={'frame_start':1,'frame_end':end,'seconds_requested':seconds,'seconds_sampled':(end-1)/P['fps'],'loop':name in ('Idle','Walk'),'hold_last_pose':name=='Death'}
+    matrices=[]; pose_bounds=[]
+    rig.animation_data_clear()
+    for frame in range(1,end+1):
+        u=(frame-1)/(end-1); author_pose(name,u)
+        matrices.append({pb.name:pb.matrix.copy() for pb in rig.pose.bones})
+        pose_bounds.append(bounds())
+        if name=='Walk':
+            row={'frame':frame,'time':(frame-1)/P['fps'],'feet':{}}
+            for key in leg_chains:
+                pre,side=key.split('.'); offset=0 if key in ('fore.L','hind.R') else .5; phase=(u+offset)%1
+                paw=rig.pose.bones[pre+'_paw.'+side]
+                row['feet'][key]={'stance':phase<.5,'ankle':list(paw.head),'paw_tip':list(paw.tail)}
+            gait_samples.append(row)
+    motion_bounds[name]=pose_bounds; authored_poses[name]=matrices
+    for pb in rig.pose.bones:
+        for con in pb.constraints:con.influence=0
+    action=bpy.data.actions.new(name); action.use_fake_user=True; rig.animation_data_create(); rig.animation_data.action=action
+    # Parents first: assigning world matrices computes correct local export rotations.
+    for frame,pose in enumerate(matrices,1):
+        for pb in rig.pose.bones:
+            if pb.parent:
+                pb.matrix_basis=pb.bone.matrix_local.inverted() @ pb.parent.bone.matrix_local @ pose[pb.parent.name].inverted() @ pose[pb.name]
+            else:
+                pb.matrix_basis=pb.bone.matrix_local.inverted() @ pose[pb.name]
+            pb.keyframe_insert('location',frame=frame,group=pb.name); pb.keyframe_insert('rotation_euler',frame=frame,group=pb.name); pb.keyframe_insert('scale',frame=frame,group=pb.name)
+    for fc in action.fcurves:
+        for kp in fc.keyframe_points:kp.interpolation='LINEAR'
+# Remove authoring constraints completely before export, preventing doubled IK evaluation.
+for pb in rig.pose.bones:
+    for con in list(pb.constraints):pb.constraints.remove(con)
+rig.animation_data.action=bpy.data.actions['Idle']; scene.frame_set(1)
+for name in clips:
+    track=rig.animation_data.nla_tracks.new(); track.name=name; track.strips.new(name,1,bpy.data.actions[name]); track.mute=True
+bpy.ops.object.select_all(action='DESELECT')
+for obj in [body,rig]+details:obj.select_set(True)
+bpy.context.view_layer.objects.active=rig
+rig.animation_data.action=None
+for tr in rig.animation_data.nla_tracks:tr.mute=False
+bpy.ops.export_scene.gltf(filepath=str(OUT/'pouncer-candidate.glb'),export_format='GLB',use_selection=True,export_animations=True,export_animation_mode='NLA_TRACKS',export_nla_strips=True,export_yup=True)
+for tr in rig.animation_data.nla_tracks:tr.mute=True
+bpy.ops.export_scene.fbx(filepath=str(OUT/'pouncer-candidate.fbx'),use_selection=True,add_leaf_bones=False,bake_anim=True,bake_anim_use_all_actions=True,bake_anim_use_nla_strips=False,axis_forward='-Z',axis_up='Y',apply_unit_scale=True,path_mode='COPY',embed_textures=True)
+rig.animation_data.action=bpy.data.actions['Idle']; scene.frame_set(1)
+bpy.ops.wm.save_as_mainfile(filepath=str(OUT/'pouncer-candidate.blend'))
+(OUT/'clip-manifest.json').write_text(json.dumps(clips,indent=2)); (OUT/'parameters.json').write_text(json.dumps(P,indent=2)); (OUT/'gait-samples.json').write_text(json.dumps(gait_samples,indent=2))
+exec(compile((HERE/'validate_asset.py').read_text(),str(HERE/'validate_asset.py'),'exec'))
+cam=setup_stage(); camera_at(cam,math.pi/2); cam.data.ortho_scale=4.35
+# Landscape 16:9 and 4.35m field fully contain head at maximum forward lunge.
+scene.render.resolution_x=960; scene.render.resolution_y=540
+review=OUT/'review'; review.mkdir(exist_ok=True); scene.render.image_settings.file_format='PNG'
+from bpy_extras.object_utils import world_to_camera_view
+render_manifest=[]; framing_failures=[]
+for name,meta in {**clips,**preview_clips}.items():
+    rig.animation_data.action=bpy.data.actions[name]; folder=review/name; folder.mkdir(exist_ok=True)
+    frames=list(range(1,meta['frame_end']+1,4))
+    if frames[-1]!=meta['frame_end']:frames.append(meta['frame_end'])
+    for index,frame in enumerate(frames):
+        scene.frame_set(frame)
+        deps=bpy.context.evaluated_depsgraph_get(); screen=[]
+        for obj in [body]+details:
+            ev=obj.evaluated_get(deps)
+            screen.extend(world_to_camera_view(scene,cam,ev.matrix_world@Vector(c)) for c in ev.bound_box)
+        framing={'min_x':min(v.x for v in screen),'max_x':max(v.x for v in screen),'min_y':min(v.y for v in screen),'max_y':max(v.y for v in screen)}
+        if min(framing['min_x'],framing['min_y'])<.02 or max(framing['max_x'],framing['max_y'])>.98:framing_failures.append({'clip':name,'frame':frame,'bounds':framing})
+        render_manifest.append({'clip':name,'png':f'{name}/{index:04}.png','source_frame':frame,'source_time_seconds':(frame-1)/P['fps'],'screen_bounds':framing})
+        scene.render.filepath=str(folder/f'{index:04}.png'); bpy.ops.render.render(write_still=True)
+(OUT/'render-manifest.json').write_text(json.dumps(render_manifest,indent=2))
+report=json.loads((OUT/'validation.json').read_text()); report['checks']['motion_framing_failures']=framing_failures
+if framing_failures:
+    validation_errors.append('Motion camera clips asset or has <2% margin'); report['status']='technical_fail'; report['errors']=validation_errors
+(OUT/'validation.json').write_text(json.dumps(report,indent=2))
+bpy.ops.wm.save_as_mainfile(filepath=str(OUT/'review-stage.blend'))
+if validation_errors:raise RuntimeError('; '.join(validation_errors))

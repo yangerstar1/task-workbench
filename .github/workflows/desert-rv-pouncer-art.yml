@@ -34,14 +34,30 @@ jobs:
           sha256sum --check selected.sha256
           tar -xf blender-4.2.3-linux-x64.tar.xz
           echo "$RUNNER_TEMP/blender/blender-4.2.3-linux-x64" >> "$GITHUB_PATH"
-      - name: Generate original asset and neutral-light review evidence
+      - name: Generate and render eight static review views first
         shell: bash
         run: |
           set -euo pipefail
           mkdir -p output/pouncer-candidate
           cp "$RUNNER_TEMP/blender/selected.sha256" output/pouncer-candidate/blender-upstream.sha256
           printf '%s\n' "$GITHUB_SHA" > output/pouncer-candidate/source-commit.txt
-          blender --background --factory-startup --threads 4 --python-exit-code 1 --python tasks/desert-rv/art/pouncer-candidate/generate.py -- --output output/pouncer-candidate --renders
+          blender --background --factory-startup --threads 4 --python-exit-code 1 --python tasks/desert-rv/art/pouncer-candidate/generate.py -- --output output/pouncer-candidate --phase static
+          python3 tasks/desert-rv/art/pouncer-candidate/package_review.py output/pouncer-candidate
+      - name: Upload early static review before animation work
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: pouncer-static-r2-${{ github.run_id }}
+          path: |
+            output/pouncer-candidate/review/turntable-*.png
+            output/pouncer-candidate/review/turntable-contact-sheet.jpg
+            output/pouncer-candidate/STATIC_SHA256SUMS
+            output/pouncer-candidate/static-review.json
+            output/pouncer-candidate/pouncer-basecolor.png
+            output/pouncer-candidate/source-commit.txt
+          if-no-files-found: error
+          retention-days: 30
+      - name: Author and render full motion after static upload
+        run: blender --background --factory-startup --threads 4 --python-exit-code 1 --python tasks/desert-rv/art/pouncer-candidate/generate.py -- --output output/pouncer-candidate --phase motion
       - name: Encode motion videos, contact sheets, and hashes
         if: always()
         run: python3 tasks/desert-rv/art/pouncer-candidate/package_review.py output/pouncer-candidate
@@ -49,12 +65,13 @@ jobs:
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: pouncer-original-candidate-${{ github.run_id }}
+          name: pouncer-original-r2-${{ github.run_id }}
           path: |
             output/pouncer-candidate/*.blend
             output/pouncer-candidate/*.glb
             output/pouncer-candidate/*.fbx
             output/pouncer-candidate/*.json
+            output/pouncer-candidate/*.png
             output/pouncer-candidate/source-commit.txt
             output/pouncer-candidate/blender-upstream.sha256
             output/pouncer-candidate/SHA256SUMS
