@@ -1,0 +1,19 @@
+{
+  "candidate": "scrapyard-bulwark-v001",
+  "status": "source_only_unrendered_unapproved",
+  "source_origin": "original procedural authorship",
+  "third_party_assets": [],
+  "sha256": {
+    "README.md": "22f3d9ab39020f58c5ece9bcde19bf6b64c24f0d1941601264cb9ccca43c4095",
+    "parameters.json": "cc64d69eba7b983093aafa4cd12c0bf82c8a32dd657bb34e4c73e0c40a86d840",
+    "motion.py": "27160d95f23396e43f6ee206a8d0755cf8386c33c36c1dd8687b7e083a7a881d",
+    "generate.py": "ec4a4008fb1914a17ddc10e2667922cbcd402a3c63211eebda51f30e88530db8",
+    "animate.py": "39e194f4c52c3d4ac3ffaa620da6fccbce3d27669c11f8168ab10961c2e42f22",
+    "test_static.py": "303b9400d1bdd8705102d420c02548ea7fa307f6a25a758345bca2b8009ab429",
+    "artifact_io.py": "3a088520d8162c1beaa2c4fcf32275f8041e05db323344b1d82a1b263787a144",
+    "validate_runtime_contract.py": "a2d91b8bc8f947168778cfc4f9ffc4fbc3e92cb6e8a68b7e7131bad3c8d106da",
+    "package_evidence.py": "f411010c0c4bc966f8c7018449a19592dc100651443245c2b85a43a631b4b04d",
+    "write_provenance.py": "af2c297a8dfeacdc85833b9d1d2b1daa58ee355b494594272643159d15e088ea",
+    "test_pipeline.py": "1bff329fba337ec068dc3fba0f609897da0e2542c0dc5ab42cfc6c674e3fdf14"
+  }
+}

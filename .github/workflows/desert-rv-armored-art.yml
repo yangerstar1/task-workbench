@@ -1,0 +1,128 @@
+name: Desert RV original armored candidate
+on:
+  workflow_dispatch:
+    inputs:
+      phase:
+        description: 'static first; full only after reviewing static evidence from this exact source commit'
+        type: choice
+        options: [static, full]
+        default: static
+      reviewed_source_sha:
+        description: 'Full phase requires the exact previously visually reviewed source commit SHA'
+        type: string
+        required: false
+permissions:
+  contents: read
+concurrency:
+  group: desert-rv-armored-art
+  cancel-in-progress: false
+jobs:
+  candidate:
+    if: github.actor == github.repository_owner && github.event_name == 'workflow_dispatch' && github.event.repository.private == false && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    env:
+      ART_ROOT: ${{ runner.temp }}/bulwark-${{ github.run_id }}-${{ github.run_attempt }}
+      ART_SOURCE: tasks/desert-rv/art/armored-candidate
+      REQUESTED_PHASE: ${{ inputs.phase }}
+      REVIEWED_SHA: ${{ inputs.reviewed_source_sha }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+          lfs: false
+      - name: Validate source and explicit phase gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$REQUESTED_PHASE" == static || "$REQUESTED_PHASE" == full ]]
+          if [[ "$REQUESTED_PHASE" == full ]]; then [[ "$REVIEWED_SHA" == "$GITHUB_SHA" ]]; fi
+          python3 "$ART_SOURCE/test_static.py"
+          python3 "$ART_SOURCE/test_pipeline.py"
+          python3 "$ART_SOURCE/validate_runtime_contract.py" --actor tasks/desert-rv/unity/Assets/DesertRV/Runtime/BeastActor.cs
+          test ! -e "$ART_ROOT"
+          mkdir -p "$ART_ROOT"
+      - name: Install official checksum-verified Blender 4.2.3 and evidence tools
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends libxkbcommon0 libsm6 libxi6 libxrender1 libxxf86vm1 libgl1 ffmpeg
+          mkdir -p "$RUNNER_TEMP/bulwark-blender"
+          cd "$RUNNER_TEMP/bulwark-blender"
+          base=https://download.blender.org/release/Blender4.2
+          curl --fail --location --retry 3 --max-time 180 "$base/blender-4.2.3-linux-x64.tar.xz" -o blender-4.2.3-linux-x64.tar.xz
+          curl --fail --location --retry 3 --max-time 60 "$base/blender-4.2.3.sha256" -o upstream.sha256
+          grep -E '[ *]blender-4\.2\.3-linux-x64\.tar\.xz$' upstream.sha256 > selected.sha256
+          test "$(wc -l < selected.sha256)" -eq 1
+          sha256sum --check selected.sha256
+          tar -xf blender-4.2.3-linux-x64.tar.xz
+          cp selected.sha256 "$ART_ROOT/blender-upstream.sha256"
+          echo "$RUNNER_TEMP/bulwark-blender/blender-4.2.3-linux-x64" >> "$GITHUB_PATH"
+      - name: Bind run provenance to complete source and official binary
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 "$ART_SOURCE/write_provenance.py" --root "$ART_ROOT"
+      - name: Generate early static review only
+        id: static
+        shell: bash
+        run: |
+          set -uo pipefail
+          set +e
+          timeout --signal=TERM --kill-after=30s 20m blender --background --factory-startup --threads 4 --python-exit-code 1 --python "$ART_SOURCE/generate.py" -- --output "$ART_ROOT/static" --phase static 2>&1 | tee "$ART_ROOT/static.log"
+          statuses=("${PIPESTATUS[@]}")
+          code=${statuses[0]}
+          if [[ "${statuses[1]}" != 0 ]]; then code=${statuses[1]}; fi
+          printf '%s\n' "$code" > "$ART_ROOT/static.exit"
+          exit "$code"
+      - name: Validate and package early static evidence
+        id: static_package
+        if: always() && steps.static.outcome != 'skipped'
+        run: python3 "$ART_SOURCE/package_evidence.py" --root "$ART_ROOT" --phase static
+      - name: Upload early static evidence before any animation
+        if: always() && steps.static.outcome != 'skipped'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: bulwark-static-evidence-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ env.ART_ROOT }}/static-package/
+          if-no-files-found: error
+          retention-days: 14
+          compression-level: 6
+      - name: Generate bounded motion and export after early upload
+        id: motion
+        if: success() && inputs.phase == 'full' && steps.static_package.outcome == 'success'
+        shell: bash
+        run: |
+          set -uo pipefail
+          set +e
+          timeout --signal=TERM --kill-after=30s 80m blender --background --factory-startup --threads 4 --python-exit-code 1 --python "$ART_SOURCE/generate.py" -- --output "$ART_ROOT/motion" --phase motion 2>&1 | tee "$ART_ROOT/motion.log"
+          statuses=("${PIPESTATUS[@]}")
+          code=${statuses[0]}
+          if [[ "${statuses[1]}" != 0 ]]; then code=${statuses[1]}; fi
+          printf '%s\n' "$code" > "$ART_ROOT/motion.exit"
+          exit "$code"
+      - name: Validate and package motion including explicit failures
+        if: always() && steps.motion.outcome != 'skipped'
+        run: python3 "$ART_SOURCE/package_evidence.py" --root "$ART_ROOT" --phase motion
+      - name: Upload complete or explicitly partial motion evidence
+        if: always() && steps.motion.outcome != 'skipped'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: bulwark-motion-evidence-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ env.ART_ROOT }}/motion-package/
+          if-no-files-found: error
+          retention-days: 14
+          compression-level: 6
+      - name: Upload allowlisted run diagnostics even if evidence packaging fails
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: bulwark-diagnostics-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            ${{ env.ART_ROOT }}/*.log
+            ${{ env.ART_ROOT }}/*.exit
+            ${{ env.ART_ROOT }}/provenance.json
+            ${{ env.ART_ROOT }}/blender-upstream.sha256
+          if-no-files-found: warn
+          retention-days: 14
