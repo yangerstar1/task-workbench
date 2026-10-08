@@ -5,7 +5,6 @@ HERE=$(cd "$(dirname "$0")" && pwd)
 python3 "$HERE/qa.py" preflight
 # The read-only API credential is needed only by preflight, never by SDK/emulator/ADB.
 unset GH_TOKEN GITHUB_TOKEN
-command -v ffmpeg >/dev/null; command -v ffprobe >/dev/null
 mkdir -p "$QA_OUT" "$QA_WORK"
 EMUPID=''; RECORDPID=''
 cleanup() {
@@ -18,10 +17,28 @@ trap cleanup EXIT
 trap 'exit 130' INT
 trap 'exit 143' TERM
 [[ -r /dev/kvm && -w /dev/kvm ]] || { echo 'BLOCKED: /dev/kvm must already be readable and writable; no permission modification allowed' | tee "$QA_OUT/blocker.txt"; exit 1; }
+# FFmpeg is a necessary evidence decoder, installed only on this verified disposable runner.
+missing=()
+for tool in ffmpeg ffprobe; do
+  if ! command -v "$tool" >/dev/null; then missing+=("$tool"); fi
+done
+printf 'Missing video verification tools: %s\n' "${missing[*]:-none}" | tee "$QA_OUT/dependency-check.txt"
+if (( ${#missing[@]} )); then
+  timeout 180 sudo apt-get update > "$QA_OUT/apt-update.txt" 2>&1
+  apt-cache policy ffmpeg > "$QA_OUT/ffmpeg-package-policy.txt"
+  # Use the standard Ubuntu repositories already configured by the official runner.
+  # Do not add repositories, disable signature checks, or accept unauthenticated packages.
+  timeout 300 sudo apt-get install -y --no-install-recommends ffmpeg > "$QA_OUT/ffmpeg-install.txt" 2>&1
+fi
+for tool in ffmpeg ffprobe; do
+  command -v "$tool" >> "$QA_OUT/dependency-check.txt" || { echo "BLOCKED: $tool unavailable after official Ubuntu package installation" | tee "$QA_OUT/blocker.txt"; exit 1; }
+done
+ffmpeg -version > "$QA_OUT/ffmpeg-version.txt"
+ffprobe -version > "$QA_OUT/ffprobe-version.txt"
 SDK=${ANDROID_SDK_ROOT:-${ANDROID_HOME:?Android SDK missing}}
 export ANDROID_SDK_ROOT="$SDK" ANDROID_HOME="$SDK"
 export PATH="$SDK/platform-tools:$SDK/emulator:$SDK/cmdline-tools/latest/bin:$PATH"
-# No --licenses, yes, chmod, sudo, udev, or user-group modifications.
+# No --licenses, yes, chmod, udev, or user-group modifications.
 # New/unaccepted SDK terms must block instead of being auto-accepted.
 timeout 600 sdkmanager 'platform-tools' 'emulator' 'platforms;android-30' 'build-tools;35.0.0' 'system-images;android-30;google_apis;x86_64' </dev/null > "$QA_OUT/sdk-install.txt" 2>&1
 emulator -version > "$QA_OUT/emulator-version.txt" 2>&1
