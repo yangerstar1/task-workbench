@@ -17,12 +17,14 @@ import verify_evidence as source
 REGIONS = ('FirstStation', 'Scrapyard', 'NightBeacon')
 VIEWS = ('overview', 'ground', 'landmark', 'cabin')
 IMAGES = {f'{r}-{v}.png' for r in REGIONS for v in VIEWS}
+CLEARANCE_FILES = {f'clearance-region-{i}.json' for i in (1,2,3)}
 GENERATED = 'Assets/DesertRV/Scenes/Journey'
 RENDER_TEST = 'DesertRV.Tests.JourneyEnvironmentRenderTests.AuthorAndCaptureTwelveRealEnvironmentViews'
 SNAPSHOT = source.TASK / 'environment-before.json'
 OUT = source.TASK / 'evidence/environment'
 PARTIAL = source.TASK / 'evidence/environment-unaccepted'
 DIAGNOSTIC = source.TASK / 'evidence/environment-source-diagnostic'
+PACKAGE_DIAGNOSTIC = source.TASK / 'evidence/environment-package-diagnostic'
 FAILED_STATUS = 'FAILED_PROTECTED_SOURCE_CHECK_NOT_ACCEPTED'
 
 
@@ -79,6 +81,25 @@ def inspect_native_report(directory):
     return source.sha(reports[0])
 
 
+def inspect_clearance(project):
+    common={'driving-corridor','vehicle-spawn','dismount','cabin-workbench'}
+    allowed=common|{'salvage-access','power-access','short-approach-Ram salvage interaction',
+                    'short-approach-Coil interaction','short-approach-Power interaction'}
+    reports=[]
+    for region in (1,2,3):
+        value=source.read_json(project/f'JourneyEvidence/clearance-region-{region}.json')
+        require(set(value)=={'region','passed','checkedZones','distantMeshes'},'Unexpected clearance fields')
+        require(value['region']==region and value['passed'] is True and value['distantMeshes']==4,
+                'Missing region clearance or incorrect distant mesh inventory')
+        zones=value['checkedZones']
+        require(isinstance(zones,list) and all(isinstance(z,str) for z in zones) and len(zones)==len(set(zones)),
+                'Invalid clearance zone list')
+        required=common|({'salvage-access'} if region==1 else {'salvage-access','power-access'} if region==2 else {'power-access'})
+        require(required<=set(zones)<=allowed,'Missing or unknown checked clearance zones')
+        reports.append(dict(region=region,passed=True,checkedZones=sorted(zones),distantMeshes=4))
+    return reports
+
+
 def inspect_capture(project):
     capture = project / 'JourneyEvidence/environment'
     require({p.name for p in capture.iterdir()} == IMAGES | {'capture-report.json'}, 'Unexpected or missing capture files')
@@ -107,7 +128,7 @@ def inspect_capture(project):
     require(seen == IMAGES, 'Incomplete regions/views')
     layout = source.read_json(project / 'JourneyEvidence/candidate-layout.json')
     require(layout.get('passed') is True, 'Candidate layout failed')
-    return dict(graphicsDeviceType='OpenGLCore', graphicsDeviceName=device, candidateLayoutPassed=True, bufferSceneTransitionsChecked=3, captureBuffersReleased=True, images=clean)
+    return dict(graphicsDeviceType='OpenGLCore', graphicsDeviceName=device, candidateLayoutPassed=True, bufferSceneTransitionsChecked=3, captureBuffersReleased=True, clearance=inspect_clearance(project), images=clean)
 
 
 def collect_generated(project):
@@ -149,6 +170,8 @@ def package():
     capture = inspect_capture(source.PROJECT)
     names = collect_generated(source.PROJECT)
     OUT.mkdir(parents=True)
+    for report in capture['clearance']:
+        (OUT/f"clearance-region-{report['region']}.json").write_text(json.dumps(dict(report,status='CANDIDATE_CLEARANCE_ONLY_NOT_GAMEPLAY_APPROVAL'),indent=2)+'\n')
     records=[]; diffs=[]
     for name in names:
         p=source.PROJECT/name; dest=OUT/'generated'/name
@@ -197,6 +220,8 @@ def package_unaccepted(project, destination, before, after, run_identity):
             all(isinstance(h,str) and re.fullmatch('[a-f0-9]{32}',h) for h in hashes), 'Invalid layout provenance')
     destination.mkdir(parents=True)
     for name in sorted(IMAGES):shutil.copyfile(project/'JourneyEvidence/environment'/name,destination/name)
+    for report in capture['clearance']:
+        (destination/f"clearance-region-{report['region']}.json").write_text(json.dumps(dict(report,status=FAILED_STATUS),indent=2)+'\n')
     capture['status']=FAILED_STATUS
     (destination/'capture-report.json').write_text(json.dumps(capture,indent=2)+'\n')
     (destination/'candidate-layout.json').write_text(json.dumps(dict(status=FAILED_STATUS,
@@ -204,7 +229,7 @@ def package_unaccepted(project, destination, before, after, run_identity):
     diagnostic=dict(run_identity,status=FAILED_STATUS,accepted=False,
                     protectedTrackedFilesUnchanged=False,changedFiles=differences)
     (destination/'protected-source-failure.json').write_text(json.dumps(diagnostic,indent=2)+'\n')
-    allowed=IMAGES|{'capture-report.json','candidate-layout.json','protected-source-failure.json'}
+    allowed=IMAGES|CLEARANCE_FILES|{'capture-report.json','candidate-layout.json','protected-source-failure.json'}
     require({p.name for p in destination.iterdir()}==allowed,'Unexpected partial export')
     manifest=[dict(path=p.name,sha256=source.sha(p),size=p.stat().st_size) for p in sorted(destination.iterdir())]
     (destination/'SHA256SUMS.json').write_text(json.dumps(dict(status=FAILED_STATUS,files=manifest),indent=2)+'\n')
@@ -231,6 +256,53 @@ def diagnose():
     print(FAILED_STATUS + ': independent safe source mismatch JSON saved.')
 
 
+def validated_unity_dependencies(value, locked=False):
+    require(isinstance(value,dict) and set(value)=={'dependencies'}, 'Unexpected package root fields')
+    dependencies=value['dependencies']
+    require(isinstance(dependencies,dict) and len(dependencies)<=200, 'Invalid package count')
+    def version_map(items):
+        require(isinstance(items,dict) and len(items)<=200,'Invalid dependency map')
+        for key,version in items.items():
+            require(isinstance(key,str) and re.fullmatch(r'com\.unity\.[a-z0-9.-]+',key) and len(key)<=120,
+                    'Non-Unity or unsafe package name')
+            require(isinstance(version,str) and re.fullmatch(r'[0-9]+\.[0-9]+\.[0-9]+(?:-[A-Za-z0-9.-]+)?',version) and len(version)<=60,
+                    'Non-version dependency; URLs, paths and tokens are forbidden')
+        return dict(sorted(items.items()))
+    if not locked:return version_map(dependencies)
+    result={}
+    for name,entry in dependencies.items():
+        require(isinstance(entry,dict) and set(entry)<={'version','depth','source','dependencies','url'} and
+                {'version','depth','source','dependencies'}<=set(entry),'Unexpected package lock fields')
+        version_map({name:entry['version']})
+        require(type(entry['depth']) is int and 0<=entry['depth']<=20,'Invalid dependency depth')
+        require(entry['source'] in ('builtin','registry'),'Unsupported source; git, local paths and private registries forbidden')
+        if entry['source']=='registry':require(entry.get('url')=='https://packages.unity.com','Non-official registry forbidden')
+        else:require('url' not in entry,'Builtin dependency must not carry registry URL')
+        result[name]=dict(version=entry['version'],depth=entry['depth'],source=entry['source'],
+                          dependencies=version_map(entry['dependencies']))
+        if entry['source']=='registry':result[name]['url']='https://packages.unity.com'
+    return dict(sorted(result.items()))
+
+
+def diagnose_packages():
+    # Separate export: failure here cannot remove the already-uploaded path/hash diagnosis.
+    require(not PACKAGE_DIAGNOSTIC.exists(),'Refuse stale package diagnosis')
+    before=source.read_json(SNAPSHOT);after=tracked_snapshot(source.ROOT)
+    names=['tasks/desert-rv/unity/Packages/manifest.json','tasks/desert-rv/unity/Packages/packages-lock.json']
+    require(any(before.get(n)!=after.get(n) for n in names),'No package mutation to diagnose')
+    report=dict(source.identity(),status=FAILED_STATUS,accepted=False,scope='Allowlisted Unity package resolution diagnosis only')
+    for name,locked,label in zip(names,(False,True),('manifest','lock')):
+        raw=subprocess.check_output(['git','show','HEAD:'+name],cwd=source.ROOT)
+        require(len(raw)<=4*1024**2 and hashlib.sha256(raw).hexdigest()==before[name], 'Original package bytes do not match protected snapshot')
+        original=json.loads(raw)
+        resolved=source.read_json(source.ROOT/name)
+        report[label]=dict(beforeSha256=before[name],afterSha256=after[name],
+            before=validated_unity_dependencies(original,locked),after=validated_unity_dependencies(resolved,locked))
+    PACKAGE_DIAGNOSTIC.mkdir(parents=True)
+    (PACKAGE_DIAGNOSTIC/'unity-package-resolution.json').write_text(json.dumps(report,indent=2)+'\n')
+    print('Strict Unity dependency metadata saved; no raw package files or arbitrary fields exported.')
+
+
 def partial():
     inspect_native_report(source.TASK/'artifacts/environment')
     ident=source.identity();ident['scope']='Unaccepted environment pixels for diagnosis; protected source check FAILED; gameplay/APK NOT_RUN'
@@ -239,5 +311,5 @@ def partial():
 
 
 if __name__ == '__main__':
-    parser=argparse.ArgumentParser();parser.add_argument('mode',choices=('before','package','partial','diagnose'))
-    args=parser.parse_args(); {'before':before,'package':package,'partial':partial,'diagnose':diagnose}[args.mode]()
+    parser=argparse.ArgumentParser();parser.add_argument('mode',choices=('before','package','partial','diagnose','diagnose-packages'))
+    args=parser.parse_args(); {'before':before,'package':package,'partial':partial,'diagnose':diagnose,'diagnose-packages':diagnose_packages}[args.mode]()

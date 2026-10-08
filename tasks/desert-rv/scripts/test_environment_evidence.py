@@ -7,7 +7,7 @@ from pathlib import Path
 from PIL import Image
 from environment_evidence import (assert_preserved, valid_generated_name, inspect_png,
     inspect_capture, collect_generated, inspect_native_report, GENERATED, REGIONS, VIEWS, RENDER_TEST,
-    package_unaccepted, protection_differences, FAILED_STATUS, IMAGES, write_protection_diagnostic)
+    package_unaccepted, protection_differences, FAILED_STATUS, IMAGES, write_protection_diagnostic, validated_unity_dependencies, CLEARANCE_FILES, inspect_clearance)
 
 class EnvironmentContracts(unittest.TestCase):
     def setUp(self):
@@ -27,6 +27,11 @@ class EnvironmentContracts(unittest.TestCase):
         report=dict(status='captured-environment-only-not-gameplay-acceptance',graphicsDeviceType='OpenGLCore',graphicsDeviceName='llvmpipe',bufferSceneTransitionsChecked=3,captureBuffersReleased=True,images=images)
         (d/'capture-report.json').write_text(json.dumps(report))
         (d.parent/'candidate-layout.json').write_text(json.dumps(dict(passed=True,mode='candidate-layout-only-not-gameplay-approval',sceneDependencyHashes=['b'*32]*4)))
+        for region in (1,2,3):
+            zones=['driving-corridor','vehicle-spawn','dismount','cabin-workbench']
+            if region<3:zones.append('salvage-access')
+            if region>1:zones.append('power-access')
+            (d.parent/f'clearance-region-{region}.json').write_text(json.dumps(dict(region=region,passed=True,checkedZones=zones,distantMeshes=4)))
         return d,report
     def rewrite(self,d,report):(d/'capture-report.json').write_text(json.dumps(report))
     def test_unchanged_source(self):assert_preserved({'a':'one'},{'a':'one'})
@@ -113,7 +118,7 @@ class EnvironmentContracts(unittest.TestCase):
     def test_unaccepted_export_is_exact_and_marked_failed(self):
         self.capture();out=self.root/'partial'
         package_unaccepted(self.root,out,{'Assets/a.mat':'a'*64},{'Assets/a.mat':'b'*64},{'commit':'c'*40})
-        self.assertEqual({p.name for p in out.iterdir()},IMAGES|{'capture-report.json','candidate-layout.json','protected-source-failure.json','SHA256SUMS.json'})
+        self.assertEqual({p.name for p in out.iterdir()},IMAGES|CLEARANCE_FILES|{'capture-report.json','candidate-layout.json','protected-source-failure.json','SHA256SUMS.json'})
         for name in ['capture-report.json','candidate-layout.json','protected-source-failure.json','SHA256SUMS.json']:
             self.assertEqual(json.loads((out/name).read_text())['status'],FAILED_STATUS)
         d=json.loads((out/'protected-source-failure.json').read_text());self.assertFalse(d['accepted'])
@@ -148,6 +153,32 @@ class EnvironmentContracts(unittest.TestCase):
         r=Path(__file__).resolve().parents[3];w=(r/'.github/workflows/desert-rv-environment.yml').read_text()
         self.assertLess(w.index('name: Upload only independent source hash diagnosis'),w.index('name: Preserve unaccepted pixels'))
         self.assertIn("if: failure() && steps.source_diag.outputs.present == 'true'",w)
+    def test_official_package_metadata_positive(self):
+        for source_name in ('builtin','registry'):
+            e=dict(version='1.6.0',depth=0,source=source_name,dependencies={'com.unity.ext.nunit':'2.0.5'})
+            if source_name=='registry':e['url']='https://packages.unity.com'
+            out=validated_unity_dependencies({'dependencies':{'com.unity.test-framework':e}},True)
+            self.assertEqual(out['com.unity.test-framework']['version'],'1.6.0')
+        self.assertEqual(validated_unity_dependencies({'dependencies':{'com.unity.test-framework':'1.6.0'}}),{'com.unity.test-framework':'1.6.0'})
+    def test_package_diagnostic_rejects_paths_tokens_and_foreign_packages(self):
+        for version in ('file:../secret','https://private.example/token','git+https://example.com/a','Bearer secret'):
+            with self.assertRaises(ValueError):validated_unity_dependencies({'dependencies':{'com.unity.test-framework':version}})
+        with self.assertRaises(ValueError):validated_unity_dependencies({'dependencies':{'org.private.package':'1.0.0'}})
+    def test_package_diagnostic_rejects_private_registry_and_extra_fields(self):
+        good=dict(version='1.6.0',depth=0,source='registry',dependencies={},url='https://packages.unity.com')
+        for patch in ({'url':'https://private.example'},{'token':'secret'},{'source':'git'},{'depth':-1},{'url':'https://packages.unity.com/?token=x'}):
+            e=dict(good,**patch)
+            with self.assertRaises(ValueError):validated_unity_dependencies({'dependencies':{'com.unity.test-framework':e}},True)
+        with self.assertRaises(ValueError):validated_unity_dependencies({'dependencies':{},'scopedRegistries':[]})
+    def test_all_region_clearance_required(self):
+        self.capture();self.assertEqual(len(inspect_clearance(self.root)),3)
+        p=self.root/'JourneyEvidence/clearance-region-2.json';p.unlink()
+        with self.assertRaises(ValueError):inspect_clearance(self.root)
+    def test_clearance_failures_and_unknown_zones_rejected(self):
+        self.capture();p=self.root/'JourneyEvidence/clearance-region-1.json';original=json.loads(p.read_text())
+        for patch in ({'passed':False},{'region':2},{'distantMeshes':0},{'checkedZones':['token']},{'extra':'secret'}):
+            p.write_text(json.dumps(dict(original,**patch)))
+            with self.assertRaises(ValueError):inspect_clearance(self.root)
     def test_native_inventory_exact(self):
         p=self.root/'result.xml';p.write_text(f'<test-run result="Passed"><test-case fullname="{RENDER_TEST}" result="Passed"/></test-run>')
         inspect_native_report(self.root)

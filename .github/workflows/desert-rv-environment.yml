@@ -91,6 +91,18 @@ jobs:
           path: tasks/desert-rv/evidence/environment-source-diagnostic/protected-source-failure.json
           if-no-files-found: error
           retention-days: 7
+      - name: Diagnose official Unity package resolution without raw files
+        id: package_diag
+        if: failure() && steps.source_diag.outputs.present == 'true'
+        run: /usr/bin/python3 tasks/desert-rv/scripts/environment_evidence.py diagnose-packages
+      - name: Upload only allowlisted Unity package metadata
+        if: failure() && steps.package_diag.outcome == 'success'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: desert-rv-packages-FAILED-NOT-ACCEPTED-${{ github.run_id }}-${{ github.run_attempt }}
+          path: tasks/desert-rv/evidence/environment-package-diagnostic/unity-package-resolution.json
+          if-no-files-found: error
+          retention-days: 7
       - name: Preserve unaccepted pixels only after a protected-source failure
         id: partial
         if: failure() && steps.native.outcome == 'success' && steps.package.outcome == 'failure'

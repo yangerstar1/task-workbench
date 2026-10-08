@@ -28,8 +28,8 @@
     },
     {
       "path": ".github/workflows/desert-rv-environment.yml",
-      "sha256": "3c685bed43a1c5bdb4bfb59e1868bc2ac84a2ff69ef2cf8d457eaa09481ebe99",
-      "size": 5071
+      "sha256": "da31facb4a1f6b9a2d0d456f7aa3c6b104ca56b52f9f726c3e9810f55d53906c",
+      "size": 5831
     },
     {
       "path": "tasks/desert-rv/ASSET-NOTICES.md",
@@ -53,8 +53,8 @@
     },
     {
       "path": "tasks/desert-rv/scripts/environment_evidence.py",
-      "sha256": "a164261d7b02d5a6730e6cf691214b8e7481e5c34599047c15b2977bf4a2db12",
-      "size": 13799
+      "sha256": "a9f3660f1f6dc9e469bd7a715cb429eeb2d85801b41f351b053d50f1508990b7",
+      "size": 19124
     },
     {
       "path": "tasks/desert-rv/scripts/expected_playmode_test_cases.json",
@@ -73,8 +73,8 @@
     },
     {
       "path": "tasks/desert-rv/scripts/test_environment_evidence.py",
-      "sha256": "6a31f5b2af3e9bd50122e0dcf43cde187f90f45abed21d1b9acdee95857d6d6a",
-      "size": 11942
+      "sha256": "2809c37367923562184a00b897c46465c5e3db7d0098f1bca04821528aa97937",
+      "size": 14795
     },
     {
       "path": "tasks/desert-rv/scripts/test_verification_scope.py",
@@ -3443,8 +3443,8 @@
     },
     {
       "path": "tasks/desert-rv/unity/Assets/DesertRV/Editor/JourneySceneAuthoring.cs",
-      "sha256": "0f8d6cfb83c5c950e30f8d39f73bd07eb78c1f543cc4f1ac34fdcf37a5ec060b",
-      "size": 32092
+      "sha256": "ce986331d323a478d6977efce9b2c611a8c9da83567671807c264327c2a3d37b",
+      "size": 46716
     },
     {
       "path": "tasks/desert-rv/unity/Assets/DesertRV/Editor/JourneySceneAuthoring.cs.meta",
