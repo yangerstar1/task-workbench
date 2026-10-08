@@ -1,0 +1,19 @@
+{
+  "schema": 1,
+  "mode": "DISCOVERY_ONLY",
+  "scope": "FULL_CANDIDATE",
+  "id": "weapon-combined-discovery-37849553855",
+  "kind": "weapon",
+  "repository": "yangerstar1/task-workbench",
+  "runUrl": "https://github.com/yangerstar1/task-workbench/actions/runs/37849553855",
+  "sourceCommit": "137de37644dc64692fe44affbe0fdac9d67196f4",
+  "artifactId": 11581960473,
+  "artifactName": "weapon-combined-candidate-37849553855",
+  "artifactSha256": "cf474231b9207401669bc223d85733ca9936fb46d40887a807189ad75b19d7f3",
+  "files": [
+    {
+      "file": "weapon_hands.fbx",
+      "sha256": "f8074e248393e67c3453dfd158312592cd4192314c38e320632acfa13ef22d4a"
+    }
+  ]
+}

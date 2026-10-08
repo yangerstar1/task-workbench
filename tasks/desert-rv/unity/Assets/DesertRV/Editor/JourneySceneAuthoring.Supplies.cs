@@ -159,9 +159,6 @@ namespace DesertRV.Editor
             {
                 SupplyIcon(mark,p.kind,new Vector3(-width*.31f,0,-.018f),height*.66f,ink);
                 SupplyWorldText(mark,p.kind==SupplyKind.Ammo?"钉弹 "+p.amount:"维修 +1",new Vector3(width*.13f,0,-.018f),width*.60f,height*.77f,height*.25f,ink,font);
-                // A narrow identity strip sits on the actual lid and front, not in the player's view.
-                var localTop=new Vector3(-bounds.size.x*.29f,bounds.max.y+.012f,bounds.center.z)-mark.localPosition;
-                SupplyLocalBox("Lid identity paint",mark,localTop,new Vector3(.055f,.012f,bounds.size.z*.91f),paint);
             }
             else
             {

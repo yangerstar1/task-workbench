@@ -66,6 +66,11 @@
       "size": 810
     },
     {
+      "path": "tasks/desert-rv/art/import-candidate/contracts/weapon-combined-discovery-37849553855.json",
+      "sha256": "59a2ec91f384cf32214ccab10a808521967a6e41009d0701c2839593748b00d8",
+      "size": 661
+    },
+    {
       "path": "tasks/desert-rv/art/import-candidate/pouncer-death-input-inventory.json",
       "sha256": "2bcbc9ef3b83e28c351989f8a025a61d3f0ec9916a5f4ce501f8d26c7a1c2fa9",
       "size": 1158
@@ -3587,8 +3592,8 @@
     },
     {
       "path": "tasks/desert-rv/unity/Assets/DesertRV/Editor/JourneySceneAuthoring.Supplies.cs",
-      "sha256": "0508e516a58377cfe27862bfa44ff5205ef70b410ee68c3a958cc9ad6b445911",
-      "size": 20253
+      "sha256": "ee1c2987fb13fe2d939d9590f8f9565932145c48b8d095243879aa353ba8ad18",
+      "size": 19915
     },
     {
       "path": "tasks/desert-rv/unity/Assets/DesertRV/Editor/JourneySceneAuthoring.Supplies.cs.meta",
