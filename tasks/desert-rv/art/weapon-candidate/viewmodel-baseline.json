@@ -1,0 +1,28 @@
+{
+  "repository": "yangerstar1/task-workbench",
+  "run_id": 37841477090,
+  "artifact_id": 11579827076,
+  "source_commit": "4c3ca2434a15544667e96fd46577169ed44369ad",
+  "zip_sha256": "f831242adfea3fe442c5334455193963f79d8251afa4e5dbedfc3a53b01034e5",
+  "zip_bytes": 25059567,
+  "files": {
+    "weapon_hands.blend": "703ac169480d5574718d7d492cc48ff8340d4318ac002c2db326453aef35ffcc",
+    "weapon_hands.glb": "cb3aa9fb4fe7e2827f5d67201ea989bad1fa0b7f84c927fca3b91e3dd17a5246",
+    "weapon_hands.fbx": "f8074e248393e67c3453dfd158312592cd4192314c38e320632acfa13ef22d4a",
+    "validation.json": "5e58e96646ab8f0a121b956c17af17ba41d9e5b2f840f1f25ea6f72ae105f2ea",
+    "package-validation.json": "6ee4858cfc4c45ae6d814ad51c9f309b47c6e2bdab56a86315c145d4a3df23b9",
+    "SHA256SUMS": "8b4d4c3144547e9799b6711482bb232d3ccd96c82f7b87c19496d1ed66041038",
+    "source-commit.txt": "57e7490bfc5339b75e84977b4861f065e79ca9c806caf7e9c7c83856b21cfc2e",
+    "side_Idle.mp4": "f14a57ac4e163ba62860427cec14334de6a5b13afe7d5dfb93e8f1c03c50a870",
+    "side_Fire.mp4": "8e3f572502a47af7c07f5d22467f87d0df47f38e990e7eb14cdb3cfefe09e509",
+    "side_Reload.mp4": "4b2e8173b1d92203efa7a0443748f3e80a5493c0bd89fc68e7cf3290ecef71d4",
+    "weapon-presentation-contract.json": "bd10200eac167ae4425ccba4b946e5dbfcd3c8156dabdc1ef883a73acc843208"
+  },
+  "only_adjustment": {
+    "rig_camera_plane_x_m": {
+      "old": 0,
+      "new": -0.015
+    }
+  },
+  "new_full_run": false
+}

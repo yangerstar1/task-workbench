@@ -1,0 +1,66 @@
+name: DesertRV bounded viewmodel correction
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: desert-rv-weapon-art
+  cancel-in-progress: false
+jobs:
+  verify-framing-only:
+    if: github.actor == github.repository_owner && github.event_name == 'workflow_dispatch' && github.event.repository.private == false && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+          lfs: false
+      - name: Static bounded-scope tests
+        run: python3 tasks/desert-rv/art/weapon-candidate/test_viewmodel_only.py
+      - name: Retrieve exact reviewed source artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh api repos/yangerstar1/task-workbench/actions/artifacts/11579827076 > /tmp/source-artifact.json
+          python3 - <<'PY'
+          import json
+          m=json.load(open('/tmp/source-artifact.json'))
+          assert m['workflow_run']['id']==37841477090
+          assert m['workflow_run']['head_sha']=='4c3ca2434a15544667e96fd46577169ed44369ad'
+          assert not m['expired']
+          PY
+          gh api repos/yangerstar1/task-workbench/actions/artifacts/11579827076/zip > /tmp/weapon-r9-full.zip
+          python3 tasks/desert-rv/art/weapon-candidate/prepare_viewmodel_source.py /tmp/weapon-r9-full.zip source-r9
+      - name: Install verified Blender 4.2.3
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --location --retry 3 -o /tmp/blender.tar.xz https://download.blender.org/release/Blender4.2/blender-4.2.3-linux-x64.tar.xz
+          curl --fail --location --retry 3 -o /tmp/blender.sha256 https://download.blender.org/release/Blender4.2/blender-4.2.3.sha256
+          hash=$(grep -E '[ *]blender-4\.2\.3-linux-x64\.tar\.xz$' /tmp/blender.sha256 | awk '{print $1}')
+          test ${#hash} -eq 64
+          echo "$hash  /tmp/blender.tar.xz" | sha256sum --check --strict
+          tar -xJf /tmp/blender.tar.xz -C /tmp
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends libxxf86vm1 libxkbcommon0 libegl1 libgl1 libsm6 libxi6 libxrender1
+      - name: Render only two aspects and their core masks
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p viewmodel-output
+          /tmp/blender-4.2.3-linux-x64/blender --background --factory-startup --disable-autoexec --threads 2 --python-exit-code 1 --python tasks/desert-rv/art/weapon-candidate/viewmodel_only.py -- "$GITHUB_WORKSPACE/source-r9" "$GITHUB_WORKSPACE/viewmodel-output" 2>&1 | tee viewmodel-output/blender.log
+      - name: Seal final evidence after Blender exit
+        if: always()
+        run: python3 tasks/desert-rv/art/weapon-candidate/seal_artifacts.py viewmodel-output
+      - name: Upload bounded framing and equivalence evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: desert-rv-viewmodel-only-${{ github.run_id }}
+          path: viewmodel-output/
+          if-no-files-found: error
+          retention-days: 14
