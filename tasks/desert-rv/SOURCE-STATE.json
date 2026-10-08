@@ -71,6 +71,11 @@
       "size": 810
     },
     {
+      "path": "tasks/desert-rv/art/import-candidate/contracts/pouncer-full-discovery-37856618820.json",
+      "sha256": "8b89f4e0270dae4a7dfe71288c931fa9a0a439e56016b434443254788eb10038",
+      "size": 800
+    },
+    {
       "path": "tasks/desert-rv/art/import-candidate/contracts/weapon-combined-discovery-37849553855.json",
       "sha256": "59a2ec91f384cf32214ccab10a808521967a6e41009d0701c2839593748b00d8",
       "size": 661

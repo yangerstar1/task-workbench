@@ -1,0 +1,23 @@
+{
+  "schema": 1,
+  "mode": "DISCOVERY_ONLY",
+  "scope": "FULL_CANDIDATE",
+  "id": "pouncer-full-discovery-37856618820",
+  "kind": "pouncer",
+  "repository": "yangerstar1/task-workbench",
+  "runUrl": "https://github.com/yangerstar1/task-workbench/actions/runs/37856618820",
+  "sourceCommit": "a1490c92e804ef54367c23bddb25dffb2dea49b1",
+  "artifactId": 11584890436,
+  "artifactName": "pouncer-combined-candidate-37856618820",
+  "artifactSha256": "bc27a00db7ae477f05f24ccf925ca7eaf8391411e5b3a5ff33550df92a4a1e89",
+  "files": [
+    {
+      "file": "pouncer-candidate.fbx",
+      "sha256": "7a00a875d8d5d8bd6f14d39aee736a9e705f95f304e754d8653d3f1150ef223f"
+    },
+    {
+      "file": "pouncer-basecolor.png",
+      "sha256": "d771c6ddefb650959e1702359745b6ecc076a3df6f4aa1f09e99346db7e4a06b"
+    }
+  ]
+}
