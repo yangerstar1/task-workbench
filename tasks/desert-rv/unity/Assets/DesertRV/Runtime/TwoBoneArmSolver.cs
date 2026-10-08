@@ -37,15 +37,26 @@ namespace DesertRV
             swing=Quaternion.identity;
             if(!Finite(epsilon)||epsilon<=0||!Finite(calibratedPlaneNormal)||!Finite(from)||!Finite(to)||
                 !Finite(from.magnitude)||!Finite(to.magnitude)||from.magnitude<=epsilon||to.magnitude<=epsilon)return false;
-            from.Normalize();to.Normalize();
-            if(Vector3.Dot(from,to)<-1+.000001f)
+            // Use double intermediates and atan2(cross length, dot), without a near-parallel
+            // identity shortcut. A sub-degree correction can still exceed the wrist-gap budget.
+            double fl=System.Math.Sqrt((double)from.x*from.x+(double)from.y*from.y+(double)from.z*from.z);
+            double tl=System.Math.Sqrt((double)to.x*to.x+(double)to.y*to.y+(double)to.z*to.z);
+            double fx=from.x/fl,fy=from.y/fl,fz=from.z/fl,tx=to.x/tl,ty=to.y/tl,tz=to.z/tl;
+            double cx=fy*tz-fz*ty,cy=fz*tx-fx*tz,cz=fx*ty-fy*tx;
+            double crossLength=System.Math.Sqrt(cx*cx+cy*cy+cz*cz),dot=fx*tx+fy*ty+fz*tz;
+            if(crossLength<=1e-12)
             {
-                // A 180-degree shortest arc has no unique axis; use the imported bend plane, never a guessed world axis.
-                var axis=Vector3.ProjectOnPlane(calibratedPlaneNormal,from);
+                if(dot>=0)return true; // Genuinely coincident directions, not a dot-product angle band.
+                // Exactly opposite directions need the calibrated plane to resolve their axis.
+                var axis=Vector3.ProjectOnPlane(calibratedPlaneNormal,from.normalized);
                 if(axis.sqrMagnitude<=epsilon*epsilon)return false;
                 swing=Quaternion.AngleAxis(180,axis.normalized);
             }
-            else swing=Quaternion.FromToRotation(from,to);
+            else
+            {
+                double half=System.Math.Atan2(crossLength,dot)*.5,s=System.Math.Sin(half)/crossLength;
+                swing=new Quaternion((float)(cx*s),(float)(cy*s),(float)(cz*s),(float)System.Math.Cos(half));
+            }
             return Finite(swing.x)&&Finite(swing.y)&&Finite(swing.z)&&Finite(swing.w);
         }
     }

@@ -19,6 +19,30 @@ class ExportTests(unittest.TestCase):
  def test_valid(self):
   r=export(self.root,self.out);self.assertFalse(r['approved']);self.assertTrue(r['files'])
   for f in r['files']:self.assertEqual(hashlib.sha256((self.out/f['path']).read_bytes()).hexdigest(),f['sha256'])
+ def nested(self,name='technical/model.fbx'):
+  for leaf in ['model.fbx','model.fbx.meta']:(self.candidate/'Source'/leaf).unlink()
+  self.c['files'][0]['file']=name
+  encoded=json.dumps(self.c);self.write('unity/CandidateImportInput/contract.json',encoded);self.write('unity/Assets/DesertRV/CandidateArtDiscovery/pouncer-test/discovery-contract.json',encoded)
+  self.report['contractSha256']=hashlib.sha256(encoded.encode()).hexdigest();self.report['models']=[{'file':name}];self.save()
+  # Only create files for the valid case; malformed names must fail before output copy.
+  if name=='technical/model.fbx':
+   self.write('unity/Assets/DesertRV/CandidateArtDiscovery/pouncer-test/Source/'+name,'model')
+   for leaf in ['technical.meta',name+'.meta']:self.write('unity/Assets/DesertRV/CandidateArtDiscovery/pouncer-test/Source/'+leaf,'fileFormatVersion: 2\nguid: '+'c'*32+'\n')
+ def test_technical_prefix_preserved(self):
+  self.nested();r=export(self.root,self.out)
+  names={f['path'] for f in r['files']}
+  self.assertIn('CandidateArtDiscovery/pouncer-test/Source/technical/model.fbx',names)
+  self.assertIn('CandidateArtDiscovery/pouncer-test/Source/technical.meta',names)
+ def test_parent_path_rejected(self):self.nested('technical/../model.fbx');self.rejected()
+ def test_absolute_path_rejected(self):self.nested('/technical/model.fbx');self.rejected()
+ def test_two_level_path_rejected(self):self.nested('technical/sub/model.fbx');self.rejected()
+ def test_unknown_prefix_rejected(self):self.nested('other/model.fbx');self.rejected()
+ def test_extra_nested_file_rejected(self):
+  self.nested();self.write('unity/Assets/DesertRV/CandidateArtDiscovery/pouncer-test/Source/technical/extra.png','bad');self.rejected()
+ def test_nested_symlink_rejected(self):
+  self.nested();p=self.candidate/'Source/technical/model.fbx';p.unlink();p.symlink_to(self.root/'unity/CandidateImportInput/contract.json');self.rejected()
+ def test_missing_technical_meta_rejected(self):
+  self.nested();(self.candidate/'Source/technical.meta').unlink();self.rejected()
  def test_extra_script(self):self.write('unity/Assets/DesertRV/CandidateArtDiscovery/pouncer-test/evil.cs','x');self.rejected()
  def test_prefab(self):self.write('unity/Assets/DesertRV/CandidateArtDiscovery/pouncer-test/x.prefab','x');self.rejected()
  def test_extra_report(self):self.report['rawLog']='sensitive';self.save();self.rejected()
@@ -34,3 +58,4 @@ class ExportTests(unittest.TestCase):
  def test_missing_native(self):
   (self.root/'artifacts/candidate-art/test.xml').unlink();self.rejected()
 if __name__=='__main__':unittest.main()
+

@@ -65,39 +65,142 @@ namespace DesertRV.Editor
                 var visual=new GameObject("Supply visual - "+p.id).transform;visual.SetParent(root.transform,false);
                 box.SetParent(visual,true);visual.SetPositionAndRotation(p.at,Quaternion.Euler(0,p.yaw,0));
                 var anchor=Point("Supply interaction - "+p.id,visual,visual.TransformPoint(new Vector3(0,bounds.center.y,bounds.min.z-.01f)));
-                var badgeColor=p.kind==SupplyKind.Ammo?new Color(.92f,.64f,.24f):new Color(.32f,.77f,.72f);
-                // Signs/locks carry no colliders; all interaction belongs to the exact case surface.
-                var active=SupplySign(visual,"Available choice",font,p.label+"\n本区二选一 · 可跳过",new Vector3(0,1.18f,0),1.62f,.66f,badgeColor);
-                var sealedSign=SupplySign(visual,"Sealed choice",font,"已封存 · 不可领取\n本区补给已经选择",new Vector3(0,1.18f,0),1.62f,.66f,new Color(.61f,.63f,.62f));
-                var strap=RenderOnlyBox("Closed cache seal",sealedSign.transform,sealedSign.transform.TransformPoint(new Vector3(0,-.88f,-.36f)),new Vector3(.10f,.56f,.02f),Cream);
-                strap.transform.rotation=visual.rotation*Quaternion.Euler(0,0,24);sealedSign.SetActive(false);
-                supplies.Add(new JourneySupplyPoint {id=p.id,label=p.label,choiceGroup=p.group,riskHint="本区二选一 · "+p.risk,
+                // Mark the existing case itself. No free-standing billboard above the loot.
+                var active=SupplyCacheMark(visual,"Available choice",font,p,bounds,false);
+                var sealedSign=SupplyCacheMark(visual,"Sealed choice",font,p,bounds,true);sealedSign.SetActive(false);
+                supplies.Add(new JourneySupplyPoint {id=p.id,label=p.label,choiceGroup=p.group,riskHint="二选一，另一箱封存",
                     kind=p.kind,amount=p.amount,point=anchor,surface=surface,visual=visual.gameObject});
                 options.Add(new JourneySupplyChoiceVisual.Option{id=p.id,availableSign=active,sealedSign=sealedSign});
             }
             b.supplies=supplies.ToArray();view.options=options.ToArray();
             Vector3 boardAt=b.region==1?new Vector3(-6.4f,1.45f,6.5f):b.region==2?new Vector3(6.3f,1.45f,19.5f):new Vector3(6.3f,1.45f,26.2f);
-            string heading="可选补给 · 本区只取一箱\n"+placements[0].label+"："+placements[0].landmark+"\n"+placements[1].label+"："+placements[1].landmark+"\n拿取后另一箱封存 · 可全部跳过";
-            view.availableBoard=SupplySign(root.transform,"Optional supply directions",font,heading,boardAt,3.3f,1.35f,Cream);
-            view.sealedBoard=SupplySign(root.transform,"Optional supply choice completed",font,"本区补给已选择\n另一箱已封存 · 继续原路线",boardAt,3.3f,1.35f,new Color(.61f,.63f,.62f));
+            view.availableBoard=SupplyDirectionPost(root.transform,"Optional supply directions",font,boardAt,placements,false);
+            view.sealedBoard=SupplyDirectionPost(root.transform,"Optional supply choice completed",font,boardAt,placements,true);
             view.sealedBoard.SetActive(false);
             // No new light source, objective, wait, reward loop, enemy, distance or route modification.
         }
-        static GameObject SupplySign(Transform parent,string name,Font font,string text,Vector3 local,float width,float height,Color ink)
+        static readonly Color SupplyRust=new Color(.47f,.29f,.15f), SupplyDust=new Color(.90f,.83f,.66f),
+            SupplyInk=new Color(.20f,.18f,.12f), SupplyAmmoPaint=new Color(.57f,.35f,.14f),
+            SupplyRepairPaint=new Color(.28f,.47f,.43f), SupplyClosedPaint=new Color(.52f,.48f,.39f);
+
+        static GameObject SupplyLocalBox(string name,Transform parent,Vector3 at,Vector3 size,Color color)
         {
-            var root=new GameObject(name).transform;root.SetParent(parent,false);root.localPosition=local;
-            var backing=RenderOnlyBox(name+" backing",root,root.position+root.forward*.035f,new Vector3(width,height,.045f),new Color(.12f,.16f,.17f));
-            backing.transform.rotation=root.rotation;
-            var post=RenderOnlyBox(name+" post",root,root.position-root.up*(height*.5f+.3f),new Vector3(.055f,.65f,.055f),Steel);post.transform.rotation=root.rotation;
-            var canvasObject=new GameObject("Chinese world label",typeof(RectTransform),typeof(Canvas));canvasObject.transform.SetParent(root,false);
+            var go=RenderOnlyBox(name,parent,parent.TransformPoint(at),size,color);
+            go.transform.localRotation=Quaternion.identity;return go;
+        }
+        static Transform SupplyMarkRoot(Transform parent,string name,Vector3 local)
+        {var root=new GameObject(name).transform;root.SetParent(parent,false);root.localPosition=local;return root;}
+        static void SupplyStroke(Transform parent,string name,Vector3 start,Vector3 end,float width,Color color)
+        {
+            var stroke=SupplyLocalBox(name,parent,(start+end)*.5f,new Vector3(width,(end-start).magnitude,.025f),color);
+            stroke.transform.localRotation=Quaternion.FromToRotation(Vector3.up,end-start);
+        }
+        static void SupplyIcon(Transform parent,SupplyKind kind,Vector3 at,float size,Color ink)
+        {
+            var icon=SupplyMarkRoot(parent,kind==SupplyKind.Ammo?"Three-nail pictogram":"Open-jaw spanner pictogram",at);icon.localScale=Vector3.one*size;
+            if(kind==SupplyKind.Ammo)
+            {
+                icon.localRotation=Quaternion.Euler(0,0,-12);
+                foreach(float x in new[]{-.30f,0,.30f})
+                {
+                    SupplyLocalBox("Nail shaft",icon,new Vector3(x,-.02f,0),new Vector3(.075f,.80f,.025f),ink);
+                    SupplyLocalBox("Nail head",icon,new Vector3(x,.40f,0),new Vector3(.23f,.085f,.025f),ink);
+                }
+            }
+            else
+            {
+                icon.localRotation=Quaternion.Euler(0,0,-32);
+                SupplyLocalBox("Spanner handle",icon,new Vector3(0,-.12f,0),new Vector3(.14f,.72f,.025f),ink);
+                SupplyLocalBox("Spanner jaw base",icon,new Vector3(0,.23f,0),new Vector3(.66f,.17f,.025f),ink);
+                foreach(float x in new[]{-.25f,.25f})SupplyLocalBox("Spanner open jaw",icon,new Vector3(x,.41f,0),new Vector3(.16f,.36f,.025f),ink);
+            }
+        }
+        static void SupplyArrow(Transform parent,Vector3 at,Vector3 targetDelta,float size,Color ink)
+        {
+            var arrow=SupplyMarkRoot(parent,"Route direction arrow",at);arrow.localScale=Vector3.one*size;
+            arrow.localRotation=Quaternion.Euler(0,0,-Mathf.Atan2(targetDelta.x,targetDelta.z)*Mathf.Rad2Deg);
+            SupplyStroke(arrow,"Arrow shaft",new Vector3(0,-.43f,0),new Vector3(0,.42f,0),.10f,ink);
+            SupplyStroke(arrow,"Arrow head L",new Vector3(-.29f,.13f,0),new Vector3(0,.44f,0),.10f,ink);
+            SupplyStroke(arrow,"Arrow head R",new Vector3(.29f,.13f,0),new Vector3(0,.44f,0),.10f,ink);
+        }
+        static void SupplyWorldText(Transform parent,string text,Vector3 at,float width,float height,float glyphHeight,Color ink,Font font)
+        {
+            const float units=600;
+            var canvasObject=new GameObject("Chinese engraved label",typeof(RectTransform),typeof(Canvas));canvasObject.transform.SetParent(parent,false);
             var canvas=canvasObject.GetComponent<Canvas>();canvas.renderMode=RenderMode.WorldSpace;
-            var rect=(RectTransform)canvasObject.transform;rect.sizeDelta=new Vector2(width*300,height*300);rect.localScale=Vector3.one/300;
-            rect.localPosition=new Vector3(0,0,-.002f);
+            var rect=(RectTransform)canvasObject.transform;rect.sizeDelta=new Vector2(width*units,height*units);rect.localScale=Vector3.one/units;rect.localPosition=at;
             var words=new GameObject("Choice text",typeof(RectTransform),typeof(CanvasRenderer),typeof(Text));words.transform.SetParent(rect,false);
-            var label=words.GetComponent<Text>();label.font=font;label.text=text;label.fontSize=42;label.color=ink;label.alignment=TextAnchor.MiddleCenter;
-            label.horizontalOverflow=HorizontalWrapMode.Wrap;label.verticalOverflow=VerticalWrapMode.Truncate;label.raycastTarget=false;
-            var textRect=(RectTransform)words.transform;textRect.anchorMin=Vector2.zero;textRect.anchorMax=Vector2.one;textRect.offsetMin=new Vector2(12,6);textRect.offsetMax=new Vector2(-12,-6);
-            return root.gameObject;
+            var label=words.GetComponent<Text>();label.font=font;label.fontStyle=FontStyle.Bold;label.text=text;label.fontSize=Mathf.RoundToInt(glyphHeight*units);label.color=ink;label.alignment=TextAnchor.MiddleCenter;
+            label.horizontalOverflow=HorizontalWrapMode.Overflow;label.verticalOverflow=VerticalWrapMode.Truncate;label.raycastTarget=false;
+            var textRect=(RectTransform)words.transform;textRect.anchorMin=Vector2.zero;textRect.anchorMax=Vector2.one;textRect.offsetMin=Vector2.zero;textRect.offsetMax=Vector2.zero;
+        }
+        static void SupplyWeatheredPlate(Transform parent,Vector3 at,float width,float height,Color paint,bool bolts)
+        {
+            SupplyLocalBox("Worn metal rim",parent,at+Vector3.forward*.012f,new Vector3(width+.018f,height+.018f,.026f),SupplyRust);
+            SupplyLocalBox("Dusty painted metal face",parent,at,new Vector3(width,height,.019f),paint);
+            // Small uneven chips interrupt the edge; no imported decals, textures, or licence claims.
+            for(int i=0;i<5;i++)
+            {
+                float x=-width*.43f+i*width*.20f;float side=i%2==0?1:-1;
+                var chip=SupplyLocalBox("Exposed paint chip",parent,at+new Vector3(x,side*height*.47f,-.010f),new Vector3(width*(i%2==0?.045f:.08f),height*.035f,.004f),SupplyRust);
+                chip.transform.localRotation=Quaternion.Euler(0,0,i%2==0?8:-12);
+            }
+            if(bolts)foreach(float x in new[]{-width*.455f,width*.455f})
+                SupplyLocalBox("Plate rivet",parent,at+new Vector3(x,0,-.013f),new Vector3(.014f,.014f,.008f),SupplyInk);
+        }
+        static GameObject SupplyCacheMark(Transform parent,string name,Font font,SupplyPlacement p,Bounds bounds,bool closed)
+        {
+            var mark=SupplyMarkRoot(parent,name,new Vector3(0,bounds.center.y,bounds.min.z-.024f));
+            float width=Mathf.Min(.54f,bounds.size.x*.84f),height=Mathf.Min(.23f,bounds.size.y*.51f);
+            Color paint=closed?SupplyClosedPaint:p.kind==SupplyKind.Ammo?SupplyAmmoPaint:SupplyRepairPaint;
+            Color ink=SupplyDust;
+            SupplyWeatheredPlate(mark,Vector3.zero,width,height,paint,true);
+            if(!closed)
+            {
+                SupplyIcon(mark,p.kind,new Vector3(-width*.31f,0,-.018f),height*.66f,ink);
+                SupplyWorldText(mark,p.kind==SupplyKind.Ammo?"钉弹 "+p.amount:"维修 +1",new Vector3(width*.13f,0,-.018f),width*.60f,height*.77f,height*.25f,ink,font);
+                // A narrow identity strip sits on the actual lid and front, not in the player's view.
+                var localTop=new Vector3(-bounds.size.x*.29f,bounds.max.y+.012f,bounds.center.z)-mark.localPosition;
+                SupplyLocalBox("Lid identity paint",mark,localTop,new Vector3(.055f,.012f,bounds.size.z*.91f),paint);
+            }
+            else
+            {
+                SupplyWorldText(mark,"封存",new Vector3(0,0,-.019f),width*.70f,height*.77f,height*.37f,SupplyDust,font);
+                // Readable closed label plus a physical cross seal over the retained case lid.
+                var top=new Vector3(bounds.center.x,bounds.max.y+.018f,bounds.center.z)-mark.localPosition;
+                foreach(float angle in new[]{-28f,28f})
+                {
+                    var band=SupplyLocalBox("Closed cache crossed seal",mark,top,new Vector3(bounds.size.x*.92f,.014f,.045f),SupplyDust);
+                    band.transform.localRotation=Quaternion.Euler(0,angle,0);
+                }
+                var lockAt=new Vector3(width*.30f,-height*.47f,-.024f);
+                SupplyLocalBox("Cache padlock body",mark,lockAt,new Vector3(.062f,.060f,.025f),SupplyRust);
+                SupplyLocalBox("Cache padlock shackle top",mark,lockAt+new Vector3(0,.048f,.003f),new Vector3(.046f,.012f,.013f),SupplyDust);
+                foreach(float x in new[]{-.017f,.017f})SupplyLocalBox("Cache padlock shackle",mark,lockAt+new Vector3(x,.032f,.003f),new Vector3(.012f,.033f,.013f),SupplyDust);
+            }
+            return mark.gameObject;
+        }
+        static GameObject SupplyDirectionPost(Transform parent,string name,Font font,Vector3 local,SupplyPlacement[] plan,bool closed)
+        {
+            var post=SupplyMarkRoot(parent,name,local);
+            SupplyLocalBox("Weathered timber post",post,new Vector3(0,-.67f,.045f),new Vector3(.085f,1.46f,.09f),SupplyRust);
+            SupplyLocalBox("Timber light worn edge",post,new Vector3(-.033f,-.64f,-.003f),new Vector3(.012f,1.36f,.012f),new Color(.61f,.44f,.27f));
+            SupplyWeatheredPlate(post,new Vector3(0,.37f,0),1.08f,.205f,SupplyRust,true);
+            SupplyWorldText(post,closed?"本区已选":"补给 · 二选一",new Vector3(0,.37f,-.019f),.91f,.18f,.085f,SupplyDust,font);
+            for(int i=0;i<2;i++)
+            {
+                float y=.085f-i*.29f;var p=plan[i];Color paint=closed?SupplyClosedPaint:i==0?SupplyAmmoPaint:SupplyRepairPaint;Color ink=SupplyDust;
+                SupplyWeatheredPlate(post,new Vector3(0,y,0),1.20f,.245f,paint,true);
+                SupplyIcon(post,p.kind,new Vector3(-.43f,y,-.019f),.15f,ink);
+                SupplyWorldText(post,p.kind==SupplyKind.Ammo?"钉弹":"维修包",new Vector3(-.025f,y,-.019f),.55f,.205f,.112f,ink,font);
+                SupplyArrow(post,new Vector3(.43f,y,-.019f),p.at-local,.16f,ink);
+                if(closed)
+                {
+                    var strike=SupplyLocalBox("Spent supply marker",post,new Vector3(-.02f,y,-.024f),new Vector3(.57f,.024f,.008f),SupplyRust);
+                    strike.transform.localRotation=Quaternion.Euler(0,0,9);
+                }
+            }
+            return post.gameObject;
         }
         // During authoring all three candidate environments may be loaded at once.
         // Ignore only OTHER scene instances in this editor check; runtime uses unchanged

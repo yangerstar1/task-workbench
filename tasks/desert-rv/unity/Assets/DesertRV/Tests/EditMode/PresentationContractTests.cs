@@ -304,7 +304,7 @@ namespace DesertRV.Tests
                     Assert.That(Quaternion.Angle(rig.transform.Find("ReachUpper0").localRotation,Quaternion.identity),Is.LessThan(.001f));
                     Assert.That(Get(f.State,"LoadedAmmo"),Is.EqualTo(3));
                     f.Actions.GetType().GetProperty("PresentationEpoch").SetValue(f.Actions,9);Call(presenter,"LateUpdate");
-                    Assert.That(Quaternion.Angle(rig.transform.Find("ReachFore0").localRotation,Quaternion.identity),Is.LessThan(.001f));
+                    Assert.That(Quaternion.Angle(rig.transform.Find("ReachUpper0/ReachFore0").localRotation,Quaternion.identity),Is.LessThan(.001f));
                     foreach(var nail in fresh)Assert.That(nail.enabled,Is.False);
                     Call(presenter,"OnDisable");
                     UnityEngine.Object.DestroyImmediate(rig);

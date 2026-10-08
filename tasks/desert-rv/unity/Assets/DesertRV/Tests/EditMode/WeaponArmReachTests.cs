@@ -60,7 +60,19 @@ namespace DesertRV.Tests
                 float grip=(float)T("ReloadPresentationPlan").GetMethod("GripWeight").Invoke(null,new object[]{phase});
                 Carrier.localPosition=Vector3.up*(before*.001f*grip); // Absolute count offset exactly once.
             }
-            public bool Solve() {object[] args={null};return (bool)Call(Reach,"TrySolveBoth",args);}
+            public string LastReason;
+            public bool Solve()
+            {
+                object[] args={null};bool ok=(bool)Call(Reach,"TrySolveBoth",args);
+                string Metrics(string side)
+                {
+                    var v=P(Reach,side+"Diagnostics");
+                    return side+"="+F(v,"reason")+" gap="+F(v,"wristGap")+" distance="+F(v,"targetDistance")+
+                        " upper="+F(v,"upperLength")+"/"+F(v,"expectedUpperLength")+" fore="+F(v,"foreLength")+"/"+F(v,"expectedForeLength")+
+                        " shoulder="+F(v,"shoulderDrift")+" target="+F(v,"targetDrift");
+                }
+                LastReason=(string)args[0]+"; "+Metrics("Left")+"; "+Metrics("Right");return ok;
+            }
             public void Dispose() {UnityEngine.Object.DestroyImmediate(Root);UnityEngine.Object.DestroyImmediate(source);}
         }
         [Test] public void Math_RejectsUnreachableZeroDistanceAndUnresolvedPole()
@@ -73,6 +85,14 @@ namespace DesertRV.Tests
             Assert.That(Elbow(Vector3.right,1,1,Vector3.right),Is.False);
             Assert.That(Elbow(new Vector3(float.NaN,0,0),1,1,Vector3.up),Is.False);
             Assert.That(Elbow(Vector3.right*2,1,1,Vector3.up),Is.True,"Straight reach uses the calibrated pole, not a guessed axis.");
+            // Tight seam budgets require real tiny swings, including the near-parallel dot band.
+            foreach(float angle in new[]{.0005f,-.0005f,.0001f,3.14109265f})
+            {
+                var target=new Vector3(Mathf.Cos(angle),Mathf.Sin(angle),0);
+                object[] args={Vector3.right,target,Vector3.forward,.000001f,null};
+                Assert.That((bool)T("TwoBoneArmSolver").GetMethod("TrySwing").Invoke(null,args),Is.True);
+                Assert.That(Vector3.Distance((Quaternion)args[4]*Vector3.right,target),Is.LessThan(.000001f),"radians="+angle);
+            }
         }
         [Test] public void Synthetic600ArmSamples_PreserveLengthsShouldersAndHandTargets()
         {
@@ -82,7 +102,7 @@ namespace DesertRV.Tests
                 foreach(int before in new[]{0,3,11}) for(int frame=1;frame<=100;frame++)
                 {
                     f.Sample((frame-1)/99f,before);var shoulder=new[]{f.Upper[0].position,f.Upper[1].position};var target=new[]{f.Target[0].position,f.Target[1].position};
-                    Assert.That(f.Solve(),Is.True,"Synthetic frame "+frame+" count "+before);
+                    Assert.That(f.Solve(),Is.True,"Synthetic frame "+frame+" count "+before+" "+f.LastReason);
                     for(int i=0;i<2;i++)
                     {
                         Assert.That(Vector3.Distance(f.Tip[i].position,target[i]),Is.LessThan(.0001f));
@@ -98,11 +118,11 @@ namespace DesertRV.Tests
         {
             using(var f=new Fixture()) foreach(int frame in new[]{35,60,68})
             {
-                float phase=(frame-1)/99f;f.Sample(phase,11);Assert.That(f.Solve(),Is.True);
+                float phase=(frame-1)/99f;f.Sample(phase,11);Assert.That(f.Solve(),Is.True,f.LastReason);
                 var up=f.Upper[0].localRotation;var fore=f.Fore[0].localRotation;var carrier=f.Carrier.localPosition;var target=f.Target[0].position;
                 for(int repeat=0;repeat<50;repeat++)
                 {
-                    f.Sample(phase,11);Assert.That(f.Solve(),Is.True);
+                    f.Sample(phase,11);Assert.That(f.Solve(),Is.True,f.LastReason);
                     Assert.That(Quaternion.Angle(up,f.Upper[0].localRotation),Is.LessThan(.02f));Assert.That(Quaternion.Angle(fore,f.Fore[0].localRotation),Is.LessThan(.02f));
                     Assert.That(f.Carrier.localPosition,Is.EqualTo(carrier));Assert.That(Vector3.Distance(f.Target[0].position,target),Is.LessThan(.000001f));
                 }
@@ -135,10 +155,10 @@ namespace DesertRV.Tests
         {
             using(var f=new Fixture())
             {
-                f.Sample(.5f,11);Assert.That(f.Solve(),Is.True);var target=f.Target[0].position;
+                f.Sample(.5f,11);Assert.That(f.Solve(),Is.True,f.LastReason);var target=f.Target[0].position;
                 Call(f.Reach,"RestoreBindPose");
                 Assert.That(Quaternion.Angle(f.Upper[0].localRotation,(Quaternion)F(f.Bindings[0],"upperBindRotation")),Is.LessThan(.001f));Assert.That(f.Target[0].position,Is.EqualTo(target));
-                f.Sample(.5f,11);Assert.That(f.Solve(),Is.True);Call(f.Reach,"OnDisable");Assert.That(P(f.Reach,"LastSolveAccepted"),Is.False);
+                f.Sample(.5f,11);Assert.That(f.Solve(),Is.True,f.LastReason);Call(f.Reach,"OnDisable");Assert.That(P(f.Reach,"LastSolveAccepted"),Is.False);
                 Assert.That(Quaternion.Angle(f.Fore[0].localRotation,(Quaternion)F(f.Bindings[0],"foreBindRotation")),Is.LessThan(.001f));
             }
         }

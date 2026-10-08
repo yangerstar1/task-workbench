@@ -50,13 +50,15 @@ def export(root,output,native='success',protected='success'):
         require(report.get('contractSha256')==sha(contract_path),'REPORT_CONTRACT_MISMATCH')
         files={f['file']:f['sha256'] for f in contract['files']}
         for name,h in files.items():
-            require(re.fullmatch(r'[A-Za-z0-9_-]+\.(fbx|png|tga)',name) and re.fullmatch('[a-f0-9]{64}',h),'UNSAFE_CONTRACT_FILE')
+            require(re.fullmatch(r'(?:technical/)?[A-Za-z0-9_-]+\.(fbx|png|tga)',name) and re.fullmatch('[a-f0-9]{64}',h),'UNSAFE_CONTRACT_FILE')
         models=report.get('models',[])
         require(len(models)==len({m.get('file') for m in models}),'DUPLICATE_MODELS')
         require(models and {m.get('file') for m in models}=={n for n in files if n.endswith('.fbx')},'MODEL_SET_MISMATCH')
         base=root/'unity/Assets/DesertRV/CandidateArtDiscovery';candidate=base/contract['id']
         require(not (root/'unity/Assets/DesertRV/CandidateArtImports').exists(),'STRICT_OUTPUT_FORBIDDEN')
         allowed={Path(contract['id']+'.meta'),Path(contract['id'])/'Source.meta',Path(contract['id'])/'discovery-contract.json',Path(contract['id'])/'discovery-contract.json.meta'}
+        if any(n.startswith('technical/') for n in files):
+            allowed.add(Path(contract['id'])/'Source'/'technical.meta')
         allowed.update(Path(contract['id'])/'Source'/n for n in files)
         allowed.update(Path(contract['id'])/'Source'/(n+'.meta') for n in files)
         actual=set()
@@ -93,3 +95,4 @@ if __name__=='__main__':
     p=argparse.ArgumentParser();p.add_argument('--native',required=True);p.add_argument('--protected',required=True);a=p.parse_args()
     try: export(Path('tasks/desert-rv'),Path('tasks/desert-rv/candidate-art-export'),a.native,a.protected)
     except EvidenceError as e: raise SystemExit(str(e))
+

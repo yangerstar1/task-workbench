@@ -1,0 +1,31 @@
+{
+  "schema": 1,
+  "mode": "DISCOVERY_ONLY",
+  "scope": "PARTIAL_DIAGNOSTIC_NOT_FULL",
+  "id": "armored-floorfix-discovery-37843918724",
+  "kind": "armored",
+  "repository": "yangerstar1/task-workbench",
+  "runUrl": "https://github.com/yangerstar1/task-workbench/actions/runs/37843918724",
+  "sourceCommit": "decc49e3b443256d890c77a85eaf337ae1b7e897",
+  "artifactId": 11578643282,
+  "artifactName": "armored-technical-37843918724-1",
+  "artifactSha256": "fe3f42452b951886f3ec37d0fa2fff3699f6aefde39eca53c865e60f15d45c17",
+  "files": [
+    {
+      "file": "technical/bulwark-candidate.fbx",
+      "sha256": "5038b9c61eb8cfef3699eeb0b47176c31fe66913fc04fac265b973f29651a4fc"
+    },
+    {
+      "file": "technical/bulwark-animations.fbx",
+      "sha256": "acdf0305fff3b47f21854310dbcd946d6977565ff7bdf5420ad80c72b2dd0196"
+    },
+    {
+      "file": "technical/bulwark-basecolor.png",
+      "sha256": "50a243fdedd6a16e0aebddde76e977691c01de86cfd56c5b4a6df01ccb5d5547"
+    },
+    {
+      "file": "technical/bulwark-orm.png",
+      "sha256": "76c370cf827f7308fc46b155d6bd12e823effd81e43056df881267e90f930b61"
+    }
+  ]
+}

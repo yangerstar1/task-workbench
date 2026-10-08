@@ -83,7 +83,12 @@ namespace DesertRV.Editor
                         }
                         Vector3 at,look;
                         if(key=="directions-before") {look=view.availableBoard.transform.position;at=look+Vector3.back*4.5f+Vector3.up*.1f;}
-                        else {var p=plan[key=="ammo-before"?0:1];at=p.stand+Vector3.up*1.52f;look=p.at+Vector3.up*.84f;}
+                        else
+                        {
+                            int option=key=="ammo-before"?0:1;var p=plan[option];
+                            at=p.stand+Vector3.up*1.52f; // Same legal standing point and 66-degree game FOV as prior evidence.
+                            look=b.supplies[option].surface.bounds.center+Vector3.up*.08f; // Look down at the real case; never move closer to magnify lettering.
+                        }
                         camera.transform.position=at;camera.transform.LookAt(look);Physics.SyncTransforms();
                         foreach(var text in Components<Text>(env).Where(t=>t.isActiveAndEnabled))text.font.RequestCharactersInTexture(text.text,text.fontSize,text.fontStyle);
                         Canvas.ForceUpdateCanvases();
