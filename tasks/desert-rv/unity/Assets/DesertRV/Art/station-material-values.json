@@ -1,0 +1,404 @@
+{
+  "entries": [
+    {
+      "name": "MAT-enamel_cream",
+      "metallic": 0,
+      "roughness": 0.48,
+      "color": [
+        0.74,
+        0.6,
+        0.39
+      ]
+    },
+    {
+      "name": "MAT-enamel_burnt_orange",
+      "metallic": 0,
+      "roughness": 0.53,
+      "color": [
+        0.53,
+        0.16,
+        0.058
+      ]
+    },
+    {
+      "name": "MAT-trim_ochre",
+      "metallic": 0,
+      "roughness": 0.58,
+      "color": [
+        0.32,
+        0.19,
+        0.082
+      ]
+    },
+    {
+      "name": "MAT-rubber_seals",
+      "metallic": 0,
+      "roughness": 0.88,
+      "color": [
+        0.024,
+        0.031,
+        0.034
+      ]
+    },
+    {
+      "name": "MAT-tyre_rubber",
+      "metallic": 0,
+      "roughness": 0.92,
+      "color": [
+        0.037,
+        0.041,
+        0.043
+      ]
+    },
+    {
+      "name": "MAT-brushed_metal",
+      "metallic": 1,
+      "roughness": 0.42,
+      "color": [
+        0.42,
+        0.44,
+        0.43
+      ]
+    },
+    {
+      "name": "MAT-painted_steel",
+      "metallic": 0,
+      "roughness": 0.65,
+      "color": [
+        0.063,
+        0.077,
+        0.073
+      ]
+    },
+    {
+      "name": "MAT-glass_bluegrey",
+      "metallic": 0,
+      "roughness": 0.18,
+      "color": [
+        0.085,
+        0.16,
+        0.2
+      ]
+    },
+    {
+      "name": "MAT-seat_olive",
+      "metallic": 0,
+      "roughness": 0.86,
+      "color": [
+        0.21,
+        0.25,
+        0.14
+      ]
+    },
+    {
+      "name": "MAT-lamp_ivory",
+      "metallic": 0,
+      "roughness": 0.26,
+      "color": [
+        0.9,
+        0.77,
+        0.48
+      ]
+    },
+    {
+      "name": "MAT-rear_lens",
+      "metallic": 0,
+      "roughness": 0.24,
+      "color": [
+        0.4,
+        0.042,
+        0.016
+      ]
+    },
+    {
+      "name": "MAT-interior_plywood",
+      "metallic": 0,
+      "roughness": 0.81,
+      "color": [
+        0.43,
+        0.29,
+        0.15
+      ]
+    },
+    {
+      "name": "MAT-wood_cut_edges",
+      "metallic": 0,
+      "roughness": 0.73,
+      "color": [
+        0.58,
+        0.4,
+        0.23
+      ]
+    },
+    {
+      "name": "MAT-ceiling_linen",
+      "metallic": 0,
+      "roughness": 0.92,
+      "color": [
+        0.68,
+        0.61,
+        0.46
+      ]
+    },
+    {
+      "name": "MAT-tool_enamel_blue",
+      "metallic": 0,
+      "roughness": 0.66,
+      "color": [
+        0.1,
+        0.21,
+        0.24
+      ]
+    },
+    {
+      "name": "MAT-desert_sand",
+      "metallic": 0,
+      "roughness": 0.95,
+      "color": [
+        0.66,
+        0.395,
+        0.17
+      ]
+    },
+    {
+      "name": "MAT-road_asphalt",
+      "metallic": 0,
+      "roughness": 0.96,
+      "color": [
+        0.115,
+        0.128,
+        0.125
+      ]
+    },
+    {
+      "name": "MAT-station_concrete",
+      "metallic": 0,
+      "roughness": 0.92,
+      "color": [
+        0.34,
+        0.315,
+        0.26
+      ]
+    },
+    {
+      "name": "MAT-station_stucco",
+      "metallic": 0,
+      "roughness": 0.91,
+      "color": [
+        0.6,
+        0.48,
+        0.32
+      ]
+    },
+    {
+      "name": "MAT-roof_silver",
+      "metallic": 0,
+      "roughness": 0.85,
+      "color": [
+        0.35,
+        0.34,
+        0.29
+      ]
+    },
+    {
+      "name": "MAT-station_red_enamel",
+      "metallic": 0,
+      "roughness": 0.64,
+      "color": [
+        0.46,
+        0.092,
+        0.04
+      ]
+    },
+    {
+      "name": "MAT-road_ochre",
+      "metallic": 0,
+      "roughness": 0.79,
+      "color": [
+        0.79,
+        0.51,
+        0.13
+      ]
+    },
+    {
+      "name": "MAT-cactus_green",
+      "metallic": 0,
+      "roughness": 0.92,
+      "color": [
+        0.13,
+        0.255,
+        0.14
+      ]
+    },
+    {
+      "name": "MAT-rust",
+      "metallic": 0,
+      "roughness": 0.94,
+      "color": [
+        0.2,
+        0.087,
+        0.035
+      ]
+    },
+    {
+      "name": "MAT-sandstone_0",
+      "metallic": 0,
+      "roughness": 0.95,
+      "color": [
+        0.4284,
+        0.1722,
+        0.08819999999999999
+      ]
+    },
+    {
+      "name": "MAT-sandstone_1",
+      "metallic": 0,
+      "roughness": 0.95,
+      "color": [
+        0.45135000000000003,
+        0.181425,
+        0.092925
+      ]
+    },
+    {
+      "name": "MAT-sandstone_2",
+      "metallic": 0,
+      "roughness": 0.95,
+      "color": [
+        0.4743,
+        0.19065,
+        0.09764999999999999
+      ]
+    },
+    {
+      "name": "MAT-sandstone_3",
+      "metallic": 0,
+      "roughness": 0.95,
+      "color": [
+        0.49724999999999997,
+        0.199875,
+        0.102375
+      ]
+    },
+    {
+      "name": "MAT-sandstone_4",
+      "metallic": 0,
+      "roughness": 0.95,
+      "color": [
+        0.5202,
+        0.20909999999999998,
+        0.1071
+      ]
+    },
+    {
+      "name": "MAT-sandstone_5",
+      "metallic": 0,
+      "roughness": 0.95,
+      "color": [
+        0.54315,
+        0.21832499999999996,
+        0.111825
+      ]
+    },
+    {
+      "name": "MAT-sandstone_6",
+      "metallic": 0,
+      "roughness": 0.95,
+      "color": [
+        0.5660999999999999,
+        0.22754999999999997,
+        0.11654999999999999
+      ]
+    },
+    {
+      "name": "MAT-desert_leaf_0",
+      "metallic": 0,
+      "roughness": 0.94,
+      "color": [
+        0.075,
+        0.135,
+        0.069
+      ]
+    },
+    {
+      "name": "MAT-desert_leaf_1",
+      "metallic": 0,
+      "roughness": 0.94,
+      "color": [
+        0.088,
+        0.154,
+        0.078
+      ]
+    },
+    {
+      "name": "MAT-desert_leaf_2",
+      "metallic": 0,
+      "roughness": 0.94,
+      "color": [
+        0.10099999999999999,
+        0.17300000000000001,
+        0.08700000000000001
+      ]
+    },
+    {
+      "name": "MAT-desert_leaf_3",
+      "metallic": 0,
+      "roughness": 0.94,
+      "color": [
+        0.11399999999999999,
+        0.192,
+        0.096
+      ]
+    },
+    {
+      "name": "MAT-roof_patch_0",
+      "metallic": 0,
+      "roughness": 0.94,
+      "color": [
+        0.32,
+        0.305,
+        0.26
+      ]
+    },
+    {
+      "name": "MAT-roof_patch_1",
+      "metallic": 0,
+      "roughness": 0.94,
+      "color": [
+        0.334,
+        0.318,
+        0.272
+      ]
+    },
+    {
+      "name": "MAT-roof_patch_2",
+      "metallic": 0,
+      "roughness": 0.94,
+      "color": [
+        0.34800000000000003,
+        0.331,
+        0.28400000000000003
+      ]
+    },
+    {
+      "name": "MAT-roof_patch_3",
+      "metallic": 0,
+      "roughness": 0.94,
+      "color": [
+        0.362,
+        0.344,
+        0.29600000000000004
+      ]
+    },
+    {
+      "name": "MAT-roof_patch_4",
+      "metallic": 0,
+      "roughness": 0.94,
+      "color": [
+        0.376,
+        0.357,
+        0.308
+      ]
+    }
+  ]
+}

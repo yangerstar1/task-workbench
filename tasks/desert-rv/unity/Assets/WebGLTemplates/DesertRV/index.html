@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>沙漠房车 · 美术优化样景</title>
+<style>body{margin:0;background:#151b21;color:#e5e9ec;font:16px system-ui,sans-serif}header{max-width:1280px;margin:24px auto 12px;padding:0 20px}h1{font-size:22px;margin:0 0 8px}p{color:#b1bcc7;margin:6px 0}main{max-width:1280px;margin:auto}canvas{display:block;width:100%;aspect-ratio:16/9;background:#222b34}#status{padding:12px 20px;color:#d3dce3}button{padding:8px 18px;background:#e9b267;border:0;border-radius:4px;cursor:pointer}</style></head>
+<body><header><h1>沙漠房车 · 车内工作区重做</h1><p>重做柜体、抽屉与开放储物，加入帆布、维修零件和车内灯光层次。本页是待审美术样景，尚未接入战斗与三场旅程。</p><p>画布按钮切换视角；驾驶时 WASD 移动，E 下车；步行时 E 开关门、F 回到驾驶、ESC 暂停。</p></header>
+<main><nav aria-label="样景视角" style="display:flex;gap:8px;flex-wrap:wrap;padding:12px 20px"><button data-view="front" disabled>房车主体</button><button data-view="top" disabled>俯视场景</button><button data-view="garage" disabled>车库近景</button><button data-view="inside" disabled>车内基地</button><button data-view="drive" disabled>开始驾驶检查</button><button id="capture" disabled>保存当前原始画面</button></nav><nav aria-label="改装外观预览" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:0 20px 12px"><span>改装外观预览</span><button data-module="none" disabled>基础房车</button><button data-module="ram" disabled>撞角</button><button data-module="arc" disabled>车顶电弧</button><button data-module="both" disabled>两项改装</button></nav><canvas id="unity-canvas" width="1280" height="720" tabindex="0"></canvas><div id="status" role="status">正在载入…</div><button id="retry" hidden onclick="location.reload()">重新载入</button></main>
+<script>
+const canvas=document.querySelector('#unity-canvas'),status=document.querySelector('#status');
+let candidateInstance,activeReview="front",renderedFirstFrame=false;
+function ready(){if(!candidateInstance||!renderedFirstFrame)return;document.querySelector('#capture').disabled=false;document.querySelectorAll('[data-view],[data-module]').forEach(button=>button.disabled=false);status.textContent='美术候选已载入。改装按钮用于外观对照，整体效果待审。';canvas.focus();}
+document.addEventListener('desert-rv-review-ready',()=>{renderedFirstFrame=true;ready();});
+document.querySelectorAll('[data-module]').forEach(button=>button.addEventListener('click',()=>{
+  candidateInstance?.SendMessage('Body Viewer','ReviewModule',button.dataset.module);canvas.focus();
+  status.textContent='当前展示改装外观，安装与战斗功能尚未验收。';
+}));
+document.querySelectorAll('[data-view]').forEach(button=>button.addEventListener('click',()=>{
+  activeReview=button.dataset.view;candidateInstance?.SendMessage('Body Viewer','ReviewView',activeReview);document.querySelector('#capture').disabled=activeReview==='drive';canvas.focus();
+}));
+// Catch this canvas's pointer-lock rejection; preserve all unrelated runtime errors.
+// Both promise-returning and older void-returning browser APIs are supported.
+const nativePointerLock=canvas.requestPointerLock?.bind(canvas);
+function pointerLockFailed(){status.textContent='浏览器未能锁定鼠标。可点击画布重试；当前可用方向键观察，ESC 暂停。';candidateInstance?.SendMessage('Body Viewer','PointerLockUnavailable');}
+if(nativePointerLock)canvas.requestPointerLock=(...args)=>{
+  try{const attempt=nativePointerLock(...args);return attempt?.catch?attempt.catch(pointerLockFailed):attempt;}
+  catch(error){pointerLockFailed();}
+};
+document.addEventListener('pointerlockerror',pointerLockFailed);
+document.querySelector('#capture').addEventListener('click',()=>{
+  const requestedView=activeReview,button=document.querySelector('#capture');
+  const label={front:'房车主体',top:'俯视场景',garage:'车库近景',inside:'车内基地'}[requestedView];
+  button.disabled=true;button.textContent='保存中…';status.textContent='正在保存'+label+'…';
+  document.querySelectorAll('[data-view]').forEach(view=>view.disabled=true);
+  requestAnimationFrame(()=>canvas.toBlob(async blob=>{
+    try{
+      if(!blob)throw new Error('empty image');
+      const response=await fetch('/review-capture/'+requestedView,{method:'POST',headers:{'Content-Type':'image/png'},body:blob});
+      status.textContent=response.ok?'已保存'+label+'原始画面。':'保存失败，请重试。';
+    }catch{status.textContent='本地保存服务不可用。';}
+    finally{button.disabled=activeReview==='drive';button.textContent='保存当前原始画面';document.querySelectorAll('[data-view]').forEach(view=>view.disabled=false);}
+  },'image/png'));
+});
+document.addEventListener('pointerlockchange',()=>{if(document.pointerLockElement===canvas)status.textContent='鼠标已锁定。移动鼠标观察，ESC 暂停并释放鼠标。';});
+const script=document.createElement('script');
+function failed(e){status.textContent='加载失败：'+String(e);document.querySelector('#retry').hidden=false;}
+script.src='Build/{{{ LOADER_FILENAME }}}';
+script.onerror=()=>failed('无法取得 Unity 加载器');
+script.onload=()=>createUnityInstance(canvas,{
+dataUrl:'Build/{{{ DATA_FILENAME }}}',frameworkUrl:'Build/{{{ FRAMEWORK_FILENAME }}}',codeUrl:'Build/{{{ CODE_FILENAME }}}',
+matchWebGLToCanvasSize:false,streamingAssetsUrl:'StreamingAssets',companyName:'Local Prototype',productName:'Desert RV Preflight',productVersion:'0.1',
+showBanner:(msg,type)=>{if(type==='error')failed(msg);}
+},p=>{status.textContent='正在载入 '+Math.round(p*100)+'%';}).then(instance=>{candidateInstance=instance;status.textContent='资源已载入，正在准备场景…';ready();}).catch(failed);
+document.body.appendChild(script);
+</script></body></html>
+
+
+
+
