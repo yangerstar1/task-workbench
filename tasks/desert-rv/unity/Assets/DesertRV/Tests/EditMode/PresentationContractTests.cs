@@ -14,6 +14,29 @@ namespace DesertRV.Tests
         static void Set(object o, string name, object value) => o.GetType().GetField(name, All).SetValue(o, value);
         static object Call(object o, string name, params object[] args) => o.GetType().GetMethod(name, All).Invoke(o, args);
         static Component Add(GameObject go, string type) => go.AddComponent(T(type));
+        static Component AddCalibratedTestArms(GameObject rig,Animator animator,Transform leftHand,Transform rightHand,Mesh source)
+        {
+            var reach=Add(rig,"WeaponArmReach");Set(reach,"animator",animator);Set(reach,"rigRoot",rig.transform);
+            Set(reach,"calibratedSourceModel",source);Set(reach,"sourceSha256",new string('a',64));
+            Set(reach,"positionToleranceRig",.001f);Set(reach,"numericToleranceRig",.00001f);
+            for(int side=0;side<2;side++)
+            {
+                Transform Make(string name,Transform parent){var go=new GameObject(name);go.transform.SetParent(parent,false);return go.transform;}
+                var upper=Make("ReachUpper"+side,rig.transform);upper.localPosition=new Vector3(side==0?-3:3,-3,0);
+                var fore=Make("ReachFore"+side,upper);fore.localPosition=new Vector3(side==0?3:-3,0,0);
+                var tip=Make("ReachTip"+side,fore);tip.localPosition=Vector3.up*3;
+                var target=Make("ReachTarget"+side,side==0?leftHand:rightHand);
+                var binding=Activator.CreateInstance(T("ArmReachBinding"));
+                Set(binding,"upperArm",upper);Set(binding,"forearm",fore);Set(binding,"wristTip",tip);Set(binding,"wristTarget",target);Set(binding,"calibrated",true);
+                Set(binding,"upperLengthRig",3f);Set(binding,"foreLengthRig",3f);Set(binding,"sourceUpperLength",3f);Set(binding,"sourceForeLength",3f);Set(binding,"sourceToRigScale",1f);
+                Set(binding,"upperAxisLocal",fore.localPosition.normalized);Set(binding,"foreAxisLocal",Vector3.up);
+                Set(binding,"poleRigLocal",Vector3.ProjectOnPlane(fore.position-upper.position,(tip.position-upper.position).normalized).normalized);
+                Set(binding,"shoulderLocal",upper.localPosition);Set(binding,"elbowLocal",fore.localPosition);Set(binding,"tipLocal",tip.localPosition);
+                Set(binding,"upperScale",Vector3.one);Set(binding,"foreScale",Vector3.one);Set(binding,"upperBindRotation",Quaternion.identity);Set(binding,"foreBindRotation",Quaternion.identity);Set(binding,"neutralPoseEvidence","Synthetic lifecycle fixture; not imported art");
+                Set(reach,side==0?"left":"right",binding);
+            }
+            return reach;
+        }
         [Test] public void Cursor_ConsumesOnceAndRejectsOldEpoch()
         {
             var cursor = Activator.CreateInstance(T("PresentationEventCursor"));
@@ -251,11 +274,13 @@ namespace DesertRV.Tests
                     var presenter=Add(rig,"WeaponPresentation"); Set(presenter,"actions",f.Actions); Set(presenter,"animator",animator);
                     Set(presenter,"weaponRenderer",renderer); Set(presenter,"leftHand",left); Set(presenter,"rightHand",right); Set(presenter,"muzzle",muzzle); Set(presenter,"muzzleFlash",particles);
                     Set(presenter,"loadedNails",loaded); Set(presenter,"incomingNails",fresh); Set(presenter,"incomingOffset",incoming); Set(presenter,"leftReloadOffset",leftCarrier); Set(presenter,"nailPitch",new Vector3(.01f,0,0));
+                    var reach=AddCalibratedTestArms(rig,animator,left,right,nailFixtureMesh);Set(presenter,"armReach",reach);
                     for(int i=0;i<9;i++) Call(f.State,"TryFire");
                     Call(f.State,"SetControl",Enum.Parse(T("ControlMode"),"OnFoot"));
                     f.Actions.GetType().GetProperty("ReloadLoadedBefore").SetValue(f.Actions,3); f.Actions.GetType().GetProperty("ReloadPlannedAdded").SetValue(f.Actions,5);
                     Set(f.Actions,"reloadRemaining",.825f); Set(f.Actions,"fireClock",.17f); Call(f.State,"Pause");
-                    rig.SetActive(true); animator.Rebind();
+                    ((Behaviour)presenter).enabled=false; // Rebind only before presentation writes arm corrections.
+                    rig.SetActive(true); animator.Rebind(); ((Behaviour)presenter).enabled=true;
                     // EditMode may not deliver non-ExecuteAlways lifecycle callbacks; execute the real callbacks if needed.
                     if(presenter.GetType().GetField("subscribed",All).GetValue(presenter)==null) Call(presenter,"OnEnable");
                     Call(presenter,"LateUpdate");
@@ -273,6 +298,14 @@ namespace DesertRV.Tests
                     Assert.That(Get(f.Actions,"ReloadRemaining"),Is.EqualTo(.825f)); Assert.That(Get(f.Actions,"FireRemaining"),Is.EqualTo(.17f));
                     Assert.That(Get(f.State,"LoadedAmmo"),Is.EqualTo(3)); Assert.That(Get(f.State,"ReserveAmmo"),Is.EqualTo(96));
                     Assert.That(f.Actions.GetType().GetField("ReloadPresented",All).GetValue(f.Actions) is Delegate d ? d.GetInvocationList().Length : 0,Is.EqualTo(1));
+                    // Cancellation while paused and an epoch reset must not retain the last arm solve.
+                    Set(f.Actions,"reloadRemaining",0f);Call(presenter,"LateUpdate");
+                    Assert.That(reach.GetType().GetProperty("LastSolveAccepted").GetValue(reach),Is.False);
+                    Assert.That(Quaternion.Angle(rig.transform.Find("ReachUpper0").localRotation,Quaternion.identity),Is.LessThan(.001f));
+                    Assert.That(Get(f.State,"LoadedAmmo"),Is.EqualTo(3));
+                    f.Actions.GetType().GetProperty("PresentationEpoch").SetValue(f.Actions,9);Call(presenter,"LateUpdate");
+                    Assert.That(Quaternion.Angle(rig.transform.Find("ReachFore0").localRotation,Quaternion.identity),Is.LessThan(.001f));
+                    foreach(var nail in fresh)Assert.That(nail.enabled,Is.False);
                     Call(presenter,"OnDisable");
                     UnityEngine.Object.DestroyImmediate(rig);
                 }

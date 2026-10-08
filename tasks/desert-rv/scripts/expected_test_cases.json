@@ -142,5 +142,12 @@
   "DesertRV.Tests.TouchRulesTests.QuickTapRetainsExactlyOneFrameEdge",
   "DesertRV.Tests.WeakPointPresentationTests.Binding_RejectsLegacyPlateWholeBodyAndSharedGeometry",
   "DesertRV.Tests.WeakPointPresentationTests.Gate_RejectsConstantAssemblyCurvesMaterialKeysAndBodyEmissionLeak",
-  "DesertRV.Tests.WeakPointPresentationTests.Lifecycle_OnlyCoreAndBothPlatesFollowRealWindowAcrossPauseDisableDeathRestart"
+  "DesertRV.Tests.WeakPointPresentationTests.Lifecycle_OnlyCoreAndBothPlatesFollowRealWindowAcrossPauseDisableDeathRestart",
+  "DesertRV.Tests.WeaponArmReachTests.Binding_FailsWithoutCalibrationOrWithScaleAxisJointChanges",
+  "DesertRV.Tests.WeaponArmReachTests.FailedSecondArm_RollsBackBothWithoutStretchOrTargetClamp",
+  "DesertRV.Tests.WeaponArmReachTests.FailureReporting_IsDeduplicatedButCountsRejectedSamples",
+  "DesertRV.Tests.WeaponArmReachTests.Math_RejectsUnreachableZeroDistanceAndUnresolvedPole",
+  "DesertRV.Tests.WeaponArmReachTests.PausedRepeatedSamples_DoNotAccumulateRotationOrCountOffset",
+  "DesertRV.Tests.WeaponArmReachTests.RestoreAndDisable_ClearCorrectionsWithoutMovingHandOrTarget",
+  "DesertRV.Tests.WeaponArmReachTests.Synthetic600ArmSamples_PreserveLengthsShouldersAndHandTargets"
 ]

@@ -290,6 +290,7 @@ namespace DesertRV.Editor
             {
                 object[] args={null};bool valid=(bool)method.Invoke(presenter,args);
                 Require(valid,label+": "+(args[0] as string ?? "presenter binding validation failed"),errors);
+                if(presenter is WeaponPresentation weapon && !WeaponArmCalibration.ValidateSourceAndBinding(weapon.armReach,out var reachReason)) errors.Add(label+": "+reachReason);
                 if(presenter is BeastWeakPointPresentation weakpoint) WeakPointContractChecks.Validate(weakpoint,label,errors);
             }
             catch(Exception error) { errors.Add(label+": binding validation threw "+(error.InnerException??error).Message); }

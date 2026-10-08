@@ -131,8 +131,8 @@
     },
     {
       "path": "tasks/desert-rv/scripts/expected_test_cases.json",
-      "sha256": "ee5d435dfd46e28b25e1655689225d780b09e37ab7fcbc008dad3fc97ca63890",
-      "size": 13538
+      "sha256": "77f5697c9dcaae75e46f5ee1e812c0bc8b0576f27f831ecab56f3e164876beda",
+      "size": 14224
     },
     {
       "path": "tasks/desert-rv/scripts/prepare_runner.sh",
@@ -176,7 +176,7 @@
     },
     {
       "path": "tasks/desert-rv/scripts/test_verify_evidence.py",
-      "sha256": "4dc1727c8d1bfa6437d8df92328a982d90a52d279e0a9446b2ae02491d86c659",
+      "sha256": "472c1070a7e4052e99a471177d8d7eef790a15842ee5f31cf8e265b1f9332599",
       "size": 17776
     },
     {
@@ -3556,8 +3556,8 @@
     },
     {
       "path": "tasks/desert-rv/unity/Assets/DesertRV/Editor/JourneyContentChecks.cs",
-      "sha256": "b4707b234d0b899fbd4a546556d30229427b1f52a47f03c1abed4a616a901c54",
-      "size": 30910
+      "sha256": "f3642483e2419a89464cf91cbe8b2c207e3922419f0814f12b7fbbec86599560",
+      "size": 31092
     },
     {
       "path": "tasks/desert-rv/unity/Assets/DesertRV/Editor/JourneyContentChecks.cs.meta",
@@ -3672,6 +3672,16 @@
     {
       "path": "tasks/desert-rv/unity/Assets/DesertRV/Editor/WeakPointContractChecks.cs.meta",
       "sha256": "34dde99d71f5c87884c1e2b185d575eab3136113f7694407b5fce0e9b7d845e9",
+      "size": 240
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Editor/WeaponArmCalibration.cs",
+      "sha256": "91f9cfdcc664389094040568f29b86897b82d16a614de6821a2763e25b71d2d4",
+      "size": 8878
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Editor/WeaponArmCalibration.cs.meta",
+      "sha256": "05e6210c4a261ddb48d3c60b8804e7f2c4ac64d992c136fb660bdaad08d139a2",
       "size": 240
     },
     {
@@ -4045,9 +4055,29 @@
       "size": 60
     },
     {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Runtime/TwoBoneArmSolver.cs",
+      "sha256": "b7baf7019b1869eafc73acf5ec62ef1898b4c583cfdc5aea2accc3b6755ce6f2",
+      "size": 3379
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Runtime/TwoBoneArmSolver.cs.meta",
+      "sha256": "fd05d73db78c0657b68eb105fcb56296490cd8fb15cc4f34c5104606d5a3048f",
+      "size": 240
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Runtime/WeaponArmReach.cs",
+      "sha256": "73e32a71a473aa3b70718e44908e2274da22c4e001943a30c74dfd52f4938be2",
+      "size": 11377
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Runtime/WeaponArmReach.cs.meta",
+      "sha256": "504fe8cfa446594360fe7518db95fdfecf3fdba78ab28a29f97f192920d10239",
+      "size": 240
+    },
+    {
       "path": "tasks/desert-rv/unity/Assets/DesertRV/Runtime/WeaponPresentation.cs",
-      "sha256": "773abda4b54c9aa627e69f3431bdd8d8c9daa8d894ec4d5aafdeaa8ed8f7e197",
-      "size": 11151
+      "sha256": "163055994caf8c9f204336b0ca03baa8c9bd8911d6418b0688139ff751c4a79c",
+      "size": 15038
     },
     {
       "path": "tasks/desert-rv/unity/Assets/DesertRV/Runtime/WeaponPresentation.cs.meta",
@@ -4456,8 +4486,8 @@
     },
     {
       "path": "tasks/desert-rv/unity/Assets/DesertRV/Tests/EditMode/PresentationContractTests.cs",
-      "sha256": "fa523d6bfc71eb1a2b3322f17fe715ca90514259ab8383b84907f5011f018769",
-      "size": 21955
+      "sha256": "4dcda185203292a5fb5555fa2edc11a84b07e7475418fb4dec8a38e0ec34bda3",
+      "size": 25370
     },
     {
       "path": "tasks/desert-rv/unity/Assets/DesertRV/Tests/EditMode/PresentationContractTests.cs.meta",
@@ -4472,6 +4502,16 @@
     {
       "path": "tasks/desert-rv/unity/Assets/DesertRV/Tests/EditMode/WeakPointPresentationTests.cs.meta",
       "sha256": "c5b7aa325c392a37ccefdecafc3b1589e15ce6e4a9b07705e0a844b13900d591",
+      "size": 240
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Tests/EditMode/WeaponArmReachTests.cs",
+      "sha256": "ab65c2287b97c998c8d51f0338ce7126a3413544473cbe26cc8a36829c301ea1",
+      "size": 11660
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Tests/EditMode/WeaponArmReachTests.cs.meta",
+      "sha256": "6cb592f9b4cb9809382aa884af84131b7f14eab4bf587a84540e25926cb6a5a9",
       "size": 240
     },
     {
