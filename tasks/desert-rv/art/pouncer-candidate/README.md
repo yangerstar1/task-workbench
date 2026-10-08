@@ -1,3 +1,15 @@
+# Death: separate genuine shoulder and pelvis support candidate
+
+The previous visually rejected pose touched the floor with a limb-root point while trunk-dominant skin remained 153–184mm above it. Read-only actual GLB reconstruction also found an 8.64mm penetration at 0.95s on Skin vertex 4581, weighted 88.85% hind_upper.L and 11.15% pelvis. These are evidence of a bad support definition and an insufficient proximal-joint contact response, not a reason to relax the 4mm threshold.
+
+This candidate uses two disjoint anatomical support regions, shoulder and pelvis. Both exclude head and distal limbs and require each vertex to carry at least 60% combined pelvis/spine/chest/neck weight. Each region reports its minimum, 5th/10th height percentiles, near-floor vertex count, world coordinates, bind coordinates and exact skin weights of six witnesses. Both must genuinely rest near the floor; one low point cannot conceal the other region hanging in the air.
+
+The authored corpse rolls into a lower oblique side-lying pose with slight spine relaxation. Its front/rear support is balanced through rigid-body pose and bounded angular adjustment, not by scaling or flattening the mesh. Individual limbs yield through bounded IK pole/reach changes, including the previously missed proximal hip surface. The same coupled contact solver preserves exact timing, stationary root and all-mesh penetration checks. Every non-Death motion branch, geometry, materials and rig remain hash-locked.
+
+The limited Death diagnostic delivers original opaque rest views plus clearly named death-support-overlay images. Only those separate witness overlays use translucent materials to expose orange shoulder and cyan pelvis markers through the skin; labels and JSON give actual world contact values and weights. Their transparency is never exported to the GLB/FBX, and the original opaque renders remain the visual-quality evidence. No visual approval is inferred from successful geometry/contact numbers. SCOPE=DEATH_DIAGNOSTIC_NOT_FULL remains mandatory until a full native Unity review is completed.
+
+---
+
 # Death rest-pose revision: relaxed side-supported corpse
 
 The preceding death-diagnostic run 37829068773 passed technical contacts, but its actual rest-07 image was visually rejected: all four paws remained horizontal and weight-bearing, with the torso twisted above them. No visual or production approval is implied by that technical pass.

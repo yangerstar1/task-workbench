@@ -1,12 +1,68 @@
 {
-  "revision": "relaxed_side_corpse_v2",
-  "intent": "Flank-supported corpse. Lower limbs lie out to the side; upper limbs fold loosely nearby. Paws turn onto their sides instead of four horizontal supporting palms.",
-  "body_roll_radians": 1.55,
+  "revision": "trunk_supported_oblique_side_v3",
+  "intent": "Low oblique side-lying corpse with separate trunk-dominant shoulder and pelvis support patches; limbs yield instead of carrying the chest.",
+  "body_roll_radians": 1.1,
   "head_pitch_radians": 0.06,
   "neck_pitch_radians": 0.025,
-  "fore.L": {"ankle": [-0.29, -0.61, 0.12], "pole": [-0.02, -0.25, 0.13], "paw_roll": 1.38, "paw_yaw": -0.18, "role": "lower_side_relaxed"},
-  "fore.R": {"ankle": [-0.07, -0.58, 0.235], "pole": [0.02, -0.15, 0.31], "paw_roll": 1.48, "paw_yaw": 0.12, "role": "upper_side_folded"},
-  "hind.L": {"ankle": [-0.30, 0.72, 0.11], "pole": [-0.02, 0.88, 0.13], "paw_roll": 1.42, "paw_yaw": 0.22, "role": "lower_side_relaxed"},
-  "hind.R": {"ankle": [-0.06, 0.49, 0.235], "pole": [0.04, 0.80, 0.27], "paw_roll": 1.50, "paw_yaw": -0.12, "role": "upper_side_folded"},
+  "fore.L": {
+    "ankle": [
+      -0.29,
+      -0.61,
+      0.12
+    ],
+    "pole": [
+      -0.02,
+      -0.25,
+      0.13
+    ],
+    "paw_roll": 1.38,
+    "paw_yaw": -0.18,
+    "role": "lower_side_relaxed"
+  },
+  "fore.R": {
+    "ankle": [
+      -0.07,
+      -0.58,
+      0.235
+    ],
+    "pole": [
+      0.02,
+      -0.15,
+      0.31
+    ],
+    "paw_roll": 1.48,
+    "paw_yaw": 0.12,
+    "role": "upper_side_folded"
+  },
+  "hind.L": {
+    "ankle": [
+      -0.3,
+      0.72,
+      0.11
+    ],
+    "pole": [
+      -0.02,
+      0.88,
+      0.13
+    ],
+    "paw_roll": 1.42,
+    "paw_yaw": 0.22,
+    "role": "lower_side_relaxed"
+  },
+  "hind.R": {
+    "ankle": [
+      -0.06,
+      0.49,
+      0.235
+    ],
+    "pole": [
+      0.04,
+      0.8,
+      0.27
+    ],
+    "paw_roll": 1.5,
+    "paw_yaw": -0.12,
+    "role": "upper_side_folded"
+  },
   "visual_approval": false
 }

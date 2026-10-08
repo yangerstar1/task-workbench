@@ -78,9 +78,16 @@ checks['death_final_hold_stable']=all((last[n][0]-before[n][0]).length<1e-5 and 
 if not checks['death_final_hold_stable']:errors.append('Death final hold not stable')
 checks['death_end_max_height']=sampled['Death'][-1]['max_z']
 rig.animation_data.action=bpy.data.actions['Death']; scene.frame_set(clips['Death']['frame_end'])
-ev=body.evaluated_get(bpy.context.evaluated_depsgraph_get()); me=ev.to_mesh()
+from death_support import TrunkSupport
+support=TrunkSupport(body);patches=support.inspect()
+checks['death_support_patches']=patches
+checks['death_torso_contact_z']=max(p['minimum_z'] for p in patches.values())
+(OUT/'death-support-witnesses.json').write_text(json.dumps({'scope':SCOPE,'regions':patches,'overlay':'separate translucent diagnostic only; opaque rest images are also preserved','marker_colors':{'shoulder':'orange','pelvis':'cyan'},'selection':'separate anatomical shoulder/pelvis, each vertex >=60% trunk-bone weight; no head/foot/leg-root-only substitutes','visual_approval':False},indent=2))
+# Keep the existing anatomical overall-height limit; support acceptance now uses both genuine patches.
 torso=[i for i,v in enumerate(body.data.vertices) if -.65<v.co.y<.77 and v.co.z>.50]
-checks['death_torso_contact_z']=min((ev.matrix_world@me.vertices[i].co).z for i in torso); ev.to_mesh_clear()
+for name,patch in patches.items():
+    if abs(patch['minimum_z'])>.012:errors.append('Death '+name+' genuine trunk patch does not contact floor')
+    if patch['q05_z']>.040 or patch['vertices_within_30mm']<max(3,math.ceil(patch['vertices']*.02)):errors.append('Death '+name+' support is only an isolated point, not a near-floor patch')
 checks['death_relaxed_paw_heights']={key:rig.pose.bones[key.split('.')[0]+'_paw.'+key.split('.')[1]].tail.z for key in leg_chains}
 rest_width=max(body.data.vertices[i].co.x for i in torso)-min(body.data.vertices[i].co.x for i in torso)
 checks['death_height_limit_from_torso_width']=rest_width+.035

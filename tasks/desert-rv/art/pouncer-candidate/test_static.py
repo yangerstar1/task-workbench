@@ -80,4 +80,19 @@ class CandidateContract(unittest.TestCase):
             self.assertGreater(pose[prefix+'.R']['ankle'][2]-pose[prefix+'.L']['ankle'][2],.10)
         self.assertIn("self.relax=t*t*(3-2*t)",(H/'death_contact.py').read_text())
         self.assertIn('death_paw_up_dot_world_up',(H/'validate_asset.py').read_text())
+    def test_genuine_two_patch_support_excludes_head_and_hip_root(self):
+        from death_support import support_region
+        self.assertEqual(support_region(.25,-.3,.65,.8),'shoulder')
+        self.assertEqual(support_region(.20,.5,.6,.75),'pelvis')
+        self.assertIsNone(support_region(.2,-.95,.65,1.0))
+        self.assertIsNone(support_region(.3,.6,.6,.1115))
+        self.assertIsNone(support_region(.3,.5,.06,.9))
+        text=(H/'validate_asset.py').read_text()
+        self.assertIn('death_support_patches',text);self.assertIn("patch['q05_z']",text)
+    def test_support_overlay_is_separate_post_export_evidence(self):
+        source=(H/'animate.py').read_text()
+        self.assertGreater(source.index('render_support_overlays(scene'),source.index('bpy.ops.export_scene.fbx'))
+        overlay=(H/'support_overlay.py').read_text()
+        self.assertIn('DIAGNOSTIC_TRANSPARENT_',overlay);self.assertIn('for obj,materials in saved:',overlay)
+        self.assertIn('death-support-overlay-',(H/'package_review.py').read_text())
 if __name__=='__main__':unittest.main()

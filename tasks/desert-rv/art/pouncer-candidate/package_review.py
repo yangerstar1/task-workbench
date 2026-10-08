@@ -29,7 +29,7 @@ for directory in sorted(review.iterdir()):
     sheet(picks,review/(directory.name+'-contact-sheet.jpg'))
 # Match the upload allowlist; raw animation-frame directories stay runner-local.
 patterns=['*.blend','*.glb','*.fbx','*.json','*.png','source-commit.txt','blender-upstream.sha256',
-          'review/*.mp4','review/*-contact-sheet.jpg','review/turntable-*.png','review/death-rest-*.png','review/death-near-*.png']
+          'review/*.mp4','review/*-contact-sheet.jpg','review/turntable-*.png','review/death-rest-*.png','review/death-near-*.png','review/death-support-overlay-*.png']
 near=sorted(review.glob('death-near-*.png'))
 if near:sheet(near,review/'DeathNear-contact-sheet.jpg')
 files=sorted({p for pattern in patterns for p in out.glob(pattern) if p.is_file()})

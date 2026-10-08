@@ -16,7 +16,7 @@
     }
   },
   "parameters_sha256": "b8b86c81e4043e7385cec478faf917df76ec89916d01d5296ab28dc6a0be11d4",
-  "preceding_death_diagnostic_commit": "b904ed4b37b22f345c9e705caca409d1078300f8",
-  "preceding_death_diagnostic_run": 37829068773,
-  "pose_revision": "relaxed_side_corpse_v2"
+  "preceding_death_diagnostic_commit": "b4890c1bd41aaa8ae5b32836ebc2acf90db1d380",
+  "preceding_death_diagnostic_run": 37835159890,
+  "pose_revision": "trunk_supported_oblique_side_v3"
 }

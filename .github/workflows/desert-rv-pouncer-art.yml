@@ -103,6 +103,7 @@ jobs:
             output/pouncer-candidate/review/*.mp4
             output/pouncer-candidate/review/death-rest-*.png
             output/pouncer-candidate/review/death-near-*.png
+            output/pouncer-candidate/review/death-support-overlay-*.png
             output/pouncer-candidate/review/*-contact-sheet.jpg
             output/pouncer-candidate/review/turntable-*.png
           if-no-files-found: error

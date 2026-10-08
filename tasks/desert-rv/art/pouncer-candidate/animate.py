@@ -80,6 +80,8 @@ def author_pose(name,u):
         t=min(1,u/.76); q=t*t*(3-2*t)
         visual.location=(.12*q,0,-.24*q); rot('visual_body',(.04*q,DEATH_POSE['body_roll_radians']*q,0))
         rot('head',(DEATH_POSE['head_pitch_radians']*q,0,.035*q)); rot('neck',(DEATH_POSE['neck_pitch_radians']*q,0,0))
+        rot('spine',(.035*q,0,-.025*q))  # Small relaxed trunk flexion, no scale or squash.
+        rot('spine',(.055*q,0,0));rot('chest',(-.020*q,0,0))
         # Lower limbs extend along the floor; upper limbs fold beside/on the lower limbs.
         # Upper-side paws deliberately do not receive standing ground-plant targets.
         for key,pts in leg_chains.items():
@@ -250,6 +252,8 @@ if args.scope=='death-diagnostic':
 rig.animation_data.action=bpy.data.actions['Death']; scene.frame_set(clips['Death']['frame_end'])
 for index in (3,7):
     camera_at(cam,index*math.tau/8); scene.render.filepath=str(review/f'death-rest-{index:02}.png'); bpy.ops.render.render(write_still=True)
+from support_overlay import render_support_overlays
+render_support_overlays(scene,cam,body,details,rig,clips,review,camera_at)
 (OUT/'render-manifest.json').write_text(json.dumps(render_manifest,indent=2))
 report=json.loads((OUT/'validation.json').read_text()); report['checks']['motion_framing_failures']=framing_failures
 if framing_failures:
