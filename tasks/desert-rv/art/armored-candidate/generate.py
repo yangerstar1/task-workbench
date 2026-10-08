@@ -26,17 +26,32 @@ pixels=[]
 for y in range(512):
     for x in range(512):
         tile=(y//256)*4+x//128; base=PALETTE[tile]
-        wear=.045*math.sin(x*.063+y*.031)+.014*math.sin(x*1.9+y*.81)
-        # Painted broad edge wear, not random high-frequency camouflage.
-        edge=min(x%128,127-x%128,y%256,255-y%256)<6
-        pixels.extend([max(.004,min(1,v+wear+(.065 if edge else 0))) for v in base]+[1])
+        u=(x%128)/127; v=(y%256)/255
+        # Sparse broad paint loss. No periodic stripe, wood grain or repeated diagonal bands.
+        chip=tile in (0,1) and ((u<.22 and .24<v<.43) or (.64<u<.88 and v>.79) or (u>.83 and .13<v<.23))
+        tone=.012*(u-.5)+.008*(v-.5)
+        color=(.19,.18,.145) if chip else base
+        pixels.extend([max(.004,min(1,k+tone)) for k in color]+[1])
 tex.pixels=pixels; tex.filepath_raw=str(OUT/'bulwark-basecolor.png'); tex.file_format='PNG'; tex.save(); tex.pack()
 mat=bpy.data.materials.new('Bulwark_StandardPBR_Atlas'); mat.use_nodes=True
 nodes=mat.node_tree.nodes; bs=nodes.get('Principled BSDF'); bs.inputs['Roughness'].default_value=.77; bs.inputs['Metallic'].default_value=.12
 image_node=nodes.new('ShaderNodeTexImage'); image_node.image=tex; mat.node_tree.links.new(image_node.outputs['Color'],bs.inputs['Base Color'])
+orm=bpy.data.images.new('Bulwark_Original_ORM',width=512,height=512,alpha=False); orm.colorspace_settings.name='Non-Color'
+orm_pixels=[]
+for y in range(512):
+    for x in range(512):
+        tile=(y//256)*4+x//128; u=(x%128)/127; v=(y%256)/255
+        chip=tile in (0,1) and ((u<.22 and .24<v<.43) or (.64<u<.88 and v>.79) or (u>.83 and .13<v<.23))
+        metal=chip or tile in (2,6); orm_pixels.extend([1,.38 if metal else .78,.72 if metal else 0,1])
+orm.pixels=orm_pixels; orm.filepath_raw=str(OUT/'bulwark-orm.png'); orm.file_format='PNG'; orm.save(); orm.pack()
+orm_node=nodes.new('ShaderNodeTexImage'); orm_node.image=orm; channels=nodes.new('ShaderNodeSeparateColor')
+mat.node_tree.links.new(orm_node.outputs['Color'],channels.inputs['Color']); mat.node_tree.links.new(channels.outputs['Green'],bs.inputs['Roughness']); mat.node_tree.links.new(channels.outputs['Blue'],bs.inputs['Metallic'])
+
 def mesh(name,verts,faces,bone,tile):
     me=bpy.data.meshes.new(name); me.from_pydata(verts,[],faces); me.update()
     o=bpy.data.objects.new(name,me); scene.collection.objects.link(o); assets.append(o); o['bone']=bone; o.data.materials.append(mat)
+    tag=me.attributes.new(name='weakpoint_face',type='INT',domain='FACE')
+    for value in tag.data:value.value=int(name.startswith('WeakpointTissue'))
     bm=bmesh.new(); bm.from_mesh(me); bmesh.ops.recalc_face_normals(bm,faces=list(bm.faces)); bm.to_mesh(me); bm.free()
     active(o); bpy.ops.object.mode_set(mode='EDIT'); bpy.ops.mesh.select_all(action='SELECT')
     bpy.ops.uv.smart_project(angle_limit=1.15,island_margin=.025); bpy.ops.object.mode_set(mode='OBJECT')
@@ -66,7 +81,7 @@ def strut(name,a,b,r1,r2,bone,tile,sides=10):
     return mesh(name,verts,faces,bone,tile)
 # A low six-sided thorax supports overlapping salvage plates, unlike the pouncer silhouette.
 loft('LivingThorax',[(0,-.94,.66,.29,.17),(0,-.65,.72,.57,.28),(0,-.10,.74,.61,.29),(0,.54,.70,.54,.24),(0,.94,.63,.29,.14)],'body',3,16)
-for i,(y,w,z) in enumerate([(-.55,.62,.91),(-.13,.67,1.00),(.29,.62,.97),(.67,.48,.85)]):
+for i,(y,w,z) in enumerate([(-.55,.62,.91),(-.13,.67,1.00),(.29,.62,.97)]):
     loft('DorsalSalvagePlate_%02d'%i,[(0,y-.25,z-.025,w*.70,.045),(0,y-.16,z,w,.125),(0,y+.15,z-.03,w*.92,.11),(0,y+.24,z-.09,w*.68,.035)],'body',0 if i%2==0 else 1,8)
     # Raised longitudinal reinforcing keel provides a distinctive armored silhouette.
     loft('PlateKeel_%02d'%i,[(0,y-.17,z+.10,.06,.016),(0,y,z+.17,.065,.038),(0,y+.15,z+.095,.04,.018)],'body',2,6)
@@ -75,15 +90,27 @@ for s in (-1,1):
     loft('RamCuttingRidge',[(s*.37,-1.02,.63,.058,.06),(s*.40,-1.35,.51,.061,.05),(s*.37,-1.55,.45,.022,.022)],'ram',2,6)
     loft('EyeRecess',[(s*.44,-.89,.76,.10,.043),(s*.46,-1.03,.735,.085,.032)],'ram',7,8)
     loft('AmberEye',[(s*.473,-.92,.775,.025,.022),(s*.478,-1.005,.755,.025,.019)],'ram',4,8)
+def slab(name,outline,thickness,bone,tile,axis=(0,0,1)):
+    # Thin closed metal sheet, outlined in XYZ, thickness directed in Z.
+    verts=[(x+axis[0]*dz,y+axis[1]*dz,z+axis[2]*dz) for dz in (-thickness/2,thickness/2) for x,y,z in outline]; n=len(outline)
+    faces=[tuple(reversed(range(n))),tuple(n+i for i in range(n))]+[(i,(i+1)%n,(i+1)%n+n,i+n) for i in range(n)]
+    return mesh(name,verts,faces,bone,tile)
+# Raised rear organ sits ABOVE the old thorax. It is a recovery-state signal, not a
+# separate hitbox: current gameplay is whole-body vulnerability for two seconds.
+loft('RearVentSocket',[(0,.57,.84,.25,.06),(0,.83,.86,.36,.06),(0,1.13,.87,.32,.055)],'body',7,12)
+for dx in (-.205,0,.205):
+    loft('WeakpointTissue_'+str(dx),[(dx,.70,.985,.080,.085),(dx,.90,1.005,.100,.125),(dx,1.14,.995,.086,.105)],'body',4,12)
 for side,s in motion.SIDES:
-    # Real separate hinged cover; side/rear weak tissue is concealed at rest.
-    loft('ExposedVentTissue_'+side,[(s*.51,.05,.70,.065,.12),(s*.52,.39,.71,.09,.16),(s*.43,.75,.63,.055,.10)],'body',4,12)
-    for j in range(4):
-        y=.10+j*.16
-        strut('VentRib_'+side+str(j),(s*.555,y,.59),(s*.58,y,.84),.018,.018,'body',2,8)
-    loft('HingedFlankShield_'+side,[(s*.60,-.10,.77,.105,.18),(s*.65,.18,.76,.13,.25),(s*.60,.53,.73,.12,.23),(s*.48,.88,.66,.075,.13)],'gate.'+side,1,8)
-    for y in (.06,.30,.54):
-        strut('ShieldRivet_'+side+str(y),(s*.74,y,.83),(s*.765,y,.83),.026,.026,'gate.'+side,5,8)
+    # Front-mounted VERTICAL hinges swing doors laterally and forward; they cannot
+    # remain like the old awning directly over the tissue in a rear FPS sightline.
+    bn='gate.'+side
+    loft('HingedSideShield_'+side,[(s*.50,.38,.93,.040,.20),(s*.54,.76,.94,.050,.235),(s*.48,1.19,.93,.045,.22)],bn,1,8)
+    # Rear shutters meet with a small overlap, hiding the orange when closed.
+    # The top flange covers the bay in high/FPS views and moves away with the same hinge.
+    slab('RearShutter_'+side,[(s*-.015,1.19,.74),(s*.52,1.19,.74),(s*.52,1.19,1.175),(s*-.015,1.19,1.175)],.025,bn,1,axis=(0,1,0))
+    slab('HatchTopFlange_'+side,[(s*-.015,.54,1.18),(s*.51,.54,1.18),(s*.53,1.20,1.18),(s*-.015,1.20,1.18)],.032,bn,0)
+    strut('VerticalHinge_'+side,(s*.50,.38,.73),(s*.50,.38,1.17),.035,.035,bn,2,10)
+    for y in (.64,.94):strut('DoorRivet_'+side+str(y),(s*.57,y,.96),(s*.59,y,.96),.025,.025,bn,5,8)
 # Four wide load-bearing legs with contrasting recessed linkages and bevel-shaped greaves.
 rest={}
 for k in motion.LEGS:
@@ -103,7 +130,7 @@ def bone(n,h,t,parent=None):
     if parent:b.parent=rig.data.edit_bones[parent]
 bone('root',(0,0,0),(0,0,.2)); bone('body',(0,0,.69),(0,0,1.0),'root')
 bone('ram',(0,-.79,.66),(0,-1.15,.66),'body')
-for side,s in motion.SIDES: bone('gate.'+side,(s*.43,.35,.95),(s*.43,.65,.95),'body')
+for side,s in motion.SIDES: bone('gate.'+side,(s*.50,.38,.95),(s*.50,.38,1.15),'body')
 for k,(h,n,f) in rest.items():
     bone('upper.'+k,h,n,'body'); bone('lower.'+k,n,f,'upper.'+k); bone('foot.'+k,f,motion.add(f,(0,-.2,0)),'lower.'+k)
 bpy.ops.object.mode_set(mode='OBJECT')
@@ -127,7 +154,7 @@ def translate(z): return Matrix.Translation((0,0,z))
 def apply_pose(pose):
     rig.pose.bones['root'].matrix=rest_matrices['root']; z=pose['z']
     rig.pose.bones['body'].matrix=translate(z)@rest_matrices['body']; bpy.context.view_layer.update()
-    for name,angle,axis in [('ram',pose['ram'],'X')]+[('gate.'+side,-s*pose['gate'],'Y') for side,s in motion.SIDES]:
+    for name,angle,axis in [('ram',pose['ram'],'X')]+[('gate.'+side,-s*pose['gate'],'Z') for side,s in motion.SIDES]:
         pivot=rest_matrices[name].translation
         rig.pose.bones[name].matrix=translate(z)@Matrix.Translation(pivot)@Matrix.Rotation(angle,4,axis)@Matrix.Translation(-pivot)@rest_matrices[name]
     for k in motion.LEGS:
@@ -173,5 +200,6 @@ if args.phase=='static':
         camera(math.tau*i/8); checks.append(validate_frame('static-'+str(i))); still(review/f'static-{i:02}.png')
     apply_pose(motion.sample('Recover',0)); camera(math.pi*.68); checks.append(validate_frame('open-weakpoint')); still(review/'static-weakpoint-open.png')
     bpy.ops.wm.save_as_mainfile(filepath=str(OUT/'bulwark-static-review.blend'))
+    exec(compile((HERE/'fps_evidence.py').read_text(),str(HERE/'fps_evidence.py'),'exec'))
     (OUT/'static-checks.json').write_text(json.dumps(checks,indent=2)); sys.exit(1 if any(c['errors'] for c in checks) else 0)
 exec(compile((HERE/'animate.py').read_text(),str(HERE/'animate.py'),'exec'))

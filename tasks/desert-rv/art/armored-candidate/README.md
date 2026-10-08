@@ -10,7 +10,7 @@ A low, wide salvage-armored quadruped with a chisel ram, overlapping cream/oxide
 
 - parameters.json: pinned versions, timings, technical budgets and declared status
 - motion.py: dependency-free exact two-link legs, foot targets, support phases, charge travel contract and synthetic interruptions
-- generate.py: mesh construction, original 512px atlas, rigid armor skinning combined into one skinned mesh / one atlas material, early static views, neutral studio and evaluated mesh framing/floor checks
+- generate.py: mesh construction, original 512px basecolor/ORM atlases, rigid armor skinning combined into one skinned mesh / one atlas material, early static views, neutral studio and evaluated mesh framing/floor checks
 - animate.py: seven complete sampled clips, evaluated pose checks, root-travel review footage, three interruption examples, turntable stills and conditional export
 - test_static.py: syntax, configuration, reachability, support speed, transition continuity, loops, interruption continuity, weak-point/death behavior and source integrity checks
 - artifact_io.py: refuses nonempty/non-directory outputs before generation to prevent stale exports entering a new run
@@ -52,8 +52,21 @@ Source tests prove mathematics and source integrity only. Review every static an
 
 Default dispatch `phase=static` produces early images only. After actual visual review, a separate `phase=full` dispatch requires `reviewed_source_sha` equal to that run's source commit. Full reruns static generation/upload before motion, and is blocked if static generation or validation fails. The input asserts a human review; it is not an automated visual-approval system. Every package still says visual_approved=false until actual review is recorded separately.
 
-Each run/attempt uses unique empty output directories. Time limits: 120-minute job, 20-minute static Blender command, 80-minute motion command. Artifact retention is 14 days. Package allowlists contain 12 static files or 83 motion files before provenance/status/checksums. Maximum individual output is 256MiB and copied output total is capped at 1GiB. Video frame counts, duration, H.264 format and dimensions are checked using ffprobe; PNG headers/dimensions, binary export signatures, generator checksums, technical reports and exact seven-clip timing are checked. These are file-integrity gates, not FBX/GLB importer parity.
+Each run/attempt uses unique empty output directories. Time limits: 120-minute job, 20-minute static Blender command, 80-minute motion command. Artifact retention is 14 days. Package allowlists contain 58 static files or 84 motion files before provenance/status/checksums. Maximum individual output is 256MiB and copied output total is capped at 1GiB. Video frame counts, duration, H.264 format and dimensions are checked using ffprobe; PNG headers/dimensions, binary export signatures, generator checksums, technical reports and exact seven-clip timing are checked. These are file-integrity gates, not FBX/GLB importer parity.
 
 write_provenance.py binds source commit, run ID/attempt, run URL, per-source SHA-256, workflow SHA-256 and verified official Blender archive checksum. package_evidence.py binds each exported file, still, video, log and provenance record in SHA256SUMS. Missing files or process/technical failures produce PARTIAL_FAILED_NOT_A_SUCCESS and a nonzero step. Partial evidence is still uploaded; diagnostics are separately allowlisted. The workflows neither upload the reference image nor other folders, and contain no secrets or publishing rights.
 
 Run `python test_pipeline.py` for the additional four stdlib packaging/workflow tests. The missing-output test deliberately exercises failure packaging and repeated-package rejection; it does not launch Blender or contact GitHub.
+
+
+## R2 changes based on actual R1 images
+
+All nine images from Actions run 37813199753 were individually inspected. Closed rear views leaked thin orange seams, the opened lateral shields formed an awning over the tissue, and repeated diagonal texture bands resembled wood grain. R2 retains the plow, four weight-bearing legs and overlapping front dorsal plates. The old rear plate and low side tissue are replaced by an elevated rear bay with three broad orange lobes. Two three-sided hatch doors cover side/rear/top when closed, and open 110 degrees about front-mounted vertical hinges. This removes the old awning path; actual occlusion/readability remains unverified until the next static run.
+
+The current BeastActor rule is whole-body vulnerability during the two-second Recover window. There is NO rear hit cone or dedicated tissue hitbox in that code. The bay is readable feedback for that existing state, not a new directional damage rule. No arrows, fake hit markers or emissive substitutes are added.
+
+R2 removes periodic stripe texture and adds sparse broad paint-loss patches plus a shared ORM atlas: matte paint/organic material and exposed metal have distinct roughness/metalness. Color, geometry and PBR import parity remain visual-review gates.
+
+Static evidence now includes 44 additional fixed-perspective FPS images: 1.65m camera height, 60-degree vertical FOV, rear-side/rear views at 2/4/6m plus both side-boundary views at 4m. Each viewpoint shares identical camera position and aim across closed, Recover 0.0s, 1.0s and 1.95s images. Framing is not auto-fit. fps-visibility.json records evaluated-mesh ray occlusion and projected tissue size; closed leaks and near-total open occlusion fail the technical check. These samples do not prove a player can recognize a two-second opportunity; rendered image and actual motion/Unity review are still required.
+
+This revision contains no workflow replacement. The existing owner-only workflow's publisher fixes for GITHUB_ENV initialization and explicit step outcomes are retained unchanged. Only the precise model/evidence source allowlist should be published. Do not run full motion until the new static images are actually reviewed.

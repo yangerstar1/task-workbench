@@ -4,14 +4,15 @@ Uses stdlib; ffprobe verifies actual video streams. Never executes Blender or do
 import argparse, hashlib, json, os, shutil, struct, subprocess
 from pathlib import Path
 from artifact_io import fresh_output
+from evidence_layout import fps_files
 HERE=Path(__file__).resolve().parent
 P=json.loads((HERE/'parameters.json').read_text())
 def sha(path):return hashlib.sha256(path.read_bytes()).hexdigest()
 def expected(phase):
     if phase=='static':
-        return ['bulwark-basecolor.png','bulwark-static-review.blend','static-checks.json']+[f'review/static-{i:02}.png' for i in range(8)]+['review/static-weakpoint-open.png']
+        return ['bulwark-basecolor.png','bulwark-orm.png','bulwark-static-review.blend','static-checks.json','fps-visibility.json']+[f'review/static-{i:02}.png' for i in range(8)]+['review/static-weakpoint-open.png']+fps_files(P)
     names=list(P['clips'])+[f'SYNTHETIC_Interrupt_{x}' for x in (.07,.42,.91)]
-    return ['bulwark-basecolor.png','bulwark-review.blend','bulwark-candidate.glb','bulwark-candidate.fbx','evaluated-validation.json','clip-manifest.json','output-sha256.json']+[f'review/{n}.mp4' for n in names]+[f'review/{n}-{f:.2f}.png' for n in names for f in (0,.25,.5,.75,1)]+[f'review/turntable-{i:02}.png' for i in range(16)]
+    return ['bulwark-basecolor.png','bulwark-orm.png','bulwark-review.blend','bulwark-candidate.glb','bulwark-candidate.fbx','evaluated-validation.json','clip-manifest.json','output-sha256.json']+[f'review/{n}.mp4' for n in names]+[f'review/{n}-{f:.2f}.png' for n in names for f in (0,.25,.5,.75,1)]+[f'review/turntable-{i:02}.png' for i in range(16)]
 def main():
     ap=argparse.ArgumentParser(); ap.add_argument('--root',required=True); ap.add_argument('--phase',choices=['static','motion'],required=True); a=ap.parse_args()
     root=Path(a.root).resolve(); phase=a.phase
@@ -53,7 +54,11 @@ def main():
     try:
         if phase=='static':
             checks=json.loads((src/'static-checks.json').read_text())
-            if len(checks)!=9 or any(c['errors'] for c in checks):errors.append('static technical checks failed')
+            if len(checks)!=9+len(fps_files(P)) or any(c['errors'] for c in checks):errors.append('static technical checks failed')
+            visibility=json.loads((src/'fps-visibility.json').read_text())
+            if len(visibility['samples'])!=len(fps_files(P)):errors.append('FPS visibility evidence incomplete')
+            for row in visibility['samples']:
+                if row['eye_height_m']!=1.65 or row['vertical_fov_degrees']!=60:errors.append('FPS camera contract mismatch')
         else:
             report=json.loads((src/'evaluated-validation.json').read_text())
             if report['failures'] or report['status']!='technical_checks_passed_visual_review_still_required':errors.append('motion technical checks failed')

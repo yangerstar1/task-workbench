@@ -1,19 +1,21 @@
 {
-  "candidate": "scrapyard-bulwark-v001",
+  "candidate": "scrapyard-bulwark-v002",
   "status": "source_only_unrendered_unapproved",
   "source_origin": "original procedural authorship",
   "third_party_assets": [],
   "sha256": {
-    "README.md": "22f3d9ab39020f58c5ece9bcde19bf6b64c24f0d1941601264cb9ccca43c4095",
-    "parameters.json": "cc64d69eba7b983093aafa4cd12c0bf82c8a32dd657bb34e4c73e0c40a86d840",
-    "motion.py": "27160d95f23396e43f6ee206a8d0755cf8386c33c36c1dd8687b7e083a7a881d",
-    "generate.py": "ec4a4008fb1914a17ddc10e2667922cbcd402a3c63211eebda51f30e88530db8",
+    "README.md": "099a0623b6183e1234a59661d1140db2718e31f38d722d557473a6a1fe2aec20",
+    "parameters.json": "02913316f01fafbe2c14d10f944dabb83276d67baf8ab8ff9c4d879f2714c376",
+    "motion.py": "2852443caff1767545e204fdab3d2dd132d14d398e6217009364dc42bcc8416c",
+    "generate.py": "7d6c909caa11b469ed8f1ee972b5435a191c3709478763e3ff3c5f0ad2ed9eb5",
     "animate.py": "39e194f4c52c3d4ac3ffaa620da6fccbce3d27669c11f8168ab10961c2e42f22",
-    "test_static.py": "303b9400d1bdd8705102d420c02548ea7fa307f6a25a758345bca2b8009ab429",
+    "test_static.py": "acc1966c677c7b9de578873fd930a374b22092498c6919ecc760f30cb05a76dd",
     "artifact_io.py": "3a088520d8162c1beaa2c4fcf32275f8041e05db323344b1d82a1b263787a144",
     "validate_runtime_contract.py": "a2d91b8bc8f947168778cfc4f9ffc4fbc3e92cb6e8a68b7e7131bad3c8d106da",
-    "package_evidence.py": "f411010c0c4bc966f8c7018449a19592dc100651443245c2b85a43a631b4b04d",
+    "package_evidence.py": "6ada47fe1f26f58eec1a32c16fe7e54767fc342260fe14b171a82f2f99cd39bc",
     "write_provenance.py": "af2c297a8dfeacdc85833b9d1d2b1daa58ee355b494594272643159d15e088ea",
-    "test_pipeline.py": "0a289711a457017a710d77a35dfa9e01811dbdfff124798f0378a896d2394c3d"
+    "test_pipeline.py": "9f08e87413c21905de00e112e72ff823aa559786fcd0fbc0ffe375f643cc03eb",
+    "fps_evidence.py": "1f8b3b3cded1466cf5089e4a2357d985140c3d9de92c84afa858771368879e5b",
+    "evidence_layout.py": "023baa909e5379b598775fc7533dc5b035370a4d47bc9251e4ae351d970d58ef"
   }
 }

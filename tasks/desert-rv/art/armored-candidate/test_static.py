@@ -59,10 +59,10 @@ class SourceTests(unittest.TestCase):
     def test_weakpoint_window_and_death_hold(self):
         self.assertEqual(motion.sample('Windup',1)['gate'],0)
         self.assertGreater(motion.sample('Recover',.8)['gate'],1)
-        self.assertEqual(motion.sample('Recover',2)['gate'],1.12)
+        self.assertEqual(motion.sample('Recover',2)['gate'],P['gate_open_radians'])
         for i in range(481):
             self.assertEqual(motion.sample('Attack',i/400)['gate'],0)
-            self.assertEqual(motion.sample('Recover',i/240)['gate'],1.12)
+            self.assertEqual(motion.sample('Recover',i/240)['gate'],P['gate_open_radians'])
         self.assertEqual(motion.sample('Death',1),motion.sample('Death',1.8))
     def test_no_external_asset_or_execution_calls(self):
         for name in ('generate.py','animate.py','motion.py'):
@@ -97,6 +97,14 @@ class SourceTests(unittest.TestCase):
             with self.assertRaises(ValueError): fresh_output(stale)
             with self.assertRaises(ValueError): fresh_output(stale/'old.fbx')
             self.assertEqual((stale/'old.fbx').read_text(),'old')
+    def test_fps_evidence_contract(self):
+        from evidence_layout import fps_files
+        f=P['fps_evidence']; self.assertEqual(f['eye_height_m'],1.65); self.assertEqual(f['distances_m'],[2,4,6])
+        self.assertEqual(f['gameplay_rule'],'whole_body_vulnerable_during_recover_no_directional_hit_cone')
+        self.assertEqual(len(fps_files(P)),44); self.assertEqual(len(set(fps_files(P))),44)
+        self.assertEqual(f['recover_seconds'],[0,1,1.95]); self.assertGreater(P['gate_open_radians'],math.pi/2)
+        text=(HERE/'generate.py').read_text(); self.assertNotIn('math.sin(x',text)
+        self.assertIn("'gate.'+side,-s*pose['gate'],'Z'",text)
     def test_source_manifest(self):
         manifest=json.loads((HERE/'source-manifest.json').read_text())
         for name,digest in manifest['sha256'].items(): self.assertEqual(hashlib.sha256((HERE/name).read_bytes()).hexdigest(),digest)

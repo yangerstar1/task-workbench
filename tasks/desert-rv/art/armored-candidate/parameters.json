@@ -1,5 +1,5 @@
 {
-  "candidate": "scrapyard-bulwark-v001",
+  "candidate": "scrapyard-bulwark-v002",
   "status": "source_only_unrendered_unapproved",
   "blender": "4.2.3",
   "unity": "6000.3.19f1",
@@ -24,7 +24,7 @@
   "up_blender": "+Z",
   "floor_penetration_limit_m": 0.004,
   "contact_gap_limit_m": 0.012,
-  "texture": "original 512x512 procedural basecolor atlas, no external pixels",
+  "texture": "Original 512px basecolor and ORM atlases; broad paint loss, no stripe texture",
   "provenance": "Original code-defined geometry, rig, texture and motion; approved private image observed only, not bundled",
   "walk_stride_seconds": 0.6,
   "weakpoint_seconds": 2.0,
@@ -44,5 +44,35 @@
     "gate_transition": "Existing Animator.CrossFade .12, visual parity requires Unity verification",
     "walk_exceptions": "Returning home 2m/s or blocked tangent .6x requires speed synchronization; current runtime lacks parameterized playback",
     "timeout_note": "runtime uses attackClock > 1.2; clip must loop or motor/state transition requires tested bounded overrun handling"
+  },
+  "gate_open_radians": 1.9198621771937625,
+  "fps_evidence": {
+    "eye_height_m": 1.65,
+    "vertical_fov_degrees": 60,
+    "distances_m": [
+      2,
+      4,
+      6
+    ],
+    "rear_angles_degrees": [
+      120,
+      180,
+      240
+    ],
+    "side_boundary_angles_degrees": [
+      90,
+      270
+    ],
+    "side_boundary_distance_m": 4,
+    "recover_seconds": [
+      0,
+      1,
+      1.95
+    ],
+    "gameplay_rule": "whole_body_vulnerable_during_recover_no_directional_hit_cone",
+    "minimum_open_visible_samples": 8,
+    "maximum_closed_visible_samples": 2,
+    "minimum_open_visible_area_px": 64,
+    "minimum_open_visible_height_px": 8
   }
 }

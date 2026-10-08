@@ -62,13 +62,13 @@ def sample(clip,t):
         # Gate stays open throughout the actual 2s gameplay vulnerability window.
         # Boundary gate changes are intentionally not disguised by premature opening/closing.
         u=smooth(t/P['weakpoint_seconds']); z=mix(-.13,-.18,smooth(t/.18)) if t<.18 else mix(-.18,0,smooth((t-.18)/(P['weakpoint_seconds']-.18)))
-        gate=1.12; ram=mix(-.12,.04,smooth(t/.18)) if t<.18 else .04*(1-smooth((t-.18)/(P['weakpoint_seconds']-.18)))
+        gate=P['gate_open_radians']; ram=mix(-.12,.04,smooth(t/.18)) if t<.18 else .04*(1-smooth((t-.18)/(P['weakpoint_seconds']-.18)))
         for k in LEGS:
             start=.20 if k in ('fore.L','hind.R') else .85
             a=max(0,min(1,(t-start)/.55)); y,_,_=gait(0,k,P['charge_speed_mps'],P['charge_stride_seconds'])
             feet[k]=add(FOOT[k],(0,y*(1-smooth(a)),.085*math.sin(math.pi*a)**2)); contact[k]=a in (0,1)
     elif clip=='Hit': z=-.065*math.sin(math.pi*min(t/P['clips']['Hit'],1))**2; ram=.10*math.sin(math.pi*min(t/P['clips']['Hit'],1))**2
-    elif clip=='Death': z=P['death_settle_z']*smooth(t/.8); gate=1.12*smooth(t/.7); ram=.18*smooth(t/.6)
+    elif clip=='Death': z=P['death_settle_z']*smooth(t/.8); gate=P['gate_open_radians']*smooth(t/.7); ram=.18*smooth(t/.6)
     else: raise ValueError(clip)
     return {'z':z,'gate':gate,'ram':ram,'feet':feet,'contact':contact}
 
@@ -78,7 +78,7 @@ def interrupted(phase,t):
     This is preview evidence, not an implemented Unity transition controller.
     """
     a=sample('Attack',phase); u=smooth(t/.24)
-    out=dict(a); out['z']=mix(a['z'],-.18,u); out['gate']=mix(a['gate'],1.12,u)
+    out=dict(a); out['z']=mix(a['z'],-.18,u); out['gate']=mix(a['gate'],P['gate_open_radians'],u)
     out['feet']={k:(v[0],v[1],mix(v[2],FOOT[k][2],u)) for k,v in a['feet'].items()}
     out['contact']={k: a['contact'][k] or t>=.24 for k in LEGS}
     return out
