@@ -14,6 +14,7 @@ namespace DesertRV
         public JourneyHud hud;
         public RegionBinding Region { get; private set; }
         public PoweredEncounterState Encounter { get; private set; }
+        public JourneyPacingTelemetry Pacing { get; } = new JourneyPacingTelemetry();
         public JourneyTelemetry Telemetry { get; } = new JourneyTelemetry();
         public string LoadError { get; private set; }
         public double WorldProgress => Region ? Region.WorldProgress(motor.PlayerPosition) : 0;
@@ -36,14 +37,31 @@ namespace DesertRV
             active = this;
             DontDestroyOnLoad(gameObject);
             motor.ObstacleContact += OnObstacleContact;
+            actions.SupplyCollected += OnSupplyCollected;
+            actions.ShotPresented += OnShotPresented;
         }
-        void OnDestroy() { if (active == this) active = null; if (motor) motor.ObstacleContact -= OnObstacleContact; }
+        void OnDestroy()
+        {
+            if (active == this) active = null;
+            if (motor) motor.ObstacleContact -= OnObstacleContact;
+            if (actions) { actions.SupplyCollected -= OnSupplyCollected; actions.ShotPresented -= OnShotPresented; }
+        }
+        void OnSupplyCollected(int region, string id, SupplyKind kind, int amount)
+        {
+            if (OwnsJourney && actions.PresentationPlaying && amount > 0 && region == journey.State.SceneId)
+                Pacing.RecordSupply(region, actions.PresentationGeneration, id);
+        }
+        void OnShotPresented(ShotPresentationEvent shot)
+        {
+            if (OwnsJourney && actions.PresentationPlaying && shot.Epoch == actions.PresentationEpoch)
+                Pacing.RecordShot(journey.State.SceneId, actions.PresentationGeneration, shot.Epoch, shot.Sequence);
+        }
         public void Begin() { if (OwnsJourney && journey.StartJourney()) ResetRun(); }
         public void Restart() { if (OwnsJourney && journey.RestartJourney()) ResetRun(); }
         void ResetRun()
         {
             minimumSpawnProgress = double.NegativeInfinity;
-            Telemetry.Reset(); progress = new RegionProgressState(journey.State, journey.Generation);
+            Pacing.Reset(journey.State); Telemetry.Reset(); progress = new RegionProgressState(journey.State, journey.Generation);
             pending = journey.BeginCurrentRegionLoad(); RequestLoad();
         }
         public void RetryLoad() { if (CanRetryLoad) RequestLoad(); }
@@ -83,6 +101,7 @@ namespace DesertRV
             {
                 if (!Region || journey.State.Status != SessionStatus.Playing) { actions.SetPaused(true); return; }
                 float dt = Time.deltaTime;
+                Vector3 beforeMove = motor.PlayerPosition;
                 motor.Tick(dt);
                 journey.TickStorm(dt, WorldProgress);
                 if (journey.State.Status != SessionStatus.Playing) return;
@@ -93,6 +112,13 @@ namespace DesertRV
                     if (Region.roadBeasts != null) foreach (var enemy in Region.roadBeasts) enemy.gameObject.SetActive(true);
                 }
                 TickEncounter(dt);
+                bool threat = false;
+                foreach (var enemy in Region.AllEnemies())
+                    if (enemy && enemy.gameObject.activeInHierarchy && !enemy.Dead && Vector3.Distance(enemy.transform.position, motor.PlayerPosition) < 19)
+                    { threat = true; break; }
+                Pacing.Sample(journey.State, dt, Vector3.Distance(beforeMove, motor.PlayerPosition), motor.InsideCabin,
+                    actions.Installing || actions.Reloading, threat, Encounter != null && !Encounter.Complete,
+                    Encounter != null ? Encounter.AliveCount : 0, (WorldProgress - journey.State.StormFrontProgress) / journey.State.StormSpeed);
                 Telemetry.Record(Region.region, actions.Installing ? JourneyActivity.Installing : actions.Reloading ? JourneyActivity.Reloading :
                     Encounter != null && !Encounter.Complete && journey.State.PowerConnected ? JourneyActivity.PoweredDefense :
                     journey.State.Control == ControlMode.Driving ? JourneyActivity.Driving : JourneyActivity.OnFoot, dt);
@@ -132,3 +158,4 @@ namespace DesertRV
         }
     }
 }
+

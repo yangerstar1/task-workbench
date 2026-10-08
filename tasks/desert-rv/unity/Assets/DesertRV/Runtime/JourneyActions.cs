@@ -67,6 +67,8 @@ namespace DesertRV
         LineRenderer tracer;
         float tracerRemaining;
         int interaction;
+        JourneySupplyPoint nearbySupply;
+        public event Action<int, string, SupplyKind, int> SupplyCollected;
 
 
         void Awake()
@@ -87,7 +89,7 @@ namespace DesertRV
             Region = region; Progress = progress; PresentationGeneration = journey.Generation;
             arc = new ArcCombatState(journey.State, region.region, journey.Generation, 3, .2);
             fireClock = reloadRemaining = installRemaining = hitFlash = damageFlash = tracerRemaining = 0;
-            tracer.enabled = false; Prompt = Notice = "";
+            tracer.enabled = false; Prompt = Notice = ""; interaction = 0; nearbySupply = null;
             ResetPresentation();
             lastHealth = journey.State.PlayerHealth;
             if (windSound) wind.Play();
@@ -100,7 +102,7 @@ namespace DesertRV
         public void Tick(float delta)
         {
             var state = journey.State;
-            if (state.Status != SessionStatus.Playing || !Region) { SetPaused(true); return; }
+            if (!PresentationPlaying || !Region.gameObject.scene.IsValid() || !Region.gameObject.scene.isLoaded) { SetPaused(true); return; }
             SetPaused(false);
             fireClock = Mathf.Max(0, fireClock - delta); hitFlash = Mathf.Max(0, hitFlash - delta); damageFlash = Mathf.Max(0, damageFlash - delta);
             tracerRemaining -= delta; tracer.enabled = tracerRemaining > 0;
@@ -157,7 +159,7 @@ namespace DesertRV
         }
         void FindInteraction()
         {
-            interaction = 0; Prompt = "";
+            interaction = 0; Prompt = ""; nearbySupply = null;
             if (journey.State.Control == ControlMode.Driving)
             { interaction = 1; Prompt = Mathf.Abs(motor.Speed) > .6f ? "停稳后下车" : "下车"; return; }
             ComponentPart part = Region.region == 1 ? ComponentPart.RamPart : ComponentPart.Coil;
@@ -170,11 +172,18 @@ namespace DesertRV
             { interaction = 3; Prompt = "安装改装 · 5 秒"; }
             else if (motor.InsideCabin && Near(cabinWorkbench, 2.1f) && journey.State.VehicleHealth < 300 && journey.State.RepairKits > 0)
             { interaction = 5; Prompt = "修理房车 · 消耗 1 修理包"; }
+            else if ((nearbySupply = FindSupplyInReach()) != null)
+            {
+                interaction = 7;
+                Prompt = Reloading ? "装填中，完成后可领取补给" : Installing ? "改装中，完成后可领取补给" :
+                    nearbySupply.label + " · " + nearbySupply.riskHint;
+            }
             else if (Vector3.Distance(motor.PlayerPosition, motor.EntryPosition) < 2.8f)
             { interaction = 4; Prompt = "回到驾驶位"; }
         }
         void Interact()
         {
+            if (!PresentationPlaying) return;
             switch (interaction)
             {
                 case 1: if (!motor.TryExitVehicle()) Say("先停稳，并给车门留出下车空间。", 3); break;
@@ -185,11 +194,54 @@ namespace DesertRV
                 case 3: installPart = journey.State.HasPart(ComponentPart.RamPart) ? ComponentPart.RamPart : ComponentPart.Coil; CancelReloadPresentation(); installRemaining = 5; break;
                 case 4: motor.TryEnterDriver(); break;
                 case 5: if (journey.State.TryRepair()) Say("房车修复 +95。", 3); break;
+                case 7:
+                    if (Reloading || Installing)
+                    { Say(Reloading ? "装填中，完成后可领取补给。" : "改装中，完成后可领取补给。", 2); break; }
+                    var supply = FindReachableSupply();
+                    if (supply == null || supply != nearbySupply) break;
+                    int before = supply.kind == SupplyKind.RepairKit ? journey.State.RepairKits : journey.State.ReserveAmmo;
+                    if ((supply.kind == SupplyKind.Ammo && before >= 144) || (supply.kind == SupplyKind.RepairKit && before >= 3))
+                    {
+                        Say(supply.kind == SupplyKind.Ammo ? "备弹已满，可选其他补给或稍后回来。" : "维修包已满，可选其他补给或稍后回来。", 3);
+                        break;
+                    }
+                    if (journey.State.TryCollectSupply(Region.region, PresentationGeneration, supply.id, supply.kind, supply.amount, supply.choiceGroup))
+                    {
+                        supply.visual.SetActive(false); Play(pickupSound, .6f);
+                        int granted = (supply.kind == SupplyKind.RepairKit ? journey.State.RepairKits : journey.State.ReserveAmmo) - before;
+                        // Observers cannot interrupt authoritative collection or subsequent actions.
+                        if (SupplyCollected != null) foreach (Action<int, string, SupplyKind, int> listener in SupplyCollected.GetInvocationList())
+                            try { listener(Region.region, supply.id, supply.kind, granted); }
+                            catch (Exception error) { Debug.LogException(error, this); }
+                        Say(supply.kind == SupplyKind.Ammo ? "钉弹已补入备弹。" : "维修包已收好，可在车内工作台使用。", 3);
+                    }
+                    break;
                 case 6:
                     if (Vector3.Distance(motor.vehicle.position, Region.powerPoint.position) > 12) Say("房车离插座太远。", 3);
                     else journey.State.SetPowerConnected(!journey.State.PowerConnected);
                     break;
             }
+        }
+        JourneySupplyPoint FindReachableSupply() => Reloading || Installing ? null : FindSupplyInReach();
+        JourneySupplyPoint FindSupplyInReach()
+        {
+            if (!PresentationPlaying || !motor || !motor.view || !motor.Walker || Region.supplies == null ||
+                !Region.gameObject.activeInHierarchy || !Region.gameObject.scene.IsValid() || !Region.gameObject.scene.isLoaded ||
+                Region.gameObject.scene != UnityEngine.SceneManagement.SceneManager.GetActiveScene() ||
+                journey.State.Control != ControlMode.OnFoot) return null;
+            foreach (var supply in Region.supplies)
+            {
+                if (supply == null || !supply.point || !supply.surface || !supply.visual || !supply.visual.activeInHierarchy ||
+                    !supply.surface.enabled || supply.surface.isTrigger || !supply.surface.gameObject.activeInHierarchy ||
+                    supply.point.gameObject.scene != Region.gameObject.scene || supply.surface.gameObject.scene != Region.gameObject.scene ||
+                    supply.visual.scene != Region.gameObject.scene || !supply.surface.transform.IsChildOf(supply.visual.transform) ||
+                    !supply.point.IsChildOf(supply.visual.transform) || journey.State.HasCollectedSupply(supply.id) ||
+                    journey.State.HasChosenSupplyGroup(supply.choiceGroup) ||
+                    Vector3.Distance(motor.view.transform.position, supply.point.position) > 2.2f) continue;
+                if (JourneyRaycast.CanReachPoint(motor.view.transform.position, supply.point.position,
+                    motor.Walker.GetComponent<CharacterController>(), supply.surface)) return supply;
+            }
+            return null;
         }
         void TickArc(float delta)
         {
@@ -236,3 +288,4 @@ namespace DesertRV
         public void Say(string message, float seconds) { Notice = message; noticeRemaining = seconds; }
     }
 }
+

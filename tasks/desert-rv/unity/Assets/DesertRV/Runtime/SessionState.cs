@@ -6,6 +6,7 @@ namespace DesertRV
     public enum SessionStatus { Menu, Loading, Playing, Paused, Failed, Completed }
     public enum ControlMode { Driving, OnFoot }
     public enum ComponentPart { RamPart, Coil }
+    public enum SupplyKind { Ammo, RepairKit }
     [Flags] public enum VehicleUpgrades { None = 0, Ram = 1, Arc = 2 }
 
     // One journey's facts. No Unity objects, persistence or network handles.
@@ -33,6 +34,8 @@ namespace DesertRV
         double stormDamageRemainder;
         SessionStatus resumeStatus = SessionStatus.Playing;
         readonly HashSet<string> collected = new HashSet<string>();
+        readonly HashSet<string> collectedSupplies = new HashSet<string>();
+        readonly HashSet<string> supplyChoices = new HashSet<string>();
         readonly HashSet<ComponentPart> parts = new HashSet<ComponentPart>();
 
         // Configure once, before the journey starts. Distances use the shared journey coordinate,
@@ -158,6 +161,31 @@ namespace DesertRV
             return true;
         }
 
+        // Independent IDs avoid collisions with component pickups. A choice group is journey-global.
+        public bool HasCollectedSupply(string id) => !string.IsNullOrWhiteSpace(id) && collectedSupplies.Contains(id);
+        public bool HasChosenSupplyGroup(string choiceGroup) => !string.IsNullOrEmpty(choiceGroup) && supplyChoices.Contains(choiceGroup);
+        public bool TryCollectSupply(int region, int generation, string id, SupplyKind kind, int amount, string choiceGroup)
+        {
+            if (Status != SessionStatus.Playing || Control != ControlMode.OnFoot || region != SceneId || generation != Generation ||
+                string.IsNullOrWhiteSpace(id) || !Enum.IsDefined(typeof(SupplyKind), kind) || amount <= 0 ||
+                HasCollectedSupply(id) || (choiceGroup != null && choiceGroup.Length > 0 && string.IsNullOrWhiteSpace(choiceGroup)) ||
+                HasChosenSupplyGroup(choiceGroup)) return false;
+            if (kind == SupplyKind.Ammo)
+            {
+                if (amount > 24 || ReserveAmmo >= 144) return false;
+                // Subtract before adding, so even untrusted integer amounts cannot overflow.
+                ReserveAmmo += Math.Min(amount, 144 - ReserveAmmo);
+            }
+            else
+            {
+                if (amount != 1 || RepairKits >= 3) return false;
+                RepairKits++;
+            }
+            collectedSupplies.Add(id);
+            if (!string.IsNullOrEmpty(choiceGroup)) supplyChoices.Add(choiceGroup);
+            return true;
+        }
+
         public bool TryFire()
         {
             if (Status != SessionStatus.Playing || LoadedAmmo == 0) return false;
@@ -237,9 +265,10 @@ namespace DesertRV
             PlayerHealth = 100; VehicleHealth = 300;
             LoadedAmmo = 12; ReserveAmmo = 96; RepairKits = 2;
             PowerConnected = false; GateOpen = false; ObjectivesResolved = false;
-            collected.Clear(); parts.Clear();
+            collected.Clear(); parts.Clear(); collectedSupplies.Clear(); supplyChoices.Clear();
             resumeStatus = SessionStatus.Playing;
             Control = ControlMode.Driving; Status = SessionStatus.Playing;
         }
     }
 }
+
