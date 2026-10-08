@@ -46,7 +46,8 @@ def inspect_fbx_animation(path):
         if not any(raw[cursor:cursor+header]):break
         cursor=node(cursor)
     carrier_curves=[{'curve_node':c[1],'carrier':models[c[2]],'property':c[3] if len(c)>3 else ''} for c in connections if c[1] in curve_nodes and models.get(c[2]) in CARRIERS]
-    return {'stacks':found,'carrier_curve_connections':carrier_curves}
+    parents={models[c[1]]:models[c[2]] for c in connections if c[0]=='OO' and c[1] in models and c[2] in models}
+    return {'stacks':found,'carrier_curve_connections':carrier_curves,'model_names':sorted(models.values()),'model_parents':parents}
 
 def fbx_animation_stacks(path):
     return inspect_fbx_animation(path)['stacks']
@@ -68,6 +69,10 @@ def technical_failures(validation):
     samples=validation.get('loading_surface_samples',[])
     if len(samples)!=42:failures.append('missing_loading_surface_samples')
     elif any(s.get('intersections') for s in samples):failures.append('loading_surface_intersections')
+    skin=validation.get('incoming_skin_contract',{})
+    if skin.get('same_rig') is not True or skin.get('positive_weight_bones')!=['reload_strip'] or skin.get('carrier_parent_of_reload_strip')!='IncomingOffset' or skin.get('renderer_reparented') is not False:failures.append('incoming_skin_contract')
+    muzzle=validation.get('muzzle',{})
+    if muzzle.get('parent')!='weapon' or max([abs(a-b) for a,b in zip(muzzle.get('head_xyz',[99]*3),[0,.35,.072])])>.00001:failures.append('muzzle_source_position')
     return failures
 
 def delivered_file(path):

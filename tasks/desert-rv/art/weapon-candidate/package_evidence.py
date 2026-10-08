@@ -17,6 +17,8 @@ validation=json.loads((p/'validation.json').read_text()); failures=technical_fai
 fbx_report=inspect_fbx_animation(p/'weapon_hands.fbx');stacks=fbx_report['stacks']; report['fbx_animation_stacks']=stacks;report['fbx_carrier_curve_connections']=fbx_report['carrier_curve_connections']
 if fbx_report['carrier_curve_connections']:failures.append('fbx_carrier_channels_present')
 if len(stacks)!=3 or {name.split('|')[-1] for name in stacks}!={'Idle','Fire','Reload'}:failures.append('fbx_clip_set_mismatch')
+if 'Muzzle' not in fbx_report['model_names'] or fbx_report['model_parents'].get('Muzzle')!='weapon':failures.append('fbx_muzzle_missing_or_wrong_parent')
+if not any(n.get('name')=='Muzzle' for n in doc.get('nodes',[])):failures.append('glb_muzzle_missing')
 carriers={i for i,n in enumerate(doc.get('nodes',[])) if n.get('name') in CARRIERS}
 if any(c['target'].get('node') in carriers for a in doc.get('animations',[]) for c in a['channels']):failures.append('glb_carrier_channels_present')
 report['technical_failures']=failures; report['technical_pass']=not failures; report['status']='REJECTED_TECHNICAL_GATE' if failures else 'TECHNICAL_PASS_VISUAL_REVIEW_REQUIRED'

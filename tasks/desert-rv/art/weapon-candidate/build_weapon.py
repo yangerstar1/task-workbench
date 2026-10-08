@@ -148,7 +148,7 @@ def bone(name,a,b,parent=None):
  e=rig.data.edit_bones.new(name); e.head=a; e.tail=b
  if parent:e.parent=rig.data.edit_bones[parent]
  bone_defs[name]=(Vector(a),Vector(b)); return e
-bone('root',(0,0,-.35),(0,0,-.25)); bone('IncomingOffset',(0,0,0),(0,.1,0),'root'); bone('LeftReloadOffset',(0,0,0),(0,.1,0),'root'); bone('weapon',(0,-.15,.03),(0,.12,.03),'root'); bone('magazine',(0,-.1,-.18),(0,.15,-.15),'weapon'); bone('trigger',(0,-.092,-.01),(0,-.097,-.045),'weapon'); bone('follower',(0,-.155,-.178),(0,-.125,-.175),'magazine'); bone('loaded_nails',(0,.13,-.14),(0,.16,-.137),'magazine'); bone('reload_strip',(0,.13,-.14),(0,.16,-.137),'IncomingOffset'); bone('safety_tip',(0,.32,.072),(0,.35,.072),'weapon')
+bone('root',(0,0,-.35),(0,0,-.25)); bone('IncomingOffset',(0,0,0),(0,.1,0),'root'); bone('LeftReloadOffset',(0,0,0),(0,.1,0),'root'); bone('weapon',(0,-.15,.03),(0,.12,.03),'root'); bone('magazine',(0,-.1,-.18),(0,.15,-.15),'weapon'); bone('trigger',(0,-.092,-.01),(0,-.097,-.045),'weapon'); bone('follower',(0,-.155,-.178),(0,-.125,-.175),'magazine'); bone('loaded_nails',(0,.13,-.14),(0,.16,-.137),'magazine'); bone('reload_strip',(0,.13,-.14),(0,.16,-.137),'IncomingOffset'); bone('safety_tip',(0,.32,.072),(0,.35,.072),'weapon'); bone('Muzzle',(0,.35,.072),(0,.385,.072),'weapon')
 for side,c in [('R',Vector((0,-.151,-.065))),('L',Vector((0,.13,-.023)))]:
  s=1 if side=='R' else -1; bone('arm.'+side,c+Vector((s*.035,-.11,-.12)),c,'LeftReloadOffset' if side=='L' else 'root'); bone('hand.'+side,c,c+Vector((0,.045,0)),'arm.'+side)
  for idx in range(5):
@@ -194,7 +194,7 @@ clips={}
 for clip,end in [('Idle',121),('Fire',14.2),('Reload',100)]:
  action=bpy.data.actions.new(clip); rig.animation_data_create(); rig.animation_data.action=action
  for n in bone_defs:
-  if n not in ['IncomingOffset','LeftReloadOffset']:key(n,1); key(n,end)
+  if n not in ['IncomingOffset','LeftReloadOffset','Muzzle']:key(n,1); key(n,end)
  for phase,con in ik_controls:
   con.influence=0; con.keyframe_insert('influence',frame=1); con.keyframe_insert('influence',frame=end)
  if clip=='Idle':
@@ -208,9 +208,11 @@ for clip,end in [('Idle',121),('Fire',14.2),('Reload',100)]:
   strip_path=[(1,(-.12,-.10,-.24)),(35,(-.12,-.10,-.24)),(48,(-.10,0,.075)),(60,(0,0,.045)),(68,(0,0,0)),(100,(0,0,0))]
   for f,d in strip_path:key('reload_strip',f,d)
   hand_path=[(1,(0,0,0)),(12,(.015,-.310,-.155)),(23,(.015,-.365,-.161)),
-   (35,(-.127,-.032,-.340)),(48,(-.107,.068,-.025)),(60,(-.007,.068,-.055)),(68,(-.007,.068,-.100)),
+   (35,(-.120,-.032,-.302)),(48,(-.100,.068,.013)),(60,(0,.068,-.017)),(68,(0,.068,-.062)),
    (73,(-.06,0,.015)),(82,(.015,-.365,-.161)),(91,(.015,-.310,-.155)),(100,(0,0,0))]
   for f,d in hand_path:key('arm.L',f,d)
+  # Pronate the palm over the slot: palm/non-pinching fingers stay above rails.
+  for f,a in [(1,0),(23,0),(35,math.pi),(68,math.pi),(78,0),(100,0)]:key('hand.L',f,rot=(a,0,0))
   for phase,con in ik_controls:
    keys=[(1,0),(30,0),(35,1),(68,1),(73,0),(100,0)] if phase=='strip' else [(1,0),(8,0),(12,1),(23,1),(28,0),(77,0),(82,1),(91,1),(96,0),(100,0)]
    for frame,value in keys:con.influence=value; con.keyframe_insert('influence',frame=frame)
@@ -225,7 +227,7 @@ for ob in assets+[rig]+list(anchors.values()):ob.select_set(True)
 bpy.context.view_layer.objects.active=rig
 for tr in rig.animation_data.nla_tracks:tr.mute=False
 rig.animation_data.action=None
-bpy.ops.export_scene.gltf(filepath=str(OUT/'weapon_hands.glb'),use_selection=True,export_format='GLB',export_animation_mode='NLA_TRACKS',export_nla_strips=True,export_skins=True)
+bpy.ops.export_scene.gltf(filepath=str(OUT/'weapon_hands.glb'),use_selection=True,export_format='GLB',export_animation_mode='NLA_TRACKS',export_nla_strips=True,export_skins=True,export_def_bones=False)
 carrier_cleanup=strip_carrier_animation_channels(OUT/'weapon_hands.glb')
 (OUT/'carrier-channel-cleanup.json').write_text(json.dumps(carrier_cleanup,indent=2))
 # Blender 4.2.3 forces constant NLA channels via force_keep=True even when
@@ -238,7 +240,7 @@ def export_motion_without_forced_constants(*args,**kwargs):
  return original_fbx_animation_sampler(*args,**kwargs)
 export_fbx_bin.fbx_animations_do=export_motion_without_forced_constants
 try:
- bpy.ops.export_scene.fbx(filepath=str(OUT/'weapon_hands.fbx'),use_selection=True,add_leaf_bones=False,bake_anim=True,bake_anim_use_all_actions=False,bake_anim_use_nla_strips=True,bake_anim_use_all_bones=False,bake_anim_simplify_factor=1.0,axis_forward='-Z',axis_up='Y')
+ bpy.ops.export_scene.fbx(filepath=str(OUT/'weapon_hands.fbx'),use_selection=True,object_types={'ARMATURE','MESH','EMPTY'},use_armature_deform_only=False,add_leaf_bones=False,bake_anim=True,bake_anim_use_all_actions=False,bake_anim_use_nla_strips=True,bake_anim_use_all_bones=False,bake_anim_simplify_factor=1.0,axis_forward='-Z',axis_up='Y')
 finally:export_fbx_bin.fbx_animations_do=original_fbx_animation_sampler
 
 for tr in rig.animation_data.nla_tracks:tr.mute=True
@@ -256,7 +258,7 @@ for label,objs,budget in [('weapon',gun,[8000,12000]),('hands',hands,[10000,1600
 # These measure kinematic alignment, NOT triangle penetration or anatomical quality.
 contact_report=[]
 rig.animation_data.action=bpy.data.actions['Reload']
-for phase,frames,target,ref in [('pull_follower',range(12,24),'follower',(.015,-.18,-.178)),('carry_and_seat_strip',range(35,69),'reload_strip',(-.007,.198,-.123)),('release_follower',range(82,92),'follower',(.015,-.18,-.178))]:
+for phase,frames,target,ref in [('pull_follower',range(12,24),'follower',(.015,-.18,-.178)),('carry_and_seat_strip',range(35,69),'reload_strip',(0,.198,-.085)),('release_follower',range(82,92),'follower',(.015,-.18,-.178))]:
  errors=[]; fingertip_errors=[]
  for frame in frames:
   scene.frame_set(frame); bpy.context.view_layer.update()
@@ -269,10 +271,12 @@ for phase,frames,target,ref in [('pull_follower',range(12,24),'follower',(.015,-
  contact_report.append({'phase':phase,'frames':[frames.start,frames.stop-1],'max_authoring_reference_error_m':max(errors),'max_fingertip_IK_error_m':max(fingertip_errors),'surface_collision_tested':False})
 validation['reload_mechanism']={'type':'fixed_open_top_magazine_fresh_collated_strip','magazine_detaches':False,'new_nails_count':12,'gameplay_events':[],'reference_contact_samples':contact_report}
 rig.animation_data.action=bpy.data.actions['Idle']; scene.frame_set(1)
+validation['incoming_skin_contract']={'same_rig':all(o.parent==rig and sum(m.type=='ARMATURE' and m.object==rig for m in o.modifiers)==1 for o in strip_objs),'positive_weight_bones':sorted({o.vertex_groups[g.group].name for o in strip_objs for v in o.data.vertices for g in v.groups if g.weight>0}),'required_carrier_ancestor':'IncomingOffset','carrier_parent_of_reload_strip':rig.data.bones['reload_strip'].parent.name,'renderer_reparented':False}
+validation['muzzle']={'node':'Muzzle','parent':rig.data.bones['Muzzle'].parent.name,'head_xyz':list(rig.data.bones['Muzzle'].head_local),'tail_xyz':list(rig.data.bones['Muzzle'].tail_local),'source_forward_axis':'+Y','bone_local_forward_axis':'+Y'}
 (OUT/'clip-manifest.json').write_text(json.dumps(clips,indent=2))
 # Unity bridge contract: count/offset application occurs after Animator evaluation.
 # No authored animation curves target the two offset bones or visibility carriers.
-contract={'capacity':12,'loaded_nodes':['LoadedNail_%02d'%i for i in range(12)],'incoming_nodes':['IncomingNail_%02d'%i for i in range(12)],'incoming_offset':'IncomingOffset','left_reload_offset':'LeftReloadOffset','source_pitch_xyz':list(NAIL_PITCH),'source_axes':'+Y muzzle, +Z up','derive_imported_pitch':'Use transformed source vector or verify imported adjacent nail origins; do not assume Unity axes.','count_snapshot':['ReloadPresented.Epoch','ReloadPresented.Sequence','LoadedBefore','PlannedAdded'],'loaded_visible':'prefix[0,LoadedBefore) until authoritative completion; then prefix[0,actualLoaded)','incoming_visible':'prefix[0,PlannedAdded), frames 35..100; hidden on cancel/complete','offset':'LoadedBefore * source_pitch; IncomingOffset throughout reload; LeftReloadOffset blends 30..35, holds35..68, fades68..73','animation_events':[],'commit':'Game commits once at 1.65s; physical seating frame68 does not allow early fire','preview':{'loaded_before':3,'planned_added':5}}
+contract={'muzzle':{'node':'Muzzle','parent_bone':'weapon','source_head_xyz':[0,.35,.072],'source_tail_xyz':[0,.385,.072],'source_forward_axis':'+Y','bone_local_forward_axis':[0,1,0],'unity_note':'Use actual imported Muzzle position; local +Y is the bone forward axis. Do not assume Transform.forward.'},'incoming_binding':{'mode':'skinned','same_rig_required':True,'positive_weight_bones_must_descend_from':'IncomingOffset','renderer_transform_may_be_at_rig_root':True,'never_reparent_skinned_mesh':True},'capacity':12,'loaded_nodes':['LoadedNail_%02d'%i for i in range(12)],'incoming_nodes':['IncomingNail_%02d'%i for i in range(12)],'incoming_offset':'IncomingOffset','left_reload_offset':'LeftReloadOffset','source_pitch_xyz':list(NAIL_PITCH),'source_axes':'+Y muzzle, +Z up','derive_imported_pitch':'Use transformed source vector or verify imported adjacent nail origins; do not assume Unity axes.','count_snapshot':['ReloadPresented.Epoch','ReloadPresented.Sequence','LoadedBefore','PlannedAdded'],'loaded_visible':'prefix[0,LoadedBefore) until authoritative completion; then prefix[0,actualLoaded)','incoming_visible':'prefix[0,PlannedAdded), frames 35..100; hidden on cancel/complete','offset':'LoadedBefore * source_pitch; IncomingOffset throughout reload; LeftReloadOffset blends 30..35, holds35..68, fades68..73','animation_events':[],'commit':'Game commits once at 1.65s; physical seating frame68 does not allow early fire','preview':{'loaded_before':3,'planned_added':5}}
 (OUT/'weapon-presentation-contract.json').write_text(json.dumps(contract,indent=2))
 def preview_pose(clip,frame,loaded_before=3,planned_added=5):
  scene.frame_set(frame)
@@ -323,11 +327,32 @@ def evaluated_bvh(obj):
  deps=bpy.context.evaluated_depsgraph_get(); ev=obj.evaluated_get(deps); mesh=ev.to_mesh()
  try:return BVHTree.FromPolygons([ev.matrix_world@v.co for v in mesh.vertices],[tuple(p.vertices) for p in mesh.polygons],all_triangles=False,epsilon=0)
  finally:ev.to_mesh_clear()
+def surface_evidence(hand,obj):
+ ht=evaluated_bvh(hand); ot=evaluated_bvh(obj); pairs=ht.overlap(ot)
+ result={'object':obj.name,'triangle_pairs':len(pairs),'sample_triangle_pairs':[list(p) for p in pairs[:8]],'max_inside_vertex_depth_m':None,'inside_vertex_regions':{}}
+ if not pairs:return result
+ ev=hand.evaluated_get(bpy.context.evaluated_depsgraph_get()); mesh=ev.to_mesh(); depths=[]; regions={}; direction=Vector((.371,.529,.763)).normalized()
+ try:
+  for v in mesh.vertices:
+   point=ev.matrix_world@v.co; nearest,normal,index,distance=ot.find_nearest(point)
+   if nearest is None or distance>.035:continue
+   cursor=point.copy(); hits=0
+   for _ in range(32):
+    hit,_,_,_=ot.ray_cast(cursor,direction,2)
+    if hit is None:break
+    hits+=1;cursor=hit+direction*.000001
+   if hits%2:
+    depths.append(distance)
+    groups=hand.data.vertices[v.index].groups; region=hand.vertex_groups[max(groups,key=lambda g:g.weight).group].name if groups else 'unweighted'
+    regions[region]=regions.get(region,0)+1
+ finally:ev.to_mesh_clear()
+ result['max_inside_vertex_depth_m']=max(depths) if depths else None;result['inside_vertex_regions']=regions
+ return result
 validation['loading_surface_samples']=[]
 for before,added in [(0,12),(3,5),(11,1)]:
  for frame in range(55,69):
   preview_pose('Reload',frame,before,added); hand_tree=evaluated_bvh(left)
-  blocked=[{'object':obj.name,'triangle_pairs':len(hand_tree.overlap(evaluated_bvh(obj)))} for obj in [*filter(lambda o:o!=follower,mag_objs),right]]
+  blocked=[surface_evidence(left,obj) for obj in [*filter(lambda o:o!=follower,mag_objs),right]]
   validation['loading_surface_samples'].append({'loaded_before':before,'added':added,'frame':frame,'intersections':[b for b in blocked if b['triangle_pairs']>0]})
 rig.animation_data.action=bpy.data.actions['Idle']; preview_pose('Idle',1); scene.cycles.samples=24
 # Preserve useful partial evidence before potentially failing image readback.
@@ -335,7 +360,7 @@ rig.animation_data.action=bpy.data.actions['Idle']; preview_pose('Idle',1); scen
 # Natural viewmodel: fixed perspective camera looking +Y, no camera roll/yaw.
 # Tool itself is held obliquely toward the reticle; sleeves continue below frame.
 validation['viewmodels']={}; scene.render.film_transparent=True
-camera.data.type='PERSP'; camera.data.lens=35; camera.data.sensor_width=36
+camera.data.type='PERSP'; camera.data.lens=34.5; camera.data.sensor_width=36
 camera.location=(0,0,0); look(camera,(0,1,0))
 def projected_bounds(core_only=False):
  bpy.context.view_layer.update(); deps=bpy.context.evaluated_depsgraph_get()
@@ -363,7 +388,7 @@ for w,h in [(1280,720),(1600,720)]:
   pixel_bounds=alpha_bounds(evidence.pixels[:],w,h,evidence.channels)
  finally:bpy.data.images.remove(evidence)
  width=pixel_bounds[2]-pixel_bounds[0]; height=pixel_bounds[3]-pixel_bounds[1]
- validation['viewmodels'][f'{w}x{h}']={'normalized_bounds':pixel_bounds,'unclipped_core_bounds':b,'core_fully_visible':core_fully_visible(b),'width_fraction':width,'height_fraction':height,'target_fit':core_fully_visible(b) and .25<=width<=.32 and .25<=height<=.35,'camera':'fixed +Y perspective 35mm, no rotation trick','rig_location':list(rig.location),'rig_euler':list(rig.rotation_euler),'camera_shift_y':camera.data.shift_y,'stable_pose_id':'R4_shared_pose_-10_-30_55','center_clear':not(pixel_bounds[0]<=.5<=pixel_bounds[2] and pixel_bounds[1]<=.5<=pixel_bounds[3]),'sleeves_reach_lower_edge':pixel_bounds[1]<=1/h,'ui_buttons':'Requires actual game HUD overlay review.'}
+ validation['viewmodels'][f'{w}x{h}']={'normalized_bounds':pixel_bounds,'unclipped_core_bounds':b,'core_fully_visible':core_fully_visible(b),'width_fraction':width,'height_fraction':height,'target_fit':core_fully_visible(b) and .25<=width<=.32 and .25<=height<=.35,'camera':'fixed +Y perspective 34.5mm, no rotation trick','rig_location':list(rig.location),'rig_euler':list(rig.rotation_euler),'camera_shift_y':camera.data.shift_y,'stable_pose_id':'R4_shared_pose_-10_-30_55','center_clear':not(pixel_bounds[0]<=.5<=pixel_bounds[2] and pixel_bounds[1]<=.5<=pixel_bounds[3]),'sleeves_reach_lower_edge':pixel_bounds[1]<=1/h,'ui_buttons':'Requires actual game HUD overlay review.'}
 rig.location=(0,0,0); rig.rotation_euler=(0,0,0)
 (OUT/'validation.json').write_text(json.dumps(validation,indent=2)); bpy.ops.wm.save_as_mainfile(filepath=str(OUT/'weapon_hands.blend'))
 (OUT/'SHA256SUMS').write_text('\n'.join(hashlib.sha256(p.read_bytes()).hexdigest()+'  '+p.name for p in sorted(OUT.iterdir()) if delivered_file(p))+'\n')

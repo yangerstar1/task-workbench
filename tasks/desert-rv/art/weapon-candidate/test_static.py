@@ -19,7 +19,7 @@ class Contracts(unittest.TestCase):
  def test_fresh_strip_and_fixed_magazine(self):
   s=(ROOT/'build_weapon.py').read_text();self.assertIn("'magazine_detaches':False",s);self.assertIn("'new_nails_count':12",s);self.assertIn("constraints.new('IK')",s)
  def test_no_animation_ammo_visibility_scaling(self):
-  s=(ROOT/'build_weapon.py').read_text();self.assertNotIn('key_scale(',s);self.assertNotIn('.0001',s);self.assertIn("if n not in ['IncomingOffset','LeftReloadOffset']",s)
+  s=(ROOT/'build_weapon.py').read_text();self.assertNotIn('key_scale(',s);self.assertNotIn('.0001',s);self.assertIn("if n not in ['IncomingOffset','LeftReloadOffset','Muzzle']",s)
  def test_no_external_art_or_game_events(self):
   s=(ROOT/'build_weapon.py').read_text(); self.assertNotIn('https://',s); self.assertIn("'gameplay_events':[]",s)
 class FramingRegression(unittest.TestCase):
@@ -75,6 +75,8 @@ class ArtifactGateRegression(unittest.TestCase):
  def test_carrier_gate_not_replaced_by_runtime_override(self):
   s=(ROOT/'package_evidence.py').read_text();self.assertIn("failures.append('fbx_carrier_channels_present')",s);self.assertIn("failures.append('glb_carrier_channels_present')",s)
   s=(ROOT/'build_weapon.py').read_text();self.assertIn("kwargs['force_keep']=False",s);self.assertIn('bake_anim_use_all_bones=False',s)
+ def test_muzzle_and_skin_contract_are_explicit(self):
+  s=(ROOT/'build_weapon.py').read_text();self.assertIn("bone('Muzzle',(0,.35,.072),(0,.385,.072),'weapon')",s);self.assertIn('use_armature_deform_only=False',s);self.assertIn('export_def_bones=False',s);self.assertIn("'renderer_reparented':False",s);self.assertIn('max_inside_vertex_depth_m',s)
  def test_fbx_single_export_path(self):
   s=(ROOT/'build_weapon.py').read_text();self.assertIn('bake_anim_use_all_actions=False,bake_anim_use_nla_strips=True',s)
 if __name__=='__main__':unittest.main()
