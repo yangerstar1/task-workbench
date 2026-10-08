@@ -4,6 +4,7 @@ from unittest.mock import patch
 from pathlib import Path
 from qa import check_run, check_bytes, digest, png_size, check_video_report, check_qa_run, execution_preflight
 from input_plan import validate
+from kvm_acl import parse as parse_acl, grant as grant_acl
 
 class VerificationTests(unittest.TestCase):
     def setUp(self):
@@ -65,6 +66,20 @@ class VerificationTests(unittest.TestCase):
         run=copy.deepcopy(self.run);run.update(path='.github/workflows/desert-rv-android-qa.yml',status='in_progress',head_sha='b'*40)
         with patch.dict(os.environ,env,clear=True),patch('qa.api',return_value=run):
             with self.assertRaises(ValueError):execution_preflight()
+    def test_acl_exact_parse(self):
+        self.assertEqual(parse_acl('# file: /dev/kvm\nuser::rw-\ngroup::rw-\nother::---\n'),{'user:':'rw-','group:':'rw-','other:':'---'})
+    def test_acl_malformed_rejected(self):
+        for text in ('user::rwx\nuser::rw-','default:user::rw-','user:someone:rw-','user::rwx #effective:r--'):
+            with self.assertRaises(RuntimeError):parse_acl(text)
+    def test_acl_later_run_or_retry_blocked_before_device(self):
+        for number,attempt in [('5','1'),('4','2'),('3','1')]:
+            with patch.dict(os.environ,{'GITHUB_RUN_NUMBER':number,'GITHUB_RUN_ATTEMPT':attempt},clear=True),patch('kvm_acl.os.stat') as stat:
+                with self.assertRaises(RuntimeError):grant_acl()
+                stat.assert_not_called()
+    def test_acl_no_explicit_input_blocks_before_device(self):
+        with patch.dict(os.environ,{'GITHUB_RUN_NUMBER':'4','GITHUB_RUN_ATTEMPT':'1','QA_MODE':'capture-only'},clear=True),patch('kvm_acl.os.stat') as stat:
+            with self.assertRaises(RuntimeError):grant_acl()
+            stat.assert_not_called()
     def test_unobserved_plan_blocks(self):
         plan=json.loads(Path(__file__).with_name('coordinates.json').read_text())
         with self.assertRaises(AssertionError):validate(plan,1280)

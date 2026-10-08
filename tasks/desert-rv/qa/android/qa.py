@@ -78,6 +78,8 @@ def check_qa_run(run, env):
     require(run['actor']['login'] == run['triggering_actor']['login'] == 'yangerstar1', 'QA owner required')
     require(run['path'] == '.github/workflows/desert-rv-android-qa.yml' and run['head_sha'] == env['GITHUB_SHA'], 'QA workflow/source identity mismatch')
     require(run['status'] == 'in_progress', 'QA run must currently be executing')
+    if env.get('ALLOW_ONCE_KVM_ACL') == 'true':
+        require(run['run_number'] == 4 and str(run['run_attempt']) == '1' and env.get('GITHUB_RUN_NUMBER') == '4', 'One-time ACL run number mismatch')
 
 def execution_preflight():
     # The local environment alone is not an attestation: also check the live GitHub

@@ -11,11 +11,17 @@ cleanup() {
   code=$?
   if [[ -n "$RECORDPID" ]]; then kill "$RECORDPID" 2>/dev/null || true; fi
   if [[ -n "$EMUPID" ]]; then adb -s emulator-5554 emu kill >/dev/null 2>&1 || true; kill "$EMUPID" 2>/dev/null || true; fi
+  python3 "$HERE/kvm_acl.py" restore || code=1
   if (( code != 0 )); then printf '{"status":"BLOCKED_OR_FAILED","exitCode":%s,"gameAcceptance":"NOT_EVALUATED"}\n' "$code" > "$QA_OUT/execution-status.json"; fi
+  exit "$code"
 }
 trap cleanup EXIT
 trap 'exit 130' INT
 trap 'exit 143' TERM
+if [[ "${ALLOW_ONCE_KVM_ACL:-false}" == true ]]; then
+  command -v getfacl >/dev/null; command -v setfacl >/dev/null
+  python3 "$HERE/kvm_acl.py" grant
+fi
 [[ -r /dev/kvm && -w /dev/kvm ]] || { echo 'BLOCKED: /dev/kvm must already be readable and writable; no permission modification allowed' | tee "$QA_OUT/blocker.txt"; exit 1; }
 # FFmpeg is a necessary evidence decoder, installed only on this verified disposable runner.
 missing=()
@@ -56,7 +62,8 @@ printf 'no\n' | avdmanager create avd -n qa -k 'system-images;android-30;google_
 ADB=(adb -s emulator-5554)
 for WIDTH in 1280 1600; do
   D="$QA_OUT/${WIDTH}x720"; mkdir -p "$D"
-  emulator -avd qa -port 5554 -no-window -no-audio -no-boot-anim -no-snapshot -wipe-data -gpu swiftshader_indirect -memory 3072 -cores 2 -skin "${WIDTH}x720" > "$D/emulator.log" 2>&1 & EMUPID=$!
+  setsid emulator -avd qa -port 5554 -no-window -no-audio -no-boot-anim -no-snapshot -wipe-data -gpu swiftshader_indirect -memory 3072 -cores 2 -skin "${WIDTH}x720" > "$D/emulator.log" 2>&1 & EMUPID=$!
+  printf '%s\n' "$EMUPID" > "$QA_WORK/emulator-group.pid"
   timeout 180 adb -s emulator-5554 wait-for-device
   READY=false
   for ((i=0;i<120;i++)); do

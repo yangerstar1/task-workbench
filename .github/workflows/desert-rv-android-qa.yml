@@ -7,6 +7,11 @@ on:
         required: true
         default: '37796490106'
         type: string
+      allow_once_kvm_acl:
+        description: Owner approved KVM ACL for run 4 attempt 1 only
+        type: boolean
+        default: false
+        required: true
       mode:
         description: Capture first; input-check requires reviewed screenshot coordinates
         required: true
@@ -31,6 +36,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     env:
+      ALLOW_ONCE_KVM_ACL: ${{ inputs.allow_once_kvm_acl }}
       QA_MODE: ${{ inputs.mode }}
       SOURCE_RUN_ID: ${{ inputs.source_run_id }}
       QA_OUT: ${{ github.workspace }}/android-qa-evidence
@@ -51,6 +57,9 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: bash tasks/desert-rv/qa/android/run.sh
+      - name: Always stop emulator and restore approved temporary ACL
+        if: always()
+        run: python3 tasks/desert-rv/qa/android/kvm_acl.py restore
       - name: Upload evidence, including blockers (never game acceptance)
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
