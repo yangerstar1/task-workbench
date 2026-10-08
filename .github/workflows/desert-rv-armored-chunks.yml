@@ -1,0 +1,192 @@
+name: Desert RV bounded armored motion chunks
+'on':
+  workflow_dispatch: null
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: desert-rv-armored-chunks
+  cancel-in-progress: false
+jobs:
+  plan:
+    if: github.actor == github.repository_owner && github.event_name == 'workflow_dispatch' && github.event.repository.private == false && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      chunks: ${{ steps.matrix.outputs.chunks }}
+      clips: ${{ steps.matrix.outputs.clips }}
+    steps:
+    - &id001
+      uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      with:
+        persist-credentials: false
+        lfs: false
+    - &id002
+      name: Download previously passed technical evidence
+      uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+      with:
+        name: armored-technical-37843918724-1
+        run-id: 37843918724
+        github-token: ${{ github.token }}
+        path: input-technical
+    - &id003
+      name: Verify source and pinned technical receipt
+      shell: bash
+      run: 'set -euo pipefail
+
+        printf ''%s  %s\n'' 8e164495f39b6ef55173e340697a6a6b0eeceacd57dd1a5d91cfc2653239ab9d input-technical/technical/stage-receipt.json | sha256sum --check --strict
+
+        python3 - <<''VERIFY''
+
+        import sys
+
+        sys.path.insert(0,''tasks/desert-rv/art/armored-staged'')
+
+        from staged import verify_source,verify_receipt
+
+        lock=verify_source(); receipt=verify_receipt(''input-technical/technical'',''technical'',lock)
+
+        assert receipt[''execution_manifest_sha256'']==''4b577a9643af901daa7f0ce2c5a3cc9687336673ababa356ec866fcda9f29ee3''
+
+        assert receipt[''run_id'']==''37843918724''
+
+        VERIFY'
+    - id: matrix
+      name: Emit bounded remaining-only plan
+      shell: bash
+      run: "set -euo pipefail\npython3 - <<'PLAN'\nimport sys,json,os\nsys.path.insert(0,'tasks/desert-rv/art/armored-staged')\nimport plan\nmatrix=plan.matrix()\n\
+        assert len(matrix)==14 and all(0<len(x['frames'])<=24 for x in matrix)\nassert not set(x['clip'] for x in matrix)&set(plan.REUSED)\nwith open(os.environ['GITHUB_OUTPUT'],'a')\
+        \ as f:\n f.write('chunks='+json.dumps({'include':matrix},separators=(',',':'))+'\\n')\n f.write('clips='+json.dumps({'include':[{'clip':c,'legacy':False}\
+        \ for c in plan.REMAINING]+[{'clip':c,'legacy':True} for c in plan.REUSED]},separators=(',',':'))+'\\n')\nPLAN"
+  chunks:
+    needs: plan
+    if: github.actor == github.repository_owner && github.event_name == 'workflow_dispatch' && github.event.repository.private == false && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 18
+    strategy:
+      fail-fast: false
+      max-parallel: 2
+      matrix: ${{ fromJSON(needs.plan.outputs.chunks) }}
+    steps:
+    - *id001
+    - *id002
+    - *id003
+    - name: Install official checksum-verified Blender 4.2.3
+      shell: bash
+      run: 'set -euo pipefail
+
+        sudo apt-get update -qq
+
+        sudo apt-get install -y --no-install-recommends libxkbcommon0 libsm6 libxi6 libxrender1 libxxf86vm1 libgl1
+
+        mkdir -p "$RUNNER_TEMP/chunk-blender"
+
+        cd "$RUNNER_TEMP/chunk-blender"
+
+        base=https://download.blender.org/release/Blender4.2
+
+        curl --fail --location --retry 3 --max-time 180 "$base/blender-4.2.3-linux-x64.tar.xz" -o blender-4.2.3-linux-x64.tar.xz
+
+        curl --fail --location --retry 3 --max-time 60 "$base/blender-4.2.3.sha256" -o upstream.sha256
+
+        grep -E ''[ *]blender-4\.2\.3-linux-x64\.tar\.xz$'' upstream.sha256 > selected.sha256
+
+        test "$(wc -l < selected.sha256)" -eq 1
+
+        sha256sum --check selected.sha256
+
+        tar -xf blender-4.2.3-linux-x64.tar.xz
+
+        echo "$RUNNER_TEMP/chunk-blender/blender-4.2.3-linux-x64" >> "$GITHUB_PATH"'
+    - name: Render at most 24 original-timeline PNG frames
+      shell: bash
+      env:
+        CLIP: ${{ matrix.clip }}
+        CHUNK: ${{ matrix.chunk }}
+      run: 'set -uo pipefail
+
+        mkdir -p chunk-output
+
+        set +e
+
+        timeout --signal=TERM --kill-after=30s 12m blender --background --factory-startup --threads 4 --python-exit-code 1 --python tasks/desert-rv/art/armored-staged/staged.py
+        -- --stage chunk --technical input-technical/technical --clip "$CLIP" --chunk "$CHUNK" --output chunk-output/evidence 2>&1 | tee chunk-output/generation.log
+
+        statuses=("${PIPESTATUS[@]}")
+
+        code=${statuses[0]}
+
+        if [[ "${statuses[1]}" != 0 ]]; then code=${statuses[1]}; fi
+
+        printf ''%s\n'' "$code" > chunk-output/generation.exit
+
+        exit "$code"'
+    - name: Keep complete or resumable partial frames and receipt
+      if: always()
+      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+      with:
+        name: armored-chunk-${{ matrix.clip }}-${{ matrix.chunk }}-${{ github.run_id }}
+        path: 'chunk-output/evidence/frames/*.png
+
+          chunk-output/evidence/stage-receipt.json
+
+          chunk-output/generation.log
+
+          chunk-output/generation.exit'
+        if-no-files-found: error
+        retention-days: 14
+  assemble:
+    needs:
+    - plan
+    - chunks
+    if: always() && needs.plan.result == 'success' && github.actor == github.repository_owner && github.event_name == 'workflow_dispatch' && github.event.repository.private
+      == false && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    strategy:
+      fail-fast: false
+      max-parallel: 2
+      matrix: ${{ fromJSON(needs.plan.outputs.clips) }}
+    steps:
+    - *id001
+    - *id002
+    - *id003
+    - name: Retrieve only this run and clip chunks
+      if: ${{ !matrix.legacy }}
+      uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+      with:
+        pattern: armored-chunk-${{ matrix.clip }}-*-${{ github.run_id }}
+        path: input-chunks
+        merge-multiple: false
+    - name: Retrieve pinned historical completed clips without rerendering
+      if: matrix.legacy
+      uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+      with:
+        name: bulwark-motion-evidence-37827225328-1
+        run-id: 37827225328
+        github-token: ${{ github.token }}
+        path: input-legacy
+    - name: Verify full coverage, preserve source time and assemble
+      shell: bash
+      env:
+        CLIP: ${{ matrix.clip }}
+        LEGACY: ${{ matrix.legacy }}
+      run: "set -euo pipefail\nsudo apt-get update -qq\nsudo apt-get install -y --no-install-recommends ffmpeg\nif [[ \"$LEGACY\" == true ]]; then\n python3 tasks/desert-rv/art/armored-staged/assemble.py\
+        \ --clip \"$CLIP\" --technical input-technical/technical --legacy input-legacy --output assembled\nelse\n python3 tasks/desert-rv/art/armored-staged/assemble.py\
+        \ --clip \"$CLIP\" --technical input-technical/technical --chunks input-chunks --output assembled\nfi"
+    - name: Upload complete clip or explicit failed receipt
+      if: always()
+      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+      with:
+        name: armored-clip-${{ matrix.clip }}-${{ github.run_id }}
+        path: 'assembled/*.mp4
+
+          assembled/*.png
+
+          assembled/stage-receipt.json
+
+          assembled/frames/*.png
+
+          assembled/frames.ffconcat'
+        if-no-files-found: error
+        retention-days: 14
