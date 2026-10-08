@@ -48,6 +48,8 @@ def valid_generated_name(name):
 def inspect_png(path):
     source.safe(path)
     require(path.stat().st_size <= 10 * 1024**2, 'Oversized screenshot')
+    with Image.open(path) as checked:
+        checked.verify()  # PNG chunk CRC validation before full pixel decoding.
     with Image.open(path) as im:
         require(im.format == 'PNG' and im.size == (1440, 900), 'Invalid image format or dimensions')
         im.load()
@@ -78,6 +80,8 @@ def inspect_capture(project):
     report = source.read_json(capture / 'capture-report.json')
     require(report.get('status') == 'captured-environment-only-not-gameplay-acceptance', 'Wrong capture scope')
     require(report.get('graphicsDeviceType') == 'OpenGLCore', 'Real OpenGL graphics required')
+    require(report.get('bufferSceneTransitionsChecked') == 3 and report.get('captureBuffersReleased') is True,
+            'Capture buffer scene transitions and explicit release not proven')
     device = report.get('graphicsDeviceName', '')
     require(isinstance(device, str) and 'llvmpipe' in device.lower() and len(device) < 256, 'Expected software Mesa llvmpipe')
     records = report.get('images')
@@ -98,7 +102,7 @@ def inspect_capture(project):
     require(seen == IMAGES, 'Incomplete regions/views')
     layout = source.read_json(project / 'JourneyEvidence/candidate-layout.json')
     require(layout.get('passed') is True, 'Candidate layout failed')
-    return dict(graphicsDeviceType='OpenGLCore', graphicsDeviceName=device, candidateLayoutPassed=True, images=clean)
+    return dict(graphicsDeviceType='OpenGLCore', graphicsDeviceName=device, candidateLayoutPassed=True, bufferSceneTransitionsChecked=3, captureBuffersReleased=True, images=clean)
 
 
 def collect_generated(project):

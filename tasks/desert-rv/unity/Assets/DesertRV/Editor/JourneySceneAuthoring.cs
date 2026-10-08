@@ -129,7 +129,7 @@ namespace DesertRV.Editor
         { AuthorCandidateScenes(); JourneyContentChecks.CheckCandidateLayout(); CaptureEnvironmentCandidates(); }
 
         [Serializable] sealed class ImageRecord { public string region, view, path, sceneHash; public int width,height; public float minimum,maximum; }
-        [Serializable] sealed class ImageReport { public string status="captured-environment-only-not-gameplay-acceptance"; public string graphicsDeviceType, graphicsDeviceName; public ImageRecord[] images; }
+        [Serializable] sealed class ImageReport { public string status="captured-environment-only-not-gameplay-acceptance"; public string graphicsDeviceType, graphicsDeviceName; public int bufferSceneTransitionsChecked; public bool captureBuffersReleased; public ImageRecord[] images; }
         public static void CaptureEnvironmentCandidates()
         {
             if (SystemInfo.graphicsDeviceType == GraphicsDeviceType.Null) throw new InvalidOperationException("Actual GPU/software graphics device required; omit -nographics and use the runner virtual display.");
@@ -138,15 +138,20 @@ namespace DesertRV.Editor
             var protectedFiles=SnapshotProtectedFiles();
             var records=new List<ImageRecord>(); string output=Path.GetFullPath("JourneyEvidence/environment"); Directory.CreateDirectory(output);
             RenderTexture target=null; Texture2D pixels=null; var previousTarget=RenderTexture.active;
+            int bufferChecks=0; bool buffersReleased=false;
             try
             {
-                target=new RenderTexture(1440,900,24,RenderTextureFormat.ARGB32){antiAliasing=1};
+                // OpenScene(Single) unloads unused native objects between regions.
+                // Keep these explicit capture buffers alive, then destroy in finally.
+                target=new RenderTexture(1440,900,24,RenderTextureFormat.ARGB32){antiAliasing=1,hideFlags=HideFlags.HideAndDontSave};
                 if(!target.Create()) throw new InvalidOperationException("Failed to create screenshot render target.");
-                pixels=new Texture2D(1440,900,TextureFormat.RGB24,false);
+                pixels=new Texture2D(1440,900,TextureFormat.RGB24,false){hideFlags=HideFlags.HideAndDontSave};
                 for(int i=0;i<3;i++)
                 {
                     var boot=EditorSceneManager.OpenScene(BootstrapPath,OpenSceneMode.Single);
                     var env=EditorSceneManager.OpenScene(RegionPaths[i],OpenSceneMode.Additive);
+                    if(!target || !target.IsCreated() || !pixels) throw new InvalidOperationException("Capture buffers were lost during scene loading.");
+                    bufferChecks++;
                     SceneManager.SetActiveScene(env); var motor=Components<JourneyMotor>(boot).Single(); var b=Components<RegionBinding>(env).Single();
                     // EditMode capture: no Director.Begin, no enemy simulation, no fake combat acceptance.
                     motor.vehicle.SetPositionAndRotation(b.spawn.position,b.spawn.rotation);
@@ -174,15 +179,28 @@ namespace DesertRV.Editor
                         RenderTexture.active=previousTarget;
                     }
                 }
-                File.WriteAllText(Path.Combine(output,"capture-report.json"),JsonUtility.ToJson(new ImageReport{graphicsDeviceType=SystemInfo.graphicsDeviceType.ToString(),graphicsDeviceName=SystemInfo.graphicsDeviceName,images=records.ToArray()},true));
             }
             finally
             {
-                RenderTexture.active=previousTarget;
-                if(pixels) Object.DestroyImmediate(pixels); if(target){target.Release();Object.DestroyImmediate(target);}
-                // All camera, RV and simulation preview changes existed only in memory; never save them.
-                try { RestoreSceneSetup(setup); } finally { VerifyProtectedFiles(protectedFiles); }
+                try
+                {
+                    RenderTexture.active=previousTarget;
+                    try { if(pixels) Object.DestroyImmediate(pixels); }
+                    finally
+                    {
+                        if(target) { try { target.Release(); } finally { Object.DestroyImmediate(target); } }
+                    }
+                    if(pixels || target) throw new InvalidOperationException("Capture buffers were not explicitly released.");
+                    buffersReleased=true;
+                }
+                finally
+                {
+                    // Even failed buffer cleanup must restore scenes and verify all original bytes.
+                    try { RestoreSceneSetup(setup); } finally { VerifyProtectedFiles(protectedFiles); }
+                }
             }
+            if(bufferChecks!=3 || !buffersReleased) throw new InvalidOperationException("Incomplete capture buffer lifecycle regression.");
+            File.WriteAllText(Path.Combine(output,"capture-report.json"),JsonUtility.ToJson(new ImageReport{graphicsDeviceType=SystemInfo.graphicsDeviceType.ToString(),graphicsDeviceName=SystemInfo.graphicsDeviceName,bufferSceneTransitionsChecked=bufferChecks,captureBuffersReleased=buffersReleased,images=records.ToArray()},true));
         }
         // A cold batch Editor can have zero loaded scenes. Unity rejects restoring
         // that snapshot (and snapshots of an unnamed scene). Restore a disposable

@@ -23,7 +23,7 @@ class EnvironmentContracts(unittest.TestCase):
             for v in VIEWS:
                 self.image(d/f'{r}-{v}.png')
                 images.append(dict(region=r,view=v,width=1440,height=900,minimum=.1,maximum=.8,sceneHash='a'*32))
-        report=dict(status='captured-environment-only-not-gameplay-acceptance',graphicsDeviceType='OpenGLCore',graphicsDeviceName='llvmpipe',images=images)
+        report=dict(status='captured-environment-only-not-gameplay-acceptance',graphicsDeviceType='OpenGLCore',graphicsDeviceName='llvmpipe',bufferSceneTransitionsChecked=3,captureBuffersReleased=True,images=images)
         (d/'capture-report.json').write_text(json.dumps(report))
         (d.parent/'candidate-layout.json').write_text('{"passed":true}')
         return d,report
@@ -94,6 +94,21 @@ class EnvironmentContracts(unittest.TestCase):
     def test_generated_symlink_fails(self):
         f=self.assets();(f/'FirstStation.unity').unlink();(f/'FirstStation.unity').symlink_to(f/'Scrapyard.unity')
         with self.assertRaises(ValueError):collect_generated(self.root)
+    def test_buffer_lifecycle_is_required(self):
+        d,r=self.capture();r['captureBuffersReleased']=False;self.rewrite(d,r)
+        with self.assertRaises(ValueError):inspect_capture(self.root)
+        r['captureBuffersReleased']=True;r['bufferSceneTransitionsChecked']=2;self.rewrite(d,r)
+        with self.assertRaises(ValueError):inspect_capture(self.root)
+    def test_crc_corruption_rejected(self):
+        p=self.root/'image.png';self.image(p);b=bytearray(p.read_bytes());b[-5]^=1;p.write_bytes(b)
+        with self.assertRaises(Exception):inspect_png(p)
+    def test_capture_cleanup_always_restores_and_checks_sources(self):
+        r=Path(__file__).resolve().parents[1]
+        s=(r/'unity/Assets/DesertRV/Editor/JourneySceneAuthoring.cs').read_text()
+        self.assertIn('if(target) { try { target.Release(); } finally { Object.DestroyImmediate(target); } }',s)
+        self.assertIn('try { if(pixels) Object.DestroyImmediate(pixels); }\n                    finally',s)
+        self.assertIn('buffersReleased=true;\n                }\n                finally',s)
+        self.assertIn('try { RestoreSceneSetup(setup); } finally { VerifyProtectedFiles(protectedFiles); }',s)
     def test_native_inventory_exact(self):
         p=self.root/'result.xml';p.write_text(f'<test-run result="Passed"><test-case fullname="{RENDER_TEST}" result="Passed"/></test-run>')
         inspect_native_report(self.root)
