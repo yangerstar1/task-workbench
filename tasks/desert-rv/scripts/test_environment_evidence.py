@@ -160,6 +160,13 @@ class EnvironmentContracts(unittest.TestCase):
             out=validated_unity_dependencies({'dependencies':{'com.unity.test-framework':e}},True)
             self.assertEqual(out['com.unity.test-framework']['version'],'1.6.0')
         self.assertEqual(validated_unity_dependencies({'dependencies':{'com.unity.test-framework':'1.6.0'}}),{'com.unity.test-framework':'1.6.0'})
+    def test_official_linux_sdk_underscores_are_preserved(self):
+        names=['com.unity.sdk.linux-arm64','com.unity.sdk.linux-x86_64','com.unity.toolchain.linux-x86_64-linux','com.unity.sysroot.base']
+        value={'dependencies':{name:'1.1.0' for name in names}}
+        self.assertEqual(set(validated_unity_dependencies(value)),set(names))
+        for name in names:
+            lock={'dependencies':{name:dict(version='1.1.0',depth=0,source='registry',dependencies={},url='https://packages.unity.com')}}
+            self.assertIn(name,validated_unity_dependencies(lock,True))
     def test_package_diagnostic_rejects_paths_tokens_and_foreign_packages(self):
         for version in ('file:../secret','https://private.example/token','git+https://example.com/a','Bearer secret'):
             with self.assertRaises(ValueError):validated_unity_dependencies({'dependencies':{'com.unity.test-framework':version}})

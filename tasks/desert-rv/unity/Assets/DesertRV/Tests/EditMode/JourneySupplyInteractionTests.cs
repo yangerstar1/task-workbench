@@ -70,19 +70,62 @@ namespace DesertRV.Tests
         [Test] public void LoadedButInactiveOldRegionCannotSupplyCurrentJourney()
         {
             var original = regionObject.scene;
-            var stale = UnityEditor.SceneManagement.EditorSceneManager.NewScene(
-                UnityEditor.SceneManagement.NewSceneSetup.EmptyScene, UnityEditor.SceneManagement.NewSceneMode.Additive);
-            UnityEngine.SceneManagement.SceneManager.SetActiveScene(original);
+            var originalActive = UnityEngine.SceneManagement.SceneManager.GetActiveScene();
+            var originalPath = original.path;
+            bool originalDirty = original.isDirty;
+            string folderName = "DesertRVSupplySceneFixture_" + Guid.NewGuid().ToString("N");
+            string folder = "Assets/" + folderName;
+            string scenePath = folder + "/InactiveRegion.unity";
+            UnityEngine.SceneManagement.Scene stale = default;
+            Assert.That(UnityEditor.AssetDatabase.CreateFolder("Assets", folderName), Is.Not.Empty);
             try
             {
+                // Saving AS COPY preserves the current untitled scene, its dirty state,
+                // and its on-disk source. This regression now exercises opening a
+                // named saved copy rather than creating a second untitled scene.
+                Assert.That(UnityEditor.SceneManagement.EditorSceneManager.SaveScene(original, scenePath, true), Is.True);
+                Assert.That(original.path, Is.EqualTo(originalPath));
+                Assert.That(original.isDirty, Is.EqualTo(originalDirty));
+                stale = UnityEditor.SceneManagement.EditorSceneManager.OpenScene(scenePath,
+                    UnityEditor.SceneManagement.OpenSceneMode.Additive);
+                // The serialized copy is only a named empty test container. Remove
+                // copied fixture roots before moving the one actual region under test.
+                foreach (var root in stale.GetRootGameObjects()) UnityEngine.Object.DestroyImmediate(root);
+                Assert.That(UnityEngine.SceneManagement.SceneManager.SetActiveScene(original), Is.True);
                 UnityEngine.SceneManagement.SceneManager.MoveGameObjectToScene(regionObject, stale);
                 Assert.That(stale.isLoaded, Is.True);
+                Assert.That(stale.handle, Is.Not.EqualTo(original.handle));
+                Assert.That(UnityEngine.SceneManagement.SceneManager.GetActiveScene(), Is.EqualTo(original));
                 Assert.That(Reach(), Is.Null);
             }
             finally
             {
-                UnityEngine.SceneManagement.SceneManager.MoveGameObjectToScene(regionObject, original);
-                UnityEditor.SceneManagement.EditorSceneManager.CloseScene(stale, true);
+                try
+                {
+                    if (regionObject && original.IsValid() && original.isLoaded && regionObject.scene != original)
+                        UnityEngine.SceneManagement.SceneManager.MoveGameObjectToScene(regionObject, original);
+                }
+                finally
+                {
+                    try
+                    {
+                        if (stale.IsValid() && stale.isLoaded)
+                            Assert.That(UnityEditor.SceneManagement.EditorSceneManager.CloseScene(stale, true), Is.True);
+                    }
+                    finally
+                    {
+                        try
+                        {
+                            if (originalActive.IsValid() && originalActive.isLoaded)
+                                UnityEngine.SceneManagement.SceneManager.SetActiveScene(originalActive);
+                        }
+                        finally
+                        {
+                            if (UnityEditor.AssetDatabase.IsValidFolder(folder))
+                                Assert.That(UnityEditor.AssetDatabase.DeleteAsset(folder), Is.True);
+                        }
+                    }
+                }
             }
             Assert.That(Reach(), Is.SameAs(supply));
         }

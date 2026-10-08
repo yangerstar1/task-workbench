@@ -53,8 +53,8 @@
     },
     {
       "path": "tasks/desert-rv/scripts/environment_evidence.py",
-      "sha256": "a9f3660f1f6dc9e469bd7a715cb429eeb2d85801b41f351b053d50f1508990b7",
-      "size": 19124
+      "sha256": "380710b96d46b9d88bafe1a55abfe30ef885ca4ea18ffb9b81119bf12d6370f4",
+      "size": 19125
     },
     {
       "path": "tasks/desert-rv/scripts/expected_playmode_test_cases.json",
@@ -73,8 +73,8 @@
     },
     {
       "path": "tasks/desert-rv/scripts/test_environment_evidence.py",
-      "sha256": "2809c37367923562184a00b897c46465c5e3db7d0098f1bca04821528aa97937",
-      "size": 14795
+      "sha256": "8135865952a95d49f970c073224a0b5dc0b8798337c7f5aa9e2d66b591d9dbd6",
+      "size": 15378
     },
     {
       "path": "tasks/desert-rv/scripts/test_verification_scope.py",
@@ -4143,8 +4143,8 @@
     },
     {
       "path": "tasks/desert-rv/unity/Assets/DesertRV/Tests/EditMode/JourneySupplyInteractionTests.cs",
-      "sha256": "0af2965da58b4cae562227c52aea0b613480e3c7a0f2b96ef9927a770470b653",
-      "size": 11487
+      "sha256": "624c913a6b4dcc1abc46baedd5a9f12038ffb1a70dfde9dc100a7663fce3a203",
+      "size": 14038
     },
     {
       "path": "tasks/desert-rv/unity/Assets/DesertRV/Tests/EditMode/JourneySupplyInteractionTests.cs.meta",

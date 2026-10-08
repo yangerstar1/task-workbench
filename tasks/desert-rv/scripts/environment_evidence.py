@@ -263,7 +263,7 @@ def validated_unity_dependencies(value, locked=False):
     def version_map(items):
         require(isinstance(items,dict) and len(items)<=200,'Invalid dependency map')
         for key,version in items.items():
-            require(isinstance(key,str) and re.fullmatch(r'com\.unity\.[a-z0-9.-]+',key) and len(key)<=120,
+            require(isinstance(key,str) and re.fullmatch(r'com\.unity\.[a-z0-9_.-]+',key) and len(key)<=120,
                     'Non-Unity or unsafe package name')
             require(isinstance(version,str) and re.fullmatch(r'[0-9]+\.[0-9]+\.[0-9]+(?:-[A-Za-z0-9.-]+)?',version) and len(version)<=60,
                     'Non-version dependency; URLs, paths and tokens are forbidden')
