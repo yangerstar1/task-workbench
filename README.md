@@ -34,12 +34,22 @@ runs, including byte verification:
 [recovery evidence](https://github.com/yangerstar1/task-workbench/releases/tag/task-recover-20261008-001).
 This establishes a small task's recovery path, not a successful Unity build.
 
-The Unity workflow below is still an unverified proof. It currently requires
-three repository secrets; neither a working Personal-license setup nor the four
-native tests nor a newly built Android APK has been verified. Its outputs currently
-expire as Actions artifacts after seven days. Release archival for Unity is still
-to be implemented after the licensing and build path is verified. Do not treat
-the release policy above as evidence that this implementation already exists.
+The Unity proof passed on 2026-10-08:
+[Actions run 37761201389](https://github.com/yangerstar1/task-workbench/actions/runs/37761201389),
+source commit `b63d73cdf8dc1fe6cd91a8f7b53acb9acd2b45b4`.
+Four native EditMode tests passed (zero skipped), followed on a separate disposable
+runner by a successful ARM64 IL2CPP development APK build and independent receipt/
+byte checks. The configured repository secrets worked without another interactive
+login in this run; indefinite credential validity is not claimed.
+
+[Version unity-proof-v0.0.1](https://github.com/yangerstar1/task-workbench/releases/tag/unity-proof-v0.0.1)
+archives the APK, test XML, receipts and SHA256SUMS. APK size: 21,455,990 bytes;
+SHA256: `1e9f04d0b8b9938a45942d97d799ea5fdec626f535e65839624eef2d6169d5df`.
+Downloaded outputs were independently verified for ZIP CRC, hashes, AArch64 ELF
+libraries and source/run bindings. This is an original minimal cube example,
+not the complete game; device execution, gameplay and store signing are untested.
+Release archival for this run was completed explicitly. Future Unity builds still
+require reviewed archival; automatic Unity Release publication is not implemented.
 
 ## What is ready to try
 
@@ -48,8 +58,7 @@ the release policy above as evidence that this implementation already exists.
   workload API. This is the first infrastructure proof, not a large-workload benchmark.
 - **unity-proof:** the separately reviewed original Unity 6000.3.19f1 sample, retained
   byte for byte under `tasks/unity-proof/`. A root workflow adapts its paths. Four real
-  native tests and a new ARM64 IL2CPP APK are required. Account activation and native
-  execution remain unverified until that independent workflow actually succeeds.
+  native tests and a new ARM64 IL2CPP APK are required. The first real native CI run succeeded; see the verified state and Release above.
 
 All checked-in material is intended for public visibility. Do not add private work,
 licensed game assets that cannot be redistributed, credentials, or personal data.
@@ -125,8 +134,8 @@ proof's exact scope and action pins. Its embedded workflow is an inert original 
 GitHub runs only `.github/workflows/unity-proof.yml`. Scripts run from the plugin
 directory; GameCI project/output and artifact paths are adapted in that wrapper.
 No existing game code or assets are included. Unity proof artifacts last seven days;
-the generic Release publisher currently applies only to data-summary. Unity Release
-archival is a separate future step, not claimed as implemented.
+the generic Release publisher currently applies only to data-summary. The first Unity run is archived in Release unity-proof-v0.0.1; automatic archival
+of future Unity runs remains unimplemented.
 
 ## Local verification
 
