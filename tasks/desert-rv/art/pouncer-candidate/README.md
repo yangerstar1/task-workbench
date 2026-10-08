@@ -1,3 +1,13 @@
+# Death rest-pose revision: relaxed side-supported corpse
+
+The preceding death-diagnostic run 37829068773 passed technical contacts, but its actual rest-07 image was visually rejected: all four paws remained horizontal and weight-bearing, with the torso twisted above them. No visual or production approval is implied by that technical pass.
+
+This revision changes only Death pose intent. The lower-side limbs extend sideways rather than beneath the shoulders and hips. The upper-side limbs fold loosely nearby at a different height; their paws no longer seek a standing ground plant. Paw surfaces progressively roll sideways with mild asymmetric yaw. Head and neck pitch are reduced so the skull follows the side-lying trunk. The torso remains the primary side-contact target. Existing per-joint contact solving, no root motion, exact 1.8-second Death timing and unchanged 4mm penetration rejection remain.
+
+The new death-rest-pose.json makes these artistic targets inspectable. Posture checks reject the prior four-horizontal-palm pattern, but cannot approve an image. The same bounded DEATH_DIAGNOSTIC_NOT_FULL rendering must be inspected again: whole Death, near-ground frames, and both opposing rest views. Mesh, materials, rig, parameters and all non-Death source motion remain hash-locked to R3.
+
+---
+
 # Pouncer R3 Death-only repair candidate
 
 SCOPE=DEATH_DIAGNOSTIC_NOT_FULL when using the default manual workflow input. No asset approval is granted. The accepted-for-Unity-candidate R3 shape, materials and non-Death actions are unchanged. The exact preceding source SHA and unchanged-region hashes are recorded in death-change-boundary.json.

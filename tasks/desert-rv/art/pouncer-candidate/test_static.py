@@ -72,4 +72,12 @@ class CandidateContract(unittest.TestCase):
         self.assertIn("render_clips={'Death':clips['Death']}",animate)
         self.assertIn('default: death-diagnostic',workflow);self.assertIn("if: inputs.scope == 'full'",workflow)
         self.assertIn('death-near-',animate);self.assertIn('death_diagnostic_technical_pass',(H/'validate_asset.py').read_text())
+    def test_corpse_relaxes_paws_instead_of_standing(self):
+        pose=json.loads((H/'death-rest-pose.json').read_text())
+        for key in ('fore.L','fore.R','hind.L','hind.R'):
+            self.assertGreater(pose[key]['paw_roll'],1.2)
+        for prefix in ('fore','hind'):
+            self.assertGreater(pose[prefix+'.R']['ankle'][2]-pose[prefix+'.L']['ankle'][2],.10)
+        self.assertIn("self.relax=t*t*(3-2*t)",(H/'death_contact.py').read_text())
+        self.assertIn('death_paw_up_dot_world_up',(H/'validate_asset.py').read_text())
 if __name__=='__main__':unittest.main()

@@ -2,7 +2,8 @@
 import collections
 import struct
 from death_contact import DeathContactSolver
-death_solver=DeathContactSolver(body,details,rig,leg_chains,P['clips']['Death'])
+DEATH_POSE=json.loads((HERE/'death-rest-pose.json').read_text())
+death_solver=DeathContactSolver(body,details,rig,leg_chains,P['clips']['Death'],DEATH_POSE)
 
 # Calibrate each original limb's pole angle against its known rest elbow/knee.
 for key,pts in leg_chains.items():
@@ -77,17 +78,16 @@ def author_pose(name,u):
         rot('head',(-.20*q,0,.23*q)); rot('neck',(-.10*q,0,-.10*q))
     elif name=='Death':
         t=min(1,u/.76); q=t*t*(3-2*t)
-        visual.location=(.12*q,0,-.24*q); rot('visual_body',(.04*q,1.48*q,0))
-        rot('head',(.16*q,0,.09*q)); rot('neck',(.09*q,0,0))
-        # Each relaxed leg receives its own reachable grounded endpoint.
-        # The upper-side legs tuck closer; lower-side legs extend outward on the floor.
+        visual.location=(.12*q,0,-.24*q); rot('visual_body',(.04*q,DEATH_POSE['body_roll_radians']*q,0))
+        rot('head',(DEATH_POSE['head_pitch_radians']*q,0,.035*q)); rot('neck',(DEATH_POSE['neck_pitch_radians']*q,0,0))
+        # Lower limbs extend along the floor; upper limbs fold beside/on the lower limbs.
+        # Upper-side paws deliberately do not receive standing ground-plant targets.
         for key,pts in leg_chains.items():
             pre,side=key.split('.')
-            endpoint=pts[2].copy(); endpoint.x=-.18 if side=='L' else .06
-            endpoint.y=(-.60 if side=='L' else -.78) if pre=='fore' else (.50 if side=='L' else .35)
+            endpoint=Vector(DEATH_POSE[key]['ankle'])
             set_target(key,pts[2].lerp(endpoint,q))
             pole=rig.pose.bones[pre+'_pole.'+side]
-            rest=bones[pole.name][0]; target=Vector((-.10,-.20 if pre=='fore' else .80,.22))
+            rest=bones[pole.name][0]; target=Vector(DEATH_POSE[key]['pole'])
             pole.location=rest.lerp(target,q)-rest
     for i in range(3):rot('tail'+str(i),(0,0,-.09 if name=='Death' else .02*math.sin(u*math.tau+i*.4)))
     bpy.context.view_layer.update()

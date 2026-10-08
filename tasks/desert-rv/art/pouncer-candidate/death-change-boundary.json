@@ -15,5 +15,8 @@
       "sha256": "f7eace8649adf7ffaf833370a5212b65e2bb407a98fcef6e95bbce50fa3170b3"
     }
   },
-  "parameters_sha256": "b8b86c81e4043e7385cec478faf917df76ec89916d01d5296ab28dc6a0be11d4"
+  "parameters_sha256": "b8b86c81e4043e7385cec478faf917df76ec89916d01d5296ab28dc6a0be11d4",
+  "preceding_death_diagnostic_commit": "b904ed4b37b22f345c9e705caca409d1078300f8",
+  "preceding_death_diagnostic_run": 37829068773,
+  "pose_revision": "relaxed_side_corpse_v2"
 }

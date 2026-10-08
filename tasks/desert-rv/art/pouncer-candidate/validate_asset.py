@@ -84,6 +84,15 @@ checks['death_torso_contact_z']=min((ev.matrix_world@me.vertices[i].co).z for i 
 checks['death_relaxed_paw_heights']={key:rig.pose.bones[key.split('.')[0]+'_paw.'+key.split('.')[1]].tail.z for key in leg_chains}
 rest_width=max(body.data.vertices[i].co.x for i in torso)-min(body.data.vertices[i].co.x for i in torso)
 checks['death_height_limit_from_torso_width']=rest_width+.035
+# Reject the previous four-palm standing design even when a torso point touches the floor.
+checks['death_paw_up_dot_world_up']={}
+for key in leg_chains:
+    pre,side=key.split('.');pb=rig.pose.bones[pre+'_paw.'+side]
+    rest_up=pb.bone.matrix_local.to_3x3().inverted() @ Vector((0,0,1))
+    checks['death_paw_up_dot_world_up'][key]=(pb.matrix.to_3x3() @ rest_up).normalized().z
+checks['death_upper_lower_paw_height_separation']={pre:checks['death_relaxed_paw_heights'][pre+'.R']-checks['death_relaxed_paw_heights'][pre+'.L'] for pre in ('fore','hind')}
+if sum(abs(v)<.50 for v in checks['death_paw_up_dot_world_up'].values())<3:errors.append('Death paws still form a four-palm standing support pose')
+if min(checks['death_upper_lower_paw_height_separation'].values())<.045:errors.append('Death upper/lower limb relaxation remains too symmetric')
 if abs(checks['death_torso_contact_z'])>.012:errors.append('Death torso is not resting on the floor')
 if max(checks['death_relaxed_paw_heights'].values())>.28:errors.append('Death legs remain rigidly raised')
 if sampled['Death'][-1]['max_z']>rest_width+.035:errors.append('Death exceeds anatomical side-lying height')
