@@ -1,0 +1,66 @@
+name: Desert RV verified Death four opaque stills
+run-name: Verified Death four opaque · ${{ github.sha }}
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: desert-rv-pouncer-opaque
+  cancel-in-progress: false
+jobs:
+  opaque:
+    if: github.repository == 'yangerstar1/task-workbench' && github.actor == github.repository_owner && github.triggering_actor == github.repository_owner && github.event_name == 'workflow_dispatch' && github.event.repository.private == false && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+          lfs: false
+      - name: Read exact successful native candidate
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          repository: yangerstar1/task-workbench
+          run-id: 37854056191
+          name: pouncer-death-technical-37854056191
+          github-token: ${{ github.token }}
+          path: baseline
+      - name: Verify unchanged passing evidence bytes
+        run: |
+          set -euo pipefail
+          test "$(cat baseline/source-commit.txt)" = ec7a88493dcba5c1d0394218efc740926cd95ce1
+          echo 'f2fd43af20d8cc82ae4eb9e5ea4fc35284fffcb50223c7b9e99bb1d1650ad73d  baseline/pouncer-candidate.blend' | sha256sum --check
+          echo '33cde1c855c27a954b72051b188fd7b92b4b9378219c972e244ace6419dcf962  baseline/technical-gate.json' | sha256sum --check
+          (cd baseline && sha256sum --check SHA256SUMS)
+      - name: Install official checksum-verified Blender 4.2.3
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends libxkbcommon0 libsm6 libxi6 libxrender1 libxxf86vm1 libgl1
+          mkdir -p "$RUNNER_TEMP/blender"
+          cd "$RUNNER_TEMP/blender"
+          base=https://download.blender.org/release/Blender4.2
+          curl --fail --location --retry 3 "$base/blender-4.2.3-linux-x64.tar.xz" -o blender-4.2.3-linux-x64.tar.xz
+          curl --fail --location --retry 3 "$base/blender-4.2.3.sha256" -o upstream.sha256
+          grep -E '[ *]blender-4\.2\.3-linux-x64\.tar\.xz$' upstream.sha256 > selected.sha256
+          test "$(wc -l < selected.sha256)" -eq 1
+          sha256sum --check selected.sha256
+          tar -xf blender-4.2.3-linux-x64.tar.xz
+          echo "$RUNNER_TEMP/blender/blender-4.2.3-linux-x64" >> "$GITHUB_PATH"
+      - name: Render only four locked candidate stills
+        timeout-minutes: 12
+        run: |
+          set -euo pipefail
+          blender --background --factory-startup --disable-autoexec --threads 4 --python-exit-code 1 --python tasks/desert-rv/art/pouncer-candidate/render_verified_death.py -- --input baseline --output opaque-output
+      - name: Upload four opaque stills with exact provenance
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: pouncer-verified-four-opaque-${{ github.run_id }}
+          path: |
+            opaque-output/opaque-*.png
+            opaque-output/*.json
+            opaque-output/SHA256SUMS
+          if-no-files-found: error
+          retention-days: 30
