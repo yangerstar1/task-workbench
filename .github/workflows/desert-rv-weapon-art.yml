@@ -4,9 +4,9 @@ on:
     inputs:
       mode:
         type: choice
-        description: Full asset validation or bounded reload diagnosis
+        description: Full asset validation, bounded reload diagnosis, or original audio only
         default: full
-        options: [full, contact-diagnostic]
+        options: [full, contact-diagnostic, reload-audio-only]
 permissions:
   contents: read
 concurrency:
@@ -14,7 +14,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   build-and-review:
-    if: github.actor == github.repository_owner && github.event_name == 'workflow_dispatch' && github.event.repository.private == false && github.ref == 'refs/heads/main'
+    if: inputs.mode != 'reload-audio-only' && github.actor == github.repository_owner && github.event_name == 'workflow_dispatch' && github.event.repository.private == false && github.ref == 'refs/heads/main'
     runs-on: ubuntu-24.04
     timeout-minutes: 120
     steps:
@@ -77,5 +77,33 @@ jobs:
             weapon-output/SHA256SUMS
             weapon-output/source-commit.txt
             weapon-output/blender-upstream.sha256
+          if-no-files-found: error
+          retention-days: 14
+
+  reload-audio:
+    if: inputs.mode == 'reload-audio-only' && github.actor == github.repository_owner && github.event_name == 'workflow_dispatch' && github.event.repository.private == false && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+          lfs: false
+      - name: Test independent audio validator using synthetic fixtures
+        run: python3 -m unittest discover -s tasks/desert-rv/art/reload-audio -p 'test_*.py' -v
+      - name: Generate and independently measure original reload candidate twice
+        run: python3 tasks/desert-rv/art/reload-audio/build_reload_candidate.py --output reload-audio-output
+      - name: Verify tracked source and all retained sounds are unchanged
+        run: git diff --exit-code && git diff --cached --exit-code
+      - name: Upload measured audio candidate (no listening or sync approval)
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: desert-rv-reload-audio-${{ github.run_id }}
+          path: |
+            reload-audio-output/*.wav
+            reload-audio-output/reload.wav.meta
+            reload-audio-output/*.json
+            reload-audio-output/*.meta
+            reload-audio-output/SHA256SUMS
           if-no-files-found: error
           retention-days: 14

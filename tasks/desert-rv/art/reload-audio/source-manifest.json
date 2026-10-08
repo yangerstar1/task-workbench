@@ -1,0 +1,102 @@
+{
+  "schema": "desert-rv-original-reload-audio-source/v1",
+  "baseline_commit": "19cc064551488607caf6cd7b9139f7be90bfd707",
+  "baseline_source_url": "https://github.com/yangerstar1/task-workbench/tree/19cc064551488607caf6cd7b9139f7be90bfd707/tasks/desert-rv",
+  "origin": "Project-authored deterministic mathematical synthesis; no recording or third-party sample",
+  "provenance_reference": "tasks/desert-rv/ASSET-NOTICES.md",
+  "license_note": "No third-party sample license is introduced; no new blanket license grant is asserted.",
+  "existing_generator_git_blob_sha": "5e441e9dbecf2dfc561c6f5872cb8ac0dffd756f",
+  "timing_reference": "tasks/desert-rv/art/weapon-candidate/build_weapon.py; Reload frames 1..100 / 60 fps; JourneyActions authority 1.65s",
+  "candidate_status": {
+    "actual_wav_generated": false,
+    "auditioned": false,
+    "unity_import_verified": false,
+    "visual_sync_approved": false,
+    "commercial_quality_approved": false
+  },
+  "candidate_source_files": [
+    {
+      "path": "tasks/desert-rv/art/scripts/make_reload_foley.py",
+      "sha256": "d0046c05f5ea6f2ea805bcfdcf4dad33956eee8b19359b13518386c39164f9b3"
+    },
+    {
+      "path": "tasks/desert-rv/art/reload-audio/validate_reload.py",
+      "sha256": "581471606c9a42c426d17e86aeb5cee056c308ada5856678699516f6b9cd89e6"
+    },
+    {
+      "path": "tasks/desert-rv/art/reload-audio/test_reload_audio.py",
+      "sha256": "ebaac7569e0a633d1ce03cdda8c49c0e01c164d4a2d45566f72ac36dbdb82f35"
+    },
+    {
+      "path": "tasks/desert-rv/art/reload-audio/build_reload_candidate.py",
+      "sha256": "ac3b5b86a92a037ad38d9325c52332c56e304d1f2e0087a0f4a55e2f41367189"
+    },
+    {
+      "path": "tasks/desert-rv/art/reload-audio/reload.wav.meta",
+      "sha256": "f390dfa2200e466a59940b9fcccada1c408ffc965ff5871110f8237ee9f92f76"
+    }
+  ],
+  "preserved_existing_audio": [
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Audio/arc.wav",
+      "sha256": "e1ad546b374bd9a6e910e64880fd6c569350a289a8127ab446b851063187bc1e",
+      "bytes": 22094
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Audio/engine.wav",
+      "sha256": "3b282f280a31a6bbf03fd2c3c985311c467a1dc2962bc6edeeaea062a88a21af",
+      "bytes": 88244
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Audio/hit.wav",
+      "sha256": "cc10ef5ea592ec3873b6af6c44f37f3efcddac4277249edae5307d01f28bac83",
+      "bytes": 10186
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Audio/pickup.wav",
+      "sha256": "e56f984adc964bc025abf3f02a390470fe876ea96f3cca78a82ebce33661a8d6",
+      "bytes": 17684
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Audio/shot.wav",
+      "sha256": "6f93137abe2303138ba452e3421e0eb1b54b86004853074d6505173163b6819d",
+      "bytes": 12832
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Audio/step.wav",
+      "sha256": "c883230add4912b07f1e0d961ccd54ebb7c3e7d2f29aff98aa604916841e1a96",
+      "bytes": 9746
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Audio/threat.wav",
+      "sha256": "a7aec729a07a702529e09ff91a1049fee17efcc0ee02584c9943ded8fc1cd35a",
+      "bytes": 30912
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Audio/upgrade.wav",
+      "sha256": "6b3ec28fd97bca5fe0871e115b1ff0ffe0651f863cf7ba1468139617e30cfbd2",
+      "bytes": 66194
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Audio/wind.wav",
+      "sha256": "5b9338f0460b9f1848e05c7982ff8369f255742e252ed879ec932df14c8455e8",
+      "bytes": 176444
+    }
+  ],
+  "candidate_target": "tasks/desert-rv/unity/Assets/DesertRV/Audio/reload.wav",
+  "expected_format": {
+    "rate_hz": 48000,
+    "channels": 1,
+    "sample_width_bytes": 2,
+    "frames": 79200,
+    "duration_seconds": 1.65
+  },
+  "generated_evidence": "Actual per-run generated/not-generated state belongs to generation-status.json, not this source-time manifest.",
+  "remaining": [
+    "Run approved existing public Actions generation mode",
+    "Retrieve and verify WAV and measurements",
+    "Unity import and new/full lifecycle tests",
+    "Real waveform listening and game mix review",
+    "Imported animation and interrupted playback synchronization review"
+  ]
+}
