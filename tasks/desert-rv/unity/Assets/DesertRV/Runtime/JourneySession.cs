@@ -9,7 +9,7 @@ namespace DesertRV
         public SessionState State { get; private set; }
         public PauseGate Pauses { get; private set; }
         public MobileInputAdapter Input { get; private set; }
-        public int Generation { get; private set; }
+        public int Generation => State == null ? 0 : State.Generation;
         bool hidden, unfocused, manual, gameplayOverlay;
         int loadSequence, pendingLoad;
         bool previousProgressValid;
@@ -30,13 +30,13 @@ namespace DesertRV
         public bool StartJourney()
         {
             if (!State.Start()) return false;
-            Generation++; pendingLoad = 0; gameplayOverlay = false; previousProgressValid = false;
+            pendingLoad = 0; gameplayOverlay = false; previousProgressValid = false;
             Pauses.Reconcile(); ApplyContext(); return true;
         }
         public bool RestartJourney()
         {
             if (!State.RestartJourney()) return false;
-            Generation++; pendingLoad = 0; gameplayOverlay = false; previousProgressValid = false;
+            pendingLoad = 0; gameplayOverlay = false; previousProgressValid = false;
             Input.ReleaseAll(); Pauses.Reconcile(); ApplyContext(); return true;
         }
         public void TogglePause()
@@ -85,6 +85,16 @@ namespace DesertRV
             public bool IsValid => Sequence != 0;
             public LoadTicket(int generation, int sequence, int scene)
             { Generation = generation; Sequence = sequence; Scene = scene; }
+        }
+        public bool IsCurrentLoad(LoadTicket ticket) => ticket.IsValid && ticket.Generation == Generation &&
+            ticket.Sequence == pendingLoad && ticket.Scene == State.SceneId;
+        // Initial scene and whole-run reset use the same callback fencing as transitions.
+        public LoadTicket BeginCurrentRegionLoad()
+        {
+            if (!State.BeginLoading()) return default;
+            pendingLoad = ++loadSequence;
+            Input.ReleaseAll(); ApplyContext();
+            return new LoadTicket(Generation, pendingLoad, State.SceneId);
         }
         public LoadTicket BeginRegionAdvance()
         {

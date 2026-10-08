@@ -2,98 +2,63 @@ using UnityEngine;
 
 namespace DesertRV
 {
-    // First playable station controller. Three-region completion is deliberately not
-    // faked here: reaching this station's exit reports a slice checkpoint, not victory.
-    public sealed class FirstStationJourney : MonoBehaviour
+    // Shared actions retain exact self-collider filtering for shots and interactions.
+    public sealed class JourneyActions : MonoBehaviour
     {
-        public bool combatUnavailable;
         public JourneySession journey;
         public JourneyMotor motor;
-        public JourneyHud hud;
-        public Transform salvagePoint, cabinWorkbench, exitPoint;
-        public GameObject salvageVisual;
-        public BeastActor[] guards, roadBeasts;
+        public Transform cabinWorkbench;
+        public Collider workbenchSurface;
         public AudioClip shotSound, hitSound, reloadSound, pickupSound, upgradeSound, windSound;
+        public RegionBinding Region { get; private set; }
+        public RegionProgressState Progress { get; private set; }
         public string Notice { get; private set; }
         public string Prompt { get; private set; }
-        public double WorldProgress => Vector3.Dot(motor.PlayerPosition, journeyDirection);
-        public bool SliceComplete { get; private set; }
         public float HitConfirmation => hitFlash;
         public float DamageFeedback => damageFlash;
         public bool Reloading => reloadRemaining > 0;
         public bool Installing => installRemaining > 0;
-        public float ActionProgress => installRemaining > 0 ? 1 - installRemaining / 5f : reloadRemaining > 0 ? 1 - reloadRemaining / 1.65f : 0;
-        public string Objective => combatUnavailable && (journey.State.Upgrades & VehicleUpgrades.Ram) != 0 ? "控制测试：战斗资产尚未通过，不代表关卡完成" : SliceComplete ? "第一站已贯通 · 后续地区制作中" :
-            (journey.State.Upgrades & VehicleUpgrades.Ram) != 0 ? "用新撞角清开公路，驶向北方" :
-            journey.State.HasPart(ComponentPart.RamPart) ? "回到房车工作台，装上撞角" : "停车下车，搜索修理间的撞角组件";
+        public float ActionProgress => Installing ? 1 - installRemaining / 5f : Reloading ? 1 - reloadRemaining / 1.65f : 0;
+        ComponentPart installPart;
+        ArcCombatState arc;
         float fireClock, reloadRemaining, installRemaining, noticeRemaining, hitFlash, damageFlash;
         int lastHealth;
         AudioSource effects, wind;
-        Vector3 journeyDirection;
-        bool roadActivated;
         LineRenderer tracer;
         float tracerRemaining;
         int interaction;
-        Collider salvageSurface, workbenchSurface;
+
 
         void Awake()
         {
-            // Legacy scenes are traversal-only until replaced by authored RegionBindings.
-            combatUnavailable = true;
-            if (FindFirstObjectByType<JourneyDirector>()) { enabled = false; return; }
             effects = gameObject.AddComponent<AudioSource>(); effects.spatialBlend = 0; effects.playOnAwake = false;
             wind = gameObject.AddComponent<AudioSource>(); wind.spatialBlend = 0; wind.playOnAwake = false;
             wind.clip = windSound; wind.loop = true; wind.volume = .16f;
-            journeyDirection = motor.Forward;
-            // Exact surfaces from the saved scene / JourneyBuild bindings. The cabin
-            // point is parented to the RV, so never exempt its whole parent hierarchy.
-            salvageSurface = salvagePoint && salvagePoint.parent
-                ? salvagePoint.parent.GetComponent<Collider>() : null;
-            var bench = motor.vehicle.Find("GEO-rear_repair_bench");
-            workbenchSurface = bench ? bench.GetComponent<Collider>() : null;
             tracer = new GameObject("Nail trajectory").AddComponent<LineRenderer>();
             tracer.positionCount = 2; tracer.startWidth = .008f; tracer.endWidth = .003f;
             tracer.material = new Material(Shader.Find("Universal Render Pipeline/Unlit"));
             tracer.material.color = new Color(1, .72f, .3f); tracer.enabled = false;
-            foreach (var beast in guards) if (beast) beast.gameObject.SetActive(false);
-            foreach (var beast in roadBeasts) if (beast) beast.gameObject.SetActive(false);
+            tracer.transform.SetParent(transform, true);
         }
-        public void Begin()
+        public void Bind(RegionBinding region, RegionProgressState progress)
         {
-            if (!journey.StartJourney()) return;
-            ResetWorld(); Say("先停稳。下车搜索修理间，别让风暴追上。", 6);
-        }
-        public void Restart()
-        {
-            if (!journey.RestartJourney()) return;
-            ResetWorld(); Say("新的一趟旅程。上一趟的物资不会保留。", 5);
-        }
-        void ResetWorld()
-        {
-            motor.ResetVehicle(); motor.RefreshModules();
+            Region = region; Progress = progress;
+            arc = new ArcCombatState(journey.State, region.region, journey.Generation, 3, .2);
             fireClock = reloadRemaining = installRemaining = hitFlash = damageFlash = tracerRemaining = 0;
-            tracer.enabled = false; roadActivated = SliceComplete = false;
-            if (salvageVisual) salvageVisual.SetActive(true);
-            foreach (var beast in guards) if (beast) { beast.ResetActor(); beast.gameObject.SetActive(false); }
-            foreach (var beast in roadBeasts) if (beast) { beast.ResetActor(); beast.gameObject.SetActive(false); }
+            tracer.enabled = false; Prompt = Notice = "";
             lastHealth = journey.State.PlayerHealth;
-            journey.ResetPositionSample(Vector3.Dot(motor.PlayerPosition, journeyDirection));
             if (windSound) wind.Play();
         }
-        void Update()
+        public void SetPaused(bool paused)
+        {
+            if (paused) { wind.Pause(); effects.Pause(); }
+            else { if (windSound && !wind.isPlaying) wind.UnPause(); effects.UnPause(); }
+        }
+        public void Tick(float delta)
         {
             var state = journey.State;
-            if (state.Status != SessionStatus.Playing)
-            {
-                if (wind.isPlaying) wind.Pause();
-                effects.Pause(); journey.Input.ConsumeFrame(); return;
-            }
-            if (windSound && !wind.isPlaying) wind.UnPause();
-            effects.UnPause();
-            float delta = Time.deltaTime;
-            motor.Tick(delta);
-            journey.TickStorm(delta, Vector3.Dot(motor.PlayerPosition, journeyDirection));
-            if (state.Status != SessionStatus.Playing) { journey.Input.ReleaseAll(); return; }
+            if (state.Status != SessionStatus.Playing || !Region) { SetPaused(true); return; }
+            SetPaused(false);
             fireClock = Mathf.Max(0, fireClock - delta); hitFlash = Mathf.Max(0, hitFlash - delta); damageFlash = Mathf.Max(0, damageFlash - delta);
             tracerRemaining -= delta; tracer.enabled = tracerRemaining > 0;
             noticeRemaining -= delta; if (noticeRemaining <= 0) Notice = "";
@@ -110,13 +75,14 @@ namespace DesertRV
                 else
                 {
                     installRemaining -= delta;
-                    if (installRemaining <= 0 && state.TryInstall(ComponentPart.RamPart))
+                    if (installRemaining <= 0 && (installPart == ComponentPart.RamPart ? Progress.TryInstallRam(Region.region, journey.Generation) : Progress.TryInstallArc(Region.region, journey.Generation)))
                     {
                         motor.RefreshModules(); Play(upgradeSound, .7f);
-                        ActivateRoad(); Say("撞角已锁紧。回到驾驶位，试试冲开公路。", 6);
+                        Say("改装已锁紧。回到驾驶位继续前进。", 6);
                     }
                 }
             }
+            TickArc(delta);
             FindInteraction();
             if (journey.Input.Interact && !Installing) Interact();
             if (state.Control == ControlMode.OnFoot && !Installing)
@@ -125,27 +91,13 @@ namespace DesertRV
                 { reloadRemaining = 1.65f; Play(reloadSound, .4f); }
                 if (journey.Input.Fire && fireClock <= 0 && reloadRemaining <= 0) Fire();
             }
-            if (roadActivated)
-            {
-                bool clear = true;
-                foreach (var beast in roadBeasts) if (beast && !beast.Dead) clear = false;
-                state.SetObjectivesResolved(clear);
-                if (!SliceComplete && clear && state.Control == ControlMode.Driving && Vector3.Distance(motor.vehicle.position, exitPoint.position) < 7)
-                { SliceComplete = true; Say("第一站完整闭环已到达出口。后续地区尚未接入。", 8); journey.TogglePause(); }
-            }
-            journey.Input.ConsumeFrame();
-        }
-        void ActivateRoad()
-        {
-            if (combatUnavailable || roadActivated) return; roadActivated = true;
-            foreach (var beast in roadBeasts) if (beast) { beast.gameObject.SetActive(true); beast.ResetActor(); }
         }
         bool Near(Transform point, float distance)
         {
             if (!point || Vector3.Distance(motor.view.transform.position, point.position) >= distance) return false;
             Vector3 origin = motor.view.transform.position;
-            Collider surface = point == salvagePoint ? salvageSurface :
-                point == cabinWorkbench ? workbenchSurface : null;
+            Collider surface = point == Region.salvage ? Region.salvageSurface :
+                point == cabinWorkbench ? workbenchSurface : point == Region.powerPoint ? Region.powerSurface : null;
             return JourneyRaycast.CanReachPoint(origin, point.position,
                 motor.Walker.GetComponent<CharacterController>(), surface);
         }
@@ -154,10 +106,14 @@ namespace DesertRV
             interaction = 0; Prompt = "";
             if (journey.State.Control == ControlMode.Driving)
             { interaction = 1; Prompt = Mathf.Abs(motor.Speed) > .6f ? "停稳后下车" : "下车"; return; }
-            if (Near(salvagePoint, 2.5f) && !journey.State.HasPart(ComponentPart.RamPart) && (journey.State.Upgrades & VehicleUpgrades.Ram) == 0)
-            { interaction = 2; Prompt = "收取撞角组件"; }
-            else if (motor.InsideCabin && Near(cabinWorkbench, 2.1f) && journey.State.HasPart(ComponentPart.RamPart))
-            { interaction = 3; Prompt = "安装撞角 · 5 秒"; }
+            ComponentPart part = Region.region == 1 ? ComponentPart.RamPart : ComponentPart.Coil;
+            VehicleUpgrades upgrade = Region.region == 1 ? VehicleUpgrades.Ram : VehicleUpgrades.Arc;
+            if (Region.region >= 2 && Near(Region.powerPoint, 2.5f))
+            { interaction = 6; Prompt = journey.State.PowerConnected ? "拔除电缆" : "连接房车供电"; }
+            else if (Region.region <= 2 && Near(Region.salvage, 2.5f) && !journey.State.HasPart(part) && (journey.State.Upgrades & upgrade) == 0)
+            { interaction = 2; Prompt = Region.region == 1 ? "收取撞角组件" : "收取线圈"; }
+            else if (motor.InsideCabin && Near(cabinWorkbench, 2.1f) && (journey.State.HasPart(ComponentPart.RamPart) || journey.State.HasPart(ComponentPart.Coil)))
+            { interaction = 3; Prompt = "安装改装 · 5 秒"; }
             else if (motor.InsideCabin && Near(cabinWorkbench, 2.1f) && journey.State.VehicleHealth < 300 && journey.State.RepairKits > 0)
             { interaction = 5; Prompt = "修理房车 · 消耗 1 修理包"; }
             else if (Vector3.Distance(motor.PlayerPosition, motor.EntryPosition) < 2.8f)
@@ -169,12 +125,33 @@ namespace DesertRV
             {
                 case 1: if (!motor.TryExitVehicle()) Say("先停稳，并给车门留出下车空间。", 3); break;
                 case 2:
-                    if (journey.State.TryCollect("station1.ram-part", ComponentPart.RamPart))
-                    { if (salvageVisual) salvageVisual.SetActive(false); Play(pickupSound, .6f); Say("组件已收好，回房车工作台安装。", 4); }
+                    if ((Region.region == 1 ? Progress.TryAcquireRam(Region.region, journey.Generation, Region.pickupId) : Progress.TryAcquireCoil(Region.region, journey.Generation, Region.pickupId)))
+                    { if (Region.salvageVisual) Region.salvageVisual.SetActive(false); Play(pickupSound, .6f); Say("组件已收好，回房车工作台安装。", 4); }
                     break;
-                case 3: reloadRemaining = 0; installRemaining = 5; break;
+                case 3: installPart = journey.State.HasPart(ComponentPart.RamPart) ? ComponentPart.RamPart : ComponentPart.Coil; reloadRemaining = 0; installRemaining = 5; break;
                 case 4: motor.TryEnterDriver(); break;
                 case 5: if (journey.State.TryRepair()) Say("房车修复 +95。", 3); break;
+                case 6:
+                    if (Vector3.Distance(motor.vehicle.position, Region.powerPoint.position) > 12) Say("房车离插座太远。", 3);
+                    else journey.State.SetPowerConnected(!journey.State.PowerConnected);
+                    break;
+            }
+        }
+        void TickArc(float delta)
+        {
+            arc.Tick(delta);
+            int pulse = arc.TryBeginPulse(Region.region, journey.Generation);
+            if (pulse == 0) return;
+            Vector3 origin = motor.vehicle.position + Vector3.up * 2.5f;
+            foreach (var collider in Physics.OverlapSphere(origin, 5, ~0, QueryTriggerInteraction.Ignore))
+            {
+                var beast = collider.GetComponentInParent<BeastActor>();
+                if (!beast || beast.Dead) continue;
+                Vector3 target = collider.bounds.center;
+                if (Physics.Linecast(origin, target, out var obstruction, ~0, QueryTriggerInteraction.Ignore) &&
+                    obstruction.collider.GetComponentInParent<BeastActor>() != beast) continue;
+                if (arc.TryHitTarget(Region.region, journey.Generation, pulse, beast.GetInstanceID().ToString()))
+                    beast.TakeHit(40, (target - origin).normalized);
             }
         }
         void Fire()
@@ -196,6 +173,6 @@ namespace DesertRV
             tracer.SetPosition(1, end); tracerRemaining = .06f; tracer.enabled = true;
         }
         void Play(AudioClip clip, float volume) { if (clip) effects.PlayOneShot(clip, volume); }
-        void Say(string message, float seconds) { Notice = message; noticeRemaining = seconds; }
+        public void Say(string message, float seconds) { Notice = message; noticeRemaining = seconds; }
     }
 }

@@ -14,6 +14,7 @@ namespace DesertRV
         public SessionStatus Status { get; private set; } = SessionStatus.Menu;
         public ControlMode Control { get; private set; } = ControlMode.Driving;
         public int SceneId { get; private set; } = 1;
+        public int Generation { get; private set; }
         public int PlayerHealth { get; private set; } = 100;
         public int VehicleHealth { get; private set; } = 300;
         public int LoadedAmmo { get; private set; } = 12;
@@ -76,6 +77,7 @@ namespace DesertRV
         public bool Start()
         {
             if (Status != SessionStatus.Menu || !StormConfigured) return false;
+            Generation++;
             Status = SessionStatus.Playing;
             return true;
         }
@@ -92,6 +94,13 @@ namespace DesertRV
         }
         public bool BeginLoading()
         {
+            // Starting/restarting while backgrounded must still issue its first load ticket.
+            // Preserve the pause; completion will only update the state to resume into.
+            if (Status == SessionStatus.Paused && resumeStatus == SessionStatus.Playing)
+            {
+                resumeStatus = SessionStatus.Loading;
+                return true;
+            }
             if (Status != SessionStatus.Playing) return false;
             Status = SessionStatus.Loading;
             return true;
@@ -221,6 +230,7 @@ namespace DesertRV
 
         void ResetJourney()
         {
+            Generation++;
             SceneId = 1; Upgrades = VehicleUpgrades.None;
             StormElapsedSeconds = 0;
             stormDamageRemainder = 0;

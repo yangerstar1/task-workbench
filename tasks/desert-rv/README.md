@@ -15,7 +15,11 @@ The controlled build and tests run in GitHub Actions. No Unity build was perform
 
 ## Provenance and exclusions
 
-`PUBLIC-EXPORT.json` records the pinned source commit and the SHA-256, size, and Git blob hash of every exported payload file. It deliberately excludes itself; its hash is pinned by the import procedure. Revisions must update the manifest together with the affected files.
+`PUBLIC-EXPORT.json` records the pinned source commit and the SHA-256, size, and Git blob hash of every exported payload file. It deliberately excludes itself; its hash is pinned by the import procedure. This manifest is immutable historical provenance for the initial 803-file export. It must not be rewritten to imply later game changes came from that private source commit.
+
+`SOURCE-STATE.json` records the current reviewed source bytes, explicitly linked to the historical export manifest hash and public baseline commit `6dc675517db262c72dcb8c1507239d4bf10acc5d`. It covers the entire Unity project, deterministic font restoration inputs, CI scripts and workflow. New unlisted source fails preflight. Regenerate it with `python scripts/update_source_state.py` on a clean source checkout, then review the diff. It excludes itself to avoid self-hashing; the native run receipt binds the actual GitHub commit and the independent evidence records this source-state hash.
+
+The current candidate adds journey/combat rules and director integration. It has 71 reviewed EditMode cases and one separate PlayMode case awaiting Unity execution. The prior baseline passed 34 EditMode cases in run 37796490106, attempt 1; this does not certify the new source. Three authored, accepted region scenes and finished combat assets are still absent, and the Android entry point remains the saved TraversalHarness.
 
 The export excludes the surrounding monorepo, reference images, internal handoff and conversation records, research/authoring studies, unknown-rights references, downloaded animal candidates, caches, logs, credentials, and compiled build products. Nonessential signing and account configuration was blanked in the public copy; Unity online reporting was disabled. The original source repository remains private.
 

@@ -82,6 +82,14 @@ class TestNativeTestGate(unittest.TestCase):
         with self.assertRaises(ValueError):
             evidence.inspect_tests(self.input)
 
+    def test_root_skipped_count_fails(self):
+        self.write(skipped=1)
+        with self.assertRaises(ValueError): evidence.inspect_tests(self.input)
+
+    def test_root_inconclusive_count_fails(self):
+        self.write(inconclusive=1)
+        with self.assertRaises(ValueError): evidence.inspect_tests(self.input)
+
     def test_multiple_reports(self):
         self.write()
         (self.input / 'second.xml').write_bytes((self.input / 'results.xml').read_bytes())
@@ -93,6 +101,175 @@ class TestNativeTestGate(unittest.TestCase):
         (self.input / 'link.xml').symlink_to(self.input / 'results.xml')
         with self.assertRaises(ValueError):
             evidence.inspect_tests(self.input)
+
+
+    def test_unknown_case_result_fails(self):
+        self.write('<test-case fullname="Rules.A" result="Passed"/><test-case fullname="Rules.B" result="Unknown"/>')
+        with self.assertRaises(ValueError): evidence.inspect_tests(self.input)
+
+    def test_playmode_has_separate_evidence(self):
+        self.write()
+        result = evidence.inspect_tests(self.input, 'playmode')
+        self.assertEqual(result['testMode'], 'playmode')
+        self.assertTrue((self.root / 'evidence/playmode/test-results.json').is_file())
+        self.assertFalse((self.root / 'evidence/tests/test-results.json').exists())
+
+
+
+class TestCurrentSourceInventory(unittest.TestCase):
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.root = Path(self.temp.name)
+        self.task = self.root / 'tasks/desert-rv'
+        for directory in evidence.SOURCE_ROOTS:
+            (self.root / directory).mkdir(parents=True, exist_ok=True)
+        self.files = list(evidence.SOURCE_FILES) + [
+            'tasks/desert-rv/unity/Assets/Game.cs',
+            'tasks/desert-rv/unity/Assets/Game.cs.meta',
+            'tasks/desert-rv/unity/Packages/manifest.json',
+            'tasks/desert-rv/unity/ProjectSettings/ProjectSettings.asset',
+            'tasks/desert-rv/backup-assets/font.xz',
+            'tasks/desert-rv/scripts/backup/restore.py']
+        for name in self.files:
+            path = self.root / name
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text('reviewed source')
+        (self.task / 'PUBLIC-EXPORT.json').write_text('{}')
+        self.baseline_hash = evidence.sha(self.task / 'PUBLIC-EXPORT.json')
+        self.patches = [patch.object(evidence, 'ROOT', self.root),
+                        patch.object(evidence, 'TASK', self.task),
+                        patch.object(evidence, 'BASELINE_EXPORT_SHA', self.baseline_hash)]
+        for p in self.patches: p.start()
+        self.state = dict(schema='desert-rv-source-state/v1',
+            baselineGameCommit=evidence.BASELINE_COMMIT,
+            baselineExportManifestSha256=self.baseline_hash,
+            coverageRoots=list(evidence.SOURCE_ROOTS), coverageFiles=list(evidence.SOURCE_FILES),
+            restoredFiles=[dict(path=evidence.FONT_PATH, sha256=evidence.FONT_SHA, size=16437340)],
+            files=[dict(path=name, sha256=evidence.sha(self.root / name),
+                        size=(self.root / name).stat().st_size) for name in self.files])
+        self.save()
+
+    def tearDown(self):
+        for p in self.patches: p.stop()
+        self.temp.cleanup()
+
+    def save(self):
+        (self.task / 'SOURCE-STATE.json').write_text(json.dumps(self.state))
+
+    def rejected(self):
+        with self.assertRaises(ValueError): evidence.verify_source_state()
+
+    def test_current_source_passes_without_rewriting_historical_manifest(self):
+        self.assertEqual(evidence.verify_source_state(), self.state)
+
+    def test_changed_source_fails(self):
+        (self.root / self.files[2]).write_text('new source')
+        self.rejected()
+
+    def test_missing_source_fails(self):
+        (self.root / self.files[2]).unlink()
+        self.rejected()
+
+    def test_unlisted_unity_source_fails(self):
+        (self.task / 'unity/Assets/Injected.cs').write_text('new source')
+        self.rejected()
+
+    def test_unlisted_unity_root_response_file_fails(self):
+        (self.task / 'unity/csc.rsp').write_text('compiler input')
+        self.rejected()
+
+    def test_unlisted_package_fails(self):
+        (self.task / 'unity/Packages/local.cs').write_text('package source')
+        self.rejected()
+
+    def test_missing_recovery_inventory_fails(self):
+        self.state['files'].pop()
+        self.save(); self.rejected()
+
+    def test_changed_historical_manifest_fails(self):
+        (self.task / 'PUBLIC-EXPORT.json').write_text('{"changed":true}')
+        self.rejected()
+
+    def test_rebinding_baseline_hash_is_not_allowed(self):
+        (self.task / 'PUBLIC-EXPORT.json').write_text('{"changed":true}')
+        self.state['baselineExportManifestSha256'] = evidence.sha(self.task / 'PUBLIC-EXPORT.json')
+        self.save(); self.rejected()
+
+    def test_wrong_baseline_commit_fails(self):
+        self.state['baselineGameCommit'] = 'a' * 40
+        self.save(); self.rejected()
+
+    def test_weakened_coverage_fails(self):
+        self.state['coverageRoots'] = []
+        self.save(); self.rejected()
+
+    def test_duplicate_entry_fails(self):
+        self.state['files'].append(self.state['files'][0])
+        self.save(); self.rejected()
+
+    def test_path_escape_fails(self):
+        self.state['files'][0]['path'] = '../outside'
+        self.save(); self.rejected()
+
+    def test_symlink_source_fails(self):
+        (self.task / 'unity/Assets/linked.cs').symlink_to(self.root / self.files[2])
+        self.rejected()
+
+    def test_arbitrary_restored_font_fails(self):
+        font = self.root / evidence.FONT_PATH
+        font.parent.mkdir(parents=True, exist_ok=True)
+        font.write_text('wrong font')
+        self.rejected()
+
+    def test_python_bytecode_is_not_source(self):
+        cache = self.task / 'scripts/__pycache__/verify_evidence.pyc'
+        cache.parent.mkdir(); cache.write_bytes(b'cache')
+        evidence.verify_source_state()
+
+    def test_art_candidate_outside_unity_does_not_enter_compile_inventory(self):
+        art = self.task / 'art/candidates/script.py'
+        art.parent.mkdir(parents=True); art.write_text('offline art authoring')
+        evidence.verify_source_state()
+
+
+class TestSeparateModeInventories(unittest.TestCase):
+    def test_separate_reviewed_inventories(self):
+        edits = evidence.expected_cases('editmode')
+        plays = evidence.expected_cases('playmode')
+        self.assertEqual(len(edits), 71)
+        self.assertEqual(len(plays), 1)
+        self.assertFalse(edits & plays)
+
+    def test_unknown_mode_fails(self):
+        with self.assertRaises(ValueError): evidence.expected_cases('combined')
+
+
+
+class TestUpstreamRunBinding(unittest.TestCase):
+    def setUp(self):
+        self.base = dict(commit='a' * 40, runId='12', runAttempt='2', sourceStateSha256='b' * 64)
+        self.env = {}
+        for mode in ('EDITMODE', 'PLAYMODE'):
+            for suffix, key in [('COMMIT', 'commit'), ('RUN_ID', 'runId'),
+                                ('RUN_ATTEMPT', 'runAttempt'), ('SOURCE_STATE_SHA256', 'sourceStateSha256')]:
+                self.env['EXPECTED_' + mode + '_' + suffix] = self.base[key]
+
+    def test_same_run_attempt_and_source_pass(self):
+        with patch.dict(evidence.os.environ, self.env, clear=True):
+            evidence.verify_upstream_identity(self.base)
+
+    def test_each_identity_field_missing_or_stale_fails(self):
+        for key in self.env:
+            for value in ('', 'stale'):
+                with self.subTest(key=key, value=value):
+                    changed = dict(self.env); changed[key] = value
+                    with patch.dict(evidence.os.environ, changed, clear=True):
+                        with self.assertRaises(ValueError): evidence.verify_upstream_identity(self.base)
+
+    def test_partial_rerun_cannot_reuse_old_attempt(self):
+        self.env['EXPECTED_EDITMODE_RUN_ATTEMPT'] = '1'
+        with patch.dict(evidence.os.environ, self.env, clear=True):
+            with self.assertRaises(ValueError): evidence.verify_upstream_identity(self.base)
 
 
 

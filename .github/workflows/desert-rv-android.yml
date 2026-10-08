@@ -21,6 +21,10 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 40
     outputs:
+      test_commit: ${{ steps.verify.outputs.test_commit }}
+      test_run_id: ${{ steps.verify.outputs.test_run_id }}
+      test_run_attempt: ${{ steps.verify.outputs.test_run_attempt }}
+      test_source_state_sha256: ${{ steps.verify.outputs.test_source_state_sha256 }}
       test_count: ${{ steps.verify.outputs.test_count }}
       test_xml_sha256: ${{ steps.verify.outputs.test_xml_sha256 }}
     steps:
@@ -28,7 +32,7 @@ jobs:
         with:
           persist-credentials: false
           lfs: false
-      - name: Verify trusted dispatch and exported source bytes
+      - name: Verify trusted dispatch and current source inventory
         id: guard
         run: python3 tasks/desert-rv/scripts/verify_evidence.py guard
       - name: Test independent evidence validator
@@ -43,7 +47,7 @@ jobs:
           UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
           UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
         run: bash tasks/desert-rv/scripts/prepare_runner.sh
-      - name: Execute original game rule tests in Unity
+      - name: Execute current game rule tests in Unity
         uses: game-ci/unity-test-runner@0ff419b913a3630032cbe0de48a0099b5a9f0ed9 # v4.3.1
         env:
           UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
@@ -70,10 +74,75 @@ jobs:
           if-no-files-found: ignore
           retention-days: 7
 
+  playmode:
+    name: Native Desert RV PlayMode loader test
+    needs: tests
+    if: >-
+      needs.tests.result == 'success' &&
+      github.repository == 'yangerstar1/task-workbench' &&
+      github.ref == 'refs/heads/main' &&
+      github.actor == 'yangerstar1' &&
+      github.triggering_actor == 'yangerstar1'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    outputs:
+      test_commit: ${{ steps.verify.outputs.test_commit }}
+      test_run_id: ${{ steps.verify.outputs.test_run_id }}
+      test_run_attempt: ${{ steps.verify.outputs.test_run_attempt }}
+      test_source_state_sha256: ${{ steps.verify.outputs.test_source_state_sha256 }}
+      test_count: ${{ steps.verify.outputs.test_count }}
+      test_xml_sha256: ${{ steps.verify.outputs.test_xml_sha256 }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+          lfs: false
+      - name: Verify trusted dispatch and current source inventory
+        id: guard
+        run: python3 tasks/desert-rv/scripts/verify_evidence.py guard
+      - name: Test independent evidence validator
+        run: python3 tasks/desert-rv/scripts/test_verify_evidence.py
+      - name: Restore and verify exact checkpoint font
+        run: |
+          python3 tasks/desert-rv/scripts/backup/restore_unity_font.py
+          python3 tasks/desert-rv/scripts/backup/restore_unity_font.py --verify-only
+      - name: Prepare disposable standard runner
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+        run: bash tasks/desert-rv/scripts/prepare_runner.sh
+      - name: Execute current game rule tests in Unity
+        uses: game-ci/unity-test-runner@0ff419b913a3630032cbe0de48a0099b5a9f0ed9 # v4.3.1
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+        with:
+          unityVersion: 6000.3.19f1
+          projectPath: tasks/desert-rv/unity
+          testMode: playmode
+          artifactsPath: tasks/desert-rv/artifacts/playmode
+          customParameters: -assemblyNames DesertRV.PlayModeTests -job-worker-count 2
+          dockerCpuLimit: 2
+          dockerMemoryLimit: 12g
+      - name: Require exact nonempty passing native test inventory
+        id: verify
+        if: always() && steps.guard.outcome == 'success'
+        run: python3 tasks/desert-rv/scripts/verify_evidence.py playmode
+      - name: Upload only bounded sanitized test evidence
+        if: always() && steps.guard.outcome == 'success'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: desert-rv-playmode-${{ github.run_id }}-${{ github.run_attempt }}
+          path: tasks/desert-rv/evidence/playmode/test-results.json
+          if-no-files-found: ignore
+          retention-days: 7
+
   android:
     name: Build saved TraversalHarness test APK (not full game)
-    needs: tests
-    if: needs.tests.result == 'success'
+    needs: [tests, playmode]
+    if: needs.tests.result == 'success' && needs.playmode.result == 'success'
     runs-on: ubuntu-24.04
     timeout-minutes: 55
     steps:
@@ -121,8 +190,18 @@ jobs:
             -desertRvRunAttempt ${{ github.run_attempt }}
       - name: Independently verify new APK and native receipt
         env:
+          EXPECTED_EDITMODE_COMMIT: ${{ needs.tests.outputs.test_commit }}
+          EXPECTED_EDITMODE_RUN_ID: ${{ needs.tests.outputs.test_run_id }}
+          EXPECTED_EDITMODE_RUN_ATTEMPT: ${{ needs.tests.outputs.test_run_attempt }}
+          EXPECTED_EDITMODE_SOURCE_STATE_SHA256: ${{ needs.tests.outputs.test_source_state_sha256 }}
+          EXPECTED_PLAYMODE_COMMIT: ${{ needs.playmode.outputs.test_commit }}
+          EXPECTED_PLAYMODE_RUN_ID: ${{ needs.playmode.outputs.test_run_id }}
+          EXPECTED_PLAYMODE_RUN_ATTEMPT: ${{ needs.playmode.outputs.test_run_attempt }}
+          EXPECTED_PLAYMODE_SOURCE_STATE_SHA256: ${{ needs.playmode.outputs.test_source_state_sha256 }}
           EXPECTED_TEST_COUNT: ${{ needs.tests.outputs.test_count }}
           EXPECTED_TEST_XML_SHA256: ${{ needs.tests.outputs.test_xml_sha256 }}
+          EXPECTED_PLAYMODE_TEST_COUNT: ${{ needs.playmode.outputs.test_count }}
+          EXPECTED_PLAYMODE_TEST_XML_SHA256: ${{ needs.playmode.outputs.test_xml_sha256 }}
         run: python3 tasks/desert-rv/scripts/verify_evidence.py apk
       - name: Upload verified test package and safe evidence only
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2

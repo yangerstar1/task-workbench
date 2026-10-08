@@ -9,6 +9,7 @@ namespace DesertRV
     {
         public JourneySession journey;
         public FirstStationJourney station;
+        public JourneyDirector director;
         public JourneyMotor motor;
         public Font font;
         RectTransform safe, menu;
@@ -37,7 +38,7 @@ namespace DesertRV
             scaler.referenceResolution = new Vector2(1280, 720); scaler.matchWidthOrHeight = 1;
             gameObject.AddComponent<GraphicRaycaster>();
             if (!FindFirstObjectByType<EventSystem>())
-            { var events = new GameObject("Journey UI events"); events.AddComponent<EventSystem>(); events.AddComponent<StandaloneInputModule>(); }
+            { var events = new GameObject("Journey UI events"); events.transform.SetParent(transform, false); events.AddComponent<EventSystem>(); events.AddComponent<StandaloneInputModule>(); }
             safe = Rect("Safe area", transform, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
             var top = Panel("Vehicle status", safe, new Vector2(0, 1), new Vector2(0, 1), new Vector2(24, -24), new Vector2(260, 116), ink);
             Label("Journey label", top, "荒漠行路 / 01", 19, new Vector2(16, -10), new Vector2(228, 28), TextAnchor.UpperLeft);
@@ -47,7 +48,7 @@ namespace DesertRV
             var goal = Panel("Objective", safe, new Vector2(.5f, 1), new Vector2(.5f, 1), new Vector2(0, -24), new Vector2(510, 90), new Color(.15f,.20f,.22f,.85f));
             objective = Label("Objective text", goal, "", 24, new Vector2(18, -12), new Vector2(474, 65), TextAnchor.MiddleLeft);
             var pause = Button("Pause", safe, "II", new Vector2(1, 1), new Vector2(1, 1), new Vector2(-24, -24), new Vector2(76, 66), paper, ink);
-            pause.onClick.AddListener(() => journey.TogglePause());
+            pause.onClick.AddListener(() => { if (!director || director.OwnsJourney) journey.TogglePause(); });
             storm = Label("Storm distance", safe, "", 20, Vector2.zero, new Vector2(230, 50), TextAnchor.MiddleRight);
             Anchor(storm.rectTransform, new Vector2(1, 1), new Vector2(1, 1), new Vector2(-120, -28), new Vector2(230, 50));
             var noticePanel = Panel("Notice", safe, new Vector2(.5f, 0), new Vector2(.5f, 0), new Vector2(0, 42), new Vector2(580, 78), new Color(.15f,.20f,.22f,.8f));
@@ -80,13 +81,16 @@ namespace DesertRV
             primaryLabel = primary.GetComponentInChildren<Text>();
             primary.onClick.AddListener(() =>
             {
-                if (journey.State.Status == SessionStatus.Menu) station.Begin();
-                else if (journey.State.Status == SessionStatus.Failed || journey.State.Status == SessionStatus.Completed) station.Restart();
+                if (director && !director.OwnsJourney) return;
+                if (director && director.CanRetryLoad) director.RetryLoad();
+                else if (journey.State.Status == SessionStatus.Menu) { if (director) director.Begin(); else station.Begin(); }
+                else if (journey.State.Status == SessionStatus.Failed || journey.State.Status == SessionStatus.Completed) { if (director) director.Restart(); else station.Restart(); }
                 else if (journey.ManualPause) journey.TogglePause();
             });
         }
         void Update()
         {
+            if (director && !director.OwnsJourney) { GetComponent<Canvas>().enabled = false; return; }
             Rect area = Screen.safeArea;
             safe.anchorMin = new Vector2(area.xMin / Screen.width, area.yMin / Screen.height);
             safe.anchorMax = new Vector2(area.xMax / Screen.width, area.yMax / Screen.height);
@@ -96,31 +100,42 @@ namespace DesertRV
             bool driving = state.Control == ControlMode.Driving;
             resources.text = $"体力 {state.PlayerHealth}     车况 {state.VehicleHealth}\n钉弹 {state.LoadedAmmo} / {state.ReserveAmmo}  ·  修理包 {state.RepairKits}";
             playerBar.fillAmount = state.PlayerHealth / 100f; carBar.fillAmount = state.VehicleHealth / 300f;
-            objective.text = station.Objective;
-            notice.text = station.Notice;
-            notice.transform.parent.gameObject.SetActive(!string.IsNullOrEmpty(station.Notice));
+            var actions = director ? director.actions : null;
+            string currentPrompt = actions ? actions.Prompt : station.Prompt;
+            bool installing = actions ? actions.Installing : station.Installing;
+            bool reloading = actions ? actions.Reloading : station.Reloading;
+            float progress = actions ? actions.ActionProgress : station.ActionProgress;
+            objective.text = director ? JourneyPresentation.Objective(state, director.Encounter) : station.Objective;
+            notice.text = actions ? actions.Notice : station.Notice;
+            notice.transform.parent.gameObject.SetActive(!string.IsNullOrEmpty(notice.text));
             crosshair.gameObject.SetActive(playing && !driving);
-            hitMark.gameObject.SetActive(playing && station.HitConfirmation > 0);
+            hitMark.gameObject.SetActive(playing && (actions ? actions.HitConfirmation : station.HitConfirmation) > 0);
             hitMark.color = orange;
-            damageEdge.color = new Color(.8f,.12f,.05f,Mathf.Clamp01(station.DamageFeedback * 3));
-            prompt.text = station.Installing ? "正在安装 · 移开会中断" : station.Reloading ? "正在装填钉条" : !driving ? station.Prompt : "";
-            actionBar.transform.parent.gameObject.SetActive(station.ActionProgress > 0); actionBar.fillAmount = station.ActionProgress;
-            storm.text = state.IsInStorm(station.WorldProgress) ? "风暴中 · 正在受伤" : "风暴正在逼近";
+            damageEdge.color = new Color(.8f,.12f,.05f,Mathf.Clamp01((actions ? actions.DamageFeedback : station.DamageFeedback) * 3));
+            prompt.text = installing ? "正在安装 · 移开会中断" : reloading ? "正在装填钉条" : !driving ? currentPrompt : "";
+            actionBar.transform.parent.gameObject.SetActive(progress > 0); actionBar.fillAmount = progress;
+            storm.text = state.IsInStorm(director ? director.WorldProgress : station.WorldProgress) ? "风暴中 · 正在受伤" : "风暴正在逼近";
             foreach (var pair in controls)
             {
                 bool show = playing && (pair.Key == TouchControl.Move || pair.Key == TouchControl.Interact ||
                     (driving ? pair.Key == TouchControl.Accelerate || pair.Key == TouchControl.Brake : pair.Key == TouchControl.Fire || pair.Key == TouchControl.Reload));
                 pair.Value.gameObject.SetActive(show);
             }
-            interactLabel.text = driving ? "下车" : string.IsNullOrEmpty(station.Prompt) ? "交互" : station.Prompt.Split('·')[0];
+            interactLabel.text = driving ? "下车" : string.IsNullOrEmpty(currentPrompt) ? "交互" : currentPrompt.Split('·')[0];
             menu.gameObject.SetActive(!playing);
             if (!playing)
             {
                 bool dead = state.Status == SessionStatus.Failed;
-                menuTitle.text = station.SliceComplete ? "第一站验证完成" : dead ? "旅程结束" : state.Status == SessionStatus.Menu ? "荒漠行路" : "旅程暂停";
-                menuBody.text = station.SliceComplete ? "第一站到达出口，后续地区尚未接入。\n可返回站内继续检查，不能视为整局通关。" : dead ? "人和房车都得撑到最后。\n重新出发会重置本趟物资和改装。" : state.Status == SessionStatus.Menu ? "驾驶房车穿过荒漠，停车搜集，回车改装。\n先打通加油站；风暴从出发开始追赶。\n当前为第一站内部玩法验证版。" : "暂停时风暴与战斗一起冻结。";
-                primaryLabel.text = dead ? "重新出发" : state.Status == SessionStatus.Menu ? "出发" : "继续";
-                primary.interactable = state.Status == SessionStatus.Menu || dead || journey.ManualPause;
+                bool won = state.Status == SessionStatus.Completed;
+                bool loading = state.Status == SessionStatus.Loading;
+                bool slice = !director && station.SliceComplete;
+                menuTitle.text = won ? "整局胜利" : loading ? "正在前往下一地区" : slice ? "第一站验证完成" : dead ? "旅程结束" : state.Status == SessionStatus.Menu ? "荒漠行路" : "旅程暂停";
+                menuBody.text = won ? "信标已经完成，电缆已拔除，房车安全撤离。\n再次出发会重置整局资源与改装。" :
+                    loading ? (director && director.CanRetryLoad ? director.LoadError : "正在加载地区，物资与风暴进度将保留。") :
+                    slice ? "仅控制测试；不代表整局通关。" : dead ? "人和房车都得撑到最后。\n重新出发会重置本趟物资和改装。" :
+                    state.Status == SessionStatus.Menu ? (director ? "驾驶、搜集、改装，穿过三个地区。\n风暴一直追赶；失败后从头出发。" : "第一站控制验证，战斗资产仍有门禁。") : "暂停时风暴与战斗一起冻结。";
+                primaryLabel.text = director && director.CanRetryLoad ? "重试加载" : dead || won ? "整局重新出发" : state.Status == SessionStatus.Menu ? "出发" : "继续";
+                primary.interactable = (director && director.CanRetryLoad) || state.Status == SessionStatus.Menu || dead || won || journey.ManualPause;
             }
             RegisterRegions();
         }

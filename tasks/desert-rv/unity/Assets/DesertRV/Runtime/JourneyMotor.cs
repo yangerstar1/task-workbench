@@ -12,6 +12,7 @@ namespace DesertRV
         public Vector3 localForward = Vector3.forward;
         public float topSpeed = 11;
         public float Speed { get; private set; }
+        public event System.Action<RaycastHit, float> ObstacleContact;
         public Transform Walker => walker.transform;
         public Vector3 PlayerPosition => journey.State.Control == ControlMode.Driving ? vehicle.position : walker.transform.position;
         public Vector3 EntryPosition => entryStep.GetComponent<Renderer>().bounds.center;
@@ -29,6 +30,7 @@ namespace DesertRV
         bool doorOpen;
         Vector3 initialPosition;
         Quaternion initialRotation;
+        readonly System.Collections.Generic.HashSet<BeastActor> rammed = new System.Collections.Generic.HashSet<BeastActor>();
         readonly RaycastHit[] carHits = new RaycastHit[32];
         readonly Collider[] rotationHits = new Collider[32];
 
@@ -37,6 +39,7 @@ namespace DesertRV
             initialPosition = vehicle.position; initialRotation = vehicle.rotation;
             closedDoor = doorHinge.localRotation; hingeAxis = doorHinge.InverseTransformDirection(Vector3.up);
             walker = new GameObject("Journey walker").AddComponent<CharacterController>();
+            walker.transform.SetParent(transform, true);
             walker.height = 1.62f; walker.radius = .19f; walker.center = Vector3.up * .81f;
             walker.stepOffset = .38f; walker.skinWidth = .025f; walker.enabled = false;
             view.nearClipPlane = .045f;
@@ -48,6 +51,16 @@ namespace DesertRV
             vehicle.SetPositionAndRotation(initialPosition, initialRotation);
             Speed = verticalSpeed = doorAngle = impactCooldown = 0; doorOpen = false;
             doorHinge.localRotation = closedDoor; RefreshModules(); Physics.SyncTransforms();
+        }
+        // Placement never changes health, ammunition, inventory, or the storm clock.
+        public void PlaceForRegion(Vector3 position, Quaternion rotation)
+        {
+            walker.enabled = false;
+            vehicle.SetPositionAndRotation(position, rotation);
+            walker.transform.position = position;
+            Speed = verticalSpeed = doorAngle = impactCooldown = recoil = 0;
+            doorOpen = false; doorHinge.localRotation = closedDoor;
+            RefreshModules(); Physics.SyncTransforms();
         }
         public void RefreshModules()
         {
@@ -101,6 +114,7 @@ namespace DesertRV
                 // before a beast behind it; never damage through the nearest obstruction.
                 System.Array.Sort(carHits, 0, count, System.Collections.Generic.Comparer<RaycastHit>.Create((a,b) => a.distance.CompareTo(b.distance)));
                 float allowed = count == carHits.Length ? 0 : distance;
+                rammed.Clear();
                 for (int i = 0; i < count; i++)
                 {
                     var hit = carHits[i];
@@ -112,9 +126,10 @@ namespace DesertRV
                         Vector3.Dot(-hit.normal, Forward) > .45f &&
                         (journey.State.Upgrades & VehicleUpgrades.Ram) != 0)
                     {
-                        beast.TakeHit(Mathf.CeilToInt(Mathf.Abs(Speed) * 30), displacement.normalized, true);
+                        if (rammed.Add(beast)) beast.TakeHit(Mathf.CeilToInt(Mathf.Abs(Speed) * 30), displacement.normalized, true);
                         if (beast.Dead) continue;
                     }
+                    ObstacleContact?.Invoke(hit, Speed);
                     allowed = Mathf.Min(allowed, Mathf.Max(0, hit.distance - .10f));
                 }
                 vehicle.position += displacement.normalized * allowed;

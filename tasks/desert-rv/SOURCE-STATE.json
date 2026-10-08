@@ -1,0 +1,4214 @@
+{
+  "schema": "desert-rv-source-state/v1",
+  "baselineGameCommit": "6dc675517db262c72dcb8c1507239d4bf10acc5d",
+  "baselineExportManifestSha256": "003d3ba2c39fc626e85053371a7b454358a35f291d5a82e30ff5be1999aec2f9",
+  "status": "current-reviewed-source-not-native-execution-evidence",
+  "coverageRoots": [
+    "tasks/desert-rv/unity",
+    "tasks/desert-rv/backup-assets",
+    "tasks/desert-rv/scripts"
+  ],
+  "coverageFiles": [
+    "tasks/desert-rv/ASSET-NOTICES.md",
+    ".github/workflows/desert-rv-android.yml"
+  ],
+  "restoredFiles": [
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/UI/Fonts/NotoSansCJKsc-Regular.otf",
+      "sha256": "a6a530f3e7e7a2c299470c42efff2e109fcc0a5be92686b96d5e84a05f3ecb2b",
+      "size": 16437340
+    }
+  ],
+  "files": [
+    {
+      "path": ".github/workflows/desert-rv-android.yml",
+      "sha256": "235862547ba1ba4bf22bf3cd0c4ac64e0e96d239b08aef9db563f86462e9a5c8",
+      "size": 9780
+    },
+    {
+      "path": "tasks/desert-rv/ASSET-NOTICES.md",
+      "sha256": "5c944b8aaea4240d9ae5e7d5128701a45490cffd8f4662243302583ceaac36e4",
+      "size": 1540
+    },
+    {
+      "path": "tasks/desert-rv/backup-assets/fonts/NotoSansCJKsc-Regular.otf.xz",
+      "sha256": "e8affaf0b8f8e8fccecf5476bf05999c891f94ef66ef9b55474fda32ce1ec786",
+      "size": 10847296
+    },
+    {
+      "path": "tasks/desert-rv/scripts/backup/restore_unity_font.py",
+      "sha256": "6cf3a11ddf58ef821198156861a7d598e1ee3515d81d90b40b9da866ec16939c",
+      "size": 2429
+    },
+    {
+      "path": "tasks/desert-rv/scripts/expected_playmode_test_cases.json",
+      "sha256": "8d592ee389ab9855f840ad543cf4099bc9906dabbfd2adb28b330093a57470ab",
+      "size": 100
+    },
+    {
+      "path": "tasks/desert-rv/scripts/expected_test_cases.json",
+      "sha256": "a37900099a9f57072338943b35dcfe2c89333af11ddc3c36e2057b662febd995",
+      "size": 6284
+    },
+    {
+      "path": "tasks/desert-rv/scripts/prepare_runner.sh",
+      "sha256": "157c081f227d7783fda9fd4186422804dfad225ff94d451e58dcfc6e42370a40",
+      "size": 1130
+    },
+    {
+      "path": "tasks/desert-rv/scripts/test_verify_evidence.py",
+      "sha256": "302a16043d0aaedee49835cd5cbce22beffbf741081a6e7380dbcf7c0a776013",
+      "size": 15039
+    },
+    {
+      "path": "tasks/desert-rv/scripts/update_source_state.py",
+      "sha256": "48568b7139ab257f1169d5495dab7af5c389a5a4316b01eff77bfae1e5d01f88",
+      "size": 1491
+    },
+    {
+      "path": "tasks/desert-rv/scripts/verify_evidence.py",
+      "sha256": "86b9c89f8c9c6e77bcda1ac64616f472d6762bd23989e04c728e0df6a79970a2",
+      "size": 15657
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DefaultVolumeProfile.asset",
+      "sha256": "3b7013359c3a25612eae5617935fb39441b24556a5a067fb987f9bd053752aba",
+      "size": 20478
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DefaultVolumeProfile.asset.meta",
+      "sha256": "13d7bf578c99b8c0226bd509107ed64de10533619d2e74633d260d4b465ff422",
+      "size": 189
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV.meta",
+      "sha256": "785b5741a17c22e628fe2b1bac09a6d52331ab79ef72a75136fc6ae6e8b1befa",
+      "size": 172
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art.meta",
+      "sha256": "5483fb1ee07a801dde4c150e2d45c74ea295896b899a5e62b3c4291da9eabc6b",
+      "size": 172
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/CabinInteriorReflection.exr",
+      "sha256": "5dc9db1d2a9e3c459377501860bbf1ce46ddf087986fc4d6c7a02d19746265af",
+      "size": 433340
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/CabinInteriorReflection.exr.meta",
+      "sha256": "d0212429a7eaaba3a6b2ebb1f7a8361cfad787bbe1b6d390cf5ae24ee3420a07",
+      "size": 3365
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/CollisionMeshes.meta",
+      "sha256": "b9fec9ac26a569dc6d8062c37aea9c2bda2d383c86f8471b4d069f0c2c951982",
+      "size": 172
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/CollisionMeshes/GEO-bay_centre_pier.asset",
+      "sha256": "03cc6f0c75a245a3b1721ee34107ea847ae6da34ad3d9da80647e813e2bb4455",
+      "size": 15183
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/CollisionMeshes/GEO-bay_centre_pier.asset.meta",
+      "sha256": "b417b26951bb176685daecf2a7a61524db80bb7d1b21305ec38e5e871f9cc928",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/CollisionMeshes/GEO-bay_left_pier.asset",
+      "sha256": "acae30896956c5d37ce10956bc8e504a14734b6ab4fd27a77f9757bce4eb8892",
+      "size": 15075
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/CollisionMeshes/GEO-bay_left_pier.asset.meta",
+      "sha256": "440d662101b31941638d7ba6fe6bb7816fe5c9ace708d8e199cd36f4dcab10df",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/CollisionMeshes/GEO-cab_dashboard.asset",
+      "sha256": "2ad35bf027f886d55eb4ac7468daf48933120c9a9433654867b923b4de2de0d7",
+      "size": 14947
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/CollisionMeshes/GEO-cab_dashboard.asset.meta",
+      "sha256": "c0994611a8c5d0ce823dd601d69012111134dd45694b95e6a2e6a47c2b9fda85",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/CollisionMeshes/GEO-cab_seat_back.001.asset",
+      "sha256": "294f5d3aec0d116d3b7694c189ee4e08236fd013b691083c96ddfca0a7641ffd",
+      "size": 14969
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/CollisionMeshes/GEO-cab_seat_back.001.asset.meta",
+      "sha256": "519c4de7736683c054ee5469e09a541223790d5afe5d5b9468c68e9619442abe",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/CollisionMeshes/GEO-cab_seat_back.asset",
+      "sha256": "50f8ffe78c526ef91a31948e8766d77dfb2ceabb1ffba19eeee0cb8d98c2ff9a",
+      "size": 14963
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/CollisionMeshes/GEO-cab_seat_back.asset.meta",
+      "sha256": "d24b035692296f6e22343cdd2b6830825b7924bca0df5ffae11dc38ab1a6d507",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/CollisionMeshes/GEO-cab_seat_base.001.asset",
+      "sha256": "17426d3869a8f30266d931cbcea4bea581af8d97c06c5e3b305891e6b968cd59",
+      "size": 14949
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/CollisionMeshes/GEO-cab_seat_base.001.asset.meta",
+      "sha256": "a55bafe750a7bc1a8893e34f0cda7e3bdc70ee7568a544428c7b53b31176d696",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/CollisionMeshes/GEO-cab_seat_base.asset",
+      "sha256": "ebc77e1c6292f909702ac135c48db81f0a43bc87535c8ccbfc5ff784f9de8a9a",
+      "size": 14943
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/CollisionMeshes/GEO-cab_seat_base.asset.meta",
+      "sha256": "fbef3152a1ab233fa70a70ba523c0eeb886c13b58341e804ac0c340fecd6252f",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/CollisionMeshes/GEO-cab_seat_cushion.001.asset",
+      "sha256": "db02ee74ad01694508e213582b3e03cf0081578746ed7860325f33bc099785b6",
+      "size": 14932
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/CollisionMeshes/GEO-cab_seat_cushion.001.asset.meta",
+      "sha256": "d7feab28a34a6c32b67f724c125b083be2342b0fbe96d78d24f59676c45614da",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/CollisionMeshes/GEO-cab_seat_cushion.asset",
+      "sha256": "af6e4338e528e67a954de7138ea50a93fc083441783d19faeb6fd95001f2d2e0",
+      "size": 14926
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/CollisionMeshes/GEO-cab_seat_cushion.asset.meta",
+      "sha256": "6fddb5346f2c9423804951dacd5eab72ec1733c7214b6743158bde30e8864d53",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/CollisionMeshes/GEO-canopy_column.001.asset",
+      "sha256": "9db6229d936f30bd3e33290946e4ad82da732508a17d718819ab58389236b49e",
+      "size": 15283
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/CollisionMeshes/GEO-canopy_column.001.asset.meta",
+      "sha256": "a1a68058eed52090e697f705e454f8148e6ffb246b6418e1dddf95e512bcbe66",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/CollisionMeshes/GEO-canopy_column.asset",
+      "sha256": "19b337e97c5d9b820e63d49eacb707849a6e8b7228db54ff3dd01dfe714de9a0",
+      "size": 15279
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/CollisionMeshes/GEO-canopy_column.asset.meta",
+      "sha256": "2dbeba3cdc39705d1913b26ab220bd96cf0bf4d745943639414ad05e8cc6a51b",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/CollisionMeshes/GEO-coach_body_shell.asset",
+      "sha256": "dd7cf5938fe8f164e3f6383639218ef9c0aec1b456d7cfc1e4585afdfe71983b",
+      "size": 173603
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/CollisionMeshes/GEO-coach_body_shell.asset.meta",
+      "sha256": "745df0346e16cff72d11a4fe9e15322a0c46d5f9d1468051809cc667f57a87ed",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/CollisionMeshes/GEO-column_foot.001.asset",
+      "sha256": "be32199af9f3fa895423d34f6d49dacc5564d106a1f6fca16d0d96dfde7690e3",
+      "size": 14979
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/CollisionMeshes/GEO-column_foot.001.asset.meta",
+      "sha256": "f54851d58b9676231ab81531580e79e8223d10a5cfd4296c49d9133d5ecb00b9",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/CollisionMeshes/GEO-column_foot.asset",
+      "sha256": "cf53084e9ad0e905c0f3ddacd1cf100caff292b9fca1e3528412de63be77bbb2",
+      "size": 14987
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/CollisionMeshes/GEO-column_foot.asset.meta",
+      "sha256": "7744e934e927146fd9150dcf72a9ff09d0d4ef654cd5b0ac6294e280df5c316f",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/CollisionMeshes/GEO-entry_door.asset",
+      "sha256": "f037f116d03052759674cf859dd3b8c07b7a1dc7df663ae506dc84a2e7b962da",
+      "size": 12978
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/CollisionMeshes/GEO-entry_door.asset.meta",
+      "sha256": "bfee0dc9fc610d8fe8e3f10df2a791c725212defc645cdf3101339abcbde7a19",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/CollisionMeshes/GEO-entry_step.asset",
+      "sha256": "c2de71bc4a2d41dada3548fa0f85d2fa9659c07e12ba5969ddd1f76b464cb407",
+      "size": 14942
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/CollisionMeshes/GEO-entry_step.asset.meta",
+      "sha256": "0e4c45ddaca92bfb991192b2891258cda75ff763bd908c5815c7a34f918fcfe9",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/CollisionMeshes/GEO-entry_step_lower.asset",
+      "sha256": "632f56aceaae30363bacc186ae22b608ef8d0c83ec0ba74a4c3849618c386eb2",
+      "size": 14946
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/CollisionMeshes/GEO-entry_step_lower.asset.meta",
+      "sha256": "9d872c081c4eff4df3a7ce26115a08d3b0ee1cfad179ec58eed9d778ed1f38be",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/CollisionMeshes/GEO-garage_left_wall.asset",
+      "sha256": "46d58bb5723b11f90adbd3de37c87fdc9e8e7c368cba62c87843d6ec984cd2d5",
+      "size": 15004
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/CollisionMeshes/GEO-garage_left_wall.asset.meta",
+      "sha256": "54676dbac36df18958367186521bcc028791762667d2cd361713890f4547678c",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/CollisionMeshes/GEO-garage_rear_wall.asset",
+      "sha256": "eaace090aa1c9bd387d9fc85e9226455e93957c7080c56d776f4a978751cff27",
+      "size": 15240
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/CollisionMeshes/GEO-garage_rear_wall.asset.meta",
+      "sha256": "538e2b75793fad56d07d06e8c1351d246e97a75dd6088a72cb5c668a024e1bfa",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/CollisionMeshes/GEO-garage_right_wall.asset",
+      "sha256": "6e807e09bb91bb07190e9c16b539a5a746e6bfbbb7b0428415948ddaecb5df4e",
+      "size": 15087
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/CollisionMeshes/GEO-garage_right_wall.asset.meta",
+      "sha256": "053929b66123d87256284d52aa5e937a05069ddfca0dc6e59988bedc66e408ef",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/CollisionMeshes/GEO-garage_wall_block_joint.001.asset",
+      "sha256": "ffb89f5beb68f7487f93f22d4e1948eab5becfbf8b5f63ec2e219ce218b253d9",
+      "size": 10407
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/CollisionMeshes/GEO-garage_wall_block_joint.001.asset.meta",
+      "sha256": "4d4aa885aa606aa60a835d982a8de0fced5996eea93b395dbfbffdaf0a50625f",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/CollisionMeshes/GEO-garage_wall_block_joint.002.asset",
+      "sha256": "239bb9588e791cb5705f3b60c78c2da5831a580449da21aeb296481d3233b8a7",
+      "size": 10407
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/CollisionMeshes/GEO-garage_wall_block_joint.002.asset.meta",
+      "sha256": "0e3f33b0000a95c37f3353b46c2237e284f35a6880c25a852e0068f6b67663d9",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/CollisionMeshes/GEO-garage_wall_block_joint.003.asset",
+      "sha256": "d84ac1ba3c344f5a575a67deac01b1a4dc440e33d899c3335b1130b0a2cd36e7",
+      "size": 10407
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/CollisionMeshes/GEO-garage_wall_block_joint.003.asset.meta",
+      "sha256": "9ad0808d0229af5b01e9a7a23141dec38c3929024fdf6402d08d30d881ec92ef",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/CollisionMeshes/GEO-garage_wall_block_joint.004.asset",
+      "sha256": "c69dcabd2cd07e2fdc4307a2865abcac52f4eb26e0b5096b69a85f3c0c3d3057",
+      "size": 10407
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/CollisionMeshes/GEO-garage_wall_block_joint.004.asset.meta",
+      "sha256": "f4294f9cde6adccba4382472ca131c59cabe493736623fbddf264b06e54b54a0",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/CollisionMeshes/GEO-garage_wall_block_joint.005.asset",
+      "sha256": "909f2ddcfc59ea386ba1b7b29afe4ad8f272bc6c841a14568526143c9811a9f6",
+      "size": 10407
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/CollisionMeshes/GEO-garage_wall_block_joint.005.asset.meta",
+      "sha256": "201f15b773467a672bff0253a6085aca8fea07b77da0335da8501d6dabca4c52",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/CollisionMeshes/GEO-garage_wall_block_joint.006.asset",
+      "sha256": "64a86e83e2911742959283ed1286fbec229927d4a37d40a85c8e7f34413437da",
+      "size": 10407
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/CollisionMeshes/GEO-garage_wall_block_joint.006.asset.meta",
+      "sha256": "aebf543f68defeddd9434c2a958bcb1f2506d302d4534597a8da37c079aa10c2",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/CollisionMeshes/GEO-garage_wall_block_joint.007.asset",
+      "sha256": "367a730de2a451d43486f7ae087c30e4138a53626421118b27a21c2ef509f0fd",
+      "size": 10407
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/CollisionMeshes/GEO-garage_wall_block_joint.007.asset.meta",
+      "sha256": "7f7bed584be05cd1993319d5ecbadc1cc03e8a64f02a19e39415a59437f024d4",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/CollisionMeshes/GEO-garage_wall_block_joint.008.asset",
+      "sha256": "f1736a5b48a0e974ba87ea9e1a27c772482e5f3a05df29358e54659e1fcfb169",
+      "size": 10407
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/CollisionMeshes/GEO-garage_wall_block_joint.008.asset.meta",
+      "sha256": "df821e24d3ca817d843cad1c1d5a49fe96f198abf80105dcb8cc2caa89d27445",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/CollisionMeshes/GEO-garage_wall_block_joint.009.asset",
+      "sha256": "45894f70cef2a0c2a27567b3b6e616df990cba82ba16546e93e6e106ee82ff4f",
+      "size": 10407
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/CollisionMeshes/GEO-garage_wall_block_joint.009.asset.meta",
+      "sha256": "4001d0a8261e278e8596692a42cdb4cfa317a4f07e9eb2fcf641202f9b9b5a7a",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/CollisionMeshes/GEO-garage_wall_block_joint.010.asset",
+      "sha256": "3af39f523d18c6f26368f61ac7713c370e25b063eee6d8887b7a6ca5d13c786d",
+      "size": 10407
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/CollisionMeshes/GEO-garage_wall_block_joint.010.asset.meta",
+      "sha256": "6b18aa1727c82e6659ab801604e2fbb0a4724e8413015ec25c2ebe214f66e02c",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/CollisionMeshes/GEO-garage_wall_block_joint.011.asset",
+      "sha256": "05bc4102ae1ac77f5c4fdb0ba5b8066f1a0044a1857a7c3ae72a47ebe5465133",
+      "size": 10407
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/CollisionMeshes/GEO-garage_wall_block_joint.011.asset.meta",
+      "sha256": "a953032cd676bbb64c93a5bcf2dda9c47d501b204a51a3e066b28abf8bb27a05",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/CollisionMeshes/GEO-garage_wall_block_joint.012.asset",
+      "sha256": "21c898cee46a8eafa61e44d6d0059f936c87c24e776ef3af3069a2da1d236d37",
+      "size": 10407
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/CollisionMeshes/GEO-garage_wall_block_joint.012.asset.meta",
+      "sha256": "17e357ee783abf4884393e0ca8b6a1571333f9f978af249ca75bdd45b8f83000",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/CollisionMeshes/GEO-garage_wall_block_joint.asset",
+      "sha256": "0c2ad6788249745df5041ae17829b16dde3a925d1fcc10bac3f518d952c5c524",
+      "size": 10403
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/CollisionMeshes/GEO-garage_wall_block_joint.asset.meta",
+      "sha256": "165a4705cce83f067d6cc957c4893e67c14e87db200f1eb8daf12089b7dc726f",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/CollisionMeshes/GEO-garage_wall_course.001.asset",
+      "sha256": "4e3c32cf406c2d370582fb892b0147fb47372739e291ecc0993f92a32bc35f07",
+      "size": 10640
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/CollisionMeshes/GEO-garage_wall_course.001.asset.meta",
+      "sha256": "fad56786a4fd952c71a4cc8c1c587ad93353b5b08ccf7c29d2664a4fc3224a93",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/CollisionMeshes/GEO-garage_wall_course.002.asset",
+      "sha256": "5f8810b38718ae67369e9bc7656c7bd87ca88e544a10417e2266398ac0307487",
+      "size": 10640
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/CollisionMeshes/GEO-garage_wall_course.002.asset.meta",
+      "sha256": "635c25c4ea4687f86e9d3bc658f07bde7364888bfb2304627081adc97206747c",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/CollisionMeshes/GEO-garage_wall_course.003.asset",
+      "sha256": "0c741275dd147d465737723a5ba57598bf1aaebca61697163979a68e18f13eca",
+      "size": 10640
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/CollisionMeshes/GEO-garage_wall_course.003.asset.meta",
+      "sha256": "c33a40fce7fa24f9f082fb6790a8ded0851eb58e2a4d0861d855e5e0dfeeccb3",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/CollisionMeshes/GEO-garage_wall_course.004.asset",
+      "sha256": "03003cd6ea538b5184b0e9611212928ff915b0c128b52a55b1241ab7484c6fa6",
+      "size": 10640
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/CollisionMeshes/GEO-garage_wall_course.004.asset.meta",
+      "sha256": "6ba45ea7054ea743e61803e15b985058bfb038a7407ccd02d06263fd9c4ebd29",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/CollisionMeshes/GEO-garage_wall_course.005.asset",
+      "sha256": "a50c3d5948a78ed11a0a9ed01d910a93533ffcd4dee3fd31ccc5ed496787b6bf",
+      "size": 10640
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/CollisionMeshes/GEO-garage_wall_course.005.asset.meta",
+      "sha256": "0669f6947901941ea39acbde7e0e9ec70098da49d57d64aeafdad2587aa3188a",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/CollisionMeshes/GEO-garage_wall_course.006.asset",
+      "sha256": "4e1a216fd9c3f5f42fa23b0aaf0a71b9e227caab38e706cf37213bb09dea18d1",
+      "size": 10640
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/CollisionMeshes/GEO-garage_wall_course.006.asset.meta",
+      "sha256": "68fc452704e25e211f2a8d0308b725187f22e2ba1b0c1bc1229b18ba4c023821",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/CollisionMeshes/GEO-garage_wall_course.asset",
+      "sha256": "28bfcde1182a2da758883b204987efa17dd3b05d03c80d8bf514318ad08d24ae",
+      "size": 10636
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/CollisionMeshes/GEO-garage_wall_course.asset.meta",
+      "sha256": "3e8d1fa55ff22df7d8853a890eaaa9bb2a0004236e6f5da01df479315084487e",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/CollisionMeshes/GEO-garage_workbench_top.asset",
+      "sha256": "0726313002ec4b97090a0936b551599410ccee8b63fbe7364f9233c33ded075a",
+      "size": 15068
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/CollisionMeshes/GEO-garage_workbench_top.asset.meta",
+      "sha256": "cc7d2936ac6424e8d24bab5b17a8183346ecf9330e78d4de282f232f3c367bf5",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/CollisionMeshes/GEO-interior_floor.asset",
+      "sha256": "32dd53d9b4ede2264aa87ba3ab3c191bd5acedb530f208b82a3a5e329af1eb78",
+      "size": 14948
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/CollisionMeshes/GEO-interior_floor.asset.meta",
+      "sha256": "a600d2ad7663c7b75088131b862e40ba1b2b9a4889418e9c37f886a99b86d529",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/CollisionMeshes/GEO-overhead_supply_cabinet.001.asset",
+      "sha256": "3a63e0272ae53c4be6ed7ce522546addfa3ae3c3736a9d9224ff9b3d2ee466be",
+      "size": 14981
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/CollisionMeshes/GEO-overhead_supply_cabinet.001.asset.meta",
+      "sha256": "0e4281a2ebcbbddb3f12bf9e754cc2a076a8b44ade6202d88d0b8d5a763b3853",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/CollisionMeshes/GEO-overhead_supply_cabinet.asset",
+      "sha256": "fa56ce2cc751e9029dcb8227cc068edb1e40704ef48cb720b267776722dae75f",
+      "size": 14975
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/CollisionMeshes/GEO-overhead_supply_cabinet.asset.meta",
+      "sha256": "b5005eb55e5a81c7ac30ac3b0ad76d55fb0899d95f9aa968548c767f7f518e6d",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/CollisionMeshes/GEO-pier_worn_red_base.001.asset",
+      "sha256": "f26be860d759ca42c30fce7969f427287f28a59c498218adef9a5d9df9bb8268",
+      "size": 9916
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/CollisionMeshes/GEO-pier_worn_red_base.001.asset.meta",
+      "sha256": "1f5e28cb84b98bde6a606bd44eb661255ebad57e03654dc59a16f2abdba186d2",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/CollisionMeshes/GEO-pier_worn_red_base.002.asset",
+      "sha256": "613ecc0484a1111281319f02693aee2117222023b0018e13639e3460adb67899",
+      "size": 9916
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/CollisionMeshes/GEO-pier_worn_red_base.002.asset.meta",
+      "sha256": "55d920470f24a4ddec8a1435d5f4d217a29ffa5c88018a0eb538eaf144566e5e",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/CollisionMeshes/GEO-pier_worn_red_base.003.asset",
+      "sha256": "bb23afbcc3c47f439caee7f59b1007e05e81b909d449bc8e85e685dca2eec44a",
+      "size": 9916
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/CollisionMeshes/GEO-pier_worn_red_base.003.asset.meta",
+      "sha256": "5d40156db04fae87bcbaa75768f9d67f02cbb67893e164c452c6095bde222855",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/CollisionMeshes/GEO-pier_worn_red_base.asset",
+      "sha256": "01280b4beb63d2a254caf95711018710635948d3295d0f85c78036e5f94b0d03",
+      "size": 9912
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/CollisionMeshes/GEO-pier_worn_red_base.asset.meta",
+      "sha256": "19c6d54863d547547adbf63eaa2b66621e5b115a0b5f3355866bae7d576724ae",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/CollisionMeshes/GEO-rear_repair_bench.asset",
+      "sha256": "009fd9927afed69de6bf6d73f4cbcb3dedffd65a13bb7d8442b3e81d84ac89bc",
+      "size": 14923
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/CollisionMeshes/GEO-rear_repair_bench.asset.meta",
+      "sha256": "e8d773315d6571ea7b6c344e749e8976f7b2a4a7a5a4026d8443675f4a359a52",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/CollisionMeshes/GEO-sand_ground.asset",
+      "sha256": "1d1ce6266e92865d05213ffba8b7d12d9ffee15d45acfc3ac994fdfc134bb54a",
+      "size": 203154
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/CollisionMeshes/GEO-sand_ground.asset.meta",
+      "sha256": "fda87986529d4b31b671a102218e47efb32d186aa6c3503d64955c62bfb638c8",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/CollisionMeshes/GEO-service_partition.asset",
+      "sha256": "691a509b882a6b060eaa3e38f1b7d40fca1b62207e9fc470fd430b4e0bb08b34",
+      "size": 14953
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/CollisionMeshes/GEO-service_partition.asset.meta",
+      "sha256": "46df057c01b6b79bc37d60b4e4fedef311e32919099fae9e6dd59e0b6ddc4ed0",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/CollisionMeshes/GEO-station_apron.asset",
+      "sha256": "8cdf783ca45aa75cddbf7c9a06f1a3038e75556227832a34037a0b07da2f8a0a",
+      "size": 14955
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/CollisionMeshes/GEO-station_apron.asset.meta",
+      "sha256": "5d6077cb8d553d4760bc2c52a2e617ca221f64486ffd44ed3e655ff88e0a0b5f",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/CollisionMeshes/GEO-supply_cabinet.asset",
+      "sha256": "4cd2310bd58ab270002b8f4a44eb9a358566cafde3749098b7d35ef7c2d7a458",
+      "size": 14956
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/CollisionMeshes/GEO-supply_cabinet.asset.meta",
+      "sha256": "29230944fa30aa815e84d7245e0ae8cddf62d8ae71726735aca5ea13f487eedf",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/CollisionMeshes/GEO-wall_tool_shelf.001.asset",
+      "sha256": "873d1c3d3bb9a49361784b9c26e68fc27bc7c82548e69f7ee393f33490877220",
+      "size": 15071
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/CollisionMeshes/GEO-wall_tool_shelf.001.asset.meta",
+      "sha256": "2126e1634e9f0bed661d8ed084bd09b0d650786ec53242019a97b9000cafc516",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/CollisionMeshes/GEO-wall_tool_shelf.002.asset",
+      "sha256": "3144a3288c56fa09462e912711a3572490224a717245d3a217622e3d2dc8d9b6",
+      "size": 15061
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/CollisionMeshes/GEO-wall_tool_shelf.002.asset.meta",
+      "sha256": "69313d476cf48acca2326246229b3653f969f63e4bd62a806a675812cc2f66ff",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/CollisionMeshes/GEO-wall_tool_shelf.asset",
+      "sha256": "c15251a5a58082e105b4079c48e2a210caa089c90989698aa8e1f53e78ca3564",
+      "size": 15057
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/CollisionMeshes/GEO-wall_tool_shelf.asset.meta",
+      "sha256": "2effe4ecc8f8bb3f4908451cab13e2bfedeafbc6653915eb44a3b4bbf8c700f0",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/CollisionMeshes/GEO-workbench_frame.asset",
+      "sha256": "0d385f4f689998467a4505f92c2e21d9c915938595ffc18e85ea7ba3e9601f1c",
+      "size": 14955
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/CollisionMeshes/GEO-workbench_frame.asset.meta",
+      "sha256": "3f088f32ef84ef37134d4752c8e2a17ccb634e211e950048b63eac243dd31947",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/DesertGround.shader",
+      "sha256": "d1c7c366ec0908ed731d9ba8a75f9739e9957424af788cb8fe1ca675d9c74e59",
+      "size": 3283
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/DesertGround.shader.meta",
+      "sha256": "c4cdfbfdbe5acb07a3373046870c79471346ccafa341b1c002034bc4063ad119",
+      "size": 204
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/Materials.meta",
+      "sha256": "92ea660c4e53fa2ef286e1f59db6014197b640540df054b9a690c7495ac8676b",
+      "size": 172
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/Materials/CabinAtlas-S10-M0.mat",
+      "sha256": "011c37f71c54be7370e993e5f1bf30c10308bd55f7bb26b907c10c8389aa34b3",
+      "size": 4066
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/Materials/CabinAtlas-S10-M0.mat.meta",
+      "sha256": "41bb5c826311bb975f275c31b843e782d1bfa95f9065ade8b72dd65ac5978316",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/Materials/CabinAtlas-S12-M0.mat",
+      "sha256": "7d2c68c6f7511e94811650b7d4a5e6e41e9188732e6cf09799d2bd666596d578",
+      "size": 4067
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/Materials/CabinAtlas-S12-M0.mat.meta",
+      "sha256": "af2d6a5adce9c7439d4bc54a2f955afccb279abf64357dcd297977d3f9fa24da",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/Materials/CabinAtlas-S12.mat",
+      "sha256": "e17de44c280909bb338737df6bea220f0ebe801c88db2e10b0e69ea735e55d6c",
+      "size": 3992
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/Materials/CabinAtlas-S12.mat.meta",
+      "sha256": "2755e1bd0f064eed677d297f91cb7e49fdb8811463454fb44d7d47a3ffe07ab4",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/Materials/CabinAtlas-S17-M0.mat",
+      "sha256": "7ea847547ba8ef0a1c5e15c2252b8490b503deb8ff2379f011df2ed185c5f120",
+      "size": 4068
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/Materials/CabinAtlas-S17-M0.mat.meta",
+      "sha256": "1e612bbdf8d55e6242ed9513d3c2b7254fcb1eeb73f2f30e3917cb1eff9db6f7",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/Materials/CabinAtlas-S27-M0.mat",
+      "sha256": "d8881c23237fc5ac08ed09d3861666d51b1c715e82b54be17849404d7a4c015d",
+      "size": 4067
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/Materials/CabinAtlas-S27-M0.mat.meta",
+      "sha256": "db40e7479685b49c38dba92a19f3e63d2b3e617695c28dd5b827dfc1538c9a50",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/Materials/CabinAtlas-S38-M0.mat",
+      "sha256": "cb57661908f5ce9d1f7e6ae7bd33f43e454e059eb673b54ad9581d71fce44742",
+      "size": 4068
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/Materials/CabinAtlas-S38-M0.mat.meta",
+      "sha256": "f33566d92fa9ea71b2ab77a142a4c43d1eb2fc9a17cead1ee6594a7d3d2281ed",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/Materials/CabinAtlas-S38.mat",
+      "sha256": "adea1fe1109705f43f2d553644410d044cdd7d4c17c1f48eef3dae6402bbc734",
+      "size": 3991
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/Materials/CabinAtlas-S38.mat.meta",
+      "sha256": "53461f7a0d1424765b83abf481107677191a41aaf46efa6815aa41ac2abd7546",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/Materials/CabinAtlas-S40-M0.mat",
+      "sha256": "a4f4adba400cbe0e3b77417a67f6be60e995ea821031bac2ae810742c3f9d7cd",
+      "size": 4067
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/Materials/CabinAtlas-S40-M0.mat.meta",
+      "sha256": "7fbbbfb3d588837245fcce2d91c4f667474c52aeb58693e2b283e0e16172af27",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/Materials/CabinAtlas-S40.mat",
+      "sha256": "fbd9ca3cf347044d6c74f812daf4aecdc71d243985a6241e2b9cb8301c4ccf84",
+      "size": 3990
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/Materials/CabinAtlas-S40.mat.meta",
+      "sha256": "b841adf81daec9f6b43a13a2f5a419e26d052e8e939c7bb1e2bdb42ec6b0520f",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/Materials/CabinAtlas-S46-M0.mat",
+      "sha256": "b9ea45c6782658c1b42ee6058a6c4b00c96e0bad0855f2ef30efc121559e5468",
+      "size": 4067
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/Materials/CabinAtlas-S46-M0.mat.meta",
+      "sha256": "6526745f8dd0fbf21e38164e0fcd84c07d744f9a99bc01499f81792aa0fb84e7",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/Materials/CabinAtlas-S50-M0.mat",
+      "sha256": "93aecccaf6a6de5cd35664bea6746e7031455e96f18a478f172086e9c13dcdd3",
+      "size": 4067
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/Materials/CabinAtlas-S50-M0.mat.meta",
+      "sha256": "9d056504f3c7004c29b48d3217aa52899e8225659f3c11cac13b60f1a36ba956",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/Materials/CabinAtlas-S50.mat",
+      "sha256": "192d7b1d0abbe14c537c82756a13a2bbd262e0852a9c700dae76b1ecdc2153e5",
+      "size": 3990
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/Materials/CabinAtlas-S50.mat.meta",
+      "sha256": "5ac2b854e991c041d418fdf6927e2de1c21af32ac9c9fd668420dd7fbbe1e5a3",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/Materials/CabinAtlas-S52-M0.mat",
+      "sha256": "9a02990235ef3ad6fe69e6a663f90d1358e3853f4e0d0b7be8fda498dd40751f",
+      "size": 4068
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/Materials/CabinAtlas-S52-M0.mat.meta",
+      "sha256": "eeaaa62b118331b82929849c70158db6a588b55682fba73bd23a2b3a21a44f70",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/Materials/CabinAtlas-S52.mat",
+      "sha256": "8940be61bc0bf1a587c3821f629c2fd6eb4f069d66f4dca6f8a23c7b645b4df3",
+      "size": 3992
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/Materials/CabinAtlas-S52.mat.meta",
+      "sha256": "cf22985c139ad2f5fd03b22a7d5205d28c27a2248b95d2255de9621ebe29a502",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/Materials/CabinAtlas-S54.mat",
+      "sha256": "8ed58fa01223237e5bd48fbe116a0f4182abeec094ef1db9e0470829aaf352c0",
+      "size": 3992
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/Materials/CabinAtlas-S54.mat.meta",
+      "sha256": "29f743f0f25a9b43c3b9e05f18c855c84617e11fb9c6651b72b05cddd1ab6cab",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/Materials/CabinAtlas-S56-M0.mat",
+      "sha256": "191591fc5f2f2c5ab45689b2726737740c06174d4067a8140fe9eca04d900bf4",
+      "size": 4067
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/Materials/CabinAtlas-S56-M0.mat.meta",
+      "sha256": "e026f8510c0c231383d6eb284530482ee66f09e8878992c68529017b00cb3ebc",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/Materials/CabinAtlas-S6-M0.mat",
+      "sha256": "44c9834b16f9da9f830b112f885dc2930c32c6f8c5b2b664707f70957199a254",
+      "size": 4067
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/Materials/CabinAtlas-S6-M0.mat.meta",
+      "sha256": "8fc00593206abc39468726466a96cb6f751f9a11eb8aa6944d0acbc65e9388c1",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/Materials/CabinAtlas-S60-M0.mat",
+      "sha256": "6c525500f69019e96337b0cce0c32f9e86cc33eba7862c6b0c1fa8c5ffcec07d",
+      "size": 4066
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/Materials/CabinAtlas-S60-M0.mat.meta",
+      "sha256": "76c6b3ab5576e583dcfb8306ccfbeeddeaeeb02f5b2e471303ad2d06249bffb7",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/Materials/CabinAtlas-S60.mat",
+      "sha256": "e3c68e87202a59265858f2a83cdc2a3c55d63ec1bd11f89159c68b699f2fe534",
+      "size": 3991
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/Materials/CabinAtlas-S60.mat.meta",
+      "sha256": "f108fe7ca1dd225022a69317730dcbd4793486fdab71d8c59512d20575eac215",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/Materials/CabinAtlas-S66-M65.mat",
+      "sha256": "5b415e38236a7d45f93866ba6c4282484af3f76c10a78e39c12076cc479e632a",
+      "size": 4070
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/Materials/CabinAtlas-S66-M65.mat.meta",
+      "sha256": "e70012acff6f31930461f8b0a4e275d9e929115f37d36b4b094f4b614e3dcc46",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/Materials/CabinAtlas-S9-M0.mat",
+      "sha256": "ed4120101b5d1046e2cda42767fc0b989140d3be36f23686630e10b58b9b0fcd",
+      "size": 4067
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/Materials/CabinAtlas-S9-M0.mat.meta",
+      "sha256": "4463c3fee83dc241fc33139813a37284439cc974ddb15ab89ec59d95b4e6fee3",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/Materials/CabinBrushedHardware.mat",
+      "sha256": "d4c998ff040e1bffd73cba9d2a2d9e5ae632997146a616b359c776edfc62a7db",
+      "size": 3870
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/Materials/CabinBrushedHardware.mat.meta",
+      "sha256": "39fcee2804e1cfdbd2ad906fe2e26c84602e6f07e403b47438ccb60cc6c9abea",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/Materials/CabinDialInk.mat",
+      "sha256": "d7d8f373e0f47678a865437e4982740e0e29fbe39006a80d1e01df42d1c4ca42",
+      "size": 3859
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/Materials/CabinDialInk.mat.meta",
+      "sha256": "7f22ea68f3fd5943b1575651772ea957021ba69036f0cd246d81530d221e241e",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/Materials/CabinDialPaper.mat",
+      "sha256": "e98d077584db7f5baf4268a5e953ef81aec44bf50aedd8a456e203c8df604492",
+      "size": 3855
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/Materials/CabinDialPaper.mat.meta",
+      "sha256": "e6f949cebb773952af97fa95b5a8bf0705c69191666a587e93e420a91c4cfbc9",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/Materials/CabinDialSafe.mat",
+      "sha256": "c59eb24ced4fd404ec6c52d8d827540f48540317169b84934bfd8d807ce6c5ca",
+      "size": 3860
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/Materials/CabinDialSafe.mat.meta",
+      "sha256": "6cff7e9afd5d1a9edce6e18266fa6752fd510ad6d3001639d6db2605d3899afe",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/Materials/CabinFixtureDiffuser.mat",
+      "sha256": "636fee316f32e4179614cf1a77926d183ff21fdff81b37dca8a99888b891f400",
+      "size": 3865
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/Materials/CabinFixtureDiffuser.mat.meta",
+      "sha256": "3929976d1de1fd1533c6fe28ad4bdb934c05bce06bceea231dead15b1cf49573",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/Materials/CabinHardwareSteel.mat",
+      "sha256": "9315ee8ce1cb6828c4b8236ffcc98d3c55b5b4f747443915ff32ffe985cfcbf0",
+      "size": 3860
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/Materials/CabinHardwareSteel.mat.meta",
+      "sha256": "775056a7528029794e824642ea49ad1274d05fa224b91aabe304ba1837dea48e",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/Materials/InspectionFloor.mat",
+      "sha256": "081ba2a3bad36c344b351985ab82c0a0e39b407a01ebe415edf9336fdf19ce40",
+      "size": 3845
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/Materials/InspectionFloor.mat.meta",
+      "sha256": "71ca19029a49d851a6c1a77807975536200e1b4aa4b948f288774e0e6e9ac18a",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/Materials/LayeredSand.mat",
+      "sha256": "6d3b5da99aac2c0591715ade8d333af0c7ad047359fb95457b1a2c90f80bf490",
+      "size": 1048
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/Materials/LayeredSand.mat.meta",
+      "sha256": "c504abc3944a4962c7d7c9e3481e5ecacc1d9957b9fc20c4cb754688c7ea3e18",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/Materials/MAT-arc_indicator.mat",
+      "sha256": "ca2581e2da3db5bfcdaab01f95f093bdad15b4341f5fe09134b1cc4ab0ca7b9d",
+      "size": 3871
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/Materials/MAT-arc_indicator.mat.meta",
+      "sha256": "5be66fdfb4558269b9c8b7c0e1cefdf5a9e3879a86f08bc89a89001bd2e255a8",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/Materials/MAT-brushed_metal.mat",
+      "sha256": "420b64f5bdb65bb5fe70e51e5f3794d5478cdc9f9c890408178452d39a8481e6",
+      "size": 3971
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/Materials/MAT-brushed_metal.mat.meta",
+      "sha256": "6f80a06982d79a019a9b4539ea44945f91dc36c829ce0cc9548e191ba1a30c1f",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/Materials/MAT-cabin_diffuser.mat",
+      "sha256": "c0e5ba144526751944baa81097c9b970920990c0cb6f0d3c9ba0e38b9c9638c7",
+      "size": 3850
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/Materials/MAT-cabin_diffuser.mat.meta",
+      "sha256": "1d8e0e84f1954374087773b19b584a0c237de87e3cae664bbd173557be1df134",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/Materials/MAT-cabin_honey.mat",
+      "sha256": "e5a73dd43532616081b3a70e2a06f2ad8e21b9eefd4e279bb9200a5e9e0ae524",
+      "size": 3862
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/Materials/MAT-cabin_honey.mat.meta",
+      "sha256": "ddf750b19abc0fa628a33487dc210d4b27ccd90b88f230ba007f8e3a7814946a",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/Materials/MAT-cabin_ivory.mat",
+      "sha256": "3605563dd6255a0268fa2caa9bc21943a475ec67c060fee9ab741edd0d10378e",
+      "size": 3860
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/Materials/MAT-cabin_ivory.mat.meta",
+      "sha256": "def532c91754227c138dc3997d24fc7e04a04edac0f954ec44956aedbe99285d",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/Materials/MAT-cabinet_recess.mat",
+      "sha256": "a4096b51a82a2f0295159179f33e0be1295695dc22ead8b73a1d3280ca88ab94",
+      "size": 3865
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/Materials/MAT-cabinet_recess.mat.meta",
+      "sha256": "ff5dbf519d9293b1738252ce11b0dc9a62e82463f32f326bdb89b8cf17931362",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/Materials/MAT-ceiling_linen.mat",
+      "sha256": "6a48ea321eace9cbb55ff4805d42d187557b7421ff1e654f06aaee11b1d91057",
+      "size": 3859
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/Materials/MAT-ceiling_linen.mat.meta",
+      "sha256": "7eccd7abdef40917643943c8a835fb63c538971f0691e7833e1e975c51a1388a",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/Materials/MAT-enamel_burnt_orange.mat",
+      "sha256": "466f28e4c2cd303be6fb1b2854f433296ff20abab7c9150ea4918c162008b92a",
+      "size": 3869
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/Materials/MAT-enamel_burnt_orange.mat.meta",
+      "sha256": "43460b753c7bb98ba2155abeebc5ff9486ac765dcd18f44513e7e5489fcfb495",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/Materials/MAT-enamel_cream.mat",
+      "sha256": "b0a57d000c3a5aa599b8c5211fa9df14f8655767b02792403133b272b8eaf18b",
+      "size": 3862
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/Materials/MAT-enamel_cream.mat.meta",
+      "sha256": "59bf2980b8fbb95766c7cdaaeecf8ce9a7530c8196dc0c871baf339ad731e8d5",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/Materials/MAT-floor_board_0.mat",
+      "sha256": "a00c40c8b99b00fadbc93ebe122fd2a7b32462092f2c840d788bc6f189b9b8ac",
+      "size": 3986
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/Materials/MAT-floor_board_0.mat.meta",
+      "sha256": "2d64bc7ed3aa695754b2d272cfe6e121df69b97de38796d31bf3ea474d9250d8",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/Materials/MAT-floor_board_1.mat",
+      "sha256": "6f14be1a91fb551980e55840f00f488ebb7919249e8faeab2f24bb89b8e930bd",
+      "size": 3985
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/Materials/MAT-floor_board_1.mat.meta",
+      "sha256": "bb559455f3a7d8fea2db6bf11bad2fed3876b0101e4fc0324fb96b070f25f55d",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/Materials/MAT-floor_board_2.mat",
+      "sha256": "dc54e970788c978524b0b48550aac4bce368ff99555fbafa9a879c6f19426184",
+      "size": 3985
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/Materials/MAT-floor_board_2.mat.meta",
+      "sha256": "ae2d39a7f4b4673dd3d25d18c3cc5eb1eaf50b8f1c3c4ecf1fa81816f2746dca",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/Materials/MAT-floor_board_3.mat",
+      "sha256": "00afee842898b89eedf697aa875a3459b208911aea22a2eff680b4d6ad9e8919",
+      "size": 3985
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/Materials/MAT-floor_board_3.mat.meta",
+      "sha256": "3096230e183685ba01ee10df6a82ac2e0f04b955f0057f6fdf2c7fb8f619e3c5",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/Materials/MAT-floor_board_4.mat",
+      "sha256": "585d813f7e8ae51f7e1bdd8421081712ae04a02b6309528b89f6136861ecf00d",
+      "size": 3985
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/Materials/MAT-floor_board_4.mat.meta",
+      "sha256": "419eb24c067e9da9db1f7651a76a8368d04a95d8c81af9a4754c8400f9c7988a",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/Materials/MAT-floor_board_5.mat",
+      "sha256": "542013d91cdc8f85519f73878a6a1626924baa34f89aae4cb4683545eac13c56",
+      "size": 3986
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/Materials/MAT-floor_board_5.mat.meta",
+      "sha256": "f20b81ee561521a85b04c8a9095dd0d7c39e91b3c7033ce699a45a31fe8dad22",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/Materials/MAT-floor_board_6.mat",
+      "sha256": "b0ebb84d63060443893db42343586699173511eff9db01705b910734b54287cf",
+      "size": 3986
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/Materials/MAT-floor_board_6.mat.meta",
+      "sha256": "2c65fbf07bd65cda4ddc1b5f43e013725e73684d916ef43e1cbad9246e938c8f",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/Materials/MAT-floor_board_7.mat",
+      "sha256": "b7d3198a60f920f6f19a12e9a4daba0923588e1b24ed3415aa79c118f23bcdc9",
+      "size": 3985
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/Materials/MAT-floor_board_7.mat.meta",
+      "sha256": "ebd5d6387fa4cf54c625a37d46d7e640a72bac8d41e8774fc10fa0c4816ec779",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/Materials/MAT-floor_board_8.mat",
+      "sha256": "e0800f469c06811e900413dfd141d2c1f309e06e6a12dc0736b2a5f53d4a0be1",
+      "size": 3986
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/Materials/MAT-floor_board_8.mat.meta",
+      "sha256": "9f2c9376ad46aeb7e7402b691580310bd5f3556d32134e059c7f9f4baada8c53",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/Materials/MAT-glass_bluegrey.mat",
+      "sha256": "c6d778cb7902408044634fb10321e7173dcdbc1c978096a891ecaed1970b360a",
+      "size": 3865
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/Materials/MAT-glass_bluegrey.mat.meta",
+      "sha256": "e213d268fd40f46a5289a94944bc185b1d966cf6b76a15f7beae90d7c2bb5429",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/Materials/MAT-interior_plywood.mat",
+      "sha256": "14293c1491f59e351260f204fabb79658bff0fedebafd2f20e7b407622a32b89",
+      "size": 3986
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/Materials/MAT-interior_plywood.mat.meta",
+      "sha256": "59808bd86434fef7bbe4045b5571f766c5fcbb6333a9987986697a08e7da14b4",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/Materials/MAT-lamp_ivory.mat",
+      "sha256": "8d268c5614278c054e307022383440495e928392a8c1ab20e94e93b873b318bd",
+      "size": 3858
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/Materials/MAT-lamp_ivory.mat.meta",
+      "sha256": "abb74c97ff1f20b7dd64a13d565d731939f0783f86301a24d2450cdb2e227571",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/Materials/MAT-painted_steel.mat",
+      "sha256": "bf87f7d2d1a7377684cfe15ddb2291af1ac7248015f40da04a851f8dc8b406c1",
+      "size": 3977
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/Materials/MAT-painted_steel.mat.meta",
+      "sha256": "3440cf20a112bd91662dd2b47e495dc021ea75df71826f25059194803fddaa7c",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/Materials/MAT-paper_ivory.mat",
+      "sha256": "36d4eed7f7c64a4b00e46540fab01342d33a84bd9fbf99c0ba4ad2c9688ccc6f",
+      "size": 3859
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/Materials/MAT-paper_ivory.mat.meta",
+      "sha256": "470d48a082d3a0792eea88bbb0605fba0897038badf6fe72959ca13cb208c659",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/Materials/MAT-printed_ink.mat",
+      "sha256": "3c7145cf0af8a9873cac4840b744ad4b17f2bea12d564db2bbbd7dfbf6b51f57",
+      "size": 3868
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/Materials/MAT-printed_ink.mat.meta",
+      "sha256": "05de4006465bd720bfda94d177e9dbaf9b40958b0850555a185c5e8466625fdb",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/Materials/MAT-rear_lens.mat",
+      "sha256": "9fe7a3281aa2f45e45423e01196e834593fa27cd02838bf70a6d8316c9be381f",
+      "size": 3860
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/Materials/MAT-rear_lens.mat.meta",
+      "sha256": "96290f37a33ebb9593857f13393be5ee936716510e4a107e4c7e26f8f4f6ddaf",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/Materials/MAT-rubber_seals.mat",
+      "sha256": "0326f9aa780c4e43e54f10b5104b6e4d6588f4bd5485ebb4792b7772bd90ab55",
+      "size": 3862
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/Materials/MAT-rubber_seals.mat.meta",
+      "sha256": "3c56e2f7139243e79f09c3ced8618ec9f75315b991cb391c10c17de1bbc19f77",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/Materials/MAT-seat_olive.mat",
+      "sha256": "3747fa12a3b32a577d04e6afc2a3069a34e64726b6d599d69f458d0176a33ed8",
+      "size": 3866
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/Materials/MAT-seat_olive.mat.meta",
+      "sha256": "4eed08616d503f94e99f83b14c36a00bd055a023c6b3e972d1fc03c5b464f0d1",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/Materials/MAT-tool_enamel_blue.mat",
+      "sha256": "877986628b90331bbfad5bc01bbdab1944898d190e349dd3464ea4c7dc682021",
+      "size": 3873
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/Materials/MAT-tool_enamel_blue.mat.meta",
+      "sha256": "96151f3865c2c1074dba81e6f92eb253bf52d6cfc974b1aeb8aeeb55fcf50ea5",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/Materials/MAT-trim_ochre.mat",
+      "sha256": "5cccb5d260abcbb6ef47f2df3e601cb6b72df75a9d990c90a768d9b5add1c3e7",
+      "size": 3867
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/Materials/MAT-trim_ochre.mat.meta",
+      "sha256": "3f59a297a169493ebc72e5ac924f0559d4d745c790b157a603dcea027be6d010",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/Materials/MAT-tyre_rubber.mat",
+      "sha256": "947fd00d974fc0bbe32be364d6d8a115f9586c273a9b6a4c4360c25c4851017c",
+      "size": 3855
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/Materials/MAT-tyre_rubber.mat.meta",
+      "sha256": "89921ec7a85c1411ab69b2a306921bfc11efc7005aad758491dd3f7e913897b8",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/Materials/MAT-upgrade_ceramic.mat",
+      "sha256": "9246842c5a9ff7d24d1c7eb73bbb4607587f76803ac961abbe8622fae94db7d0",
+      "size": 3863
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/Materials/MAT-upgrade_ceramic.mat.meta",
+      "sha256": "4d9bbfb19a31497d9ee0e9fa9bbe879c228312534dec606458e54a77db2e2c30",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/Materials/MAT-upgrade_copper.mat",
+      "sha256": "e7c4ad8c08d8ae2033a14f897f48dce7343d30466367123c3a3c9bf0955f1fa9",
+      "size": 3864
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/Materials/MAT-upgrade_copper.mat.meta",
+      "sha256": "6a93347309267456da668137c8927bd203ce112fe48b1fe2f6f7a99bea76272a",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/Materials/MAT-upgrade_oxide.mat",
+      "sha256": "5be5d0acb601c6705730e7b2d2e0ff5019fd5d8326feccdf57458e45b49f86af",
+      "size": 3863
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/Materials/MAT-upgrade_oxide.mat.meta",
+      "sha256": "c6ebc27d4362679ca0bedf05b175b89ac89b282cb7f083e3fec239e8722470c0",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/Materials/MAT-upgrade_rubber.mat",
+      "sha256": "29c8f3304f8c111fc6ac9d3edd7cfbc1004e1daac2d250989b65243b49cd8f6b",
+      "size": 3866
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/Materials/MAT-upgrade_rubber.mat.meta",
+      "sha256": "ce007225a4741a752ae7ea7abec01b4263570ac15b2249d3b71cbc9b6d4e41aa",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/Materials/MAT-upgrade_steel.mat",
+      "sha256": "a1767f6515c719a9fe92434ae1534b5d3de5b45649eaef25b05944e619041d4f",
+      "size": 3861
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/Materials/MAT-upgrade_steel.mat.meta",
+      "sha256": "e1937c700195321dc79bc0446ecd070e574007203abe60aa420f9428135fc9b3",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/Materials/MAT-upgrade_teal.mat",
+      "sha256": "c1e4c0c3d17e6c64fbe47dd5fd80138b7e9e13ed25d7d41ada32baa306d2c6eb",
+      "size": 3863
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/Materials/MAT-upgrade_teal.mat.meta",
+      "sha256": "15482a92de417b0d12a41972bba4ed6822128cec0e7687a9a15bfeeece1c156d",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/Materials/MAT-wood_cut_edges.mat",
+      "sha256": "2bd20015200e04c6deaa429418a2491ff55a6ca2fc29d93082982fc1721dc13d",
+      "size": 3977
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/Materials/MAT-wood_cut_edges.mat.meta",
+      "sha256": "e0c202cb2d5d7658d89f586ac6f35410786f24329e41537a6050131561fffe8b",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/Materials/MAT-workshop_oxide.mat",
+      "sha256": "8a33ef7ca4ea2a2c9bc2d26c70115e3b91762dc838ba0c671528bdd99b9b2381",
+      "size": 3863
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/Materials/MAT-workshop_oxide.mat.meta",
+      "sha256": "9550f50a38b76bac6d99b8d114fc6ed486303b68e1d1c12130a4ef8df4242b96",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/Materials/MAT-workshop_teal.mat",
+      "sha256": "7f6f4b427b7aa3d7c83c8d0e7bb19d404afe46679b73ae7044a01b8d9c487611",
+      "size": 3862
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/Materials/MAT-workshop_teal.mat.meta",
+      "sha256": "99429cf359065227d04234700293025e9f2d18f46df75b33d574c8b13e607900",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/Materials/MAT-worn_brass.mat",
+      "sha256": "73533c4204d157597690a0cc8096903961371e038c888abb43bb55aa600e2b40",
+      "size": 3973
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/Materials/MAT-worn_brass.mat.meta",
+      "sha256": "8816280dcdd4b6a887d4590d5d57e08cfa56aeefbe541b15a8892bf4a82bd298",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials.meta",
+      "sha256": "2889e2832f459735d6887a1947a80c05d6c8e594d141be6b39da9d7faccb280e",
+      "size": 172
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/DesertSky.mat",
+      "sha256": "2c148db6a4812414ffe801e5cfc58905d255b69ca83c91d9565393f8f0b42e40",
+      "size": 1021
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/DesertSky.mat.meta",
+      "sha256": "a251a07a5033eab8675b8b8a849e61edd6bc20913ac58988d8e8d1c23e5bbf54",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/MAT-brushed_metal.mat",
+      "sha256": "4da012c94df00d81fd6a1eed33ef94a7c142b5addcdbacea4903eb7983f8b7a5",
+      "size": 3971
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/MAT-brushed_metal.mat.meta",
+      "sha256": "042dc30cd39f2620dd71975d6044b276587cecfaaaba47f6dc9afc2903b804cb",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/MAT-cactus_green.mat",
+      "sha256": "4b2ceb666089f61026dff048093b442e97544498a86ad140ea678a182b607085",
+      "size": 3869
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/MAT-cactus_green.mat.meta",
+      "sha256": "73b587089a8095851113da5c9042ac95499fb09792d59cb2398d7bfdb39d75fb",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/MAT-ceiling_linen.mat",
+      "sha256": "2c60b745201702acfab02bcb2b39c011efd3fa92baa921a693bd464a84511207",
+      "size": 3859
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/MAT-ceiling_linen.mat.meta",
+      "sha256": "7659cf145613313c490386b701b0cc1949b4cba1653040adc6f5062314783693",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/MAT-desert_leaf_0.mat",
+      "sha256": "30f3a22568c2fcc7f47b560c92a710e9138c289025aa83cac941b7719d101425",
+      "size": 3871
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/MAT-desert_leaf_0.mat.meta",
+      "sha256": "5f70beef68357e9818c151972d7d323333dfbbdcc8b1d956659d646cffad2c1e",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/MAT-desert_leaf_1.mat",
+      "sha256": "2b974e06a0f38eb0cc9f32d4f73e20d801040a572c9e9b93be896b3b0d3c3e72",
+      "size": 3870
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/MAT-desert_leaf_1.mat.meta",
+      "sha256": "8fc8b3f72520e3d29ddf0b522046bfe7d62e8aae9b67e9e8c0436f063c5740ce",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/MAT-desert_leaf_2.mat",
+      "sha256": "03f529211f4034378f630d5d2818d89264e94948a27e66bd8c799509befa509a",
+      "size": 3870
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/MAT-desert_leaf_2.mat.meta",
+      "sha256": "ae7537c7d9a059b5b238233ad3c5257613df2c2cc243a64e3c5216ee0a3a6108",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/MAT-desert_leaf_3.mat",
+      "sha256": "9508d590616ae4aaacdee4786c20201ed8f4e1a8deed58c6d48414d9fda5c0bb",
+      "size": 3872
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/MAT-desert_leaf_3.mat.meta",
+      "sha256": "7dead3cc943167d99bcf4e4db7c5ec32be51184cc45f02612f00ec4077d02275",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/MAT-desert_sand.mat",
+      "sha256": "e3737cf06de8f0d58c7c05fc1c538ba6cb9c20e34b9c89ba294a94ece67c96b4",
+      "size": 2839
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/MAT-desert_sand.mat.meta",
+      "sha256": "5dd87085fea631c2a9a2ef116b42deb06853fa8264ad8599ed3f94c2a92b9d01",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/MAT-enamel_burnt_orange.mat",
+      "sha256": "3b7b2f8034e9ac2f6f31c55bdf664f6d6fe0edd3ee65ef23c6df08ef8b699160",
+      "size": 3982
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/MAT-enamel_burnt_orange.mat.meta",
+      "sha256": "d204e81bc4ec25f23a3bfb3ad5ba4f157f510eb08309e33ab0288a319ccaee9d",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/MAT-enamel_cream.mat",
+      "sha256": "1e47a354c9bd9b3b3265bfb9743d2e14ceeae5a46eb92ed32d2fca9d20b45f0f",
+      "size": 4042
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/MAT-enamel_cream.mat.meta",
+      "sha256": "2af473535bf7f107ae56420828451019ef90c0eabc4fdf5b4de1981f8e9fcd92",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/MAT-glass_bluegrey 1.mat",
+      "sha256": "752c56b9c5c6844352a2e898eaade8ede390982b148993aea432fd6d8504c6fa",
+      "size": 3930
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/MAT-glass_bluegrey 1.mat.meta",
+      "sha256": "9abbf4ea3caeeea56dc28e34b0d3be4dc2ba4307677897c19b33b670e8e6dd00",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/MAT-glass_bluegrey 2.mat",
+      "sha256": "21e7ad54ebb28e00c39bd5bbc3e26800ea251e9a619a05062db4be28e5372370",
+      "size": 3930
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/MAT-glass_bluegrey 2.mat.meta",
+      "sha256": "36e5a55f9f4850070d2de1c072b1a9be1fb3ade74b3bd14ab3315eeb485f9581",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/MAT-glass_bluegrey 3.mat",
+      "sha256": "265564a32246d3a73caa023dcb4f30b1db514073b156365e13f305275906d3cb",
+      "size": 3931
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/MAT-glass_bluegrey 3.mat.meta",
+      "sha256": "17fc9053267639e6cf51c05d983ea305cd92ee9be2f2069b37286d52a071ffde",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/MAT-glass_bluegrey 4.mat",
+      "sha256": "49af0c68119a3d1284bfb3430a6c15831c0c2ea0a136a499f5130cd7a6868c16",
+      "size": 3865
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/MAT-glass_bluegrey 4.mat.meta",
+      "sha256": "de7eb35b1162009b68a29f0070ddab884d27bf3b7d28d5470ea99505e36389ba",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/MAT-glass_bluegrey 5.mat",
+      "sha256": "451db6f2ab11df71b43768e60a205145a71e682bf9787aa83bcfff5977f64a03",
+      "size": 3931
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/MAT-glass_bluegrey 5.mat.meta",
+      "sha256": "866412e716f27c7af34e4105784ab1816f5ec20c1c650c85d3a936b32fd6d24a",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/MAT-glass_bluegrey 6.mat",
+      "sha256": "52e6ba21d750926042eae411dbd5f9ee3d8094039df75916eec356d107f2757a",
+      "size": 3931
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/MAT-glass_bluegrey 6.mat.meta",
+      "sha256": "54a515bd92085ebfa0f37639233ad58a78ff1840e485b88a8d2cc43e28ac3f45",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/MAT-glass_bluegrey 7.mat",
+      "sha256": "eea518bc61a571a97bb08ede05ec99f044db39f0fcf8def6284889ade091a68a",
+      "size": 3930
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/MAT-glass_bluegrey 7.mat.meta",
+      "sha256": "6ca2de23b7529437525797298587ce817ea85a8fdf7558e7830be65aeaf525f6",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/MAT-glass_bluegrey 8.mat",
+      "sha256": "bebc956ef9b34e466371b7028e14ca02f7ff6b4b37f7048ad49183e4cbb77c93",
+      "size": 3931
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/MAT-glass_bluegrey 8.mat.meta",
+      "sha256": "cede1fda266c6b7eeadeddc60294f996ee18485137963d2931d7de8a2b2d244e",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/MAT-glass_bluegrey 9.mat",
+      "sha256": "9115e93c375753f6f1e64796c9cdbefdd22d9ec3fc721dc604eef013827fe43c",
+      "size": 3930
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/MAT-glass_bluegrey 9.mat.meta",
+      "sha256": "da40ea6940bcbea3d7f9c2095a3004a0ad82532daef8a70ec4a1c9577720cdfa",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/MAT-glass_bluegrey.mat",
+      "sha256": "745f8feb07e791bb655ed839ec48e453bb80c16496c39d40523f66997e43124e",
+      "size": 3929
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/MAT-glass_bluegrey.mat.meta",
+      "sha256": "be8bc882eb8ab6cd2acf88424074cb2e1fe74c91f0a080c1f92ba1052211db09",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/MAT-interior_plywood.mat",
+      "sha256": "e524a8c788cd6cbd16578c196527fbd6c92b1b68477246b707cd1da20aa2ff54",
+      "size": 3987
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/MAT-interior_plywood.mat.meta",
+      "sha256": "c5867e250c4a54b7f57a948891b7c2fdb0f0435687d77e00d0481d848e6ba419",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/MAT-lamp_ivory 1.mat",
+      "sha256": "dfaaac4fc8bc2790f06b13c1af0a47dbfa61bc0f9a4812d16d463ce101bcf176",
+      "size": 3849
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/MAT-lamp_ivory 1.mat.meta",
+      "sha256": "5682ace4bf1fe6d2d64b1489db2ae56ab9dbfa2ec9858d759dcdc9aebcec38f3",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/MAT-lamp_ivory 2.mat",
+      "sha256": "232f0eb08e0f1ce82fc2bafb8aead59142fc624114c205c3eeb3559903251926",
+      "size": 3850
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/MAT-lamp_ivory 2.mat.meta",
+      "sha256": "deca7318ed56b9c2b6d3c4a57efddf52f2325ebb0a077f92e606e0bc78b073ea",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/MAT-lamp_ivory 3.mat",
+      "sha256": "1b4868c6c92be9286314b619b59dabb323a0507e67cc6ff20d7aa26d667fe3cf",
+      "size": 3848
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/MAT-lamp_ivory 3.mat.meta",
+      "sha256": "dd64f8158abcbb73ef894e17faf11a0301bdddfa8ef5197717a033ea39491e4b",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/MAT-lamp_ivory 4.mat",
+      "sha256": "34cdb394dafe9033aa87e20cd4616aab143cc7e00e851e1d32ce18a839780628",
+      "size": 3849
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/MAT-lamp_ivory 4.mat.meta",
+      "sha256": "4429b2c6d019c90deee65226e88aad16345180788135e273a95a61fe18161528",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/MAT-lamp_ivory 5.mat",
+      "sha256": "591889689f2cfa6ec98e74bd3a852ea32e9553eb219b6e397546d4348d4f2068",
+      "size": 3866
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/MAT-lamp_ivory 5.mat.meta",
+      "sha256": "6a4de562b26ce97ffb22dadb7341c9ab9597630ef40a5d702ce568ccf3e6f508",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/MAT-lamp_ivory.mat",
+      "sha256": "3a936600c0cddf9fde40e5aafebaf3037e17d3d892c9d25d372cf3000a52cd38",
+      "size": 3858
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/MAT-lamp_ivory.mat.meta",
+      "sha256": "6a8404df0142e9282f74bd6dbbcd570d0db5105d59b2add667479414bcaac24f",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/MAT-manual_paper.mat",
+      "sha256": "051ed523d69b8fcffc2964dff8d8a152d00394f5ea4a244384119264e69e159d",
+      "size": 3866
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/MAT-manual_paper.mat.meta",
+      "sha256": "282915bf1c4e2c213120e8e8b60660c5a73409257c70c5754f6aa44847897bec",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/MAT-painted_steel.mat",
+      "sha256": "e64eaed3bbec14c44e14a4ab6b642ed8c8ff29f25383dd8ef8dd6f77b7372c1c",
+      "size": 3864
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/MAT-painted_steel.mat.meta",
+      "sha256": "82b161107771424bddbe8dbfcab1c1affcf51cc2e4517c19084e23bc2d3c3377",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/MAT-polish_sandstone_2.mat",
+      "sha256": "15e7cc46d4608d9b0e26b8d7c971c94e5199eb19f65e0af7dcb84234eb46d320",
+      "size": 3872
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/MAT-polish_sandstone_2.mat.meta",
+      "sha256": "e72a98dad46630ed8fa2d27ab7c20e4301a8566740dac03f15c204c294bdbd80",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/MAT-polish_sandstone_3.mat",
+      "sha256": "e3b46c27e31e09325141fe649cd6419c6cf11301466ff6a2be72ba5b626ece04",
+      "size": 3871
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/MAT-polish_sandstone_3.mat.meta",
+      "sha256": "81e34de6c8e7956283ba62920459f1152df6668d45144879754ed98111abe9f4",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/MAT-polish_sandstone_4.mat",
+      "sha256": "b63f718fb718677f8d506ea4c670fa83aa71b635cbe0f1a93b98d6ab3dcb52ed",
+      "size": 3872
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/MAT-polish_sandstone_4.mat.meta",
+      "sha256": "5c0dd2d27b4d94c111250164361c1b0745c54d01ba07572cae06e35d588ae609",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/MAT-polish_sandstone_5.mat",
+      "sha256": "9fa7070970e8bc38f5ee61364969e20d26a9a778ec1771e86e3321c03e25613c",
+      "size": 3872
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/MAT-polish_sandstone_5.mat.meta",
+      "sha256": "aea73da71c9818b5bee29badd85df1619cb3894e96545114565dbc5b85369598",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/MAT-polish_sandstone_6.mat",
+      "sha256": "98745e9f0e4a585f616608dc7d343b31ef8ef777bd98446cab2420ab514069f8",
+      "size": 3871
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/MAT-polish_sandstone_6.mat.meta",
+      "sha256": "7f30f7242fad2db56666da9eda6ce80dc7af9bd8dd678d2d2deea3e418740794",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/MAT-road_asphalt.mat",
+      "sha256": "36d60b4059ce45f5e790124c034e12f0bc142e67b33983a65410d9fe08bb3660",
+      "size": 3934
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/MAT-road_asphalt.mat.meta",
+      "sha256": "1b710be757f886970ac2500327d789aee15640d476490cce99fe475ea0da9f66",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/MAT-road_ochre.mat",
+      "sha256": "82774c31b0dd2f264187ba4ced0aee6171eea882acf9e8401e5da9645a0ba2a9",
+      "size": 3864
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/MAT-road_ochre.mat.meta",
+      "sha256": "465a26b1f4057f4382d0a74828ca0805b8d6ec5e4db16ac92ac1d6a2715831ba",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/MAT-roof_patch_0.mat",
+      "sha256": "212344c8db59ac7fbfc1300b66513ddb11e3e0e48244e25cdfb4f8611cd8d159",
+      "size": 3979
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/MAT-roof_patch_0.mat.meta",
+      "sha256": "7b966c7fa1227c4cdc85f22ccd18791ee42658fa9f1695aec7d675e7ef749a15",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/MAT-roof_patch_1.mat",
+      "sha256": "e1bb32ad856a30471ca27c88d738ed7a65f04e5d2996f43305f00463ad8ce273",
+      "size": 3978
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/MAT-roof_patch_1.mat.meta",
+      "sha256": "6c02a7937f896320bc4af18f36198f0200912c3a5a4166f9e6f417d6d63c5234",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/MAT-roof_patch_2.mat",
+      "sha256": "4852af4ea7f04176c284190630cf0872059b7be81d936d415a83ab8c80685453",
+      "size": 3980
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/MAT-roof_patch_2.mat.meta",
+      "sha256": "ae57de3fbee6fdfdd17d0f62b98a22d59a1e1a0c4e347ad9f48c733594875251",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/MAT-roof_patch_3.mat",
+      "sha256": "193b9e2f622a90253731da7aa0f21f7b2da13f5628a99ee5da27af98d46cb31c",
+      "size": 3980
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/MAT-roof_patch_3.mat.meta",
+      "sha256": "2bc6231ded415e1c41a1d512b80547e133bc41f9d32f7a2f5ad4a5837cbce5c4",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/MAT-roof_patch_4.mat",
+      "sha256": "106b53787548cca1ec2149a3335e08b26ff6585ad9e96a18abe46eaa5b8478d0",
+      "size": 3980
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/MAT-roof_patch_4.mat.meta",
+      "sha256": "000129d7cdbcce70b49fa85eadafb6327f9d3e034c5f3f9824cd5c285c22361e",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/MAT-roof_silver.mat",
+      "sha256": "d949c7bc1ca5e3e8a46a2932250ac10c32ad90f0e6258b889bbc489023651f51",
+      "size": 3979
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/MAT-roof_silver.mat.meta",
+      "sha256": "6fd9ab1a7884d01ad7ba848ba0390ea84c3ef36ea1d6200f09f2579cf67ec7a9",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/MAT-rubber_seals.mat",
+      "sha256": "34f6a27a29f3326473aa800062c322e9d68c4502fc27a8bc1517194e2df14997",
+      "size": 3862
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/MAT-rubber_seals.mat.meta",
+      "sha256": "ee54a2ffcf9f86d44ad961f4956d535c151772bb94dc654fb5eff92a78fff79d",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/MAT-rust.mat",
+      "sha256": "cc052b4a14e0ece6975ee1335374e850d388b13a35df00dcd28baa1bb35b8a92",
+      "size": 3864
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/MAT-rust.mat.meta",
+      "sha256": "2489c05783a9a2ee78d63d9e0049738c29ed0b9c5e505ccfd2775c1a0119391b",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/MAT-sandstone_0.mat",
+      "sha256": "8b540bfc30c00d6859c2b1a939b7b5c355eb237f82d33048d284454ec1fcfdff",
+      "size": 3865
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/MAT-sandstone_0.mat.meta",
+      "sha256": "45afd58387e4b82ce2df5e3a48aca9988b6d606795d57484fcab480b5c287287",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/MAT-sandstone_1.mat",
+      "sha256": "8006887f7b150fbc10a2f6598b1d94b13a38c256c6c85adcaa21f7b10a9430c2",
+      "size": 3865
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/MAT-sandstone_1.mat.meta",
+      "sha256": "e8c586f1df2d61a82fb7937bf9a085c25ef95d53b473aec597eb62a561b7fadf",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/MAT-sandstone_2.mat",
+      "sha256": "97fbf870f23d516298746511782543882e2549925d6f321df4663fd0ff05bf30",
+      "size": 3865
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/MAT-sandstone_2.mat.meta",
+      "sha256": "1fc58fa1eb9a529b7159c1ff100264fe89be5dfdbb8379935ede55963e40bc9c",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/MAT-sandstone_3.mat",
+      "sha256": "e9254a3e1a08bfc1f17d6818d73eceed903fa778535b1c5b94ee6376b78c0d66",
+      "size": 3864
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/MAT-sandstone_3.mat.meta",
+      "sha256": "6e0ce91be771579297b891b026fa9cd590b2c1bab29106896104df939a88784e",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/MAT-sandstone_4.mat",
+      "sha256": "c497c287efdbc69c089c13b5e78dbe96ba42c42fd120da2d0c5cbbb3353d25c8",
+      "size": 3864
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/MAT-sandstone_4.mat.meta",
+      "sha256": "bb6480610ba81eaeb612473199104587b28998763fe9c0d00cd4c8cc73d6415d",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/MAT-station_concrete.mat",
+      "sha256": "2f7b3e74c595076e88e0118a89a9e1218d39e9a199e29d6ece60f76ba08a2c2d",
+      "size": 3976
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/MAT-station_concrete.mat.meta",
+      "sha256": "8a75aaa6a55177fa0093e1a08b42a0b1d1b15348c26ceb5b2d3c727937ca4be5",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/MAT-station_red_enamel.mat",
+      "sha256": "14f699e50ce7646f51bc996adec33fc80240f913946b0dd12914165bb37c1e68",
+      "size": 4048
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/MAT-station_red_enamel.mat.meta",
+      "sha256": "841b8d063cad7ee51d94c4fc37ac208aeaeb8500a6a2bbfce60db63a4d10efe4",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/MAT-station_stucco.mat",
+      "sha256": "fa19596c32d8272de88d17a499d98e2a420beeb53b96b0673c0ff1b8d6f7f5a3",
+      "size": 3991
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/MAT-station_stucco.mat.meta",
+      "sha256": "c789323400d6e52eae25f13e6206cde3ebb7138b6aba36d762d31189c86064e7",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/MAT-tool_enamel_blue.mat",
+      "sha256": "3a6c5c362a278f038375da21838da8a20a40144255b95f18caf13b501eb685e4",
+      "size": 4053
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/MAT-tool_enamel_blue.mat.meta",
+      "sha256": "6f40f55f46c98db104568777f7037925c649332dbe7bcb27636047e6867523af",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/MAT-trim_ochre.mat",
+      "sha256": "51380c504064645234c5c6dab01fc36f02620c25368193e2c7fa2f1570780b80",
+      "size": 3867
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/MAT-trim_ochre.mat.meta",
+      "sha256": "5021c084ab116e497c7e75636f2f09ac87aff9bd0c0a4b85593ff08828a05d83",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/MAT-wood_cut_edges.mat",
+      "sha256": "0abaff21857a004750b65b79d7815a460d633a88289e7f2ac635806832432699",
+      "size": 3976
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/MAT-wood_cut_edges.mat.meta",
+      "sha256": "a6bc4230a9018b7c6a1d225dc7fb9bcbe7a9998a75eba244f51eb40b521de080",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/Universal Render Pipeline_Particles_Simple Lit 1.mat",
+      "sha256": "b43d344ae9b11353855fb749a20e3bcf0ef3cbaa920435a1365141d755c414d8",
+      "size": 3012
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/Universal Render Pipeline_Particles_Simple Lit 1.mat.meta",
+      "sha256": "f5379dc69a9730996dfc9021954cca5d1252779d2d2a89e8158a151eb9653e90",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/Universal Render Pipeline_Particles_Simple Lit 10.mat",
+      "sha256": "9a6d05d6869ff50e9b2515da0651aafcd247c01f352c6ae9a882f9a12e59d940",
+      "size": 3013
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/Universal Render Pipeline_Particles_Simple Lit 10.mat.meta",
+      "sha256": "6a8722c887380d0931f8d7b7d8479040197962f1f31f11cd230acca5022818f1",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/Universal Render Pipeline_Particles_Simple Lit 11.mat",
+      "sha256": "ca5f0dd456af7640e77434555e50add9b204c5a8688c62ab007fa3f145d8c493",
+      "size": 3012
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/Universal Render Pipeline_Particles_Simple Lit 11.mat.meta",
+      "sha256": "60a43177b637664092771db055f6d9f08dbd84be518def682079c434db4673e0",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/Universal Render Pipeline_Particles_Simple Lit 12.mat",
+      "sha256": "f9fa8892fa60f7624c80fe992231c144f237a5f21b04b966e17a9496490b0502",
+      "size": 2990
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/Universal Render Pipeline_Particles_Simple Lit 12.mat.meta",
+      "sha256": "694cd6c11bb18088e0922962000ee26dd806f7fc3e601ddcf7aec076cdeef37f",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/Universal Render Pipeline_Particles_Simple Lit 13.mat",
+      "sha256": "c06e9224cbf30d6cc93e46edd073245fde48d03efc37efe4b2d0fd129c900870",
+      "size": 3012
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/Universal Render Pipeline_Particles_Simple Lit 13.mat.meta",
+      "sha256": "c09735ba59f483276db9ed093b8f5e2108c9e78f99f23ed6929d64a1b4eb7c8d",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/Universal Render Pipeline_Particles_Simple Lit 14.mat",
+      "sha256": "9c5f8c5f13f62ad715e161247b991718ead96c317215a530511c9b503a0f92e7",
+      "size": 3012
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/Universal Render Pipeline_Particles_Simple Lit 14.mat.meta",
+      "sha256": "9a3129b1c0933d0a3b2918e4160451d5efefa53031be507493cb934375a31fc3",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/Universal Render Pipeline_Particles_Simple Lit 15.mat",
+      "sha256": "82526f8d9725b60c1a040a34f791066dfc3b816cab449029de61210f46f091a5",
+      "size": 2993
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/Universal Render Pipeline_Particles_Simple Lit 15.mat.meta",
+      "sha256": "9008a5fee85823f200057067d975050d3551d1b6193fe3a5d9fe71a8d1f8e4e8",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/Universal Render Pipeline_Particles_Simple Lit 16.mat",
+      "sha256": "c8a781114d2bea097df93d02077c53481338119794a0e8d979affb13ecad4879",
+      "size": 3012
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/Universal Render Pipeline_Particles_Simple Lit 16.mat.meta",
+      "sha256": "e23aa633c4afc588547684ed4a00e42d23901e20ee301dc163591fc5741a6042",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/Universal Render Pipeline_Particles_Simple Lit 17.mat",
+      "sha256": "25f39185626474f56c170d0540152e029569e629dfd42001e4183c442369478e",
+      "size": 3012
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/Universal Render Pipeline_Particles_Simple Lit 17.mat.meta",
+      "sha256": "067cc7ea577f41c024bd8304c16184f5c9286239d653d0440ba3b5a29515b51d",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/Universal Render Pipeline_Particles_Simple Lit 18.mat",
+      "sha256": "a6061545b3d62c124eaf15de7403e58da4ba85e77b5d559557659475afd0a62e",
+      "size": 3013
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/Universal Render Pipeline_Particles_Simple Lit 18.mat.meta",
+      "sha256": "d5ee297abcfc3da0cbd211bd2b48a453dcdda4c10822efdff13895a588b099d5",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/Universal Render Pipeline_Particles_Simple Lit 19.mat",
+      "sha256": "92f418837adf3ba11ddc45c8504f798082ebacb7dc8ec1a9a5db73d7b49414bc",
+      "size": 3012
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/Universal Render Pipeline_Particles_Simple Lit 19.mat.meta",
+      "sha256": "48e8273a3afa2af2c2dd506c505cc712fff14e739dd60c13445972dad826a952",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/Universal Render Pipeline_Particles_Simple Lit 2.mat",
+      "sha256": "86793cf2a0ef52e6a5552252a53664bce2a69632d11e46d5809c2df05f0f09b0",
+      "size": 3011
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/Universal Render Pipeline_Particles_Simple Lit 2.mat.meta",
+      "sha256": "56bfd90b1a773baa34e775065a1754740c63aef03cc960818048942132590d0e",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/Universal Render Pipeline_Particles_Simple Lit 20.mat",
+      "sha256": "0dc582f624ab3b2e32442774d9658150850cfa1c8130873dda771b3b75b9cd6e",
+      "size": 3012
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/Universal Render Pipeline_Particles_Simple Lit 20.mat.meta",
+      "sha256": "70aec7c3b70d306f9df3159a9d47be6a8e988d395f54b2dd88cbee070d72a31d",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/Universal Render Pipeline_Particles_Simple Lit 21.mat",
+      "sha256": "a295429c189ca00333a7e3b67b21e5867e82067014761db96c83b183cda263b5",
+      "size": 2993
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/Universal Render Pipeline_Particles_Simple Lit 21.mat.meta",
+      "sha256": "63d30c2df36bf74f6ecf12e6626e363754ed52ec64349ce18bda15b055209763",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/Universal Render Pipeline_Particles_Simple Lit 22.mat",
+      "sha256": "efad9fe0cf3e94ba21dd6d41c8452a574a2d5b20374da5cee64afd7cf701add0",
+      "size": 3012
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/Universal Render Pipeline_Particles_Simple Lit 22.mat.meta",
+      "sha256": "d83eab61c9638bac45ccadc8f53be525489de6d3dcd7930c33c4b55449e936ad",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/Universal Render Pipeline_Particles_Simple Lit 23.mat",
+      "sha256": "c54b8e7ae628913382dffc48ff1a6fda1a35c9b263bb51f0fd9b710d90af5ef4",
+      "size": 3012
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/Universal Render Pipeline_Particles_Simple Lit 23.mat.meta",
+      "sha256": "d97728e82783b45e433893e228506970c66228d10241eb2c7a0062839aa0efb4",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/Universal Render Pipeline_Particles_Simple Lit 24.mat",
+      "sha256": "b47ba76b166c6aca93f158e75c88efbf9fa1022d45be220d173652db3e9a1006",
+      "size": 3013
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/Universal Render Pipeline_Particles_Simple Lit 24.mat.meta",
+      "sha256": "76a5ea1fe87a4171389546c92c3e5e30b636222d6ee323907ced7de9c47e2bdd",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/Universal Render Pipeline_Particles_Simple Lit 25.mat",
+      "sha256": "78d1a0b1270f28f0bdbf81d6e30b4891db832b6c458e593a9da210c2432dd62b",
+      "size": 3012
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/Universal Render Pipeline_Particles_Simple Lit 25.mat.meta",
+      "sha256": "b53a7d100faded64a44dc74c361c50d13ffa544fb52c9bbccb668bc0ccacd946",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/Universal Render Pipeline_Particles_Simple Lit 26.mat",
+      "sha256": "598ed7dbf132057b3e45d93ca68983e1e34f0881a244a41f0008f0dd4948fa07",
+      "size": 3012
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/Universal Render Pipeline_Particles_Simple Lit 26.mat.meta",
+      "sha256": "c1469aa544694cd1d6514c8779ea603a8eb9eb1e47ff5de1fc419a84e415b89b",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/Universal Render Pipeline_Particles_Simple Lit 27.mat",
+      "sha256": "f5d4584d2136b55d2d9ea412e4cb68296cec2c3551cc1535203231bfb262d689",
+      "size": 3013
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/Universal Render Pipeline_Particles_Simple Lit 27.mat.meta",
+      "sha256": "1647dfd4ccc8d612a56705fbfc1046a854ec61f2682b70d45cb728ca0d3ae4f2",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/Universal Render Pipeline_Particles_Simple Lit 28.mat",
+      "sha256": "ddb6bfc034ed431c8538200b0d88fd0b246248e6ff2f34d4a95584bf288c6398",
+      "size": 3013
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/Universal Render Pipeline_Particles_Simple Lit 28.mat.meta",
+      "sha256": "b5ab18140159b9ccdc62ea27f347fb91d4f26cdc0110ec418c769b5279465d6a",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/Universal Render Pipeline_Particles_Simple Lit 29.mat",
+      "sha256": "8092911185dfad90229c9628e1bdd0801c1e924edf3d44444018b12ac4ac9ab8",
+      "size": 3012
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/Universal Render Pipeline_Particles_Simple Lit 29.mat.meta",
+      "sha256": "38d1982980b67e86518a7318d66480330af084d4b6819f935992f81ee5c36b7d",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/Universal Render Pipeline_Particles_Simple Lit 3.mat",
+      "sha256": "95c469f84b07b88017e75550b56f3cb1c333b6acc86b468937b8012758dea2b5",
+      "size": 3012
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/Universal Render Pipeline_Particles_Simple Lit 3.mat.meta",
+      "sha256": "24f148d6653eaba85f42bec933b347e7b9a4b6b0c7cd5a31b6b1b31a88dbf087",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/Universal Render Pipeline_Particles_Simple Lit 30.mat",
+      "sha256": "46ac58bed212db6e9cc6a3cac6b96f3249c2f5b89fec859cefbc94b68ad5c5d5",
+      "size": 3012
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/Universal Render Pipeline_Particles_Simple Lit 30.mat.meta",
+      "sha256": "42184406c148c52a66fbb7c30072a4c52e04586a2e7c01505c12313d4d89253c",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/Universal Render Pipeline_Particles_Simple Lit 31.mat",
+      "sha256": "c525d1588b54c4fdc58ae26e45ba6efe8c45302a00b862b948dc8052c00758b5",
+      "size": 3013
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/Universal Render Pipeline_Particles_Simple Lit 31.mat.meta",
+      "sha256": "605bd7c27d4e4710608d9da66b4928f7954e88ecf8875d9a947185319ff62d37",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/Universal Render Pipeline_Particles_Simple Lit 32.mat",
+      "sha256": "c5250c171c27f67e26df1d4049f0d53e7db8a9da8ab4fe1c47450712c4424227",
+      "size": 3012
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/Universal Render Pipeline_Particles_Simple Lit 32.mat.meta",
+      "sha256": "30f7665857e52395c1a208e2a6733666a4ac97be92652d25f02e654b567a0b63",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/Universal Render Pipeline_Particles_Simple Lit 33.mat",
+      "sha256": "1b2c8eefbbc2c82c9db06e0e825bdcc754984bf5edb9d926d449b1c43103f199",
+      "size": 3013
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/Universal Render Pipeline_Particles_Simple Lit 33.mat.meta",
+      "sha256": "7423afc1cbecc4596d7de9f713e767c320231e0b4cc0da371a2031295cf0f1f6",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/Universal Render Pipeline_Particles_Simple Lit 34.mat",
+      "sha256": "eea971103f579429ab1a4bd5e56a5009cab41de937c76eccaade097ad2d4ac7a",
+      "size": 3012
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/Universal Render Pipeline_Particles_Simple Lit 34.mat.meta",
+      "sha256": "4952f162ec21564e2f217205a7cc1ea77fe0a030caccc0bf6ddc0968005bb1dc",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/Universal Render Pipeline_Particles_Simple Lit 35.mat",
+      "sha256": "e16546d5a8c5b9e86386f1b1c431aa94a1ceb2919e8e3799ea6bf31a520a80d8",
+      "size": 3013
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/Universal Render Pipeline_Particles_Simple Lit 35.mat.meta",
+      "sha256": "bd4dff6fef350e8ac86a16785faa7742a7a6334ad7276bbad3c9b6eff5d1d28c",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/Universal Render Pipeline_Particles_Simple Lit 36.mat",
+      "sha256": "a62ca593fc03b2e107faa3005e9924e24fcbbebd168adb9cb8cc445db57ea635",
+      "size": 2993
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/Universal Render Pipeline_Particles_Simple Lit 36.mat.meta",
+      "sha256": "1e9ad15c62a740b67c1e0618f8291eacc1f51ed8c74fe9d29398288ffd68fb06",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/Universal Render Pipeline_Particles_Simple Lit 37.mat",
+      "sha256": "621ae64916e4a59b4b08861e4dd6679c12b74d48c5b11ada06873437d9be2976",
+      "size": 3012
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/Universal Render Pipeline_Particles_Simple Lit 37.mat.meta",
+      "sha256": "7023fa6a1f42ba6630ec09d0422b0a45969d9f7bfc8b26b24e2582ce37739149",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/Universal Render Pipeline_Particles_Simple Lit 38.mat",
+      "sha256": "361c6af8ea551f9f509c9db4752e110ff3c9d45fee8643767d4cd08af10f2747",
+      "size": 3012
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/Universal Render Pipeline_Particles_Simple Lit 38.mat.meta",
+      "sha256": "3205aa4a5b1ff14550144ac1d65e2a7f3363ade97ae2ff0b8adff40cf4c8e7ad",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/Universal Render Pipeline_Particles_Simple Lit 39.mat",
+      "sha256": "7a8f97877b0b6ce4483c4f92a9af5da65b634860cf8ef02e133d57bf42f3f95f",
+      "size": 3011
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/Universal Render Pipeline_Particles_Simple Lit 39.mat.meta",
+      "sha256": "92ebeced5555526f9679676674f336b9512b23e5ff47f7770522ea0ccd4afce8",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/Universal Render Pipeline_Particles_Simple Lit 4.mat",
+      "sha256": "5d1f80e01d0aa206b806b720beff3fffd9d16dd52d8def1540f34975bfb13bdc",
+      "size": 2991
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/Universal Render Pipeline_Particles_Simple Lit 4.mat.meta",
+      "sha256": "7b7b98f9b6815358cc881cefe675bd31d11a3d265a4be71659cd2d8e59b291ad",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/Universal Render Pipeline_Particles_Simple Lit 40.mat",
+      "sha256": "4e8060f610a597c0a47197a04c9f619dfad2d4beabcd854aa24431d99e30913e",
+      "size": 3013
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/Universal Render Pipeline_Particles_Simple Lit 40.mat.meta",
+      "sha256": "0aad99ea175338c80741ea8e2f4202b9c07fb4fb753059a0f575ef90d644aefb",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/Universal Render Pipeline_Particles_Simple Lit 41.mat",
+      "sha256": "c322cd726e9bb6a2727a9364dfd75bc84eaf88be5aa5b49e58ee4bdcd178a4c4",
+      "size": 3012
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/Universal Render Pipeline_Particles_Simple Lit 41.mat.meta",
+      "sha256": "9a6834614432eedd06b0684126f8240e572c1ecba7109426da0d27cac09cfe54",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/Universal Render Pipeline_Particles_Simple Lit 42.mat",
+      "sha256": "56578c68aed303f3748495d970032cdf8ea370b8f3150d77f88339c17a8dadb1",
+      "size": 3013
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/Universal Render Pipeline_Particles_Simple Lit 42.mat.meta",
+      "sha256": "412509f80483b2163a081c20fc2ff25f6197a32bc56a6e43b953f1233e6017c8",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/Universal Render Pipeline_Particles_Simple Lit 43.mat",
+      "sha256": "3082e153b8bcc187668ffadaf7c53d2ceb2adfa932d38ef7a7cea30a2511a352",
+      "size": 3012
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/Universal Render Pipeline_Particles_Simple Lit 43.mat.meta",
+      "sha256": "6ac7c2508a23d370fbe4c2a0790217e6e6decb8a7edd6be08a491992ff7cd00e",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/Universal Render Pipeline_Particles_Simple Lit 44.mat",
+      "sha256": "d19e53cfc640e48b1a28d256038bfdec36b52a005bc335883c8057e3d99a0657",
+      "size": 3012
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/Universal Render Pipeline_Particles_Simple Lit 44.mat.meta",
+      "sha256": "926f7b063ca9e7998a34a0020595af8978205503650a65b5b9ac701ea8fb5a0e",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/Universal Render Pipeline_Particles_Simple Lit 45.mat",
+      "sha256": "0c7b5364565f822408510d6d653567d3815f3555700bd4c798ef886f53cb338e",
+      "size": 3011
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/Universal Render Pipeline_Particles_Simple Lit 45.mat.meta",
+      "sha256": "e9856ed9d10f6e00919c7c32c622dfdc20bcbeda5028d5a64ab8ba291d48a06c",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/Universal Render Pipeline_Particles_Simple Lit 46.mat",
+      "sha256": "4106a74ed13888929b25f752b2ef8644b67915c92763bfdb5dedf9758c9c02e0",
+      "size": 3013
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/Universal Render Pipeline_Particles_Simple Lit 46.mat.meta",
+      "sha256": "9068812fc631dadcc3b44102658c98e04a87c90eff267e2944db7d7fe2623c1c",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/Universal Render Pipeline_Particles_Simple Lit 47.mat",
+      "sha256": "e657677e8be81b4156ce19f66b6bbfdecd6f2ab6bba5846513d3c72746c10fc6",
+      "size": 3012
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/Universal Render Pipeline_Particles_Simple Lit 47.mat.meta",
+      "sha256": "b0fef1e4fc7f84dc03127bb1e714ef9bbd0424f2f3ae558c148377fac93a6de7",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/Universal Render Pipeline_Particles_Simple Lit 48.mat",
+      "sha256": "782762dc25eaf025fcdbe9af8a20b0c9de55879bc2f4442c28310c77c32e4b75",
+      "size": 3012
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/Universal Render Pipeline_Particles_Simple Lit 48.mat.meta",
+      "sha256": "e171a2ba584ffb3451008210828ba82364db2413c8df34cf119af82ea5fca8ac",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/Universal Render Pipeline_Particles_Simple Lit 49.mat",
+      "sha256": "806e7d25990cc1ec6e6e0c5e1fc5392fe4f47ed9733bb114965496224f29a475",
+      "size": 3012
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/Universal Render Pipeline_Particles_Simple Lit 49.mat.meta",
+      "sha256": "5412616bda8cf9e85f40a6875fd0fbd196270713e465f74a4a3d92aff71918d7",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/Universal Render Pipeline_Particles_Simple Lit 5.mat",
+      "sha256": "e83d58be700dd08470c275e7035fa9c2ec6a9d0a401b98e1c375d676cb6b374f",
+      "size": 3011
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/Universal Render Pipeline_Particles_Simple Lit 5.mat.meta",
+      "sha256": "8c6cbe8f723cc4df5a8bcc19a9db302627de346deace0ff6e3a3a3e32c9eb7d6",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/Universal Render Pipeline_Particles_Simple Lit 50.mat",
+      "sha256": "923d063aeadd4f3d19798fc474373dca9f9602668548ac243cc55f5c9eef078d",
+      "size": 3012
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/Universal Render Pipeline_Particles_Simple Lit 50.mat.meta",
+      "sha256": "5b451d0cbe9af2295c648071a8b44edc5a7f909758f714def59fcc95fc2ae64a",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/Universal Render Pipeline_Particles_Simple Lit 51.mat",
+      "sha256": "49470f737c403c058835b9e0903b8618cb281c7b2dcd866a64917ebceadc201d",
+      "size": 3012
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/Universal Render Pipeline_Particles_Simple Lit 51.mat.meta",
+      "sha256": "55b53b04027dd17251cba1f74304326e0ccecb48e68b2e40c8321e99e5a005fd",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/Universal Render Pipeline_Particles_Simple Lit 52.mat",
+      "sha256": "6824f36e731503a25e06f5f90102de8a31e22fbac17352728f91015ac1d9e04c",
+      "size": 3012
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/Universal Render Pipeline_Particles_Simple Lit 52.mat.meta",
+      "sha256": "0baec465f19b438330180239e6666037c03b9d3b6d88e71a11c8f0b365fcf6cb",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/Universal Render Pipeline_Particles_Simple Lit 53.mat",
+      "sha256": "1a758f02e0702b05d189c633604833c3ff72f406e7963edf03adf3354cc55935",
+      "size": 3012
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/Universal Render Pipeline_Particles_Simple Lit 53.mat.meta",
+      "sha256": "f789f105016b7c3d2872b5199bd4aba9f65b601f3e587438f651e1a8d33fd469",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/Universal Render Pipeline_Particles_Simple Lit 54.mat",
+      "sha256": "b5cb1a82e045bb5b1c6a5d9d9de9e5cd98606a8cdde9b14deb75cc8fb2ef2c83",
+      "size": 3012
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/Universal Render Pipeline_Particles_Simple Lit 54.mat.meta",
+      "sha256": "71e918872c02a34ca6cf21cc19475e7ffe121dd1ff0a70bdc77d3bbbd02ce6b3",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/Universal Render Pipeline_Particles_Simple Lit 55.mat",
+      "sha256": "a46370ae764bff0af9014c776f1a243d4c845e11296e8e9bf7ba7f566d5d8dfa",
+      "size": 3013
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/Universal Render Pipeline_Particles_Simple Lit 55.mat.meta",
+      "sha256": "75c89390de020fbd13b83c16dd340194eaa3d54d907253d4d42995e44ca4c5f9",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/Universal Render Pipeline_Particles_Simple Lit 56.mat",
+      "sha256": "18410c8ee482f8398529c948c8e3d113ec50677183a3edd7fc7855d3e9761990",
+      "size": 3012
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/Universal Render Pipeline_Particles_Simple Lit 56.mat.meta",
+      "sha256": "9f93c61e4851efa3ff82b8746487e3e09186168a365323bb371f8769cd3c653a",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/Universal Render Pipeline_Particles_Simple Lit 57.mat",
+      "sha256": "00566305e5d0fad229813da594b85c2c843ba0c20c8587526d30f18dd8b9abbd",
+      "size": 3013
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/Universal Render Pipeline_Particles_Simple Lit 57.mat.meta",
+      "sha256": "ff1e9e9af4903da9cf75673f1fd0906ea4a48bc66557dcd7f12aaf421a9f4a57",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/Universal Render Pipeline_Particles_Simple Lit 58.mat",
+      "sha256": "aec2bcdec43a10b298b7a20dcdcabee92277476704ff040ab8c6e723a68a74e4",
+      "size": 3013
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/Universal Render Pipeline_Particles_Simple Lit 58.mat.meta",
+      "sha256": "fad8c7ba0f89b500abb33b6c79ac76da9cebad7c75cc6e05451cdfa84d423905",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/Universal Render Pipeline_Particles_Simple Lit 59.mat",
+      "sha256": "4deeb4475108db4c3b221d1f6b140d45c602aee27a18136418471b298b575c0a",
+      "size": 3013
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/Universal Render Pipeline_Particles_Simple Lit 59.mat.meta",
+      "sha256": "9e6fbf8eb0b159d634c76d90aaeb860b7e56a540dafd5e4bd866b6d565c37ee9",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/Universal Render Pipeline_Particles_Simple Lit 6.mat",
+      "sha256": "e36cd976d37d33845d3902def2fd84a4570aeaf102e2f9a977dbf9ef7ea9d03b",
+      "size": 3012
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/Universal Render Pipeline_Particles_Simple Lit 6.mat.meta",
+      "sha256": "e0b17b85d3ad936f2e12ade9f81d122f6a12e0748e88e5c2e9e5c329780d1d0f",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/Universal Render Pipeline_Particles_Simple Lit 60.mat",
+      "sha256": "0d21d5426b8d3434e625583cff048f741a1ca105755e24217f6ac9f597c2fb80",
+      "size": 3013
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/Universal Render Pipeline_Particles_Simple Lit 60.mat.meta",
+      "sha256": "d19c39c476214175c48dd53578e1b5bd287b98fb59e40f6f1673c93c695882ad",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/Universal Render Pipeline_Particles_Simple Lit 61.mat",
+      "sha256": "24a98885de5e7f5840ba83214f598733c3e4b52a576b9e22cdf3ff9616e66918",
+      "size": 3013
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/Universal Render Pipeline_Particles_Simple Lit 61.mat.meta",
+      "sha256": "535161cab5a97d3a1ae82db0bfa2e119c9a35c97255489ab355bc84feea38f55",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/Universal Render Pipeline_Particles_Simple Lit 62.mat",
+      "sha256": "2cf84c3fbcd633e4ec272757ad49fa360772a4a42e0174bcfb6d50c5f6fdda28",
+      "size": 3012
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/Universal Render Pipeline_Particles_Simple Lit 62.mat.meta",
+      "sha256": "1dff93fbd4cda000be4e9e45b41a6bca88709d1a3dbc724bb85088f4936f8b48",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/Universal Render Pipeline_Particles_Simple Lit 63.mat",
+      "sha256": "0f0c62094f5196133d492a8324a23d1319f60b6bacefe2c9d63382b244a58b4a",
+      "size": 3013
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/Universal Render Pipeline_Particles_Simple Lit 63.mat.meta",
+      "sha256": "f89bca11b6f75896520d1202918dc26e6731d7bd697d24592b6df7059e50c1b3",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/Universal Render Pipeline_Particles_Simple Lit 64.mat",
+      "sha256": "fb8e832b4a1d0e80fbead00b42117d41d774c40c3e2e5a2b88b2fc6d62705028",
+      "size": 3013
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/Universal Render Pipeline_Particles_Simple Lit 64.mat.meta",
+      "sha256": "7c1d845db2f2a20531238f13ea90c6e57422df85b2610aac9c75bf124bd2024f",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/Universal Render Pipeline_Particles_Simple Lit 65.mat",
+      "sha256": "fb6989c5dea8b86e760579dda7aa7d7d27e58b70c501c66472eddac227c5e9fb",
+      "size": 3011
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/Universal Render Pipeline_Particles_Simple Lit 65.mat.meta",
+      "sha256": "bd8c9b5ff6d54ea24acb804f7d4a489a8e9c89b38164ca33c653caf0063eb9f7",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/Universal Render Pipeline_Particles_Simple Lit 66.mat",
+      "sha256": "bd13eeb1e3ce4acbc6cd110ec354bc2dbc96d73ae7fb6a98b69e2d392839bfef",
+      "size": 3012
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/Universal Render Pipeline_Particles_Simple Lit 66.mat.meta",
+      "sha256": "859a2adb8e0b603c0eceb7096bbc3052d632121a1829401a576128cd69d08a69",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/Universal Render Pipeline_Particles_Simple Lit 67.mat",
+      "sha256": "f76556dd3cd0a428cdcba71686a035f9daef94e58b122c527f06703ef481b053",
+      "size": 3012
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/Universal Render Pipeline_Particles_Simple Lit 67.mat.meta",
+      "sha256": "d7a4656c3ac6666ce0e2e548c8447d27367799d58f0bb1cfeffdab8d185e0947",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/Universal Render Pipeline_Particles_Simple Lit 68.mat",
+      "sha256": "cba1f67862f0071825168e09ac6235a0c2700ec70b0716596c0f08fb48010539",
+      "size": 3012
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/Universal Render Pipeline_Particles_Simple Lit 68.mat.meta",
+      "sha256": "e152927890ea3b6ee9dfb8f1207fed42e10867785c4cae92d5759f4dc9c43e5b",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/Universal Render Pipeline_Particles_Simple Lit 69.mat",
+      "sha256": "fb174591751192b16f8660653060f93e89d616fa9fab4cdf5806a167991b7830",
+      "size": 3012
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/Universal Render Pipeline_Particles_Simple Lit 69.mat.meta",
+      "sha256": "029afa1b543d0dc137c2f6bb32727b51a922b67cf011d172374b7e50697558d7",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/Universal Render Pipeline_Particles_Simple Lit 7.mat",
+      "sha256": "b421f395b4ef1f71b6a7e8dbfbf8f58c99e1056942530e103aa42d5e2dd75e1e",
+      "size": 3012
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/Universal Render Pipeline_Particles_Simple Lit 7.mat.meta",
+      "sha256": "d5da1f7e7fe8ca9559b9c3eb2bb9a8734f7db20cd288060edbd76eb700c0bcea",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/Universal Render Pipeline_Particles_Simple Lit 70.mat",
+      "sha256": "69459280fcc97f4c6c72478d21d8284cce0d38be784326bbd0b19755c0ed4d15",
+      "size": 3012
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/Universal Render Pipeline_Particles_Simple Lit 70.mat.meta",
+      "sha256": "e52567e6cdfd8d32fc67142fa9250a8da2710e164fc75e6d479efab3ab88a54f",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/Universal Render Pipeline_Particles_Simple Lit 71.mat",
+      "sha256": "51df92b50111c52c8266fb2412be8b92a4819553ffbe6d2102dc4895d507a24b",
+      "size": 3013
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/Universal Render Pipeline_Particles_Simple Lit 71.mat.meta",
+      "sha256": "92df6df031d50a9b3fbd240b33cdbe0606be91f46c726b2b978dc27ef5005659",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/Universal Render Pipeline_Particles_Simple Lit 72.mat",
+      "sha256": "64a1823783e26aa0df6fb4aea68f466a5226df414ea042b146fb4e4a6444dcdb",
+      "size": 3013
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/Universal Render Pipeline_Particles_Simple Lit 72.mat.meta",
+      "sha256": "31b938b930a6cbb848220d9c53130603d7d151988ec8d77c4e882e4f0a2c0568",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/Universal Render Pipeline_Particles_Simple Lit 73.mat",
+      "sha256": "d90b546253c3a712c6337fc3d7dc8d58c18e8532916762c634fc94963988deee",
+      "size": 3012
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/Universal Render Pipeline_Particles_Simple Lit 73.mat.meta",
+      "sha256": "f30a966ff6e8580594e9739d6e7a7904f1d6ddedf4f915f9595b89ffed426478",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/Universal Render Pipeline_Particles_Simple Lit 74.mat",
+      "sha256": "dca99f324e6c6d19da06120e0ab4fe92b392faf5cf2b21894b93584947afefe2",
+      "size": 3013
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/Universal Render Pipeline_Particles_Simple Lit 74.mat.meta",
+      "sha256": "99961ef1bce4fcd08d52c2edd03da501290ae7d834dfb95ccb725212eb407027",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/Universal Render Pipeline_Particles_Simple Lit 75.mat",
+      "sha256": "e1325a5ba0e7c1e52fa206be69ef10f98c13d6f96ad5b50ffed4cca59ac41f1d",
+      "size": 3013
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/Universal Render Pipeline_Particles_Simple Lit 75.mat.meta",
+      "sha256": "aa95a0ea2caeb2723bc7eb2d3f2514a597241b5ef19aae99797b6dfdc8fd68c2",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/Universal Render Pipeline_Particles_Simple Lit 76.mat",
+      "sha256": "fa99b4b991501c7eb490f443691db1b8d44a499f3190d49f35bf744b0b9c8195",
+      "size": 3013
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/Universal Render Pipeline_Particles_Simple Lit 76.mat.meta",
+      "sha256": "10e618a3c45a32daf51842bab993008ed4f6447de8293b9344d8d0388235f692",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/Universal Render Pipeline_Particles_Simple Lit 77.mat",
+      "sha256": "65987af37395f7da905f26d45f2150d2235d563faf14a64adbfeba4684220368",
+      "size": 2992
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/Universal Render Pipeline_Particles_Simple Lit 77.mat.meta",
+      "sha256": "c63a7500f826470124a4c6b6b1ec074e67b663b8888a32abe68833b9a5350d12",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/Universal Render Pipeline_Particles_Simple Lit 78.mat",
+      "sha256": "2eb3ac6e5af801a1afe9b1a6602b4e9b3f50518a8edeef24ea8cf611a2254e71",
+      "size": 3013
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/Universal Render Pipeline_Particles_Simple Lit 78.mat.meta",
+      "sha256": "845a4fc575397956ad81d8e9d0994632d1374cd99a19e3739dbc4015f3d95aa1",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/Universal Render Pipeline_Particles_Simple Lit 79.mat",
+      "sha256": "d43a511cc87a652aef24e3b048ad307f1c9327afea7e7661d1052c68f23e3ec6",
+      "size": 3013
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/Universal Render Pipeline_Particles_Simple Lit 79.mat.meta",
+      "sha256": "aae1dc41c087f3f8e89a3635743c6a6957da60632c05dfe8939baacc18f8c3d5",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/Universal Render Pipeline_Particles_Simple Lit 8.mat",
+      "sha256": "b33bbddd4d7176aaefd8516dc0c021984de6266a86b716710a5d86ce787f347e",
+      "size": 3012
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/Universal Render Pipeline_Particles_Simple Lit 8.mat.meta",
+      "sha256": "1613e8ab5040624093d622dbdf97929a8294dc8c7688664ceddbac4992d9a2cb",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/Universal Render Pipeline_Particles_Simple Lit 80.mat",
+      "sha256": "67161d7488040613335cf37257d31310a38f7cb7af97155355769c050276a012",
+      "size": 3013
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/Universal Render Pipeline_Particles_Simple Lit 80.mat.meta",
+      "sha256": "53420f11f08dc9f601c97480ee6dee7367e250ae198ab36cdbc4d04467bf2583",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/Universal Render Pipeline_Particles_Simple Lit 81.mat",
+      "sha256": "fdea99b2d5bb1fa08d44ff126f5fe51a1d92bdf2dd2e13f77dd763ae1045f038",
+      "size": 3012
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/Universal Render Pipeline_Particles_Simple Lit 81.mat.meta",
+      "sha256": "a3084892fe5bbdb2f7d2d59c7aa3697a36d27b2517d1db1549b00a835d44d4e3",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/Universal Render Pipeline_Particles_Simple Lit 9.mat",
+      "sha256": "8f4c8c0dc0fc3e8b81fec1abd505ec6c66709efb59b5b63c7bb025a1fb79c2da",
+      "size": 3012
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/Universal Render Pipeline_Particles_Simple Lit 9.mat.meta",
+      "sha256": "43de10d1c489c4751c1ff552e52a7573a937ebe4ceb0be9b53d117663702afd5",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/Universal Render Pipeline_Particles_Simple Lit.mat",
+      "sha256": "a90edb84ae3bd23801cf0b6849d2221ccec157490763befb0fe9f9dea7342260",
+      "size": 3010
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/Universal Render Pipeline_Particles_Simple Lit.mat.meta",
+      "sha256": "4c98234362324783d455d8248811101af2ba23c5fba516580c666bf4f028dcf0",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/coach baked paint.mat",
+      "sha256": "ced144be0b76a8a530e01782709bafa1f4dd388a3d865c8b3de84c7b140f06b2",
+      "size": 4012
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/coach baked paint.mat.meta",
+      "sha256": "a5cdd9536b7810076870ad28c6ffc4f093768686c54cb2a294e0a5dd9fa0e306",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/door baked paint.mat",
+      "sha256": "c7dbf623d8ef823e3f76770057e32da6452dedf0ef054285c8f73982419e185a",
+      "size": 4011
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SceneMaterials/door baked paint.mat.meta",
+      "sha256": "fc458016a608f8a0ed8c641f27cb7bd74e101075690382ea4e500ca16d99ad17",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SoftDesertSky.shader",
+      "sha256": "3af56a744ac59a2195f225e5cb96fc61a8d100e1f07cb3b06270b2f317d5446a",
+      "size": 2418
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/SoftDesertSky.shader.meta",
+      "sha256": "ef09f0c582c113d23360a552f0c0d390f7965c3ec7a4c24c1782c6b4421ae331",
+      "size": 204
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/Textures.meta",
+      "sha256": "cd78bd8d72ae1c3c2ff630a0f7927e0823f5600fe75fce373853de4be9f3866d",
+      "size": 172
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/Textures/coach-albedo.png",
+      "sha256": "3b24b630605f8f11fc7089d0d36006ad236c819598d00b0f78c9ef9b7b656a2e",
+      "size": 1106258
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/Textures/coach-albedo.png.meta",
+      "sha256": "6ad771ef803ea4a057f99929323249960f841062550093cbb55d2a8122fb9f7b",
+      "size": 3364
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/Textures/coach-ao.png",
+      "sha256": "78ce2cfa1d0ce5caa7bafab42865a39d2003b2a1330bbdb016c0f6a815fb2987",
+      "size": 363610
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/Textures/coach-ao.png.meta",
+      "sha256": "1dd4a3de3bd076d41004f38055e8328565704854e4e90b9cc2a4ca730af3044f",
+      "size": 3364
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/Textures/door-albedo.png",
+      "sha256": "8a95fe6a73395064c365c745932f5a9a6a2e53b74b1ae27dcdd4b0b7e3a3730f",
+      "size": 58041
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/Textures/door-albedo.png.meta",
+      "sha256": "4064f50a868371ecd97bfef8a287c94490327f7b066bc1d6b46aed598e4fa53a",
+      "size": 3364
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/Textures/door-ao.png",
+      "sha256": "ffd0a7a56c716d52bdcc11785cc9fd9ba41c5db077615c22da910098e8cecd09",
+      "size": 33929
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/Textures/door-ao.png.meta",
+      "sha256": "ac07fa8e1585180a416064c7332baa79380ea229a808fa4aa532a857d0e197f0",
+      "size": 3364
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/Textures/polish-asphalt-albedo.png",
+      "sha256": "ff40c49f06ef6411942916ad2fd9382b08d449872333ac8ba2f7affa5c738795",
+      "size": 915196
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/Textures/polish-asphalt-albedo.png.meta",
+      "sha256": "45f9e5961678daa75faaa8a97f45ec15c1d1eb1528676a904201080a8f0fb9dd",
+      "size": 3364
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/Textures/polish-asphalt-height.png",
+      "sha256": "c6fffbfd2ab979b97df25e68cc61924101002a57ded474b4b5e5928cd26bb476",
+      "size": 1295159
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/Textures/polish-asphalt-height.png.meta",
+      "sha256": "cd8940458e09683ee3d275b00ab1c297ea83bea7b4f322b0777ec45975be0245",
+      "size": 3365
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/Textures/polish-concrete-albedo.png",
+      "sha256": "0d38ad7c1d93350283b91c3e208ca3e654098f1b56c7f91dd6fa2e250cefec2f",
+      "size": 811920
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/Textures/polish-concrete-albedo.png.meta",
+      "sha256": "82697e8f2403aedab3c5dfe06aeefc869b2698dcc9a0b3496d0d969c29e2c850",
+      "size": 3364
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/Textures/polish-concrete-height.png",
+      "sha256": "ba736dbde9b1513edfd47c7be49a1d296dcb7b863b852a83b95deecfec4cc6ce",
+      "size": 1234251
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/Textures/polish-concrete-height.png.meta",
+      "sha256": "9924fa49fc0d7ccd1fe4ec37a37db6c03e2a485ecb8a540bbffa6ed3a42232d7",
+      "size": 3365
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/Textures/polish-metal-albedo.png",
+      "sha256": "3f2a274476713a818ffac489a56bf5f1245add9d453957121b5bd93c68642857",
+      "size": 887867
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/Textures/polish-metal-albedo.png.meta",
+      "sha256": "3ef2d62bd85bb67a16dcee220b051ed4597ea33495ad0f83470cd431a503d6dc",
+      "size": 3364
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/Textures/polish-metal-height.png",
+      "sha256": "dabe6c81eb22197dc9eed92acb80e864ba0f940659a20375c176d9c85aa86406",
+      "size": 1277957
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/Textures/polish-metal-height.png.meta",
+      "sha256": "a18858e42f5e65f94c423e8ef1c7ea2608eb14fc60e9729eae8e7462dddf373d",
+      "size": 3365
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/Textures/polish-rock-albedo.png",
+      "sha256": "eb1de2e63aad7791dcaeccf40d39c6a6908e758092c822d9f5100c7f95a3c4e9",
+      "size": 842836
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/Textures/polish-rock-albedo.png.meta",
+      "sha256": "d97dde723c42f8dae9f01ca85dfd2061881e61153d6c11d9344f27b299f61d07",
+      "size": 3364
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/Textures/polish-rock-height.png",
+      "sha256": "f3ae8a77cef759771b54262023b689f17de3b967bd31957ed706cc733b7cebec",
+      "size": 1138369
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/Textures/polish-rock-height.png.meta",
+      "sha256": "70f0d8e7a25a7330ff715b944dbb9d54f9ed45be814e2b35e6bc152d039d5aab",
+      "size": 3365
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/Textures/polish-sand-albedo.png",
+      "sha256": "050426bc8ac91a275d3fc0076a7215ac2dc35822df3c8e0e51fd9d65b27a8f92",
+      "size": 861037
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/Textures/polish-sand-albedo.png.meta",
+      "sha256": "dcba150f83ded51089903635b3a8fcda8462a3b9771b98302a3cf4a06a8440e8",
+      "size": 3364
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/Textures/polish-sand-height.png",
+      "sha256": "74a161d6b4db4247b721a1cea34d160bfcc6fc430f3c0c2c0b2ea2d46509967a",
+      "size": 1148635
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/Textures/polish-sand-height.png.meta",
+      "sha256": "0c70b4ad6dd604444ac769fb30eb6feb017d96ae5c79b8289cd8bb0fa6294ed6",
+      "size": 3365
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/Textures/polish-stucco-albedo.png",
+      "sha256": "cc3d5391e82696c508016cc3427c58a6c203fd836ed9bc3802d2f0c37f60e7a9",
+      "size": 922430
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/Textures/polish-stucco-albedo.png.meta",
+      "sha256": "3211333c33f567f6fc856f1a0322106acf56198f580d6621e2b73d47b99b9f58",
+      "size": 3364
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/Textures/polish-stucco-height.png",
+      "sha256": "663c0014b36b15a13a038f9c937de7fb2e949241887b0e6b39f3bea0bb9720d5",
+      "size": 1264175
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/Textures/polish-stucco-height.png.meta",
+      "sha256": "de43afaecdb047093e860d236941c240f68ce52d08bd0cd11d9359233b1be5e8",
+      "size": 3365
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/Textures/polish-wood-albedo.png",
+      "sha256": "4d1f95e55ed3a0427f37c40c99b9e3446673d640e5761f484cc2aaf9bad7bbc5",
+      "size": 333197
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/Textures/polish-wood-albedo.png.meta",
+      "sha256": "e1c974460e872b211805ad9d2da18dd5669200b2c55ab9ebd700b1dde69c3472",
+      "size": 3364
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/Textures/polish-wood-height.png",
+      "sha256": "6e5c095add52e8db13c8bb4bfe50aa4ad4cb362ff91e11c26461178168976df3",
+      "size": 292691
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/Textures/polish-wood-height.png.meta",
+      "sha256": "d929e3d1cdc4b73ea23211ea53eb46ea187207be63d9234c460d2bcd26c3a23d",
+      "size": 3365
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/Textures/tile-asphalt-albedo.png",
+      "sha256": "f9832dba4161bc3e6c9f99419c90a170667df93b1ebe5c7574ca2eab2dc798bf",
+      "size": 690464
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/Textures/tile-asphalt-albedo.png.meta",
+      "sha256": "9df67bf1109411a1f2ab195a9239269b4779d200bb48e13905b4b06fc0685fae",
+      "size": 3364
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/Textures/tile-asphalt-height.png",
+      "sha256": "d1fd76fb55f9ec8e4087caa9ac8bf1b5164a00b0241d74ea371586172c92ebe5",
+      "size": 1364200
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/Textures/tile-asphalt-height.png.meta",
+      "sha256": "191f923c580c51d245d304326ef069f805cb0a7cd967f4cc769d604e31c566bd",
+      "size": 3365
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/Textures/tile-concrete-albedo.png",
+      "sha256": "be8e2aa99f8427ca1dc81c249c99451e0be87754880fc870d9558474048b4c9d",
+      "size": 713567
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/Textures/tile-concrete-albedo.png.meta",
+      "sha256": "59b2aab8a4e77c0f378f9ea4f159e8ea54fd825402364da266152132957b8597",
+      "size": 3364
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/Textures/tile-concrete-height.png",
+      "sha256": "9142baa200f1fb05b9f4f25719429fec1ae07e1e5c03d3ced923803cc8551d83",
+      "size": 1301571
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/Textures/tile-concrete-height.png.meta",
+      "sha256": "d83d1d4c43467be518d5f37c490f9e21ac754197a8b6200ecfa0b8da7e0d23c3",
+      "size": 3365
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/Textures/tile-sand-albedo.png",
+      "sha256": "850db11778db589e2691eca1d5db4d2a645f21b9ba73202c40264354955f83bd",
+      "size": 561246
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/Textures/tile-sand-albedo.png.meta",
+      "sha256": "559bf6cd9291a81a69d9f435751bcbd0be3c1a8f401c52410300e4072e726fab",
+      "size": 3364
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/Textures/tile-sand-height.png",
+      "sha256": "77cd0492a59ae2429377bdaa3975286a2ec456033726518463d96f1ad00cb3cb",
+      "size": 1155890
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/Textures/tile-sand-height.png.meta",
+      "sha256": "ab02e24e3fee0f3ba3226eebbc8e4b3534a929ec763e7cdcce236c3274c8a061",
+      "size": 3365
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/Textures/tile-wood-albedo.png",
+      "sha256": "d5836e26a1a68b6a17e0dc564e0e1ebc24eb8a061b7c9ba88a58190cf1d97655",
+      "size": 503886
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/Textures/tile-wood-albedo.png.meta",
+      "sha256": "9930899a7abd36698263008de650e31fea7ee5d648ae622acb57e55303ddbda8",
+      "size": 3364
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/Textures/tile-wood-height.png",
+      "sha256": "37b8fb2dc160ac900e529509e42390f83e56585025796229ac62ee9728a61855",
+      "size": 1317396
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/Textures/tile-wood-height.png.meta",
+      "sha256": "e8397482d898f0df9fa271626a8002c58e16c80981545dde185849ad504350f8",
+      "size": 3365
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/Textures/uv-checker.png",
+      "sha256": "1de0fc8ff67d780e8664ea48124c873275b24f415f7a4865120441828f19579b",
+      "size": 60386
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/Textures/uv-checker.png.meta",
+      "sha256": "c0e4fe403514484106e2c33bc4a109f4b97a58ef4de45e9d2b5ce89cb85e281c",
+      "size": 3364
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/arc-module.fbx",
+      "sha256": "48705bf573c62e286ca804822a4166d89cfe05a130976d7df30be8fe3866cd0d",
+      "size": 361868
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/arc-module.fbx.meta",
+      "sha256": "b568c9c804f191b98678d012ba30bba943207198c208f738f7fdbe5c39bd1f69",
+      "size": 2891
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/cabin-finish-albedo.png",
+      "sha256": "5ce53aaceddac96d3393bffbf62a40f70614cb70a7fe9ef41940039420f2024c",
+      "size": 11173734
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/cabin-finish-albedo.png.meta",
+      "sha256": "b4f6218b94d7fc855770ecb5993e5273faa761a8a4b784c3d129bd818c5a1863",
+      "size": 3010
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/cabin-finish-ao.png",
+      "sha256": "d1093bc661ab35904556fc463d6649a26e2bb096332b5571a4a5ac3678e64ffd",
+      "size": 1918691
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/cabin-finish-ao.png.meta",
+      "sha256": "6e03b528b9d48720222f798cc1cca72170ddfe56610af78dcad8d84e2a02bd9a",
+      "size": 3010
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/cabin-finish-normal.png",
+      "sha256": "71d480d9506bbd085ee3db8be8bfa5fca0bae50b758d67225d2e5224515309ea",
+      "size": 432935
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/cabin-finish-normal.png.meta",
+      "sha256": "1bac450dc8415a6281d76218102d339ac176a2ce1159b8f9b88c59eb74e4d299",
+      "size": 3010
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/cabin-finished.fbx",
+      "sha256": "be2c87c7f4ff1fa054df0adc3178fb7b77dc1227b92ed983e53b1d6de736106a",
+      "size": 1283052
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/cabin-finished.fbx.meta",
+      "sha256": "970ef96dd884ff750118bcb45673d0df01d6f406a73256f9acc5b408796026ff",
+      "size": 2891
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/cabin-fittings.fbx",
+      "sha256": "4171ab348d629d676d4dd6f468ba3f511e30940fc13ecc427fd50e9411d66c7e",
+      "size": 124828
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/cabin-fittings.fbx.meta",
+      "sha256": "7c2985688c4eac48e572d1bfeea771527641f7fc5e90c48db7ccf08129e3180f",
+      "size": 2891
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/cabin-hardware.fbx",
+      "sha256": "0a41a11923d672eeef244a3a5d3b35cf833faf7f2e0dcd45fd051b4a6dc0c8ee",
+      "size": 201036
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/cabin-hardware.fbx.meta",
+      "sha256": "6f48eddff1f13154fa2f6efcd1931bc29d03c09d7791c69d6e796a62437b7afa",
+      "size": 2891
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/material-values.json",
+      "sha256": "8203719b669524e72bb2859f6c819f5ff80154bd2d46e1375151d2b5ab3dda30",
+      "size": 3933
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/material-values.json.meta",
+      "sha256": "2bf67510ef5f61f10c9c96019a0979e12bdbf78684079a82a65c806046f600bc",
+      "size": 158
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/polish-body-material-values.json",
+      "sha256": "71120ba65d3f9e38cad53fdb44d968d04e6459899ff23702a152a0297ebbe1e4",
+      "size": 6593
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/polish-body-material-values.json.meta",
+      "sha256": "132a39763be195f51238d6ecbd8a9f2f4a0a2c035fed2ebaee32eda5b8af5ed6",
+      "size": 158
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/polish-station-material-values.json",
+      "sha256": "623ad11c532b4c0894e9b18cf7110717ceb2e7dbd5de51fac3fd2d801071a5d7",
+      "size": 10342
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/polish-station-material-values.json.meta",
+      "sha256": "1c27a3ba5d8e9cc0b1c6eb77a2dd4a5cbfad2dbacdd1d13a51243a3c93099fd5",
+      "size": 158
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/ram-module.fbx",
+      "sha256": "db0a43132bb86fd7880aa832ea32e059793e6462de2077d51c346517321a145a",
+      "size": 164444
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/ram-module.fbx.meta",
+      "sha256": "4e81c7194b2eb970a10dcba449ea0bb382660da78c755cc5f9d207d987b5af56",
+      "size": 2891
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/rv-body-study.fbx",
+      "sha256": "aefcb2b0b7633cc236989fb46d3746aa9067e437686971c00f1b607f12fa7a63",
+      "size": 2460188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/rv-body-study.fbx.meta",
+      "sha256": "299f1ef91819bfc4d6f03bdaaac3cca8f49017cb75c974a234759905a87ce928",
+      "size": 2891
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/rv-polish.fbx",
+      "sha256": "ef83f5cd0b3eace88412bd4e918fc8d4544fa5dd985a857b625a3914e43fbccf",
+      "size": 3089884
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/rv-polish.fbx.meta",
+      "sha256": "b4cc40edaebc2c44ae1fb384d690227f195512c2bdb2ed519bdb7dac3e601e79",
+      "size": 2891
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/rv-upgrade-structure.fbx",
+      "sha256": "25abd3c89110109f13a2a8bd445ae41cae14675ce80cde1ddba94cdcfe2c5c52",
+      "size": 2497868
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/rv-upgrade-structure.fbx.meta",
+      "sha256": "09ccfa8f7ba3a7b02b7f67e6cd596159e24104199aa007bcb15e5a04c9d55bb7",
+      "size": 2891
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/sand-handpainted-v1.png",
+      "sha256": "5d3931e7a80c15c67de4dcef84591a94d2b2ac5b7fe9149445b2625c02d0d5ff",
+      "size": 1755153
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/sand-handpainted-v1.png.meta",
+      "sha256": "c5b7323f4705f491316544200d7a62ffe369a31c67b859f3b52d45711d2e8f8d",
+      "size": 3364
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/station-material-values.json",
+      "sha256": "eb6135394b4fb0e02fe576c4ffde9505db3e3addaa6a2475c9686dd5722e7ad8",
+      "size": 6699
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/station-material-values.json.meta",
+      "sha256": "acaea78cbca59b644e810cf760f15cb04ef61c556d9798ba788712deaa1c3f88",
+      "size": 158
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/station-polish.fbx",
+      "sha256": "ed26bb782f3c3f9030d8b7d98b6ca73016aaad88c5590054578b67f103b5fa6a",
+      "size": 5899004
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/station-polish.fbx.meta",
+      "sha256": "94ca4ea2c2fef74061abc8f854ec25678008020072bead12c7d5c6a74909ce88",
+      "size": 2891
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/station-study.fbx",
+      "sha256": "825bc68633d8d0d79ff796555b785bce2634081df926b043402d7c53e0c89c41",
+      "size": 4794844
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/station-study.fbx.meta",
+      "sha256": "5a10bd7953d067b09f9f644e1c7678a46ed1b63e44b8f3053b23f25fc0007987",
+      "size": 2891
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Audio.meta",
+      "sha256": "80ce0c66e674dfb9ca26101baa497148506aa9b4d818384ed5b38bc78ec0f5e1",
+      "size": 172
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Audio/arc.wav",
+      "sha256": "e1ad546b374bd9a6e910e64880fd6c569350a289a8127ab446b851063187bc1e",
+      "size": 22094
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Audio/arc.wav.meta",
+      "sha256": "83f018f137833858064c5983646cb1a635babd699510cc4d88c879a1547f4abe",
+      "size": 485
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Audio/engine.wav",
+      "sha256": "3b282f280a31a6bbf03fd2c3c985311c467a1dc2962bc6edeeaea062a88a21af",
+      "size": 88244
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Audio/engine.wav.meta",
+      "sha256": "4ed91f03f2f8bf6b0d3e480982f24d374b094e765490d9612f783966e7cfb5b1",
+      "size": 485
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Audio/hit.wav",
+      "sha256": "cc10ef5ea592ec3873b6af6c44f37f3efcddac4277249edae5307d01f28bac83",
+      "size": 10186
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Audio/hit.wav.meta",
+      "sha256": "8e939667541a4961c7a728191b1ddcf61896ec7a0878c0a4ee28fd6f8af95e13",
+      "size": 485
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Audio/pickup.wav",
+      "sha256": "e56f984adc964bc025abf3f02a390470fe876ea96f3cca78a82ebce33661a8d6",
+      "size": 17684
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Audio/pickup.wav.meta",
+      "sha256": "dde88c05f9d89170053d6299cdb23f2600216f96f5ed8ef382cdd3046fe7fab4",
+      "size": 485
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Audio/shot.wav",
+      "sha256": "6f93137abe2303138ba452e3421e0eb1b54b86004853074d6505173163b6819d",
+      "size": 12832
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Audio/shot.wav.meta",
+      "sha256": "2705ea62d128f8b0f0312e6dcf34987c2b45f5f376c209dad77cee91dec6c47b",
+      "size": 485
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Audio/step.wav",
+      "sha256": "c883230add4912b07f1e0d961ccd54ebb7c3e7d2f29aff98aa604916841e1a96",
+      "size": 9746
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Audio/step.wav.meta",
+      "sha256": "9c3e83653f50c2e2ef172d783d21633bb955c733bd608758ab64f456bfd3427f",
+      "size": 485
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Audio/threat.wav",
+      "sha256": "a7aec729a07a702529e09ff91a1049fee17efcc0ee02584c9943ded8fc1cd35a",
+      "size": 30912
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Audio/threat.wav.meta",
+      "sha256": "825b2fc477d43c1b42f35f2e57b0b37d9da5bcaa9eb294dd222081c0ddece33e",
+      "size": 485
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Audio/upgrade.wav",
+      "sha256": "6b3ec28fd97bca5fe0871e115b1ff0ffe0651f863cf7ba1468139617e30cfbd2",
+      "size": 66194
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Audio/upgrade.wav.meta",
+      "sha256": "7c4768ecbfc553aa08eb7e0ee504b1325b492cac95fa8e95db52b4fae782eedd",
+      "size": 485
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Audio/wind.wav",
+      "sha256": "5b9338f0460b9f1848e05c7982ff8369f255742e252ed879ec932df14c8455e8",
+      "size": 176444
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Audio/wind.wav.meta",
+      "sha256": "e54d6095685cf0ac871fc8aa6b57ffc779d6873bdb818f8a27703a821d072c21",
+      "size": 485
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Editor.meta",
+      "sha256": "410e1f27d46d05502b79cefc2a836ef1812f11c7a2da2ec399895c821894fe7d",
+      "size": 172
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Editor/AndroidBuild.cs",
+      "sha256": "55f141d74302258439a98cd8300e11adf11cc8598bc088117f5b98b06a1b17d9",
+      "size": 11733
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Editor/AndroidBuild.cs.meta",
+      "sha256": "14c83feb5b8be5976f51dda3cc2c0fbe73c65a4f1ee2d7252621fe3ed7e20b6d",
+      "size": 60
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Editor/BodyBuild.cs",
+      "sha256": "d80fc759fb4b52e25068f05e27a671cabd7f86752d48922f0ef44fd3558118ac",
+      "size": 8710
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Editor/BodyBuild.cs.meta",
+      "sha256": "fe657b2c9baf5dbd7a03318bf3ba092260ca9f1bd90f11d1e1fa2981c3990e4f",
+      "size": 59
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Editor/CabinFinish.cs",
+      "sha256": "94694d5a4b86c918d5c2d376597db4efca25264864406434ce49f64497b8877c",
+      "size": 7875
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Editor/CabinFinish.cs.meta",
+      "sha256": "d1bcd2c071b7e8e6abf77e17826757a6962f2df2d063ebb3584ff71cb38c600c",
+      "size": 59
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Editor/CabinQuality.cs",
+      "sha256": "dfee2a115e071c73d3963a7932910f950623bfe046a5003a0ddc781dd8056307",
+      "size": 4687
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Editor/CabinQuality.cs.meta",
+      "sha256": "cfd5415f42ad07a2b78c664b02ae2561960f90d6cd227201c14d9bb0c81c9d8c",
+      "size": 59
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Editor/JourneyBuild.cs",
+      "sha256": "2aa143ddc7c11e459151b3f9cf06cb8a4ba1522b758a930ca5a008990685aa4d",
+      "size": 8178
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Editor/JourneyBuild.cs.meta",
+      "sha256": "053ce6eefd79743382ff6588f18256c1bc99a0ae6e543bfe52e13a6097364175",
+      "size": 60
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Editor/PlayerBuild.cs",
+      "sha256": "0fa249683e2c48a886ef9b2d718192e898af03051054500498f7238b4ac47cda",
+      "size": 2944
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Editor/PlayerBuild.cs.meta",
+      "sha256": "4c2aa3bf4d54f910e40e8b58f80417ed96e20804dbd4b9dc2e7ef11357941c2b",
+      "size": 60
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Editor/ReviewSession.cs",
+      "sha256": "ed2abe51e3264299f8b6b908b692f82e5dc6663a0cde9c7de640c088b329292c",
+      "size": 9859
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Editor/ReviewSession.cs.meta",
+      "sha256": "6e605ef702f1635636df9ce50c93bc91d91920ca5b1e66b9b627e8694e5ddb4d",
+      "size": 59
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Editor/SessionChecks.cs",
+      "sha256": "6c005c80c5f93ada586a31072db1b8b38678e76079a59c36d6a26b17ab76213e",
+      "size": 2563
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Editor/SessionChecks.cs.meta",
+      "sha256": "57cd5b1c70ba4aa2c77c956d26a31e1ca8ce5f8ee1248dcf32835d0ce56e53a8",
+      "size": 59
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Editor/StationEnvironment.cs",
+      "sha256": "ba82a60d7d6d9c64e33b5cee463f22c3dd859fce09d434417571351f3c92daf3",
+      "size": 8808
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Editor/StationEnvironment.cs.meta",
+      "sha256": "9a329960d3bfd58c5606d2bf9468b22d8894fd6960a9211628fe69ccc2019c29",
+      "size": 59
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Editor/StationLook.cs",
+      "sha256": "b55f36fd45f3294cb872733ba1d7bbdf29d9c2f6f8cee2e91e1a38abb7eebcfa",
+      "size": 16758
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Editor/StationLook.cs.meta",
+      "sha256": "3e97badd29363a84a3e57405e0b5da72ba0ec13a6d4544d2efbbd0adfb122d77",
+      "size": 59
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Editor/StormChecks.cs",
+      "sha256": "d1ad3321cae0608f0a76cbd1300d9e0b6a9f5389712ade95e287026ec44a0969",
+      "size": 5661
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Editor/StormChecks.cs.meta",
+      "sha256": "db2d3b5daa7dc2d7d2acf1372daf18f1491d29b68f98fb4aeff3d1bd6f4f83d7",
+      "size": 59
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Editor/UpgradeStructureChecks.cs",
+      "sha256": "b037074ea6cb89c782c546ba7809697c3e0535817397a6c65e74bf5b5af96fed",
+      "size": 4586
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Editor/UpgradeStructureChecks.cs.meta",
+      "sha256": "273395cb5ef75c54be38ecba732b5a5c5ba5b346e009186d5db7902221ae8202",
+      "size": 59
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Editor/WebBuild.cs",
+      "sha256": "80ed47be2b8dd921b16d09ebb9466c482d8bd3794d39b905086ac1360d81295c",
+      "size": 6889
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Editor/WebBuild.cs.meta",
+      "sha256": "75e593804df23d51be33d85f98b896f95810bb1f1863c79d0dc99660d5f24958",
+      "size": 59
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Plugins.meta",
+      "sha256": "8f107cec6b58d2f2049a2087dc218ac6f0edd174a00b2064f627c6fca4e2d408",
+      "size": 172
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Plugins/WebGL.meta",
+      "sha256": "764281736e446def8fd97aac57871a6f3d6861588a258c415558efa91c0077d8",
+      "size": 172
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Plugins/WebGL/ReviewBridge.jslib",
+      "sha256": "a372d8f330bc2a768c16fcc9fda02a4a2abd043d60e6daec901c722c4fc78ddd",
+      "size": 151
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Plugins/WebGL/ReviewBridge.jslib.meta",
+      "sha256": "3f327aa1a875bb9e2182d7dbf5147d5eae6d250e8a87c89717846ca38211f133",
+      "size": 59
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Runtime.meta",
+      "sha256": "5b7981baaf3f6bbebac9e781bae2d66b1bff971c3b5533ddd9b8a474479e7241",
+      "size": 172
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Runtime/ArcCombatState.cs",
+      "sha256": "539458da9984f1be382e784d98ffdf64d9baf4d35e4236deb7fd2bd8d7c50346",
+      "size": 2802
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Runtime/ArcCombatState.cs.meta",
+      "sha256": "302720bdeecb8c66be4dad0150ab8aae8356d9d3bec2a0005efffc41e0c6862c",
+      "size": 60
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Runtime/BeastActor.cs",
+      "sha256": "e2eba615820def380c6e1fc0734e93d9b6569f7aa3a3d5cbd638b01071146f51",
+      "size": 7744
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Runtime/BeastActor.cs.meta",
+      "sha256": "ecb2d23fd1c56f1e1d34b62c68f1cad8d594e5bf8b75b95cce91cd7eb568356a",
+      "size": 60
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Runtime/BeastCombatState.cs",
+      "sha256": "a6e10fa1fc0533165950a41b12c04b59012ca89e68d107dfa8697b4946441945",
+      "size": 2382
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Runtime/BeastCombatState.cs.meta",
+      "sha256": "bbd6e12a199be7426e83f95af30ff4f187bdfcd0619e58caadaacb079f5536cf",
+      "size": 60
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Runtime/BodyViewer.cs",
+      "sha256": "15242a3eba5011302ac0ce52366d9f3bee1a7d028b8ad61bfef7e6e8819effd4",
+      "size": 9780
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Runtime/BodyViewer.cs.meta",
+      "sha256": "8ba15cedf3dacc032c5591a89d9cd274fbe757de7b5719890760e67e593468c7",
+      "size": 59
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Runtime/CabinLighting.cs",
+      "sha256": "1d6275831342858009a29c4c8994ece9b9c9f80f3a7efe3230be980db6c1f489",
+      "size": 1906
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Runtime/CabinLighting.cs.meta",
+      "sha256": "0d3ede3af76f5c730b7f3cc8c7fdce4666c8084fea0b184198f3efae622c19b6",
+      "size": 59
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Runtime/FirstStationJourney.cs",
+      "sha256": "d57b7a423aa635bc883ea24d15648f467c900b7f5b14398b89cadb97446705bd",
+      "size": 11588
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Runtime/FirstStationJourney.cs.meta",
+      "sha256": "41bdba889106d0eab092059c7b9ace27a3b86a282f11655f3ffa18b8808730a2",
+      "size": 60
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Runtime/JourneyActions.cs",
+      "sha256": "48b5c3ddc964febcf3e5be28ce51bba6af25f92624dde66cbd30f281faa87197",
+      "size": 10381
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Runtime/JourneyActions.cs.meta",
+      "sha256": "65da18f316aee95391f229c6d0ff3b674c98ff404b77e3b13489e9a6be9a2101",
+      "size": 60
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Runtime/JourneyDirector.cs",
+      "sha256": "4ff96bcede47af7cfee5c3f1a6c69778438f8480059203ca0d30adbfefb2649f",
+      "size": 7838
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Runtime/JourneyDirector.cs.meta",
+      "sha256": "02df4c5026969af00ef77b44b2cc9e26cbea74d3d36ef60e01b6a5c20e78384c",
+      "size": 60
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Runtime/JourneyHud.cs",
+      "sha256": "f62d7ef5bf5737365538f20e7b8fdeccf4d30724326dbbfaaa54fc1d698f10e3",
+      "size": 16241
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Runtime/JourneyHud.cs.meta",
+      "sha256": "acbb13a350944c9f2d9173f4be482373c8c6e130998a9f71e29fdcdc403ce6e9",
+      "size": 60
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Runtime/JourneyMotor.cs",
+      "sha256": "a0ac13f7a4ddeb2007d11935ead4ede8b7c13362115d85afc12f71654fd1d65a",
+      "size": 11944
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Runtime/JourneyMotor.cs.meta",
+      "sha256": "330f679680db94bf8bc9c12b82d73897b507790f9fe4e52429755360efaef244",
+      "size": 60
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Runtime/JourneyPresentation.cs",
+      "sha256": "dbcb9f59996d9f90c5a41865e1a2bb89500d7dfac594114e5815a4890a74ad2b",
+      "size": 1233
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Runtime/JourneyPresentation.cs.meta",
+      "sha256": "2e2801071e71e3f19ef26e4cebb3eb693c673100a1623e23ba6ea3f1e0642d75",
+      "size": 60
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Runtime/JourneyRaycast.cs",
+      "sha256": "b6a7afc339742fbf34817c267aabdda901b1420f3c367fb627caa6da0750b739",
+      "size": 1918
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Runtime/JourneyRaycast.cs.meta",
+      "sha256": "c8a5f540dac2a221fc8d3e014e28bc8861423ff1d3d9a428249305329a20a8b7",
+      "size": 60
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Runtime/JourneySession.cs",
+      "sha256": "453e10c9fdbbd91ab020afb66201717cb71f52bddfd0385fed11aedbeb7b9ab5",
+      "size": 5547
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Runtime/JourneySession.cs.meta",
+      "sha256": "27f2d6d844f340a0e06360fb9a4cf95290b0a388fd354bb6d25b4fefbd5d3af9",
+      "size": 60
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Runtime/JourneyTelemetry.cs",
+      "sha256": "fa6ad92f69c78109b3efc7dafc7a645ec6156a3d858c76784b4a6fe33435e01a",
+      "size": 1624
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Runtime/JourneyTelemetry.cs.meta",
+      "sha256": "8cd7f97456cbfa56de584394d855caebcacee9f2d3495f178f565278c2f49a3a",
+      "size": 60
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Runtime/MobileInputAdapter.cs",
+      "sha256": "56a1745dad369abf81c8c54d9e64fb132709d03b6acbd831d427402f3568ceea",
+      "size": 7395
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Runtime/MobileInputAdapter.cs.meta",
+      "sha256": "519f2a2bad1822994a4fd0a4e8a5f31a3cf2804c72a8094bea7d9402b7385ec2",
+      "size": 60
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Runtime/PauseGate.cs",
+      "sha256": "f96c413f64f780bb4d2f35442b4973e8910d6f8cbca74930fdbb3bc38672f713",
+      "size": 1550
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Runtime/PauseGate.cs.meta",
+      "sha256": "3113c85e37354f138ac3e478301d4d2101ce96b242fd19b5e8f833c41186c4c2",
+      "size": 60
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Runtime/PoweredEncounterState.cs",
+      "sha256": "5ff7bff4fb85779ae5f9198f60c7f4d9cb7c3aeb8a09efbf191e70b61da15ed3",
+      "size": 4202
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Runtime/PoweredEncounterState.cs.meta",
+      "sha256": "85092bdeedc432b0742784163057eefb21de0e5db6adca708e646124ec414bd4",
+      "size": 60
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Runtime/RegionBinding.cs",
+      "sha256": "3e58c5e696c25b5c32a655421f0ed4f2ef7ff757ec0207cfd90d4e033b79ee5d",
+      "size": 4034
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Runtime/RegionBinding.cs.meta",
+      "sha256": "07a54cfdfc052fc7d443aa28b87e8e3f357635407048c118574289a5ae92a8ce",
+      "size": 60
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Runtime/RegionLoader.cs",
+      "sha256": "5d89360ed36163cb23e6792dc55fb7edc29eef66313a4e3659d1d4fb9020227d",
+      "size": 3726
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Runtime/RegionLoader.cs.meta",
+      "sha256": "7653bc4a56d1241913ef447087b80ba93978f922739486908d9d42f057550ddc",
+      "size": 60
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Runtime/RegionProgressState.cs",
+      "sha256": "2ee88e3a8176c6a11990ccb6fcc784d37758d80203f3bcb1c6405af72127858b",
+      "size": 3541
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Runtime/RegionProgressState.cs.meta",
+      "sha256": "2c1a0b7b341db5b91383f304c7e82cba1be9a762eb62c85f1cbf7ab30c58de84",
+      "size": 60
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Runtime/SessionState.cs",
+      "sha256": "8691fe53f07fcbf4e3b51a2c830ab620d83e5d9138065989c67d45c6f4d99a6a",
+      "size": 11464
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Runtime/SessionState.cs.meta",
+      "sha256": "cfbc946d8bd43c6d6df8ab90859a4e12464d1a83c846ef6f3e80af74a3ef6198",
+      "size": 59
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Runtime/TouchInputState.cs",
+      "sha256": "3d059196050b7eb027adf80cd3f33210fb975e54d2e7be9a7c9dd6a73b3788ae",
+      "size": 6008
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Runtime/TouchInputState.cs.meta",
+      "sha256": "78e9b9653b868a1dde78d9d472db808a5eb66aaa299262af1154d077768b0598",
+      "size": 60
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Runtime/WebPreflight.cs",
+      "sha256": "c18ec1f274b4911968509d7ae0dc9f1bd6b239bc16f8433aa93b0958efebf640",
+      "size": 1992
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Runtime/WebPreflight.cs.meta",
+      "sha256": "2fcc67cb7723ee9996894703479bc64689463bfec8042c57ac166fc5a6f5145d",
+      "size": 59
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Scenes.meta",
+      "sha256": "b5e9f214355ff8bd787229e422f4b4737514935547118a51b335e0539a391d71",
+      "size": 172
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Scenes/BodyStudy.meta",
+      "sha256": "c106898e22e7331bba7ec8b94dcf068d1db78869399468526ae2091e848f62e7",
+      "size": 172
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Scenes/BodyStudy.unity",
+      "sha256": "bdc5f183daeeaf463660068944cbfaed7f4bb1d28a4078a0d479709e5f6a1a0c",
+      "size": 4392597
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Scenes/BodyStudy.unity.meta",
+      "sha256": "0ccf200b3e5a87ec632afc8a33327a7e89c0459cfdd755eedd0c63adf669044f",
+      "size": 155
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Scenes/BodyStudy/LightingData.asset",
+      "sha256": "91e82d264af8e826e1e773e6973e2399bed4faa05f277c5b4becc400b50c3236",
+      "size": 116209
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Scenes/BodyStudy/LightingData.asset.meta",
+      "sha256": "f2ac085f6ae21225c78efada0789906e080d93983678cf644c9c9c6a9aec9b42",
+      "size": 190
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Scenes/BodyStudy/Lightmap-0_comp_dir.png",
+      "sha256": "2ecfffb39b823065f69a4a0cf66d2b8f7d2e4525c98ba9713d1cf00c991e088a",
+      "size": 43101
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Scenes/BodyStudy/Lightmap-0_comp_dir.png.meta",
+      "sha256": "de5fe7c8c0be8703bdb68eccb8fa32083eb5f4ee9fe376f9ddeb61afd4440872",
+      "size": 3365
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Scenes/BodyStudy/Lightmap-0_comp_light.exr",
+      "sha256": "efacc82bc778a41827b48ac6701ff297ba65a5b5a9f292af3879238831e454cf",
+      "size": 573035
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Scenes/BodyStudy/Lightmap-0_comp_light.exr.meta",
+      "sha256": "c507a9ed2ae24eeecf1a306d68cd8a4a42126f591ce82ab48b5ff374316ed314",
+      "size": 3364
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Scenes/BodyStudy/Lightmap-0_comp_shadowmask.png",
+      "sha256": "4254f58523d93a3d8e2a1cb4d30e0f49b7dcd4237a9ebe898f949efee893e6c1",
+      "size": 5809
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Scenes/BodyStudy/Lightmap-0_comp_shadowmask.png.meta",
+      "sha256": "a4127a76d024e25238b6d7e115a8cabc245158fa9cdb08adf3a7e3b4288d794d",
+      "size": 3365
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Scenes/BodyStudy/Lightmap-1_comp_dir.png",
+      "sha256": "aaf4e64f39f857ce9a4f295fe0f2526a6c152bc0b94bd2eb103e5e8950f4a524",
+      "size": 21934
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Scenes/BodyStudy/Lightmap-1_comp_dir.png.meta",
+      "sha256": "33841f1569435c1da7e100e5f6444c9e3cd33ee5e97446345f16705f8b3be392",
+      "size": 3365
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Scenes/BodyStudy/Lightmap-1_comp_light.exr",
+      "sha256": "5a6be31ec2bd755efc11327cb74d00f1a711419ec579242e7663571a2cfcabaf",
+      "size": 279068
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Scenes/BodyStudy/Lightmap-1_comp_light.exr.meta",
+      "sha256": "021bffef9a6497f369f619d6ed1b51572a7cc3df91c38869754eee4328e12903",
+      "size": 3364
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Scenes/BodyStudy/Lightmap-1_comp_shadowmask.png",
+      "sha256": "4ba43386bbf0d42aeac262e16385a9a8adc8cc0dc4c97b01a54e38a6b7919152",
+      "size": 2198
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Scenes/BodyStudy/Lightmap-1_comp_shadowmask.png.meta",
+      "sha256": "fed9845e912a17dba56a58b0eea551886fb2227781740bc4c637cd3a3a8b7223",
+      "size": 3365
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Scenes/BodyStudy/ReflectionProbe-0.exr",
+      "sha256": "5f919db5ba1664a24c5311147c049d667e090ec4507473bb572c38adf8f43b61",
+      "size": 51815
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Scenes/BodyStudy/ReflectionProbe-0.exr.meta",
+      "sha256": "2c9324dcec474380be6200b8147c272289c43f1580510343452c8aadca32ca45",
+      "size": 3365
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Scenes/BodyStudy/ReflectionProbe-1.exr",
+      "sha256": "a0d9dbce38535b062625fcd7241767527d9bb01122afbadc05df05e732b84e40",
+      "size": 51583
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Scenes/BodyStudy/ReflectionProbe-1.exr.meta",
+      "sha256": "f572d197f9f33a05cf1c29ded46e35188bbf7fe88bd43441a56132a8f56dcb3e",
+      "size": 3365
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Scenes/TraversalHarness.unity",
+      "sha256": "e2190df5849283b12a0674c276069536fd498c5db5799f52f4687162c7b76e8f",
+      "size": 4442909
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Scenes/TraversalHarness.unity.meta",
+      "sha256": "10b21d6474a3a8bd5b29fea136692af6b676fe55ad6f7dc401095f82b625592c",
+      "size": 155
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Scenes/WebPreflight.unity",
+      "sha256": "c3a96a930d3d0b3b7aeba29354fcbaa567ae8f89680b70ab24bfc329220f8db9",
+      "size": 20723
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Scenes/WebPreflight.unity.meta",
+      "sha256": "863274acf0a64d003c81ebd060175aa3381b4b3e3cf8de621663381a16fea5e3",
+      "size": 155
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Settings.meta",
+      "sha256": "7a8808dca532767a186e2e1f71612bfc7e0779b5d577c4db3f1a2c7e09fbf788",
+      "size": 172
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Settings/Ground.mat",
+      "sha256": "18f8f6679bd3070cb88fe73ab2e27ec0843ff219739c2fab5088bc7829d6850d",
+      "size": 3835
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Settings/Ground.mat.meta",
+      "sha256": "100f787d20e0dd368174b98605cf62008757256708cef57922f49f6c066fef23",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Settings/Materialtest.mat",
+      "sha256": "dfbaeff4b9db84c1ac4b6da1fb8c118d53919e9a255e4e7add5d1d762a19db8e",
+      "size": 3842
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Settings/Materialtest.mat.meta",
+      "sha256": "3d172b3d426bbed5b39388097af435ece7ddb8c13c85a91a937c2390a2f4c7a1",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Settings/Smoothnormaltest.mat",
+      "sha256": "44dd3a318b636f8b3908699c421cc139edee79333cbc9c209eac5f21bb73d894",
+      "size": 3840
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Settings/Smoothnormaltest.mat.meta",
+      "sha256": "1c8673b78480798286f511307652566e87853895d7c29ede84e5e414c75dd8aa",
+      "size": 188
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Settings/StationLighting.lighting",
+      "sha256": "a05a013b978160c0edc4313dd4b245bd03e8088ca1753b9abebf81ccf662ebb6",
+      "size": 1979
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Settings/StationLighting.lighting.meta",
+      "sha256": "05ab18699a36e663a42ecf7d5048df9321a8deb0b084152ab259ff73b6588d94",
+      "size": 200
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Settings/StationLook.asset",
+      "sha256": "85b9bc1057dd48c8b4eb7538313662a1a9736ec916881390116a861cb8cbdf16",
+      "size": 2299
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Settings/StationLook.asset.meta",
+      "sha256": "e934fa4ff7d39afadb90410474287bfb04ab4857a5a8945280e9e7dceae29c33",
+      "size": 189
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Settings/WebRenderer.asset",
+      "sha256": "1a9ccff9c15b6755da0f9302ca8ff36c27eee594ced2f23d22312b00ca621c8c",
+      "size": 2680
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Settings/WebRenderer.asset.meta",
+      "sha256": "5656cfb726b97499b8019f335df7dcb146ac35a42fca70a646f10a85c278ba02",
+      "size": 189
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Settings/WebURP.asset",
+      "sha256": "0b3f9b16ac462efc6cc9501de703e8c7a1e62105a9a3c026343a23ccba8555ad",
+      "size": 4684
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Settings/WebURP.asset.meta",
+      "sha256": "1c108e54c142094929d93730a7acb3c92b2130b211b2d053daedf72d8eac124c",
+      "size": 189
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Tests.meta",
+      "sha256": "cd14d57c8f1351b26de12fbe3aa89878dab45ca3824d892afac9f603977f7672",
+      "size": 116
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Tests/EditMode.meta",
+      "sha256": "aca50d53fd0c83774f6aa3dde19b6187f06e25b4c101a5d83e41a8c6dc277a09",
+      "size": 116
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Tests/EditMode/CombatTimingRulesTests.cs",
+      "sha256": "54b0ef312051387244c461dbe01f907eac68cbe6a6530ee00bdc856f59babdbe",
+      "size": 10512
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Tests/EditMode/CombatTimingRulesTests.cs.meta",
+      "sha256": "ae7523b1f4ef49e1cee810bdccc57a894948b05ad125895df0af44f5d443ae34",
+      "size": 60
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Tests/EditMode/CoreRulesTests.cs",
+      "sha256": "cd1da6d02734fc085f5196927f20d356e41b700568a4b9e0f190043e48de9705",
+      "size": 18813
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Tests/EditMode/CoreRulesTests.cs.meta",
+      "sha256": "2c10ea917f3caa3b608c065ebcb500efd6903aad6b4f51c603d42f40aa5bc5e9",
+      "size": 60
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Tests/EditMode/DesertRV.EditModeTests.asmdef",
+      "sha256": "4a7c2ab8dd643b9134f978b8817eddcf7135aa0f6b6c134a19885c6bf49325be",
+      "size": 383
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Tests/EditMode/DesertRV.EditModeTests.asmdef.meta",
+      "sha256": "bf9a270e11bd51d67933b52a8359c475cf0d8c4cc46e62d7ab2bb7b6e6c99c70",
+      "size": 110
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Tests/EditMode/JourneyDirectorTests.cs",
+      "sha256": "70e7750451d6ecda71cf39693e9885288ff1201441eefc502d86edd890159ea1",
+      "size": 11324
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Tests/EditMode/JourneyDirectorTests.cs.meta",
+      "sha256": "3db91f2a2a494ddf67f2d323663c07f6cc484320a9702d960fba9bd70deabd6a",
+      "size": 60
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Tests/EditMode/JourneyProgressRulesTests.cs",
+      "sha256": "f37c5ee2520c082aa70aa6790b5f37b761e077eeca3be5d6279bf0217f5ddfe8",
+      "size": 14098
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Tests/EditMode/JourneyProgressRulesTests.cs.meta",
+      "sha256": "5d6dd885ca61e6cbc96df1771ebf5b2098e2b49f0205ad7eb7cf9a39416f59f4",
+      "size": 60
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Tests/EditMode/JourneyRaycastTests.cs",
+      "sha256": "003ecc4afc9d5307c7fa277dfc076ce7eaee8e1835603cb0a05103fb6cff76fa",
+      "size": 5743
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Tests/EditMode/JourneyRaycastTests.cs.meta",
+      "sha256": "0454ebe4c19001aaf619bb09251faa0efec1d7f28055bdd8f846285a38ac2819",
+      "size": 60
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Tests/PlayMode.meta",
+      "sha256": "d40d7bd3d30e5f02ac5d7d69030e0e9427971e64751cd66116ff692da75ef740",
+      "size": 172
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Tests/PlayMode/DesertRV.PlayModeTests.asmdef",
+      "sha256": "f01c83b107d7fcfa0458aebb3199c8398aa4a0a3a5a86e09eea76b2f7b87ab1e",
+      "size": 331
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Tests/PlayMode/DesertRV.PlayModeTests.asmdef.meta",
+      "sha256": "3a802dd76e3af1136321b25a140da650c9810eaa4ccf42bf9754abea818e0b8b",
+      "size": 60
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Tests/PlayMode/JourneyLoaderPlayModeTests.cs",
+      "sha256": "fd4221cfda8986280ecadab8940e8cf367ec62f79f4ccb33d62d072375679c41",
+      "size": 2003
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Tests/PlayMode/JourneyLoaderPlayModeTests.cs.meta",
+      "sha256": "0a14e71aeee559998c5bd433b474290d7f0431d3a554235750502a44b5aa06ca",
+      "size": 60
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/UI.meta",
+      "sha256": "d86eb1041a482b2c7597c2266a0e23a4debc9d954429bb5b5df0e4b84273283c",
+      "size": 172
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/UI/Fonts.meta",
+      "sha256": "6a1598bed08aa7d3886eb9a68d72e4e1d85855ac6a59d59c22f47a482f5aebbc",
+      "size": 172
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/UI/Fonts/NotoSansCJKsc-Regular.otf.meta",
+      "sha256": "e4c83478e2ad31187b1c6dd2cce61e2630c06b57c4e5727c6303af491718d09e",
+      "size": 481
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/UI/Fonts/OFL.txt",
+      "sha256": "6a73f9541c2de74158c0e7cf6b0a58ef774f5a780bf191f2d7ec9cc53efe2bf2",
+      "size": 4301
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/UI/Fonts/OFL.txt.meta",
+      "sha256": "5b8f4a3c2f90f6abd0ce7f1c720c8015bdaaf4d56fadc54fe3b9ed04ee74bef8",
+      "size": 158
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/UniversalRenderPipelineGlobalSettings.asset",
+      "sha256": "61cde2f63d369bc08fe2124956938191fe54a9652381677a0baf43cedd67539e",
+      "size": 25933
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/UniversalRenderPipelineGlobalSettings.asset.meta",
+      "sha256": "136e3d6f04d9fa031c83e27362841a96dac789e89c399eba45a45b5ccfbf5251",
+      "size": 189
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/WebGLTemplates.meta",
+      "sha256": "55a9b611ec150d4984f9870434db4b238ac55e90f5832d40a93fba742d9073d3",
+      "size": 172
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/WebGLTemplates/DesertRV.meta",
+      "sha256": "66a077898f7178006b47b094e3e738f76fbfba8e5256b7386766f85fb07f7c9d",
+      "size": 172
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/WebGLTemplates/DesertRV/index.html",
+      "sha256": "25a32548c20f5aad845d674bac179b40dd3c82e07c94b61a0629a325b3949a26",
+      "size": 6069
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/WebGLTemplates/DesertRV/index.html.meta",
+      "sha256": "e5608c24933c0d722c48f58d0babf37220fa098a7dde3c2f47a33a81b81ca09d",
+      "size": 155
+    },
+    {
+      "path": "tasks/desert-rv/unity/Packages/manifest.json",
+      "sha256": "696dca2fe314a005eb84362c7b7a54cc0a208564ccecbbd199845745758a8cd7",
+      "size": 325
+    },
+    {
+      "path": "tasks/desert-rv/unity/Packages/packages-lock.json",
+      "sha256": "76313a737ceabc25b0ed20b6810e44dccbb08c459168a21e478e2474da7bed59",
+      "size": 4446
+    },
+    {
+      "path": "tasks/desert-rv/unity/ProjectSettings/AudioManager.asset",
+      "sha256": "9543c41dbfc7d3951217c4dd9481ed026eb8e529b85ecf4463969a0fea747729",
+      "size": 523
+    },
+    {
+      "path": "tasks/desert-rv/unity/ProjectSettings/ClusterInputManager.asset",
+      "sha256": "40e65dd214bf254955d2c8829ca8ce2130fd3510485560ce012e9a1ddd93e623",
+      "size": 114
+    },
+    {
+      "path": "tasks/desert-rv/unity/ProjectSettings/DynamicsManager.asset",
+      "sha256": "fb36e677f7de32325bede8462e7e3eaf0be86ca374216d2907886fce7cb1d488",
+      "size": 1553
+    },
+    {
+      "path": "tasks/desert-rv/unity/ProjectSettings/EditorBuildSettings.asset",
+      "sha256": "edb772ad22c9846a15be5c2204ff00f8e01d2fac866ffa86fbee362459551be7",
+      "size": 297
+    },
+    {
+      "path": "tasks/desert-rv/unity/ProjectSettings/EditorSettings.asset",
+      "sha256": "4a87c54b3541c7bd242aad68c3fc28661083db1117ec56149694ee592156415e",
+      "size": 1603
+    },
+    {
+      "path": "tasks/desert-rv/unity/ProjectSettings/GraphicsSettings.asset",
+      "sha256": "15153f9b5d2dadd72feb34e8ba1d8985f9a73413fa77f0a2e9209e5701d24319",
+      "size": 2615
+    },
+    {
+      "path": "tasks/desert-rv/unity/ProjectSettings/InputManager.asset",
+      "sha256": "60c83ae48e29a782141f99032eb38e803d18475124ff5224fbd1fd81b233f051",
+      "size": 9754
+    },
+    {
+      "path": "tasks/desert-rv/unity/ProjectSettings/MemorySettings.asset",
+      "sha256": "1e8379a461b10ae09f3f696911088c16875d63e87ed5f2d95df9e1892703f9fd",
+      "size": 1192
+    },
+    {
+      "path": "tasks/desert-rv/unity/ProjectSettings/MultiplayerManager.asset",
+      "sha256": "ce4075d7a7dd8ac7ffe55de2427692c63f90dae398208bd80cec0f27cbe09f4b",
+      "size": 232
+    },
+    {
+      "path": "tasks/desert-rv/unity/ProjectSettings/NavMeshAreas.asset",
+      "sha256": "7ebbf8f53b8033104e1878b95ca07a28d0954092d81c220f14196a42f651e658",
+      "size": 1361
+    },
+    {
+      "path": "tasks/desert-rv/unity/ProjectSettings/Physics2DSettings.asset",
+      "sha256": "1cfc0c8fbceec604fd7cd2a06c04ff05dddee6335b75c92b0f5715ad80ba9490",
+      "size": 1862
+    },
+    {
+      "path": "tasks/desert-rv/unity/ProjectSettings/PresetManager.asset",
+      "sha256": "29c125923fe6e29f90190d4fce1c82d660e7051546e2c9d02908d18c9cf2436c",
+      "size": 146
+    },
+    {
+      "path": "tasks/desert-rv/unity/ProjectSettings/ProjectSettings.asset",
+      "sha256": "4508539ef0d76b843206ef4d05d4f0700c6eb0dc2d6a36d14174fc9072411577",
+      "size": 22342
+    },
+    {
+      "path": "tasks/desert-rv/unity/ProjectSettings/ProjectVersion.txt",
+      "sha256": "3e78f3e1fbb6e96c92f36002865a679ff7344056725f11d06922c2b2eab02ff3",
+      "size": 85
+    },
+    {
+      "path": "tasks/desert-rv/unity/ProjectSettings/QualitySettings.asset",
+      "sha256": "b8a7c6d4fd0843a7aa1058a94a5602d99f26eafb0122dcefc7e3ea9a5a2e21e4",
+      "size": 10137
+    },
+    {
+      "path": "tasks/desert-rv/unity/ProjectSettings/SceneTemplateSettings.json",
+      "sha256": "bb9098b3bfcde78d93e264b96f7b77b5430e64e8c57a7aad7f5a5d9c3945e16a",
+      "size": 3535
+    },
+    {
+      "path": "tasks/desert-rv/unity/ProjectSettings/ShaderGraphSettings.asset",
+      "sha256": "6fead5a816c4eed70f224d5472340ecf1ea0b4de4f87d5926bb17fa10ffb3dc9",
+      "size": 633
+    },
+    {
+      "path": "tasks/desert-rv/unity/ProjectSettings/TagManager.asset",
+      "sha256": "da4b5eefc927f8b91bcf9e56a186d2b852f49d9cbe91d466638d26c79d6a83ce",
+      "size": 411
+    },
+    {
+      "path": "tasks/desert-rv/unity/ProjectSettings/TimeManager.asset",
+      "sha256": "3396f52fdc16d445024e01d7a2d99db6f0a37569d1d73c0302e9ffb857d90287",
+      "size": 305
+    },
+    {
+      "path": "tasks/desert-rv/unity/ProjectSettings/UnityConnectSettings.asset",
+      "sha256": "b41bbe7441e38c8623493633b110daf5e4bd06905e3f8c16394e4223894af55e",
+      "size": 1063
+    },
+    {
+      "path": "tasks/desert-rv/unity/ProjectSettings/VFXManager.asset",
+      "sha256": "2973a6af930e142f62cde00076beda8a3cc3a66d9bfcde7a58ba7d4be2251c26",
+      "size": 525
+    },
+    {
+      "path": "tasks/desert-rv/unity/ProjectSettings/VersionControlSettings.asset",
+      "sha256": "e199cdfa6a8f2bf33cfd47e549198f13e3eb2a5099e908fdb4e0f14d939ccc6b",
+      "size": 172
+    }
+  ]
+}

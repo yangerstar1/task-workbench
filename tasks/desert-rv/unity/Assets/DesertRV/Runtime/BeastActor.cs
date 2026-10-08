@@ -15,7 +15,9 @@ namespace DesertRV
         public bool KilledByRam { get; private set; }
         Vector3 home, attackDirection;
         float phaseTime, lastHit, attackClock;
-        bool dealtDamage, initialized;
+        bool initialized;
+        BeastCombatState combat;
+        int combatRegion, combatGeneration, chargeId;
         Collider hurtbox;
         readonly RaycastHit[] hits = new RaycastHit[16];
 
@@ -30,21 +32,34 @@ namespace DesertRV
         {
             EnsureInitialized();
             transform.position = home; Health = armored ? 160 : 65;
-            KilledByRam = false; if (hurtbox) hurtbox.enabled = true;
+            KilledByRam = false; combat = null; chargeId = 0; lastHit = 0; attackClock = 0;
+            EnsureCombat(); if (hurtbox) hurtbox.enabled = true;
             SetPhase(BeastPhase.Idle);
+        }
+        bool EnsureCombat()
+        {
+            if (!journey || journey.State == null || journey.State.Generation <= 0) return false;
+            if (combat == null)
+            {
+                combatRegion = journey.State.SceneId; combatGeneration = journey.State.Generation;
+                combat = new BeastCombatState(journey.State, combatRegion, combatGeneration);
+            }
+            return combatRegion == journey.State.SceneId && combatGeneration == journey.State.Generation;
         }
         void SetPhase(BeastPhase phase)
         {
             Phase = phase; phaseTime = 0;
+            if (phase == BeastPhase.Recover && combat != null)
+                combat.TryBeginRecovery(combatRegion, combatGeneration, chargeId, armored ? 2.0 : 1.3);
             if (animator) animator.CrossFade(phase == BeastPhase.Stalk ? "Walk" : phase == BeastPhase.Dead ? "Death" : phase.ToString(), .12f);
         }
         void Update()
         {
-            if (!journey || journey.State.Status != SessionStatus.Playing)
+            if (!EnsureCombat() || journey.State.Status != SessionStatus.Playing || !player)
             { if (animator) animator.speed = 0; return; }
             if (animator) animator.speed = 1;
             if (Dead) return;
-            float dt = Mathf.Min(Time.deltaTime, .1f); phaseTime += dt; lastHit -= dt;
+            float dt = Mathf.Min(Time.deltaTime, .1f); phaseTime += dt; lastHit -= dt; combat.Tick(dt);
             Vector3 target = player.PlayerPosition; Vector3 to = target - transform.position; to.y = 0;
             float distance = to.magnitude;
             if (Phase == BeastPhase.Idle)
@@ -54,7 +69,10 @@ namespace DesertRV
                 if (distance > 34) { MoveToward(home, 2, dt); return; }
                 Face(to, dt * 7);
                 if (distance < (armored ? 8 : 5.2f) && ClearAttackLine(target))
-                { attackDirection = to.normalized; dealtDamage = false; SetPhase(BeastPhase.Windup); }
+                {
+                    chargeId = combat.TryBeginCharge(combatRegion, combatGeneration);
+                    if (chargeId != 0) { attackDirection = to.normalized; SetPhase(BeastPhase.Windup); }
+                }
                 else MoveToward(target, armored ? 2.1f : 2.7f, dt);
             }
             else if (Phase == BeastPhase.Windup)
@@ -70,11 +88,11 @@ namespace DesertRV
                 bool touchedVehicle = contact && contact.transform.IsChildOf(player.vehicle);
                 bool touchedPlayer = contact && contact.transform == player.Walker;
                 // Damage follows an actual swept contact, never proximity through cover.
-                if (!dealtDamage && (touchedVehicle || touchedPlayer))
+                if ((touchedVehicle || touchedPlayer) && combat.TryRegisterChargeHit(combatRegion, combatGeneration, chargeId))
                 {
                     if (touchedVehicle) journey.State.DamageVehicle(armored ? 38 : 19);
                     else journey.State.DamagePlayer(armored ? 27 : 15);
-                    dealtDamage = true; SetPhase(BeastPhase.Recover);
+                    SetPhase(BeastPhase.Recover);
                 }
                 else if (blocked || attackClock > (armored ? 1.2f : .8f)) SetPhase(BeastPhase.Recover);
             }
@@ -120,9 +138,10 @@ namespace DesertRV
         }
         public int TakeHit(int damage, Vector3 direction, bool ramHit = false)
         {
-            if (Dead || journey.State.Status != SessionStatus.Playing) return 0;
+            EnsureInitialized();
+            if (!EnsureCombat() || Dead || journey.State.Status != SessionStatus.Playing || damage <= 0) return 0;
             int applied = damage;
-            if (armored && !ramHit && Phase != BeastPhase.Recover) applied = Mathf.Max(1, damage / 5);
+            if (armored && !ramHit && !combat.WeakPointOpen) applied = Mathf.Max(1, damage / 5);
             Health = Mathf.Max(0, Health - applied);
             if (Health == 0)
             { KilledByRam = ramHit; if (hurtbox) hurtbox.enabled = false; SetPhase(BeastPhase.Dead); }
