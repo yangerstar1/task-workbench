@@ -115,10 +115,13 @@ namespace DesertRV.Editor
             finally
             {
                 // In-memory source changes were saved exclusively to new paths.
-                EditorSceneManager.RestoreSceneManagerSetup(previous);
-                if (!source.SequenceEqual(File.ReadAllBytes(SourcePath)) || !meta.SequenceEqual(File.ReadAllBytes(SourcePath + ".meta")))
-                    throw new InvalidOperationException("Source preservation check failed.");
-                VerifyProtectedFiles(protectedFiles);
+                try { RestoreSceneSetup(previous); }
+                finally
+                {
+                    if (!source.SequenceEqual(File.ReadAllBytes(SourcePath)) || !meta.SequenceEqual(File.ReadAllBytes(SourcePath + ".meta")))
+                        throw new InvalidOperationException("Source preservation check failed.");
+                    VerifyProtectedFiles(protectedFiles);
+                }
             }
         }
         // One explicit CI command can author, inspect and render without importing any combat asset.
@@ -178,8 +181,18 @@ namespace DesertRV.Editor
                 RenderTexture.active=previousTarget;
                 if(pixels) Object.DestroyImmediate(pixels); if(target){target.Release();Object.DestroyImmediate(target);}
                 // All camera, RV and simulation preview changes existed only in memory; never save them.
-                EditorSceneManager.RestoreSceneManagerSetup(setup); VerifyProtectedFiles(protectedFiles);
+                try { RestoreSceneSetup(setup); } finally { VerifyProtectedFiles(protectedFiles); }
             }
+        }
+        // A cold batch Editor can have zero loaded scenes. Unity rejects restoring
+        // that snapshot (and snapshots of an unnamed scene). Restore a disposable
+        // empty in-memory scene instead; never write a fallback asset or settings.
+        internal static void RestoreSceneSetup(SceneSetup[] setup)
+        {
+            bool restorable = setup != null && setup.Any(s => s.isLoaded && s.isActive) &&
+                setup.All(s => !s.isLoaded || !string.IsNullOrEmpty(s.path));
+            if (restorable) EditorSceneManager.RestoreSceneManagerSetup(setup);
+            else EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
         }
         static Dictionary<string,string> SnapshotProtectedFiles()
         {

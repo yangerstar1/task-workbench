@@ -85,7 +85,7 @@ The scenes contain retained asphalt segments with broken edges/gaps, reusable de
 
 All generated Unity assets, including the manifest, sky/layout materials and their meta, are now under the new `Assets/DesertRV/Scenes/Journey/` tree. The author and capture hooks snapshot all pre-existing Assets outside that tree plus ProjectSettings and Packages, then byte-check them in finally; changes or unexpected new files outside the permitted generated tree fail. `JourneyEvidence/protected-source-sha256.txt` is the before inventory. Capture never saves camera/RV preview changes; RT, image objects, original active render target and scene setup are restored in finally.
 
-Use `scripts/run_environment_evidence.sh` in the actual Actions checkout to collect all generated new file diffs (including untracked files), scene/meta/material snapshots, layout report and screenshot report. A capture failure remains a failure. The script does not claim formal readiness and never changes project settings or deletes original scenes/assets.
+Use the manual `desert-rv-environment.yml` workflow described below. Its `scripts/environment_evidence.py` validator collects allowlisted generated scene/meta/material files, diffs, screenshot pixels and a sanitized receipt. The earlier standalone shell candidate is superseded and is not part of this repository. A capture failure remains a failure; this workflow never grants formal readiness.
 
 ## Manual native environment evidence (separate from gameplay checks)
 

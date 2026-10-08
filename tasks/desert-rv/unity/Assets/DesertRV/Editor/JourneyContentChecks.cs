@@ -93,7 +93,7 @@ namespace DesertRV.Editor
                     }
                 }
             }
-            finally { EditorSceneManager.RestoreSceneManagerSetup(setup); }
+            finally { JourneySceneAuthoring.RestoreSceneSetup(setup); }
             return errors;
         }
         public static void ValidateManifest(JourneyContentManifest m, List<string> errors)
