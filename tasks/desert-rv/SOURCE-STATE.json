@@ -10,7 +10,8 @@
   ],
   "coverageFiles": [
     "tasks/desert-rv/ASSET-NOTICES.md",
-    ".github/workflows/desert-rv-android.yml"
+    ".github/workflows/desert-rv-android.yml",
+    ".github/workflows/desert-rv-environment.yml"
   ],
   "restoredFiles": [
     {
@@ -22,8 +23,13 @@
   "files": [
     {
       "path": ".github/workflows/desert-rv-android.yml",
-      "sha256": "235862547ba1ba4bf22bf3cd0c4ac64e0e96d239b08aef9db563f86462e9a5c8",
-      "size": 9780
+      "sha256": "a921a22d3bafd4b736575ceb48a44e302a4c31104b77fc8d341ec83162b0d4cd",
+      "size": 11242
+    },
+    {
+      "path": ".github/workflows/desert-rv-environment.yml",
+      "sha256": "7320396c7e5590c483fd807ec4ce2811449ec591e60578f7e428d68303dda5f5",
+      "size": 3532
     },
     {
       "path": "tasks/desert-rv/ASSET-NOTICES.md",
@@ -36,19 +42,29 @@
       "size": 10847296
     },
     {
+      "path": "tasks/desert-rv/scripts/Environment.Dockerfile",
+      "sha256": "f0d83398543119a22f73cd922257c88ee00894f41d6c5f302f1f525438ad73ab",
+      "size": 588
+    },
+    {
       "path": "tasks/desert-rv/scripts/backup/restore_unity_font.py",
       "sha256": "6cf3a11ddf58ef821198156861a7d598e1ee3515d81d90b40b9da866ec16939c",
       "size": 2429
     },
     {
+      "path": "tasks/desert-rv/scripts/environment_evidence.py",
+      "sha256": "30ea6ec3eec1e478fd99b655853b59b838e971e30bc346901a052f8d16053ada",
+      "size": 8715
+    },
+    {
       "path": "tasks/desert-rv/scripts/expected_playmode_test_cases.json",
-      "sha256": "8d592ee389ab9855f840ad543cf4099bc9906dabbfd2adb28b330093a57470ab",
-      "size": 100
+      "sha256": "9adf455255e668edebfa8bf63381c7fba61c9b5c3c8850af181c0526704f2dde",
+      "size": 630
     },
     {
       "path": "tasks/desert-rv/scripts/expected_test_cases.json",
-      "sha256": "a37900099a9f57072338943b35dcfe2c89333af11ddc3c36e2057b662febd995",
-      "size": 6284
+      "sha256": "98d5cac42a22a10a49807e55829e0c6e5282b7ab768513068ce0e4a75807aab4",
+      "size": 6867
     },
     {
       "path": "tasks/desert-rv/scripts/prepare_runner.sh",
@@ -56,8 +72,18 @@
       "size": 1130
     },
     {
+      "path": "tasks/desert-rv/scripts/test_environment_evidence.py",
+      "sha256": "c191403f590870a7c95ea62b86ad7a5c853bb9de8fdc36018628d66375d86d51",
+      "size": 7235
+    },
+    {
+      "path": "tasks/desert-rv/scripts/test_verification_scope.py",
+      "sha256": "4be6a94d444d24e8dd326d3b1aa87c44f660c1c5bf99f900132778772be73388",
+      "size": 1995
+    },
+    {
       "path": "tasks/desert-rv/scripts/test_verify_evidence.py",
-      "sha256": "302a16043d0aaedee49835cd5cbce22beffbf741081a6e7380dbcf7c0a776013",
+      "sha256": "69d49a2490cd3ddb614e2b47a222bc0ac4a2ddb0d2a992787a0bab4f0147a97d",
       "size": 15039
     },
     {
@@ -66,9 +92,14 @@
       "size": 1491
     },
     {
+      "path": "tasks/desert-rv/scripts/verification_scope.py",
+      "sha256": "8a833481f740e0002f551adbf8cdd7b17356dfd17c77748265a4c454593be20e",
+      "size": 1643
+    },
+    {
       "path": "tasks/desert-rv/scripts/verify_evidence.py",
-      "sha256": "86b9c89f8c9c6e77bcda1ac64616f472d6762bd23989e04c728e0df6a79970a2",
-      "size": 15657
+      "sha256": "eb79f0151e230224f44456a9d5763d83852d4b9f29aa8a593360d550e032afeb",
+      "size": 15704
     },
     {
       "path": "tasks/desert-rv/unity/Assets/DefaultVolumeProfile.asset",
@@ -3401,6 +3432,26 @@
       "size": 60
     },
     {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Editor/JourneyContentChecks.cs",
+      "sha256": "97468761dbd6b713051fb765d676e268a9640733153bd59e0d4be256b8e965e5",
+      "size": 23491
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Editor/JourneyContentChecks.cs.meta",
+      "sha256": "f2ed27960786f3266249ed3c0d317ae880a3c5333a9547545ff9d5c9edba65a8",
+      "size": 60
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Editor/JourneySceneAuthoring.cs",
+      "sha256": "6e0b0a512357ff3a695f82014b295634ac3a88a1329394f48eb9c446f2b9da93",
+      "size": 30154
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Editor/JourneySceneAuthoring.cs.meta",
+      "sha256": "77b3da4121445a6067c1827ea2317c395413065a4e53ec7037ce6b63fd488e9b",
+      "size": 60
+    },
+    {
       "path": "tasks/desert-rv/unity/Assets/DesertRV/Editor/PlayerBuild.cs",
       "sha256": "0fa249683e2c48a886ef9b2d718192e898af03051054500498f7238b4ac47cda",
       "size": 2944
@@ -3576,6 +3627,16 @@
       "size": 60
     },
     {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Runtime/JourneyContentManifest.cs",
+      "sha256": "96874ce50dd84b1b735ab119529df6847764fb06233f49b6bb3a7f6ddc8d9f05",
+      "size": 1337
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Runtime/JourneyContentManifest.cs.meta",
+      "sha256": "93d1fd7dc94ec21bb8d2cd36848f6cf5b29ac035864d90fb84f827b882585db9",
+      "size": 60
+    },
+    {
       "path": "tasks/desert-rv/unity/Assets/DesertRV/Runtime/JourneyDirector.cs",
       "sha256": "4ff96bcede47af7cfee5c3f1a6c69778438f8480059203ca0d30adbfefb2649f",
       "size": 7838
@@ -3687,8 +3748,8 @@
     },
     {
       "path": "tasks/desert-rv/unity/Assets/DesertRV/Runtime/RegionLoader.cs",
-      "sha256": "5d89360ed36163cb23e6792dc55fb7edc29eef66313a4e3659d1d4fb9020227d",
-      "size": 3726
+      "sha256": "4f720bb68e48a4466872861e90c9418a8f93238423b1d071b52b4713585e7f00",
+      "size": 6079
     },
     {
       "path": "tasks/desert-rv/unity/Assets/DesertRV/Runtime/RegionLoader.cs.meta",
@@ -3981,6 +4042,16 @@
       "size": 110
     },
     {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Tests/EditMode/JourneyContentTests.cs",
+      "sha256": "21246f1c1944702c66b1eee3908d084c1ab0af06d87549e2242605cba766560d",
+      "size": 3631
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Tests/EditMode/JourneyContentTests.cs.meta",
+      "sha256": "25a258d02b2bd7740bd6e240f1335a4d6ca1c8ea3cbbd2555451994b9dade327",
+      "size": 60
+    },
+    {
       "path": "tasks/desert-rv/unity/Assets/DesertRV/Tests/EditMode/JourneyDirectorTests.cs",
       "sha256": "70e7750451d6ecda71cf39693e9885288ff1201441eefc502d86edd890159ea1",
       "size": 11324
@@ -4011,6 +4082,31 @@
       "size": 60
     },
     {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Tests/EditorRender.meta",
+      "sha256": "2bfc6987f07924345dc6980fb11d4db2e3d749ca18fa5e71891b59ba137bdb5f",
+      "size": 172
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Tests/EditorRender/DesertRV.EditorRenderTests.asmdef",
+      "sha256": "038075a1bbbffbdc55b6a93fac7019f049b16dad388f279a6d0d40cb9c743b27",
+      "size": 387
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Tests/EditorRender/DesertRV.EditorRenderTests.asmdef.meta",
+      "sha256": "c6aaebd9e16aa6471bda534ff19b3191a1b20c822dc2931cf71ea079abb4ac1d",
+      "size": 166
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Tests/EditorRender/JourneyEnvironmentRenderTests.cs",
+      "sha256": "1ac836d01a3a305b6bf80f2a3dba9a9ac03de360abe6539721571d2bd2e42426",
+      "size": 819
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Tests/EditorRender/JourneyEnvironmentRenderTests.cs.meta",
+      "sha256": "8e47cc348c7b0019642d1c32d810262b744716c447d1dea27e122f62f0df480d",
+      "size": 243
+    },
+    {
       "path": "tasks/desert-rv/unity/Assets/DesertRV/Tests/PlayMode.meta",
       "sha256": "d40d7bd3d30e5f02ac5d7d69030e0e9427971e64751cd66116ff692da75ef740",
       "size": 172
@@ -4033,6 +4129,16 @@
     {
       "path": "tasks/desert-rv/unity/Assets/DesertRV/Tests/PlayMode/JourneyLoaderPlayModeTests.cs.meta",
       "sha256": "0a14e71aeee559998c5bd433b474290d7f0431d3a554235750502a44b5aa06ca",
+      "size": 60
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Tests/PlayMode/RegionLoaderActiveSceneTests.cs",
+      "sha256": "6a353a777d2ffad39738d786093c651909e97c52abf999657a1f8d09e895072b",
+      "size": 11292
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Tests/PlayMode/RegionLoaderActiveSceneTests.cs.meta",
+      "sha256": "35d88a9cd4cc146273eb04df7c824f1b15476570d85e78aa08242675fa070f7d",
       "size": 60
     },
     {

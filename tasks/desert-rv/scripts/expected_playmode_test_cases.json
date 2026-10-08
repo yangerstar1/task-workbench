@@ -1,3 +1,8 @@
 [
-  "DesertRV.Tests.JourneyLoaderPlayModeTests.MissingRegion_RemainsLoadingAndSameTicketCanRetry"
+  "DesertRV.Tests.JourneyLoaderPlayModeTests.MissingRegion_RemainsLoadingAndSameTicketCanRetry",
+  "DesertRV.Tests.RegionLoaderActiveSceneTests.LoadedRegion_IsActiveWithItsRenderSettingsBeforeReady",
+  "DesertRV.Tests.RegionLoaderActiveSceneTests.ReadyException_RestoresActiveReleasesBusyAndKeepsTicket",
+  "DesertRV.Tests.RegionLoaderActiveSceneTests.RejectedSameNameReload_RestoresPreviousActiveAndAllowsSameTicketRetry",
+  "DesertRV.Tests.RegionLoaderActiveSceneTests.StaleGenerationLoad_DoesNotStealNewerActiveScene",
+  "DesertRV.Tests.RegionLoaderActiveSceneTests.UnloadedScene_ActivationFailsWithoutChangingActiveScene"
 ]

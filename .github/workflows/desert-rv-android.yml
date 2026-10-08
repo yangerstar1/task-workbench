@@ -1,7 +1,17 @@
-name: Desert RV saved TraversalHarness Android
+name: Desert RV native verification
+run-name: Desert RV ${{ inputs.mode || 'traversal-apk' }} · ${{ github.sha }}
 
 on:
   workflow_dispatch:
+    inputs:
+      mode:
+        description: 'checks-only runs native tests; traversal-apk also builds the saved test APK'
+        type: choice
+        required: true
+        default: traversal-apk
+        options:
+          - traversal-apk
+          - checks-only
 
 permissions:
   contents: read
@@ -142,7 +152,9 @@ jobs:
   android:
     name: Build saved TraversalHarness test APK (not full game)
     needs: [tests, playmode]
-    if: needs.tests.result == 'success' && needs.playmode.result == 'success'
+    if: >-
+      needs.tests.result == 'success' && needs.playmode.result == 'success' &&
+      (inputs.mode == 'traversal-apk' || inputs.mode == '')
     runs-on: ubuntu-24.04
     timeout-minutes: 55
     steps:
@@ -210,3 +222,29 @@ jobs:
           path: tasks/desert-rv/evidence/android/
           if-no-files-found: error
           retention-days: 7
+
+  scope:
+    name: Report exact verification scope (skipped APK is NOT_RUN)
+    needs: [tests, playmode, android]
+    if: >-
+      always() &&
+      github.repository == 'yangerstar1/task-workbench' &&
+      github.ref == 'refs/heads/main' &&
+      github.actor == 'yangerstar1' &&
+      github.triggering_actor == 'yangerstar1'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+          lfs: false
+      - name: Test scope reporting contracts (not native evidence)
+        run: python3 tasks/desert-rv/scripts/test_verification_scope.py
+      - name: Distinguish native checks from an actual APK build
+        env:
+          VERIFICATION_MODE: ${{ inputs.mode || 'traversal-apk' }}
+          EDITMODE_RESULT: ${{ needs.tests.result }}
+          PLAYMODE_RESULT: ${{ needs.playmode.result }}
+          ANDROID_RESULT: ${{ needs.android.result }}
+        run: python3 tasks/desert-rv/scripts/verification_scope.py
