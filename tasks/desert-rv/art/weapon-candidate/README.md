@@ -11,7 +11,7 @@ Exports: `weapon_hands.blend`, skinned `weapon_hands.glb`, `weapon_hands.fbx`; m
 ## Coordinate / runtime contract
 
 - Metric units; source +Y toward muzzle, +Z up, +X right. GLB and FBX exporters perform axis conversion. FBX `-Z` forward / `Y` up.
-- Armature: `root`, `weapon`, `magazine`, `follower`, `trigger`, `arm.L/R`, `hand.L/R`, three-segment fingers (two thumb segments).
+- Armature: `root`, `weapon`, `magazine`, `follower`, `loaded_nails`, `reload_strip`, `trigger`, `arm.L/R`, `hand.L/R`, three-segment fingers (two thumb segments).
 - Named `Grip`, `Trigger`, `Magazine` empties are authoring anchors. They are not game event callbacks.
 - Idle: 2 s. Fire: exactly 0.22 s, with subframe endpoint. Reload: exactly 1.65 s. Motion evidence sampled at 60 fps; integer-frame Fire video is 15/60 s including endpoint sampling, distinct from animation action duration.
 - Initial budget checks report weapon 8–12k / hands 10–16k triangles; budget compliance is neither a quality certificate nor silently forced by unnecessary subdivision.
@@ -22,8 +22,16 @@ Exports: `weapon_hands.blend`, skinned `weapon_hands.glb`, `weapon_hands.fbx`; m
 
 Eight studio views, complete side-view Idle/Fire/Reload videos, 1280x720 and 1600x720 model composition captures, clip/weight/triangle validation, exported GLB animation validation and SHA256 manifest. Output has no game HUD; actual phone-button overlap requires a real HUD overlay, so it is explicitly **not passed** by this package.
 
-Reload first candidate keeps the same magazine and left hand synchronized through withdrawal/reinsertion, then reaches for follower. This is not yet a certified fresh-magazine transfer. Finger contact/penetration and the follower interaction remain visual-review gates. Hand anatomy is voxel-unioned geometry with distance-weight skinning, not production retopology. A successful runner only proves artifacts were generated; it must not be described as commercial-quality acceptance.
+Revision 2 uses a fixed open-top magazine. The left hand pulls back its follower, retrieves a genuinely new 27-nail collated strip from below frame, guides it into the exposed channel, releases the follower and returns to support. This is specifically an empty-magazine reload; partial/tactical reload needs separate integration review. Hand and tool contact reference distances are sampled throughout the three contact phases, but reference alignment does not certify surface penetration. Finger contact/penetration and the follower interaction remain visual-review gates. Hand anatomy is voxel-unioned geometry with distance-weight skinning, not production retopology. A successful runner only proves artifacts were generated; it must not be described as commercial-quality acceptance.
 
 No production scene, game controller, damage system or ammunition logic is modified.
 
-The initial straight-forward viewmodel may fall below target horizontal occupancy due to gun foreshortening. `target_fit` reports this explicitly; reviewer should reject or revise camera/pose rather than accept a cropped or stretched model.
+Revision 2 replaces the rejected straight-rear orthographic view with a fixed +Y 35mm perspective camera and oblique tool pose. The camera is not rolled or rotated to fake composition. A pose search targets 29% width and 32.5% height in both aspect ratios. Final `target_fit` uses actual rendered alpha pixels. Sleeves extend through the lower frame edge; they have no visible end caps. Each aspect ratio records the rig transform for integration. No image stretching or post-render repositioning is used.
+
+Private approved concept was actually inspected: it contains hands but no gun. Orange hand-back reinforcement and wrist bands over graphite gloves extend its glove design; ivory/oxide gun colors are an original interpretation of its environment palette, not a recovered gun. The reference image is not part of this package.
+
+## R1 pixel rejection fixes included in R2
+
+Four fingers now stack along the grip axis, with explicit inter-digit gaps, a separate thumb web, flattened palm/back planes and shallow leather/seam detail. The open sleeve mesh blends wrist motion toward a stationary proximal arm. A real underbarrel rubber grip supports the left hand. Split shell service covers, darker gaskets, an open magazine channel and safety return spring express assembly/function; coatings use higher roughness. Fire adds moving safety-tip travel. These are candidate fixes, not evidence of visual acceptance.
+
+Reload adds separate IK targets for opposing thumb/index/middle fingertips, keyed acquisition/release influence, and left/right contact stills at frames 30, 35, 60, 68, 91. Sampled IK residuals and grip-reference residuals are reported separately from untested surface intersection. The 1.65-second action remains purely visual.

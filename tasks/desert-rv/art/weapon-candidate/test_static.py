@@ -13,6 +13,11 @@ class Contracts(unittest.TestCase):
  def test_exports_and_evidence(self):
   s=(ROOT/'build_weapon.py').read_text()
   for token in ['export_scene.gltf','export_scene.fbx','save_as_mainfile','range(8)','1280,720','1600,720',"'quality_gate':'PENDING_RENDER_REVIEW'","'weight_errors'"] :self.assertIn(token,s)
+ def test_pixel_footprint_and_contact_evidence(self):
+  s=(ROOT/'build_weapon.py').read_text()
+  for token in ["bpy.data.images['Render Result'].pixels","'max_fingertip_IK_error_m'","reload_contact_{frame:03d}","camera.data.type='PERSP'","'Forearm_'"]:self.assertIn(token,s)
+ def test_fresh_strip_and_fixed_magazine(self):
+  s=(ROOT/'build_weapon.py').read_text();self.assertIn("'magazine_detaches':False",s);self.assertIn("'new_nails_count':27",s);self.assertIn("constraints.new('IK')",s)
  def test_no_external_art_or_game_events(self):
   s=(ROOT/'build_weapon.py').read_text(); self.assertNotIn('https://',s); self.assertIn("'gameplay_events':[]",s)
 if __name__=='__main__':unittest.main()
