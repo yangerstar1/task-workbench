@@ -1,39 +1,55 @@
-name: Desert RV original pouncer candidate
-run-name: Pouncer ${{ inputs.scope }} · ${{ github.sha }}
+name: Desert RV pouncer Death technical first
+run-name: Death technical-first · ${{ github.sha }}
 on:
   workflow_dispatch:
     inputs:
       scope:
-        description: 'Death diagnostic is not a complete motion review or asset approval'
-        required: true
-        default: death-diagnostic
         type: choice
-        options:
-          - death-diagnostic
-          - full
+        required: true
+        default: death-technical-first
+        options: [death-technical-first]
+      render_after_pass:
+        type: boolean
+        required: true
+        default: true
+        description: Render exactly four opaque stills only after the native technical gate passes
 permissions:
   contents: read
+  actions: read
 concurrency:
   group: desert-rv-pouncer-art
   cancel-in-progress: false
 jobs:
   candidate:
-    if: github.actor == github.repository_owner && github.event_name == 'workflow_dispatch' && github.event.repository.private == false && github.ref == 'refs/heads/main'
+    if: github.repository == 'yangerstar1/task-workbench' && github.actor == github.repository_owner && github.triggering_actor == github.repository_owner && github.event_name == 'workflow_dispatch' && github.event.repository.private == false && github.ref == 'refs/heads/main'
     runs-on: ubuntu-24.04
-    timeout-minutes: ${{ inputs.scope == 'death-diagnostic' && 60 || 120 }}
+    timeout-minutes: 35
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
           persist-credentials: false
           lfs: false
-      - name: Static source contract checks
-        run: python3 tasks/desert-rv/art/pouncer-candidate/test_static.py
-      - name: Install official pinned Blender and evidence tools
+      - name: Source contract checks, not native proof
+        run: python3 tasks/desert-rv/art/pouncer-candidate/test_death_technical_first.py
+      - name: Download the exact already-examined native baseline
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          repository: yangerstar1/task-workbench
+          run-id: 37844163484
+          name: pouncer-death-diagnostic-37844163484
+          github-token: ${{ github.token }}
+          path: baseline
+      - name: Verify pinned baseline bytes and source
+        run: |
+          set -euo pipefail
+          test "$(cat baseline/source-commit.txt)" = 36dee7d1c52b9f9fb4eaae17197d23157ed1932c
+          echo '68c9b7f4af17d3e02b585b2d709ccced5a18815a364a2e4ec3c9ee2d37a309a4  baseline/pouncer-candidate.blend' | sha256sum --check
+      - name: Install official checksum-verified Blender 4.2.3
         shell: bash
         run: |
           set -euo pipefail
           sudo apt-get update -qq
-          sudo apt-get install -y --no-install-recommends libxkbcommon0 libsm6 libxi6 libxrender1 libxxf86vm1 libgl1 ffmpeg python3-pil
+          sudo apt-get install -y --no-install-recommends libxkbcommon0 libsm6 libxi6 libxrender1 libxxf86vm1 libgl1
           mkdir -p "$RUNNER_TEMP/blender"
           cd "$RUNNER_TEMP/blender"
           base=https://download.blender.org/release/Blender4.2
@@ -44,67 +60,47 @@ jobs:
           sha256sum --check selected.sha256
           tar -xf blender-4.2.3-linux-x64.tar.xz
           echo "$RUNNER_TEMP/blender/blender-4.2.3-linux-x64" >> "$GITHUB_PATH"
-      - name: Prepare bounded candidate scope
-        env:
-          REVIEW_SCOPE: ${{ inputs.scope }}
-        run: |
-          set -euo pipefail
-          case "$REVIEW_SCOPE" in death-diagnostic|full) ;; *) exit 2;; esac
-          mkdir -p output/pouncer-candidate
-          cp "$RUNNER_TEMP/blender/selected.sha256" output/pouncer-candidate/blender-upstream.sha256
-          printf '%s\n' "$GITHUB_SHA" > output/pouncer-candidate/source-commit.txt
-      - name: Generate and render eight static review views first
-        if: inputs.scope == 'full'
-        shell: bash
+      - name: Native reauthor, 200Hz Death sampling, serialize and read back; NO RENDER
+        id: technical
+        timeout-minutes: 20
         run: |
           set -euo pipefail
           mkdir -p output/pouncer-candidate
-          cp "$RUNNER_TEMP/blender/selected.sha256" output/pouncer-candidate/blender-upstream.sha256
           printf '%s\n' "$GITHUB_SHA" > output/pouncer-candidate/source-commit.txt
-          blender --background --factory-startup --threads 4 --python-exit-code 1 --python tasks/desert-rv/art/pouncer-candidate/generate.py -- --output output/pouncer-candidate --phase static
-          python3 tasks/desert-rv/art/pouncer-candidate/package_review.py output/pouncer-candidate
-      - name: Upload early static review before animation work
-        if: inputs.scope == 'full'
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
-        with:
-          name: pouncer-static-r3-${{ github.run_id }}
-          path: |
-            output/pouncer-candidate/review/turntable-*.png
-            output/pouncer-candidate/review/turntable-contact-sheet.jpg
-            output/pouncer-candidate/STATIC_SHA256SUMS
-            output/pouncer-candidate/static-review.json
-            output/pouncer-candidate/topology-stages.json
-            output/pouncer-candidate/pouncer-basecolor.png
-            output/pouncer-candidate/source-commit.txt
-          if-no-files-found: error
-          retention-days: 30
-      - name: Generate export and verify all structure; render only requested scope
-        timeout-minutes: ${{ inputs.scope == 'death-diagnostic' && 50 || 110 }}
-        env:
-          REVIEW_SCOPE: ${{ inputs.scope }}
-        run: blender --background --factory-startup --threads 4 --python-exit-code 1 --python tasks/desert-rv/art/pouncer-candidate/generate.py -- --output output/pouncer-candidate --phase motion --scope "$REVIEW_SCOPE"
-      - name: Encode motion videos, contact sheets, and hashes
+          cp tasks/desert-rv/art/pouncer-candidate/death-baseline.json output/pouncer-candidate/
+          blender --background --factory-startup --threads 4 --python-exit-code 1 --python tasks/desert-rv/art/pouncer-candidate/death_repose.py -- --phase technical --input baseline/pouncer-candidate.blend --output output/pouncer-candidate
+      - name: Hash native technical output, including failure reports
         if: always()
-        run: python3 tasks/desert-rv/art/pouncer-candidate/package_review.py output/pouncer-candidate
-      - name: Upload candidate and evidence even on validation failure
+        run: python3 tasks/desert-rv/art/pouncer-candidate/package_technical_first.py output/pouncer-candidate technical
+      - name: Upload technical evidence before any picture
         if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: pouncer-${{ inputs.scope }}-${{ github.run_id }}
+          name: pouncer-death-technical-${{ github.run_id }}
           path: |
             output/pouncer-candidate/*.blend
             output/pouncer-candidate/*.glb
             output/pouncer-candidate/*.fbx
             output/pouncer-candidate/*.json
-            output/pouncer-candidate/*.png
-            output/pouncer-candidate/source-commit.txt
-            output/pouncer-candidate/blender-upstream.sha256
+            output/pouncer-candidate/*.txt
             output/pouncer-candidate/SHA256SUMS
-            output/pouncer-candidate/review/*.mp4
-            output/pouncer-candidate/review/death-rest-*.png
-            output/pouncer-candidate/review/death-near-*.png
-            output/pouncer-candidate/review/death-support-overlay-*.png
-            output/pouncer-candidate/review/*-contact-sheet.jpg
-            output/pouncer-candidate/review/turntable-*.png
+          if-no-files-found: error
+          retention-days: 30
+      - name: Exactly four opaque stills of the exact passing native candidate
+        id: opaque
+        if: success() && inputs.render_after_pass && steps.technical.outcome == 'success'
+        timeout-minutes: 8
+        run: |
+          blender --background --factory-startup --threads 4 --python-exit-code 1 --python tasks/desert-rv/art/pouncer-candidate/death_repose.py -- --phase opaque --input output/pouncer-candidate/pouncer-candidate.blend --output output/pouncer-candidate
+          python3 tasks/desert-rv/art/pouncer-candidate/package_technical_first.py output/pouncer-candidate opaque
+      - name: Upload only the four post-gate opaque stills
+        if: steps.opaque.outcome == 'success'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: pouncer-death-four-opaque-${{ github.run_id }}
+          path: |
+            output/pouncer-candidate/opaque-*.png
+            output/pouncer-candidate/opaque-scope.json
+            output/pouncer-candidate/OPAQUE_SHA256SUMS
           if-no-files-found: error
           retention-days: 30

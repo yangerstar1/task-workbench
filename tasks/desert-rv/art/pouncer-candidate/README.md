@@ -1,3 +1,25 @@
+# Death technical-first: physically correct proximal anatomy
+
+This entry point supersedes the earlier iterative Death render loop below. It uses the exact already-examined native baseline from run 37844163484, artifact 11579478380, pinned by source SHA and blend SHA256 in death-baseline.json. No new sculpt, external mesh, weights, materials or other action is created or changed. Baseline expiry/mismatch is a hard blocker, not permission to substitute another file.
+
+## Explicit support-definition correction
+
+The former >=60% trunk-only rule was wrong for this generated anatomy. Its genuinely exterior proximal shoulder flesh is almost 100% fore_upper.L weighted, and the proximal hip flesh is mostly hind_upper.L. The old rule excluded the real load-bearing meat and forced it approximately 166mm into the floor to place an interior trunk subset on the plane. The task's direction explicitly approved correcting that definition after examining the actual GLB evidence. The all-mesh 4mm collision tolerance is unchanged.
+
+Support is now selected by anatomical space, combined local muscle/trunk influence, and the first proximal portion of the appropriate upper-limb bone: segment fraction [-0.50,0.45], within 0.34m of its root, with explicit shoulder and pelvis bounds. Head, distal elbow/knee, and paws cannot substitute. Every witness reports its actual weights and segment fraction. Separate two-region multi-point and low-percentile checks remain. The former trunk-only result is still reported for comparison, but is no longer allowed to force exterior flesh through the floor.
+
+## Numerical candidate, then native gate
+
+Read-only probes of the existing GLB found a close-to-current pose with approximately five degrees of longitudinal tilt, real shoulder/hip muscle support, and relaxed neck. A refined final-pose probe had all-mesh minimum +0.126mm, face skin +14.36mm, shoulder +4.36mm, hip +1mm. These numbers are mathematical feasibility, not a rendered or native pass. Full evidence is retained in death-feasibility-math.json.
+
+The native Actions-only script loads the pinned .blend, preserves all baseline meshes/weights/rig data and every non-Death action by digest, and authors Death's visual-body rigid placement plus neck relaxation. It uses the real all-mesh support envelope rather than the invalid inner-trunk plane. It does not scale or squash a model. Gameplay root remains fixed and duration remains 1.8s. The complete baked Death is sampled at 200Hz, including half-keyframes, checked for ground penetration, contact patches, face proximity, final hold and discontinuous placement jumps. GLB and FBX are exported and their actual seven clip durations are read back.
+
+A failed native technical gate uploads its numeric output and renders NOTHING. A pass may render exactly four opaque stills of that exact SHA-verified candidate: terminal views 03/07 and fixed 1.02s/1.35s side views. No video or full seven-action rendering is run. The report explicitly remains DEATH_TECHNICAL_FIRST_NOT_FULL, with no visual or production approval. Full native Unity action/interruption/collision review is still required.
+
+Manual workflow input is scope=death-technical-first; render_after_pass defaults true and can be disabled for a strictly numerical run. Technical output is uploaded before the optional four images. Both artifacts have independent checksum lists. This is all on a standard free GitHub Actions runner; no local Blender or Unity execution is required.
+
+## Archived iteration context (not the current execution entry)
+
 # Death precision correction: head-axis feedback and hidden shoulder collision
 
 Actual support diagnostic 37840535651 kept the improved low side-lying appearance, but its worst exported penetration was 203.8mm at 1.02s on the lower jaw. The former hardcoded negative neck-Z response was the wrong sign after side-roll. Read-only GLB axis probes found positive local neck-Z raises the jaw. They also exposed a separate hidden 150mm proximal fore_upper.L skin penetration and its joint origin 15mm below the floor; raising the mouth alone would not fix that second problem.

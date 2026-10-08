@@ -1,0 +1,13 @@
+{
+  "repository": "yangerstar1/task-workbench",
+  "run_id": 37844163484,
+  "artifact_id": 11579478380,
+  "artifact_name": "pouncer-death-diagnostic-37844163484",
+  "source_commit": "36dee7d1c52b9f9fb4eaae17197d23157ed1932c",
+  "blend_sha256": "68c9b7f4af17d3e02b585b2d709ccced5a18815a364a2e4ec3c9ee2d37a309a4",
+  "definition_change": "Authorized after numerical proof: proximal shoulder/hip muscle surfaces may be upper-limb weighted. The former >=60% trunk-only rule excluded real shoulder bulk and forced it through the floor. Global 4mm penetration tolerance is unchanged.",
+  "extra_global_pitch_degrees": -5.0,
+  "neck_local_delta_x_radians": 0.10,
+  "neck_local_delta_z_radians": -0.55,
+  "scope": "DEATH_TECHNICAL_FIRST_NOT_FULL"
+}
