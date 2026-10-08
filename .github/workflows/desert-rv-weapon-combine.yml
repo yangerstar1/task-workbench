@@ -1,0 +1,49 @@
+name: Desert RV combined weapon candidate evidence
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: desert-rv-weapon-combine
+  cancel-in-progress: false
+jobs:
+  package:
+    if: github.actor == github.repository_owner && github.event_name == 'workflow_dispatch' && github.event.repository.private == false && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+          lfs: false
+      - name: Retrieve exact immutable source ZIPs and server identities
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir source-zips
+          for id in 11579827076 11580746875; do
+            gh api "repos/yangerstar1/task-workbench/actions/artifacts/$id" > "source-zips/$id.json"
+            gh api "repos/yangerstar1/task-workbench/actions/artifacts/$id/zip" > "source-zips/$id.zip"
+          done
+          python3 - <<'PY'
+          import json,sys
+          sys.path.insert(0,'tasks/desert-rv/art/weapon-candidate')
+          from combine_verified_evidence import LOCKS
+          for lock in LOCKS:
+              m=json.load(open('source-zips/'+str(lock['artifact'])+'.json'))
+              assert m['id']==lock['artifact'] and not m['expired']
+              assert m['workflow_run']['id']==lock['run'] and m['workflow_run']['head_sha']==lock['source']
+              assert m['digest']=='sha256:'+lock['zip_sha256'] and m['size_in_bytes']==lock['bytes']
+          PY
+      - name: Copy verified original bytes and bind corrected framing evidence
+        run: python3 tasks/desert-rv/art/weapon-candidate/combine_verified_evidence.py --r9 source-zips/11579827076.zip --r10 source-zips/11580746875.zip --output combined-candidate
+      - name: Upload complete combined candidate without production approval
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: weapon-combined-candidate-${{ github.run_id }}
+          path: combined-candidate/
+          if-no-files-found: error
+          retention-days: 30
