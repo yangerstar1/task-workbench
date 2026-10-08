@@ -232,6 +232,21 @@ class TestCurrentSourceInventory(unittest.TestCase):
         evidence.verify_source_state()
 
 
+class TestPresentationBuiltinModules(unittest.TestCase):
+    def test_presenter_native_modules_are_declared_and_builtin(self):
+        packages = evidence.TASK / 'unity/Packages'
+        manifest = json.loads((packages / 'manifest.json').read_text())['dependencies']
+        locked = json.loads((packages / 'packages-lock.json').read_text())['dependencies']
+        # CoreModule supplies transforms/renderers; these optional modules supply the added native APIs.
+        for suffix in ('animation', 'audio', 'physics', 'particlesystem'):
+            name = 'com.unity.modules.' + suffix
+            self.assertEqual(manifest.get(name), '1.0.0', name)
+            self.assertEqual(locked[name]['version'], '1.0.0', name)
+            self.assertEqual(locked[name]['source'], 'builtin', name)
+            self.assertEqual(locked[name]['depth'], 0, name)
+            self.assertNotIn('url', locked[name], name)
+
+
 class TestSeparateModeInventories(unittest.TestCase):
     def test_separate_reviewed_inventories(self):
         edits = evidence.expected_cases('editmode')

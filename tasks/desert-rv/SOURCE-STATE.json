@@ -83,8 +83,8 @@
     },
     {
       "path": "tasks/desert-rv/scripts/test_verify_evidence.py",
-      "sha256": "d87bcd55800707bc1ec4996ba8d08c85edf21b4302cf52c50fd1dc66183c2d42",
-      "size": 15039
+      "sha256": "df27740cf7fb3f65d83e4bb3e3e1eba1b3def16722406d5ad6f6108176c033d3",
+      "size": 15948
     },
     {
       "path": "tasks/desert-rv/scripts/update_source_state.py",
@@ -4248,13 +4248,13 @@
     },
     {
       "path": "tasks/desert-rv/unity/Packages/manifest.json",
-      "sha256": "696dca2fe314a005eb84362c7b7a54cc0a208564ccecbbd199845745758a8cd7",
-      "size": 325
+      "sha256": "9e9b4451ef0794393210bfd5ff61a68fa4e6787a67511158176db2e81d05a608",
+      "size": 374
     },
     {
       "path": "tasks/desert-rv/unity/Packages/packages-lock.json",
-      "sha256": "76313a737ceabc25b0ed20b6810e44dccbb08c459168a21e478e2474da7bed59",
-      "size": 4446
+      "sha256": "cb5f3d5e845ae3a51c2f00a4d48b06fd3360c7f4313aabda8f16742fbf1c91cc",
+      "size": 4591
     },
     {
       "path": "tasks/desert-rv/unity/ProjectSettings/AudioManager.asset",
