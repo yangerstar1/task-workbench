@@ -1,0 +1,66 @@
+name: DesertRV original weapon-hand candidate
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: desert-rv-weapon-art
+  cancel-in-progress: false
+jobs:
+  build-and-review:
+    if: github.actor == github.repository_owner && github.event_name == 'workflow_dispatch' && github.event.repository.private == false && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+          lfs: false
+      - name: Static source contract checks
+        run: python3 tasks/desert-rv/art/weapon-candidate/test_static.py
+      - name: Install official Blender with published checksum
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --location --retry 3 -o /tmp/blender.tar.xz https://download.blender.org/release/Blender4.2/blender-4.2.3-linux-x64.tar.xz
+          curl --fail --location --retry 3 -o /tmp/blender.sha256 https://download.blender.org/release/Blender4.2/blender-4.2.3.sha256
+          hash=$(grep -E '[ *]blender-4\.2\.3-linux-x64\.tar\.xz$' /tmp/blender.sha256 | awk '{print $1}')
+          test ${#hash} -eq 64
+          printf '%s  blender-4.2.3-linux-x64.tar.xz\n' "$hash" > /tmp/blender-selected.sha256
+          echo "$hash  /tmp/blender.tar.xz" | sha256sum --check --strict
+          tar -xJf /tmp/blender.tar.xz -C /tmp
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends ffmpeg libxxf86vm1 libxkbcommon0 libegl1 libgl1 libsm6 libxi6 libxrender1
+      - name: Generate export and render actual candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p weapon-output
+          printf '%s\n' "$GITHUB_SHA" > weapon-output/source-commit.txt
+          cp /tmp/blender-selected.sha256 weapon-output/blender-upstream.sha256
+          /tmp/blender-4.2.3-linux-x64/blender --background --factory-startup --threads 2 --python-exit-code 1 --python tasks/desert-rv/art/weapon-candidate/build_weapon.py -- "$GITHUB_WORKSPACE/weapon-output"
+      - name: Encode complete side motion evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          for action in Idle Fire Reload; do
+            ffmpeg -y -framerate 60 -i "weapon-output/frames_${action}/%04d.png" -c:v libx264 -crf 19 -pix_fmt yuv420p "weapon-output/side_${action}.mp4"
+          done
+          python tasks/desert-rv/art/weapon-candidate/package_evidence.py weapon-output
+      - name: Upload candidate for strict visual review
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: desert-rv-weapon-hands-candidate-${{ github.run_id }}
+          path: |
+            weapon-output/*.png
+            weapon-output/*.mp4
+            weapon-output/*.json
+            weapon-output/*.glb
+            weapon-output/*.fbx
+            weapon-output/*.blend
+            weapon-output/SHA256SUMS
+            weapon-output/source-commit.txt
+            weapon-output/blender-upstream.sha256
+          if-no-files-found: error
+          retention-days: 14

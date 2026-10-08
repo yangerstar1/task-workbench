@@ -1,0 +1,65 @@
+name: Desert RV original pouncer candidate
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: desert-rv-pouncer-art
+  cancel-in-progress: false
+jobs:
+  candidate:
+    if: github.actor == github.repository_owner && github.event_name == 'workflow_dispatch' && github.event.repository.private == false && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+          lfs: false
+      - name: Static source contract checks
+        run: python3 tasks/desert-rv/art/pouncer-candidate/test_static.py
+      - name: Install official pinned Blender and evidence tools
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends libxkbcommon0 libsm6 libxi6 libxrender1 libxxf86vm1 libgl1 ffmpeg python3-pil
+          mkdir -p "$RUNNER_TEMP/blender"
+          cd "$RUNNER_TEMP/blender"
+          base=https://download.blender.org/release/Blender4.2
+          curl --fail --location --retry 3 "$base/blender-4.2.3-linux-x64.tar.xz" -o blender-4.2.3-linux-x64.tar.xz
+          curl --fail --location --retry 3 "$base/blender-4.2.3.sha256" -o upstream.sha256
+          grep -E '[ *]blender-4\.2\.3-linux-x64\.tar\.xz$' upstream.sha256 > selected.sha256
+          test "$(wc -l < selected.sha256)" -eq 1
+          sha256sum --check selected.sha256
+          tar -xf blender-4.2.3-linux-x64.tar.xz
+          echo "$RUNNER_TEMP/blender/blender-4.2.3-linux-x64" >> "$GITHUB_PATH"
+      - name: Generate original asset and neutral-light review evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p output/pouncer-candidate
+          cp "$RUNNER_TEMP/blender/selected.sha256" output/pouncer-candidate/blender-upstream.sha256
+          printf '%s\n' "$GITHUB_SHA" > output/pouncer-candidate/source-commit.txt
+          blender --background --factory-startup --threads 4 --python-exit-code 1 --python tasks/desert-rv/art/pouncer-candidate/generate.py -- --output output/pouncer-candidate --renders
+      - name: Encode motion videos, contact sheets, and hashes
+        if: always()
+        run: python3 tasks/desert-rv/art/pouncer-candidate/package_review.py output/pouncer-candidate
+      - name: Upload candidate and evidence even on validation failure
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: pouncer-original-candidate-${{ github.run_id }}
+          path: |
+            output/pouncer-candidate/*.blend
+            output/pouncer-candidate/*.glb
+            output/pouncer-candidate/*.fbx
+            output/pouncer-candidate/*.json
+            output/pouncer-candidate/source-commit.txt
+            output/pouncer-candidate/blender-upstream.sha256
+            output/pouncer-candidate/SHA256SUMS
+            output/pouncer-candidate/review/*.mp4
+            output/pouncer-candidate/review/*-contact-sheet.jpg
+            output/pouncer-candidate/review/turntable-*.png
+          if-no-files-found: error
+          retention-days: 30
