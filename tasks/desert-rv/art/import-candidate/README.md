@@ -1,6 +1,6 @@
-# Candidate art import preparation (unpublished, unreviewed)
+# Candidate art import and bounded technical evidence
 
-This source is a candidate pipeline, not a production asset or asset approval. It has not been compiled/run in Unity or Blender. It never writes JourneyContentManifest, original scenes, original RV/model assets, acceptance flags or gate sources. An unpublished workflow is provided; none has been triggered. Run only in explicitly authorized public/free Actions.
+This pipeline produces unapproved candidates. Real Pouncer, Armored and Weapon Discovery runs have succeeded; they establish imported metadata only. The first Armored strict binding/capture revision is awaiting native execution. It preserves original assets, scenes, source, production gates and acceptance flags. Use only the existing explicitly authorized public/free Actions workflow.
 
 ## Files and execution
 
@@ -16,7 +16,7 @@ Required identity: schema=1, mode (DISCOVERY_ONLY or STRICT_BINDING), scope (FUL
 
 files is an array of {file, sha256}; relative paths have no traversal, backslash, absolute paths or collisions. Include the model, all clip FBXs, and all material textures. Supplied meta/scripts are forbidden. Actual source bytes must exactly match hashes.
 
-clips is an array of {state, file, take, seconds, loop, poseExpectation}. `file` is the hashed FBX, `take` the exact actual FBX importer takeName, not a guessed state suffix. No extra/missing takes are allowed. `poseExpectation` must explicitly be `held` or `varying` based on the authored contract; held Recover is legal because plate opening belongs to the runtime presenter. Do not add fake movement to satisfy capture checks. Animator state names are exact and flat under Base Layer. Only Idle and enemy Walk loop.
+clips is an array of {state, file, take, seconds, loop, poseExpectation}. `file` is the hashed FBX, `take` the exact actual FBX importer takeName, not a guessed state suffix. No extra/missing takes are allowed. `poseExpectation` must explicitly be `held` or `varying` based on the authored contract; held Recover is legal because plate opening belongs to the runtime presenter. Do not add fake movement to satisfy capture checks. Animator state names are exact and flat under Base Layer. Idle and enemy Walk loop. The reviewed Armored Attack source loop is also allowed to cover the existing attack timer and normalized CrossFade overrun; no other attack/reload loop is allowed.
 
 Duration seconds:
 - Pouncer: Idle 2, Walk .4, Windup .78, Attack .8, Recover 1.3, Hit .28, Death 1.8.
@@ -25,7 +25,7 @@ Duration seconds:
 
 Importer reads back actual AnimationClip frame rate, duration (within one actual frame), loop status, transform curves, event absence, object-curve absence, competing quaternion/Euler bindings and root/motion curves. Every binding path must resolve against the final model Animator root. This structural readback is not a visual or motion approval. Charge timeout/crossfade overrun still needs actual runtime review.
 
-materials is an array of {sourceName, baseColorFile, normalFile, metallicSmoothnessFile, occlusionFile, baseColor, metallic, smoothness}. `sourceName` must exactly match actual imported source material name. Every source renderer slot must map, and no mapping may be unused. Optional texture path may be empty; other texture paths must be hashed files. `baseColor` is Unity Color JSON {r,g,b,a}. Only already-correct Unity packed metallic R/smoothness A is supported; DO NOT route raw ORM into this field. ORM requires a separately specified/tested repacking step not provided here. Texture content/channel correctness needs actual inspection. No material inference or silent fallback.
+materials is an array of {sourceName, baseColorFile, normalFile, metallicSmoothnessFile, occlusionFile, baseColor, metallic, smoothness}. `sourceName` must exactly match actual imported source material name. Every source renderer slot must map, and no mapping may be unused. Optional texture path may be empty; other texture paths must be hashed files. `baseColor` is Unity Color JSON {r,g,b,a}. Only already-correct Unity packed metallic R/smoothness A is supported; DO NOT route raw ORM into this field. Armored ormFile uses the explicitly tested linear conversion R=source.B, G=source.R, B=0, A=255-source.G, with actual imported pixel readback and unchanged original hash. Texture content/channel correctness needs actual inspection. No material inference or silent fallback.
 
 bindings: every transform/renderer path is exact model-root-relative (animatorPath alone may be empty for model root), with no duplicate sibling-name ambiguity. Do not assume FBX axis conversion or hierarchy.
 - Common: animatorPath, body (renderer path).
@@ -43,33 +43,27 @@ bindings: every transform/renderer path is exact model-root-relative (animatorPa
 - Armored uses the new two-plate fields via checked SerializedObject reflection. Old single-plate runtime fails immediately rather than silently falling back.
 - Actual Unity compilation/import/render, interrupted actions, reload cases, weakpoint states, three-region playthrough, Android device performance and the unchanged production gate remain required. No accepted=true or evidence approval is generated.
 
-## Verification completed here
+## Manual workflow and real capture entry
 
-Python artifact stager: 10 isolated unit tests passed (happy allowlist, wrong source/run, absent server digest, tampered ZIP/payload, case collision, traversal, overwrite and failed generation). Static source audit only for C#. Unity/C# compile and all asset runtime stages NOT RUN. Production gate/manifest and original files untouched by this source candidate.
+`.github/workflows/desert-rv-candidate-art-import.yml` takes a checked-in contract path and independently reviewed SHA256. `prepare_input.py` retrieves authenticated repository/run/artifact metadata and the original ZIP using the read-only Actions token. It rejects private repositories and revalidates source, server digest and payload bytes. The fixed Unity 6000.3.19f1 / official GameCI / Mesa software OpenGL environment and existing Unity secrets are reused.
 
-## Prepared dispatch workflow and real capture entry
+The isolated `DesertRV.CandidateArtTests` assembly contains the selected-mode entry plus two animation-policy regression tests. Core game inventories are separate. Strict Armored samples actual Animator clips, existing normalized CrossFade interruptions, source-loop overrun and Animator resets, then nine real-presenter Editor fixture views. Camera images are diagnostic candidates; an Animator reset is not whole-game restart evidence.
 
-`.github/workflows/desert-rv-candidate-art-import.yml` takes an already checked-in contract path and its independently reviewed SHA256. Contract must additionally include positive integer `artifactId`; no sample with invented inputs is supplied. `prepare_input.py` retrieves real repository/run/artifact API JSON and ZIP using the scoped read-only GitHub token; private repositories are rejected. Existing source-pinned Unity 6000.3.19f1 + Mesa environment Dockerfile and official GameCI test runner are reused. Required secrets are the existing Unity license/email/password. This package neither creates credentials nor dispatches itself.
+The safe exporter requires all three native cases, successful native/protected steps, closed-schema reports, exact frame inventory and original-source identity. Failure uploads only a safe fixed code and validated source identity. It never uploads partial candidate directories or raw logs. The existing Discovery branch preserves its narrower source-only export and does not produce screenshots.
 
-Dedicated `DesertRV.CandidateArtTests` assembly avoids altering normal rule-test inventory. Its sole test reflects into `JourneyCandidateArtCapture.ImportAndCapture`. The entry imports first, creates a disposable preview scene, requires real OpenGLCore, samples each actual Animator clip at five positions, checks correct Animator state and actual deformed-mesh pose variation only when the contract explicitly requests varying poses (held clips remain legal), and captures fixed-camera 960x540 PNGs. For enemies it calls the existing normalized `CrossFade(...,.12f)` from Attack 25/50/75% to Recover and from every non-Death phase at 25/50/75% to Death, advances the real Animator, checks the final state, and saves intermediate transition traces. Two Animator rebinds are captured. Capture output is unreviewed diagnostic evidence.
+## Reviewed inputs and remaining work
 
-This does NOT test the gameplay-owned weakpoint presenter (disabled during isolated Animator capture), contact physics, first-person gameplay framing, reload amount projection, or whole-session restart. Actual gameplay tests and human review remain blockers; Animator rebind is explicitly not called a whole-game restart. No render is generated here and no past Blender image substitutes for a Unity capture.
-
-`verify_output.py` requires exactly one passing named native NUnit case, a successful structural import report, actual nonempty frame records/PNG files, matching dependency fingerprint, and no approval flags. Workflow always checks all tracked repository files are unchanged (including Assets, Packages and ProjectSettings), even after a failed native step and only uploads the new candidate asset tree and bounded candidate reports/images (no raw logs or token-bearing metadata). A failed import/capture stays failed and uploads available diagnostic candidate output.
-
-## Inputs currently missing
-
-A real death-diagnostic DiscoveryOnly contract is now supplied (see verified dispatch input below); no strict binding contract is supplied. First import does NOT require already-known Unity hierarchy/takes/materials: use DISCOVERY_ONLY below. Strict binding consumes the subsequent discovery and calibration. Pouncer R3 Death contact remains under repair; Weapon R5 explicit Muzzle export run 37825145435 is pending validation; Armored split-export/core/plate geometry and Unity opening-axis calibration require final artifact proof. Thus there is intentionally no runnable concrete contract that would pretend these inputs passed. Once reviewed exact inputs exist, add their contract and dispatch this prepared workflow for diagnostic import (still no production acceptance).
+Three actual Discovery outputs now exist, including Weapon combined FULL metadata and Armored model/animation/texture readback. Armored has a new genuine FULL aggregate and measured strict contract; its first strict Unity run remains pending. Weapon requires measured source-unit, material, muzzle and two-bone calibration work before its strict safe-export path is opened. Pouncer partial Death discovery remains partial. Visual acceptance, actual runtime interruption, whole-game input traversal and Android device acceptance remain separate gates.
 
 ## Capture lifecycle and source-first compilation revision
 
 Capture uses URP `SingleCameraRequest`, `SupportsRenderRequest` and `SubmitRenderRequest`, matching the previously exercised environment capture route. It does not call legacy Camera.Render. Report writes are inside nested try/finally cleanup, so a failed report save still fails the test but cannot skip RenderTexture release/destroy, Texture2D destroy, or preview-scene closure. Per-render active RenderTexture is restored even on render/readback failure.
 
-Every captured frame now reports actual BakeMesh/rigid-mesh vertex count, worldMinY, actor-origin groundReferenceY, offscreen/behind-camera vertex counts, and a deformed-mesh SHA256. Below-reference counts apply only to enemy kinds, never to the weapon. These are raw measured diagnostics, not approved foot-contact thresholds; renderer-wide bounds alone do not certify feet or floor contact. Held clips do not fail because their five images match. Presenter-owned weakpoint opening remains explicitly untested.
+Every captured frame now reports actual BakeMesh/rigid-mesh vertex count, worldMinY, actor-origin groundReferenceY, offscreen/behind-camera vertex counts, and a deformed-mesh SHA256. Below-reference counts apply only to enemy kinds, never to the weapon. These are raw measured diagnostics, not approved foot-contact thresholds; renderer-wide bounds alone do not certify feet or floor contact. Held clips do not fail because their five images match. The separate nine-view weakpoint fixture exercises the actual presenter under isolated authoritative state; it is not end-to-end gameplay.
 
 The C# Editor sources and isolated test assembly can be published first for ordinary Unity compilation, with no concrete artifact contract and no importer dispatch. The normal native workflow's explicit EditMode/PlayMode assembly selection does not execute DesertRV.CandidateArtTests; compilation still sees the Editor C# source. Do not claim compilation passed until its actual Actions result. The dedicated candidate workflow intentionally fails without a real reviewed contract; it is not auto-triggered on push.
 
-Latest local checks: 10 offline stager tests plus 6 static capture-source regression tests. These guard source choices and are not Unity runtime tests.
+Local validation covers the stager, source contracts and both safe exporters with positive and negative fixtures. These tests do not substitute for native compilation/rendering.
 
 ## Final source overlay integrity
 
@@ -89,9 +83,9 @@ The dedicated test routes only by the explicit contract mode. Output validation 
 
 Pouncer run 37829068773 is eligible for proposed discovery only under DEATH_DIAGNOSTIC_NOT_FULL. `pouncer-death-input-inventory.json` records hashes actually read from the available FBX/PNG and the artifact's source-commit.txt. It is an inventory rather than a dispatch contract. The separate contracts/pouncer-death-discovery-37829068773.json is the real reviewed-input DiscoveryOnly contract; provenance and ZIP byte checks are documented below. No Unity take or material name was invented. Root has not approved Death visual quality; no full-motion pass is implied.
 
-Local verification is now 15 offline stager tests plus 9 static source checks, not Unity execution. All source still can compile without an asset contract; only explicit dispatch executes discovery/import.
+Only explicit manual dispatch executes discovery/import. Ordinary core test compilation does not execute the isolated candidate assembly.
 
-## Verified DiscoveryOnly dispatch input (source candidate, not dispatched)
+## Historical verified Pouncer Discovery input
 
 Contract: `tasks/desert-rv/art/import-candidate/contracts/pouncer-death-discovery-37829068773.json`
 Contract SHA256: `cbd1f7901223a436461cb2cb58380bdea730664097db424f7cdc69b89214bb90`
@@ -106,6 +100,12 @@ Only two payload files enter Unity:
 No takes, hierarchy roles, material names, muzzle/plate calibration, final prefab or acceptance are filled in. ZIP scope explicitly says full_motion_visual_review=NOT_RUN, render_fps=30. Even successful Unity discovery will not permit this partial input to enter STRICT_BINDING. Selecting a genuinely full candidate and constructing a later measured binding contract remain separate decisions.
 
 
-## First native discovery export gate
+## Bounded export and current execution scopes
 
-Manual workflow currently exposes DISCOVERY_ONLY only. Strict-binding source remains unexecuted and needs a separately reviewed contract and export policy before enabling. The native test is an isolated CandidateArt assembly, separate from the 129 EditMode and 6 PlayMode game inventory. All tracked files (including Packages/ProjectSettings) must remain unchanged. Upload uses only a separately validated export directory: exact contract/model identity, original payload hashes, generated metas and discovery report, plus per-file SHA256 receipt. Failure exports contain only a fixed error code and validated source identity, never raw logs/stacks or unverified candidate directories. Discovery never sets production acceptance.
+The manual workflow offers DISCOVERY_ONLY and Armored STRICT_BINDING. The hosted preflight rejects strict inputs for other asset kinds until their measured binding and safe export contracts are implemented. A genuine FULL_CANDIDATE source is mandatory for strict mode; old partial inputs are never relabeled.
+
+Strict capture expects three passing isolated CandidateArt NUnit cases, 202 actual 960×540 PNGs including nine real-presenter Editor fixture views, 70 root-curve records, measured root stability, and exact source/prefab dependencies. The reviewed contract pins the actual Discovery neutral root TRS and four renderer world bounds. Capture checks these before any Animator Rebind/Update, retains that original baseline, and reports actual deformed mesh dimensions on every sample. Constant root curves must also agree with the imported neutral transform; there is no automatic unit normalization or camera rescaling around a changed animation root. ORM conversion is checked again offline against every original pixel, Unity's bottom-up decoded-pixel hash and linear readable importer settings. No game test inventory is altered: the core baseline remains 164 EditMode / 9 PlayMode.
+
+Only exact contract-declared source files/metas, newly generated candidate prefab/controller/materials/derived ORM, three closed-schema reports and the exact referenced PNGs can leave the runner. All files are validated before export. Failed native/protected/schema/image checks export only a fixed safe error code and validated source identity. No workspace, cache, raw XML, stack, licensing log or arbitrary directory is uploaded. The receipt binds the current import SHA/run, upstream source identity, native XML hash and every exported file hash.
+
+All tracked source, including original Assets, Packages and ProjectSettings, must remain unchanged. Candidate technical output never sets visual/gameplay/production approval. The weakpoint fixture uses an isolated in-memory SessionState/BeastCombatState and actual presenter; it does not establish input-driven combat, interruption/restart, whole-game progression or Android acceptance. The first strict revision remains unexecuted until its own successful native receipt exists.

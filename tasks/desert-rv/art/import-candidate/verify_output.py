@@ -6,6 +6,7 @@ import os
 import shutil
 from pathlib import Path
 import xml.etree.ElementTree as ET
+from strict_output import StrictError, export_strict, read as strict_read
 
 EXPECTED='DesertRV.Tests.CandidateArtImportTests.ExecutePinnedDiscoveryOrBindingDiagnostics'
 class EvidenceError(ValueError): pass
@@ -24,7 +25,9 @@ def export(root,output,native='success',protected='success'):
         summary.update(importCommit=head,importRunUrl='https://github.com/yangerstar1/task-workbench/actions/runs/'+run)
     try:
         contract_path=root/'unity/CandidateImportInput/contract.json';safe_file(contract_path)
-        contract=json.loads(contract_path.read_text())
+        contract=strict_read(contract_path)
+        if contract.get('mode')=='STRICT_BINDING':
+            return export_strict(root,output,contract,summary,native,protected)
         require(contract.get('mode')=='DISCOVERY_ONLY','DISCOVERY_ONLY_EXPORT')
         require(re.fullmatch('[a-z0-9][a-z0-9-]{3,79}',contract.get('id','')),'INVALID_ID')
         require(re.fullmatch('[a-f0-9]{40}',contract.get('sourceCommit','')),'INVALID_SOURCE')
@@ -81,18 +84,19 @@ def export(root,output,native='success',protected='success'):
             dest=output/rel;dest.parent.mkdir(parents=True,exist_ok=True);shutil.copyfile(p,dest)
             records.append({'path':rel.as_posix(),'sha256':sha(dest),'bytes':dest.stat().st_size})
         summary.update(status='DISCOVERED_UNREVIEWED_NOT_BOUND',errorCode=None,files=records)
-    except EvidenceError as e:
+    except (EvidenceError,StrictError) as e:
         summary['errorCode']=str(e)
         raise
     except Exception:
         summary['errorCode']='INVALID_EVIDENCE'
         raise EvidenceError('INVALID_EVIDENCE') from None
     finally:
-        (output/'receipt.json').write_text(json.dumps(summary,indent=2)+'\n')
+        if summary.get('status')!='STRICT_CANDIDATE_CAPTURED_NOT_ACCEPTED':
+            (output/'receipt.json').write_text(json.dumps(summary,indent=2)+'\n')
     return summary
 if __name__=='__main__':
     import argparse
     p=argparse.ArgumentParser();p.add_argument('--native',required=True);p.add_argument('--protected',required=True);a=p.parse_args()
     try: export(Path('tasks/desert-rv'),Path('tasks/desert-rv/candidate-art-export'),a.native,a.protected)
-    except EvidenceError as e: raise SystemExit(str(e))
+    except (EvidenceError,StrictError) as e: raise SystemExit(str(e))
 

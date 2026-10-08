@@ -18,16 +18,19 @@ namespace DesertRV.Editor
         [Serializable] public sealed class ClipSpec { public string state, file, take, poseExpectation; public float seconds; public bool loop; }
         [Serializable] public sealed class MaterialSpec
         {
-            public string sourceName, baseColorFile, normalFile, metallicSmoothnessFile, occlusionFile;
+            public string sourceName, baseColorFile, normalFile, metallicSmoothnessFile, occlusionFile, ormFile;
             public Color baseColor = Color.white; public float metallic, smoothness;
             // Only Unity packed metallic R/smoothness A is accepted, never raw ORM.
         }
+        [Serializable] public sealed class RendererNeutralBaseline { public string path; public Vector3 worldCenter,worldExtents; }
+        [Serializable] public sealed class RootNeutralBaseline { public Vector3 position,scale;public Quaternion rotation;public RendererNeutralBaseline[] renderers; }
         [Serializable] public sealed class Bindings
         {
             public string animatorPath, body, leftHand, rightHand, muzzle, incomingOffset, leftReloadOffset;
+            public RootNeutralBaseline neutralBaseline;
             public string[] loadedNails, incomingNails;
             public string weakPointRoot, core; public string[] plates, plateRenderers;
-            public Vector3[] openEuler; public Color openEmission;
+            public Vector3[] openEuler; public Color openEmission, openBaseColor;
             public Vector3 colliderCenter; public float colliderRadius, colliderHeight;
         }
         [Serializable] public sealed class Contract
@@ -44,12 +47,17 @@ namespace DesertRV.Editor
             public Vector3 importedWorldPosition, importedBasisX, importedBasisY, importedBasisZ;
             public string gate = "BLOCKED: verify actual exported head/tail or imported basis against barrel geometry before creating forward-aligned ShotMuzzle/flash adapter. No flash is bound; WeaponPresentation.ValidateBindings must fail until completed.";
         }
+        [Serializable] public sealed class RootCurveReadback { public string state,property; public int keys; public float minimum,maximum; public bool constant,tangentsSafe; }
         [Serializable] public sealed class Report
         {
+            public string mode="STRICT_BINDING",scope,kind;
             public string status = "failed-candidate-import", contractSha256, prefab, dependencyHash, dependencySha256;
             public string runUrl, sourceCommit, artifactName, artifactSha256;
             public bool candidateOnly = true, visualReviewed = false, gameplayReviewed = false;
             public MuzzleObservation muzzle;
+            public string[] importedAnimatorPaths,dependencies;
+            public List<CandidateOrmConversion.Record> derivedTextures=new List<CandidateOrmConversion.Record>();
+            public List<RootCurveReadback> rootCurves=new List<RootCurveReadback>();
             public List<ClipReadback> clips = new List<ClipReadback>(); public List<string> failures = new List<string>();
             public string[] stillRequired = { "Actual Unity camera rendering and human visual review", "Interrupted/repeated runtime flows", "Full three-region playthrough", "Android device acceptance", "Explicit production review and unchanged production gate" };
         }
@@ -67,6 +75,7 @@ namespace DesertRV.Editor
                 Check(Application.unityVersion == "6000.3.19f1", "Exact Unity version required.");
                 Check(!string.IsNullOrEmpty(input) && !string.IsNullOrEmpty(contractFile) && !string.IsNullOrEmpty(archive), "Three explicit input environment variables required.");
                 var c = JsonUtility.FromJson<Contract>(File.ReadAllText(contractFile)); ValidateContract(c);
+                report.scope=c.scope;report.kind=c.kind;
                 report.contractSha256 = Sha(contractFile); report.runUrl=c.runUrl; report.sourceCommit=c.sourceCommit; report.artifactName=c.artifactName; report.artifactSha256=c.artifactSha256;
                 Check(Sha(archive)==c.artifactSha256, "Downloaded artifact archive SHA256 mismatch.");
                 string destination = Root + "/" + c.id;
@@ -86,10 +95,11 @@ namespace DesertRV.Editor
                 // All paths are model-root-relative and explicit, never name-search heuristics.
                 var animatorRoot=At(visual.transform,c.bindings.animatorPath);
                 var animators=visual.GetComponentsInChildren<Animator>(true);
-                foreach(var a in animators) Check(a.transform==animatorRoot,"Unexpected nested Animator.");
+                report.importedAnimatorPaths=animators.Select(a=>AnimationUtility.CalculateTransformPath(a.transform,visual.transform)).ToArray();
+                foreach(var a in animators) Check(a.transform==animatorRoot,"Unexpected imported Animator: actual=["+AnimationUtility.CalculateTransformPath(a.transform,visual.transform)+"] expected=["+c.bindings.animatorPath+"]. No automatic relocation.");
                 var animator=animatorRoot.GetComponent<Animator>() ?? animatorRoot.gameObject.AddComponent<Animator>(); animator.applyRootMotion=false;
                 var clips=ReadClips(c,destination,animatorRoot,report);
-                BindMaterials(c,destination,visual);
+                BindMaterials(c,destination,visual,report);
                 string controllerPath=destination+"/Candidate.controller";
                 var controller=AnimatorController.CreateAnimatorControllerAtPath(controllerPath);
                 foreach(var spec in c.clips) { var state=controller.layers[0].stateMachine.AddState(spec.state); state.motion=clips[spec.state]; if(spec.state=="Idle")controller.layers[0].stateMachine.defaultState=state; }
@@ -105,7 +115,7 @@ namespace DesertRV.Editor
                 report.prefab=destination+"/Candidate.prefab";
                 Check(PrefabUtility.SaveAsPrefabAsset(instance,report.prefab),"Prefab save failed.");
                 AssetDatabase.SaveAssets(); AssetDatabase.Refresh(ImportAssetOptions.ForceSynchronousImport);
-                var dependencies=AssetDatabase.GetDependencies(report.prefab,true);
+                var dependencies=AssetDatabase.GetDependencies(report.prefab,true);report.dependencies=dependencies;
                 foreach(string file in c.clips.Select(clip=>clip.file).Concat(new[]{c.modelFile}).Distinct())
                     Check(dependencies.Contains(destination+"/Source/"+file),"Prefab lost actual model/animation FBX dependency: "+file);
                 report.dependencyHash=AssetDatabase.GetAssetDependencyHash(report.prefab).ToString();
@@ -143,7 +153,7 @@ namespace DesertRV.Editor
                 Check(s.poseExpectation=="held" || s.poseExpectation=="varying","Explicit held/varying pose expectation required: "+s.state);
                 float expected=ExpectedSeconds(c.kind,s.state);
                 Check(Mathf.Abs(expected-s.seconds)<.00001f,"Duration differs from source/runtime contract: "+s.state);
-                Check(s.loop==(s.state=="Idle" || s.state=="Walk"),"Only Idle/Walk loop. Charge timeout overrun needs separate runtime review.");
+                Check(s.loop==AllowedLoop(c.kind,s.state),"Only Idle/Walk and source-authored Armored Attack may loop; runtime still owns attack duration.");
             }
             Check(c.bindings!=null && c.materials!=null && c.materials.Length>0 && c.materials.Select(m=>m.sourceName).Distinct().Count()==c.materials.Length,"Explicit bindings/material mappings required.");
             if(c.kind!="weapon") Check(c.bindings.colliderRadius>=.15f && c.bindings.colliderRadius<=1.5f && c.bindings.colliderHeight>=.4f && c.bindings.colliderHeight<=4 && c.bindings.colliderHeight>=2*c.bindings.colliderRadius,"Explicit physical collider dimensions invalid.");
@@ -194,23 +204,43 @@ namespace DesertRV.Editor
                         Check(binding.type==typeof(Transform),"Only authored transform animation supported: "+binding.propertyName);
                         At(root,binding.path); var curve=AnimationUtility.GetEditorCurve(clip,binding);
                         Check(curve!=null && curve.keys.Length>0 && curve.keys.All(k=>Finite(k.value)),"Missing/nonfinite curve.");
-                        if(binding.path=="") Check(curve.keys.All(k=>Mathf.Abs(k.value-curve.keys[0].value)<.00001f),"Animated model root forbidden.");
+                        if(binding.path=="")
+                        {
+                            bool constant=curve.keys.All(k=>Mathf.Abs(k.value-curve.keys[0].value)<.00001f);
+                            bool tangentsSafe=curve.keys.All(k=>SafeConstantTangent(k.inTangent)&&SafeConstantTangent(k.outTangent));
+                            report.rootCurves.Add(new RootCurveReadback{state=spec.state,property=binding.propertyName,keys=curve.keys.Length,minimum=curve.keys.Min(k=>k.value),maximum=curve.keys.Max(k=>k.value),constant=constant,tangentsSafe=tangentsSafe});
+                            Check(constant && tangentsSafe,"Animated/interpolating model root forbidden.");
+                        }
                         if(binding.propertyName.StartsWith("m_LocalScale",StringComparison.Ordinal)) Check(curve.keys.All(k=>k.value>.001f),"Animation scales geometry away.");
                     }
+                    if(c.kind=="armored")RequireNeutralRootCurves(spec.state,report.rootCurves.Where(r=>r.state==spec.state).ToArray(),root);
                     // Euler and quaternion tracks on one transform would be competing rotation representations.
                     foreach(var track in floats.GroupBy(b=>b.path)) Check(!(track.Any(b=>b.propertyName.StartsWith("m_LocalRotation")) && track.Any(b=>b.propertyName.IndexOf("Euler",StringComparison.OrdinalIgnoreCase)>=0)),"Competing rotation curves: "+track.Key);
-                    report.clips.Add(new ClipReadback { state=spec.state,file=spec.file,take=spec.take,seconds=clip.length,frameRate=clip.frameRate,floatBindings=floats.Length,objectBindings=objects.Length,loop=clip.isLooping });
+                    report.clips.Add(new ClipReadback { state=spec.state,file=spec.file,take=spec.take,poseExpectation=spec.poseExpectation,seconds=clip.length,frameRate=clip.frameRate,floatBindings=floats.Length,objectBindings=objects.Length,loop=clip.isLooping });
                     result.Add(spec.state,clip);
                 }
             }
             return result;
+        }
+        static void RequireNeutralRootCurves(string state,RootCurveReadback[] rows,Transform root)
+        {
+            var required=new[]{"m_LocalPosition.x","m_LocalPosition.y","m_LocalPosition.z","m_LocalRotation.x","m_LocalRotation.y","m_LocalRotation.z","m_LocalRotation.w","m_LocalScale.x","m_LocalScale.y","m_LocalScale.z"};
+            Check(rows.Length==10 && rows.Select(r=>r.property).Distinct().Count()==10 && required.All(p=>rows.Any(r=>r.property==p)),"Exact ten neutral root curves required: "+state);
+            var values=rows.ToDictionary(r=>r.property,r=>r.minimum);
+            var position=new Vector3(values["m_LocalPosition.x"],values["m_LocalPosition.y"],values["m_LocalPosition.z"]);
+            var scale=new Vector3(values["m_LocalScale.x"],values["m_LocalScale.y"],values["m_LocalScale.z"]);
+            var rotation=new Quaternion(values["m_LocalRotation.x"],values["m_LocalRotation.y"],values["m_LocalRotation.z"],values["m_LocalRotation.w"]);
+            float norm=Quaternion.Dot(rotation,rotation);
+            Check(Finite(norm) && Mathf.Abs(norm-1f)<=.00001f,"Invalid constant root quaternion: "+state);
+            Check(Vector3.Distance(position,root.localPosition)<=.00001f && Vector3.Distance(scale,root.localScale)<=.00001f && Quaternion.Angle(rotation.normalized,root.localRotation.normalized)<=.001f,
+                "Constant root curves differ from imported neutral: "+state+" expected position="+root.localPosition.ToString("G9")+" scale="+root.localScale.ToString("G9")+" rotation="+root.localRotation.ToString("G9")+"; actual position="+position.ToString("G9")+" scale="+scale.ToString("G9")+" rotation="+rotation.ToString("G9")+". Units are not automatically normalized.");
         }
         static void ConfigureTextures(Contract c,string destination)
         {
             var roles=new Dictionary<string,string>();
             foreach(var m in c.materials)
             {
-                foreach(var pair in new[]{new[]{m.baseColorFile,"color"},new[]{m.normalFile,"normal"},new[]{m.metallicSmoothnessFile,"linear"},new[]{m.occlusionFile,"linear"}})
+                foreach(var pair in new[]{new[]{m.baseColorFile,"color"},new[]{m.normalFile,"normal"},new[]{m.metallicSmoothnessFile,"linear"},new[]{m.occlusionFile,"linear"},new[]{m.ormFile,"linear"}})
                 {
                     if(string.IsNullOrEmpty(pair[0]))continue;
                     Check(c.files.Any(f=>f.file==pair[0]) && !pair[0].EndsWith(".fbx",StringComparison.OrdinalIgnoreCase),"Texture must be a declared hashed image.");
@@ -224,7 +254,7 @@ namespace DesertRV.Editor
                 importer.sRGBTexture=pair.Value=="color"; importer.mipmapEnabled=true; importer.SaveAndReimport();
             }
         }
-        static void BindMaterials(Contract c,string destination,GameObject visual)
+        static void BindMaterials(Contract c,string destination,GameObject visual,Report report)
         {
             var shader=Shader.Find("Universal Render Pipeline/Lit"); Check(shader,"URP Lit shader unavailable.");
             var maps=new Dictionary<string,Material>(); Directory.CreateDirectory(destination+"/Materials");
@@ -236,6 +266,14 @@ namespace DesertRV.Editor
                 SetTexture(material,"_BumpMap",s.normalFile,destination,"_NORMALMAP");
                 SetTexture(material,"_MetallicGlossMap",s.metallicSmoothnessFile,destination,"_METALLICSPECGLOSSMAP");
                 SetTexture(material,"_OcclusionMap",s.occlusionFile,destination,"_OCCLUSIONMAP");
+                if(!string.IsNullOrEmpty(s.ormFile))
+                {
+                    Check(string.IsNullOrEmpty(s.metallicSmoothnessFile)&&string.IsNullOrEmpty(s.occlusionFile),"Choose original ORM derivation or already packed textures, not both.");
+                    var texture=CandidateOrmConversion.Convert(destination+"/Source/"+s.ormFile,destination+"/Derived/ORM_"+i.ToString("D2")+".png",out var conversion);
+                    report.derivedTextures.Add(conversion);material.SetTexture("_MetallicGlossMap",texture);material.SetTexture("_OcclusionMap",texture);
+                    material.SetFloat("_WorkflowMode",1);material.SetFloat("_SmoothnessTextureChannel",0);material.SetFloat("_Smoothness",1);material.SetFloat("_OcclusionStrength",1);
+                    material.EnableKeyword("_METALLICSPECGLOSSMAP");material.EnableKeyword("_OCCLUSIONMAP");
+                }
                 AssetDatabase.CreateAsset(material,destination+"/Materials/Material_"+i.ToString("D2")+".mat"); maps.Add(s.sourceName,material);
             }
             var used=new HashSet<string>(); var renderers=visual.GetComponentsInChildren<Renderer>(true); Check(renderers.Length>0,"No model renderers.");
@@ -310,7 +348,8 @@ namespace DesertRV.Editor
             Check(renderers.All(r=>r is MeshRenderer),"Plate renderers must be rigid MeshRenderer.");
             RejectKeys(clips,actor.animator.transform,new[]{root},true);
             Check(b.openEmission.maxColorComponent>0 && Finite(b.openEmission.r) && Finite(b.openEmission.g) && Finite(b.openEmission.b),"Explicit nonzero core emission required.");
-            var open=new Material(core.sharedMaterials[0]); open.name="Candidate_Core_Open"; open.SetColor("_EmissionColor",b.openEmission); open.EnableKeyword("_EMISSION");
+            Check(b.openBaseColor.a>0 && b.openBaseColor.maxColorComponent>0 && Finite(b.openBaseColor.r) && Finite(b.openBaseColor.g) && Finite(b.openBaseColor.b),"Explicit candidate open base color required.");
+            var open=new Material(core.sharedMaterials[0]); open.SetColor("_BaseColor",b.openBaseColor); open.name="Candidate_Core_Open"; open.SetColor("_EmissionColor",b.openEmission); open.EnableKeyword("_EMISSION");
             AssetDatabase.CreateAsset(open,destination+"/Materials/Core_Open.mat");
             var presenter=instance.AddComponent<BeastWeakPointPresentation>();
             var so=new SerializedObject(presenter);
@@ -351,7 +390,10 @@ namespace DesertRV.Editor
             return full;
         }
         internal static string Sha(string path) { using(var sha=SHA256.Create()) using(var stream=File.OpenRead(path)) return BitConverter.ToString(sha.ComputeHash(stream)).Replace("-","").ToLowerInvariant(); }
+        internal static bool AllowedLoop(string kind,string state)=>state=="Idle" || state=="Walk" || (kind=="armored" && state=="Attack");
+        internal static bool SafeConstantTangent(float value)=>!float.IsNaN(value) && (float.IsInfinity(value)||value==0f);
         static bool Finite(float value)=>!float.IsNaN(value)&&!float.IsInfinity(value);
         internal static void Check(bool value,string message) { if(!value)throw new InvalidOperationException(message); }
     }
 }
+

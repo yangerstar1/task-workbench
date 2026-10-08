@@ -3,11 +3,11 @@ on:
   workflow_dispatch:
     inputs:
       mode:
-        description: Discovery enumerates actual imports; strict binding requires a later verified contract
+        description: Discovery enumerates actual imports; Armored strict captures reviewed technical candidates
         required: true
         type: choice
         default: DISCOVERY_ONLY
-        options: [DISCOVERY_ONLY]
+        options: [DISCOVERY_ONLY, STRICT_BINDING]
       contract:
         description: Checked-in tasks/desert-rv/art/import-candidate/contracts/<id>.json
         required: true
@@ -34,9 +34,11 @@ jobs:
         with:
           persist-credentials: false
           lfs: false
+      - name: Install official bounded image validators
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends python3-pil python3-yaml
       - name: Test offline stager
         working-directory: tasks/desert-rv/art/import-candidate
-        run: python3 -m unittest -v test_stage_artifact test_capture_source test_verify_output
+        run: /usr/bin/python3 -m unittest -v test_stage_artifact test_capture_source test_verify_output test_strict_output
       - name: Fetch and verify pinned candidate input
         env:
           GH_TOKEN: ${{ github.token }}
@@ -78,12 +80,12 @@ jobs:
         run: |
           git diff --quiet --exit-code
           git diff --cached --quiet --exit-code
-      - name: Export only validated discovery files or safe failure code
+      - name: Export only validated mode-specific files or safe failure code
         if: always()
         env:
           NATIVE_RESULT: ${{ steps.native.outcome }}
           PROTECTED_RESULT: ${{ steps.protected.outcome }}
-        run: python3 tasks/desert-rv/art/import-candidate/verify_output.py --native "$NATIVE_RESULT" --protected "$PROTECTED_RESULT"
+        run: /usr/bin/python3 tasks/desert-rv/art/import-candidate/verify_output.py --native "$NATIVE_RESULT" --protected "$PROTECTED_RESULT"
       - name: Upload candidate outputs only (never approval)
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02

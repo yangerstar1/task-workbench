@@ -12,6 +12,9 @@ def prepare(contract_path, expected_sha, output, mode):
     require(hashlib.sha256(contract_path.read_bytes()).hexdigest()==expected_sha,'Contract SHA mismatch')
     contract=json.loads(contract_path.read_text())
     require(contract.get('mode')==mode,'Dispatch mode differs from reviewed contract')
+    if mode=='STRICT_BINDING':
+        from strict_output import contract_shape
+        contract_shape(contract)
     require(contract['repository']=='yangerstar1/task-workbench','Wrong repository')
     repo=api('/repos/yangerstar1/task-workbench'); require(repo['private'] is False,'Free public repository required')
     match=re.fullmatch('https://github.com/yangerstar1/task-workbench/actions/runs/([0-9]+)',contract['runUrl']); require(match,'Exact run URL required')

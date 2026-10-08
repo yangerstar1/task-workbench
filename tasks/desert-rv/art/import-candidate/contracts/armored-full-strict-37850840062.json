@@ -1,0 +1,241 @@
+{
+  "schema": 1,
+  "mode": "STRICT_BINDING",
+  "scope": "FULL_CANDIDATE",
+  "id": "armored-full-strict-37850840062",
+  "kind": "armored",
+  "repository": "yangerstar1/task-workbench",
+  "runUrl": "https://github.com/yangerstar1/task-workbench/actions/runs/37850840062",
+  "sourceCommit": "dcead0dca122cbe5a071a3f99ee49c5404701f90",
+  "artifactId": 11581259258,
+  "artifactName": "armored-combined-candidate-37850840062",
+  "artifactSha256": "fc710c12d1b6c073ae9db097beb37074dd2a661ad8881632127dad47e2172bcd",
+  "modelFile": "bulwark-candidate.fbx",
+  "files": [
+    {
+      "file": "bulwark-candidate.fbx",
+      "sha256": "5038b9c61eb8cfef3699eeb0b47176c31fe66913fc04fac265b973f29651a4fc"
+    },
+    {
+      "file": "bulwark-animations.fbx",
+      "sha256": "acdf0305fff3b47f21854310dbcd946d6977565ff7bdf5420ad80c72b2dd0196"
+    },
+    {
+      "file": "bulwark-basecolor.png",
+      "sha256": "50a243fdedd6a16e0aebddde76e977691c01de86cfd56c5b4a6df01ccb5d5547"
+    },
+    {
+      "file": "bulwark-orm.png",
+      "sha256": "76c370cf827f7308fc46b155d6bd12e823effd81e43056df881267e90f930b61"
+    }
+  ],
+  "clips": [
+    {
+      "state": "Idle",
+      "file": "bulwark-animations.fbx",
+      "take": "Bulwark_Rig|Idle",
+      "seconds": 2,
+      "loop": true,
+      "poseExpectation": "varying"
+    },
+    {
+      "state": "Walk",
+      "file": "bulwark-animations.fbx",
+      "take": "Bulwark_Rig|Walk",
+      "seconds": 0.6,
+      "loop": true,
+      "poseExpectation": "varying"
+    },
+    {
+      "state": "Windup",
+      "file": "bulwark-animations.fbx",
+      "take": "Bulwark_Rig|Windup",
+      "seconds": 1.1,
+      "loop": false,
+      "poseExpectation": "varying"
+    },
+    {
+      "state": "Attack",
+      "file": "bulwark-animations.fbx",
+      "take": "Bulwark_Rig|Attack",
+      "seconds": 1.2,
+      "loop": true,
+      "poseExpectation": "varying"
+    },
+    {
+      "state": "Recover",
+      "file": "bulwark-animations.fbx",
+      "take": "Bulwark_Rig|Recover",
+      "seconds": 2,
+      "loop": false,
+      "poseExpectation": "varying"
+    },
+    {
+      "state": "Hit",
+      "file": "bulwark-animations.fbx",
+      "take": "Bulwark_Rig|Hit",
+      "seconds": 0.28,
+      "loop": false,
+      "poseExpectation": "varying"
+    },
+    {
+      "state": "Death",
+      "file": "bulwark-animations.fbx",
+      "take": "Bulwark_Rig|Death",
+      "seconds": 1.8,
+      "loop": false,
+      "poseExpectation": "varying"
+    }
+  ],
+  "materials": [
+    {
+      "sourceName": "Bulwark_StandardPBR_Atlas",
+      "baseColorFile": "bulwark-basecolor.png",
+      "normalFile": "",
+      "metallicSmoothnessFile": "",
+      "occlusionFile": "",
+      "ormFile": "bulwark-orm.png",
+      "baseColor": {
+        "r": 1,
+        "g": 1,
+        "b": 1,
+        "a": 1
+      },
+      "metallic": 0,
+      "smoothness": 1
+    },
+    {
+      "sourceName": "Core_Closed",
+      "baseColorFile": "",
+      "normalFile": "",
+      "metallicSmoothnessFile": "",
+      "occlusionFile": "",
+      "ormFile": "",
+      "baseColor": {
+        "r": 0.5563932061195374,
+        "g": 0.34064337611198425,
+        "b": 0.17923614382743835,
+        "a": 1
+      },
+      "metallic": 0,
+      "smoothness": 0.3700000047683716
+    }
+  ],
+  "bindings": {
+    "animatorPath": "Bulwark_Rig",
+    "body": "Bulwark_Body",
+    "weakPointRoot": "Bulwark_Rig/root/body/WeakPointAssembly",
+    "core": "Bulwark_Rig/root/body/WeakPointAssembly/Core_Renderer",
+    "plates": [
+      "Bulwark_Rig/root/body/WeakPointAssembly/ArmorPlate_L_Pivot",
+      "Bulwark_Rig/root/body/WeakPointAssembly/ArmorPlate_R_Pivot"
+    ],
+    "plateRenderers": [
+      "Bulwark_Rig/root/body/WeakPointAssembly/ArmorPlate_L_Pivot/ArmorPlate_L_Renderer",
+      "Bulwark_Rig/root/body/WeakPointAssembly/ArmorPlate_R_Pivot/ArmorPlate_R_Renderer"
+    ],
+    "openEuler": [
+      {
+        "x": 0,
+        "y": 140,
+        "z": 0
+      },
+      {
+        "x": 0,
+        "y": -140,
+        "z": 0
+      }
+    ],
+    "openEmission": {
+      "r": 0.12,
+      "g": 0.025,
+      "b": 0.002,
+      "a": 1
+    },
+    "openBaseColor": {
+      "r": 0.85,
+      "g": 0.255,
+      "b": 0.025,
+      "a": 1
+    },
+    "colliderCenter": {
+      "x": 0,
+      "y": 0.725,
+      "z": 0
+    },
+    "colliderRadius": 0.5,
+    "colliderHeight": 1.55,
+    "neutralBaseline": {
+      "position": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "rotation": {
+        "x": -0.7071068286895752,
+        "y": 0.0,
+        "z": 0.0,
+        "w": 0.7071068286895752
+      },
+      "scale": {
+        "x": 100.0,
+        "y": 100.0,
+        "z": 100.0
+      },
+      "renderers": [
+        {
+          "path": "Bulwark_Body",
+          "worldCenter": {
+            "x": 0.0,
+            "y": 0.5717158913612366,
+            "z": 0.2100001722574234
+          },
+          "worldExtents": {
+            "x": 0.9459490180015564,
+            "y": 0.6311941742897034,
+            "z": 1.3400009870529175
+          }
+        },
+        {
+          "path": "Bulwark_Rig/root/body/WeakPointAssembly/ArmorPlate_L_Pivot/ArmorPlate_L_Renderer",
+          "worldCenter": {
+            "x": -0.24399998784065247,
+            "y": 0.8700001239776611,
+            "z": -0.7750003933906555
+          },
+          "worldExtents": {
+            "x": 0.25599998235702515,
+            "y": 0.17500007152557373,
+            "z": 0.37000012397766113
+          }
+        },
+        {
+          "path": "Bulwark_Rig/root/body/WeakPointAssembly/ArmorPlate_R_Pivot/ArmorPlate_R_Renderer",
+          "worldCenter": {
+            "x": 0.24399998784065247,
+            "y": 0.8700001239776611,
+            "z": -0.7750003933906555
+          },
+          "worldExtents": {
+            "x": 0.25599998235702515,
+            "y": 0.17500007152557373,
+            "z": 0.37000012397766113
+          }
+        },
+        {
+          "path": "Bulwark_Rig/root/body/WeakPointAssembly/Core_Renderer",
+          "worldCenter": {
+            "x": 0.0,
+            "y": 0.8650910258293152,
+            "z": -0.7800003886222839
+          },
+          "worldExtents": {
+            "x": 0.2849999666213989,
+            "y": 0.09540921449661255,
+            "z": 0.2050001174211502
+          }
+        }
+      ]
+    }
+  }
+}
