@@ -4,6 +4,43 @@ A small, public workspace for finite, reviewed computational tasks. Source, inpu
 stage checkpoints and results are tied together by hashes. It uses standard public
 GitHub Actions, not a continuously running server or an autonomous agent platform.
 
+
+## Current development and version policy (2026-10-08)
+
+GitHub is the source of truth for code, project documentation, version history and
+reviewed release deliverables. Execution should use bounded jobs on standard
+public GitHub Actions runners. The temporary interactive cloud-computer route
+is discontinued; do not rely on its installed tools or authentication surviving.
+No independent coding task or paid runner is implied by this policy.
+
+- Commit every identifiable project version with a useful change description.
+  Preserve unfinished work on a branch; do not label it a tested release.
+- Update the README and relevant design, build and recovery instructions in the
+  same version as the implementation. Record known limitations and actual tests.
+- Give verified release versions immutable tags and reviewed GitHub Release
+  assets. Bind each binary to its source commit, workflow run and SHA256.
+- Keep source and distributable assets in Git, subject to size and license limits.
+  Keep generated installers/builds in Releases, not duplicated throughout Git.
+- Never commit passwords, tokens, license credentials, signing keys, local
+  authentication stores, or non-redistributable materials.
+- Reconstruct disposable build environments from pinned tooling and dependency
+  declarations. Persist results before a job ends. GitHub is not a persistent VM.
+- Do not maintain a separate Space as the project documentation source.
+
+### Verified state and remaining blocker
+
+The generic data-summary complete/checkpoint/recover path has passed real Actions
+runs, including byte verification:
+[recovery evidence](https://github.com/yangerstar1/task-workbench/releases/tag/task-recover-20261008-001).
+This establishes a small task's recovery path, not a successful Unity build.
+
+The Unity workflow below is still an unverified proof. It currently requires
+three repository secrets; neither a working Personal-license setup nor the four
+native tests nor a newly built Android APK has been verified. Its outputs currently
+expire as Actions artifacts after seven days. Release archival for Unity is still
+to be implemented after the licensing and build path is verified. Do not treat
+the release policy above as evidence that this implementation already exists.
+
 ## What is ready to try
 
 - **data-summary:** an original eight-row, fictional CSV. One stage validates and
