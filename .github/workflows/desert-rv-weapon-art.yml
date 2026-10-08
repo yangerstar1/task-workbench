@@ -1,6 +1,12 @@
 name: DesertRV original weapon-hand candidate
 on:
   workflow_dispatch:
+    inputs:
+      mode:
+        type: choice
+        description: Full asset validation or bounded reload diagnosis
+        default: full
+        options: [full, contact-diagnostic]
 permissions:
   contents: read
 concurrency:
@@ -38,8 +44,11 @@ jobs:
           mkdir -p weapon-output
           printf '%s\n' "$GITHUB_SHA" > weapon-output/source-commit.txt
           cp /tmp/blender-selected.sha256 weapon-output/blender-upstream.sha256
-          /tmp/blender-4.2.3-linux-x64/blender --background --factory-startup --threads 2 --python-exit-code 1 --python tasks/desert-rv/art/weapon-candidate/build_weapon.py -- "$GITHUB_WORKSPACE/weapon-output" 2>&1 | tee weapon-output/blender.log
+          extra=()
+          if [[ "${{ inputs.mode }}" == "contact-diagnostic" ]]; then extra+=(--contact-only); fi
+          /tmp/blender-4.2.3-linux-x64/blender --background --factory-startup --threads 2 --python-exit-code 1 --python tasks/desert-rv/art/weapon-candidate/build_weapon.py -- "$GITHUB_WORKSPACE/weapon-output" "${extra[@]}" 2>&1 | tee weapon-output/blender.log
       - name: Encode complete side motion evidence
+        if: inputs.mode == 'full'
         shell: bash
         run: |
           set -euo pipefail
@@ -51,7 +60,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: desert-rv-weapon-hands-candidate-${{ github.run_id }}
+          name: desert-rv-weapon-${{ inputs.mode }}-${{ github.run_id }}
           path: |
             weapon-output/*.log
             weapon-output/*.png

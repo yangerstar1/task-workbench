@@ -28,3 +28,7 @@ def core_fit_score(bounds):
         return float('inf')
     x0, y0, x1, y1 = bounds
     return abs(x1-x0-.285)+abs(y1-y0-.27)+10*(max(0,.62-x0)+max(0,x1-.975)+max(0,.045-y0)+max(0,y1-.345))
+
+def core_target_fit(core_alpha, core_geometry):
+    width=core_alpha[2]-core_alpha[0];height=core_alpha[3]-core_alpha[1]
+    return core_fully_visible(core_geometry) and .25<=width<=.32 and .25<=height<=.35

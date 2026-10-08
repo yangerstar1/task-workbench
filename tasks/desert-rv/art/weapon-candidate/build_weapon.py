@@ -7,9 +7,10 @@ from mathutils.bvhtree import BVHTree
 from bpy_extras.object_utils import world_to_camera_view
 sys.path.insert(0,str(pathlib.Path(__file__).resolve().parent))
 from asset_validation import strip_carrier_animation_channels, delivered_file
-from pixel_evidence import alpha_bounds, is_core_asset, core_fully_visible, core_fit_score
+from pixel_evidence import alpha_bounds, is_core_asset, core_fully_visible, core_fit_score, core_target_fit
 OUT=pathlib.Path(sys.argv[sys.argv.index('--')+1] if '--' in sys.argv else 'output'); OUT.mkdir(parents=True,exist_ok=True)
 bpy.context.preferences.filepaths.save_version=0
+CONTACT_ONLY='--contact-only' in sys.argv
 bpy.ops.object.select_all(action='SELECT'); bpy.ops.object.delete(use_global=False)
 scene=bpy.context.scene; scene.render.engine='CYCLES'; scene.cycles.samples=24
 scene.render.resolution_percentage=100; scene.render.image_settings.file_format='PNG'; scene.render.image_settings.color_mode='RGBA'; scene.render.fps=60
@@ -171,6 +172,25 @@ for o in hands:
   for v in o.data.vertices:
    t=max(0,min(1,((o.matrix_world@v.co)-start).dot(span)/span.length_squared)); t=t*t*(3-2*t)
    o.vertex_groups['hand.'+side].add([v.index],1-t,'REPLACE'); o.vertex_groups['root'].add([v.index],t,'REPLACE')
+# Anatomical skin partition: the continuous palm/wrist follows hand only.
+# Localized finger chains blend at their own roots; arm.L/R never influences
+# the glove, avoiding the R5 arm-stationary/hand-rotated split deformation.
+for side,obj in [('R',right),('L',left)]:
+ c=bone_defs['hand.'+side][0]; obj.vertex_groups.clear()
+ for name in ['hand.'+side]+[n for n in bone_defs if n.startswith('finger') and n.endswith(side)]:obj.vertex_groups.new(name=name)
+ for vertex in obj.data.vertices:
+  p=obj.matrix_world@vertex.co; rel=p-c
+  if rel.z>.020 and rel.y<.013:
+   digit=4; amount=max(0,min(1,(rel.z-.016)/.018))
+  elif rel.y>.006:
+   digit=min(range(4),key=lambda k:min(distance_seg(p,a,b) for a,b in zip(finger_paths[(side,k)],finger_paths[(side,k)][1:])))
+   amount=max(0,min(1,(rel.y-.006)/.016))
+  else:digit=None;amount=0
+  obj.vertex_groups['hand.'+side].add([vertex.index],1-amount,'REPLACE')
+  if amount:
+   names=[n for n in bone_defs if n.startswith('finger%d.'%digit) and n.endswith(side)]
+   nearest=sorted((distance_seg(p,*bone_defs[n]),n) for n in names)[:2]; values=[1/max(d,.004)**2 for d,n in nearest]; total=sum(values)
+   for (_,name),value in zip(nearest,values):obj.vertex_groups[name].add([vertex.index],amount*value/total,'REPLACE')
 # Pinch IK changes the fingers' pose for strip carry and follower operation.
 # Targets are explicit opposing surfaces; constraints are sampled by exporters.
 ik_controls=[]; contact_targets={}
@@ -295,11 +315,11 @@ for name,pos,power,size in [('Key',(1,-1.5,2),180,2),('Fill',(-1,-.5,.7),100,1.5
  bpy.ops.object.light_add(type='AREA',location=pos); ob=bpy.context.object; ob.name=name; ob.data.energy=power; ob.data.shape='DISK'; ob.data.size=size; look(ob,(0,0,0))
 bpy.ops.object.camera_add(); camera=bpy.context.object; scene.camera=camera; camera.data.type='ORTHO'; camera.data.ortho_scale=1.15
 scene.render.resolution_x=960; scene.render.resolution_y=720
-for i in range(8):
+for i in range(0 if CONTACT_ONLY else 8):
  a=i*math.tau/8; camera.location=(math.cos(a)*1.2,math.sin(a)*1.2,.4); look(camera,(0,.04,-.15)); scene.render.filepath=str(OUT/('studio_%02d.png'%i)); bpy.ops.render.render(write_still=True)
 # Orthographic side animation evidence, complete cycles at 60fps, PNG for ffmpeg.
 camera.location=(-1.1,.1,.12); look(camera,(0,.04,-.15)); scene.render.resolution_x=640; scene.render.resolution_y=480; scene.cycles.samples=8
-for clip in clips:
+for clip in ([] if CONTACT_ONLY else clips):
  rig.animation_data.action=bpy.data.actions[clip]; folder=OUT/('frames_'+clip); folder.mkdir(exist_ok=True)
  for f in range(1,math.ceil(clips[clip]['frames'][1])+1):
   preview_pose(clip,f); scene.render.filepath=str(folder/('%04d.png'%f)); bpy.ops.render.render(write_still=True)
@@ -354,13 +374,18 @@ for before,added in [(0,12),(3,5),(11,1)]:
   preview_pose('Reload',frame,before,added); hand_tree=evaluated_bvh(left)
   blocked=[surface_evidence(left,obj) for obj in [*filter(lambda o:o!=follower,mag_objs),right]]
   validation['loading_surface_samples'].append({'loaded_before':before,'added':added,'frame':frame,'intersections':[b for b in blocked if b['triangle_pairs']>0]})
+if CONTACT_ONLY:
+ diagnostic={'scope':'reload-contact-diagnostic','full_asset_validation':False,'approved':False,'sample_count':len(validation['loading_surface_samples']),'failed_samples':sum(bool(s['intersections']) for s in validation['loading_surface_samples'])}
+ (OUT/'contact-diagnostic.json').write_text(json.dumps(diagnostic,indent=2));(OUT/'validation.json').write_text(json.dumps(validation,indent=2))
+ (OUT/'SHA256SUMS').write_text('\n'.join(hashlib.sha256(p.read_bytes()).hexdigest()+'  '+p.name for p in sorted(OUT.iterdir()) if delivered_file(p))+'\n')
+ raise SystemExit(1 if diagnostic['failed_samples'] else 0)
 rig.animation_data.action=bpy.data.actions['Idle']; preview_pose('Idle',1); scene.cycles.samples=24
 # Preserve useful partial evidence before potentially failing image readback.
 (OUT/'validation.json').write_text(json.dumps(validation,indent=2)); bpy.ops.wm.save_as_mainfile(filepath=str(OUT/'weapon_hands.blend'))
 # Natural viewmodel: fixed perspective camera looking +Y, no camera roll/yaw.
 # Tool itself is held obliquely toward the reticle; sleeves continue below frame.
 validation['viewmodels']={}; scene.render.film_transparent=True
-camera.data.type='PERSP'; camera.data.lens=34.5; camera.data.sensor_width=36
+camera.data.type='PERSP'; camera.data.lens=37.75; camera.data.sensor_width=36
 camera.location=(0,0,0); look(camera,(0,1,0))
 def projected_bounds(core_only=False):
  bpy.context.view_layer.update(); deps=bpy.context.evaluated_depsgraph_get()
@@ -373,10 +398,10 @@ def projected_bounds(core_only=False):
 rig.location=(.76484,2.44693,-.44683)
 rig.rotation_euler=tuple(math.radians(a) for a in (-10,-30,55))
 camera.data.sensor_fit='HORIZONTAL'
-base_aspect=16/9; target_center_y=.178
+base_aspect=16/9; target_center_y=.192; reference_center_y=.18264
 for w,h in [(1280,720),(1600,720)]:
  scene.render.resolution_x=w; scene.render.resolution_y=h
- aspect=w/h; camera.data.shift_y=(target_center_y-.5)/base_aspect-(target_center_y-.5)/aspect
+ aspect=w/h; camera.data.shift_y=(reference_center_y-.5)/base_aspect*(37.75/34.5)-(target_center_y-.5)/aspect
  b=projected_bounds(core_only=True)
  scene.render.filepath=str(OUT/f'viewmodel_{w}x{h}.png'); bpy.ops.render.render(write_still=True)
  # Exact alpha-pixel footprint from the actual render, not only projected boxes.
@@ -387,8 +412,17 @@ for w,h in [(1280,720),(1600,720)]:
   if tuple(evidence.size)!=(w,h):raise RuntimeError(f'Evidence PNG dimensions {tuple(evidence.size)} != {(w,h)}')
   pixel_bounds=alpha_bounds(evidence.pixels[:],w,h,evidence.channels)
  finally:bpy.data.images.remove(evidence)
+ full_alpha_bounds=pixel_bounds
+ # Render a true core-only mask: exclude only long forearms, never gloves/cuffs.
+ sleeves=[o for o in assets if not is_core_asset(o.name)]; visibility=[o.hide_render for o in sleeves]
+ for o in sleeves:o.hide_render=True
+ scene.render.filepath=str(OUT/f'viewmodel_core_{w}x{h}.png');bpy.ops.render.render(write_still=True)
+ evidence=bpy.data.images.load(scene.render.filepath,check_existing=False)
+ try:pixel_bounds=alpha_bounds(evidence.pixels[:],w,h,evidence.channels)
+ finally:bpy.data.images.remove(evidence)
+ for o,hidden in zip(sleeves,visibility):o.hide_render=hidden
  width=pixel_bounds[2]-pixel_bounds[0]; height=pixel_bounds[3]-pixel_bounds[1]
- validation['viewmodels'][f'{w}x{h}']={'normalized_bounds':pixel_bounds,'unclipped_core_bounds':b,'core_fully_visible':core_fully_visible(b),'width_fraction':width,'height_fraction':height,'target_fit':core_fully_visible(b) and .25<=width<=.32 and .25<=height<=.35,'camera':'fixed +Y perspective 34.5mm, no rotation trick','rig_location':list(rig.location),'rig_euler':list(rig.rotation_euler),'camera_shift_y':camera.data.shift_y,'stable_pose_id':'R4_shared_pose_-10_-30_55','center_clear':not(pixel_bounds[0]<=.5<=pixel_bounds[2] and pixel_bounds[1]<=.5<=pixel_bounds[3]),'sleeves_reach_lower_edge':pixel_bounds[1]<=1/h,'ui_buttons':'Requires actual game HUD overlay review.'}
+ validation['viewmodels'][f'{w}x{h}']={'normalized_bounds':pixel_bounds,'core_alpha_bounds':pixel_bounds,'full_alpha_bounds':full_alpha_bounds,'footprint_metric':'core-only rendered alpha, long forearms excluded','unclipped_core_bounds':b,'core_fully_visible':core_fully_visible(b),'width_fraction':width,'height_fraction':height,'target_fit':core_target_fit(pixel_bounds,b),'camera':'fixed +Y perspective 37.75mm, no rotation trick','rig_location':list(rig.location),'rig_euler':list(rig.rotation_euler),'camera_shift_y':camera.data.shift_y,'stable_pose_id':'R4_shared_pose_-10_-30_55','center_clear':not(pixel_bounds[0]<=.5<=pixel_bounds[2] and pixel_bounds[1]<=.5<=pixel_bounds[3]),'sleeves_reach_lower_edge':full_alpha_bounds[1]<=1/h,'ui_buttons':'Requires actual game HUD overlay review.'}
 rig.location=(0,0,0); rig.rotation_euler=(0,0,0)
 (OUT/'validation.json').write_text(json.dumps(validation,indent=2)); bpy.ops.wm.save_as_mainfile(filepath=str(OUT/'weapon_hands.blend'))
 (OUT/'SHA256SUMS').write_text('\n'.join(hashlib.sha256(p.read_bytes()).hexdigest()+'  '+p.name for p in sorted(OUT.iterdir()) if delivered_file(p))+'\n')

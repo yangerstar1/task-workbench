@@ -12,7 +12,7 @@ class Contracts(unittest.TestCase):
   self.assertAlmostEqual((14.2-1)/60,.22); self.assertAlmostEqual((100-1)/60,1.65)
  def test_exports_and_evidence(self):
   s=(ROOT/'build_weapon.py').read_text()
-  for token in ['export_scene.gltf','export_scene.fbx','save_as_mainfile','range(8)','1280,720','1600,720',"'quality_gate':'PENDING_RENDER_REVIEW'","'weight_errors'"] :self.assertIn(token,s)
+  for token in ['export_scene.gltf','export_scene.fbx','save_as_mainfile','range(0 if CONTACT_ONLY else 8)','1280,720','1600,720',"'quality_gate':'PENDING_RENDER_REVIEW'","'weight_errors'"] :self.assertIn(token,s)
  def test_pixel_footprint_and_contact_evidence(self):
   s=(ROOT/'build_weapon.py').read_text()
   for token in ["bpy.data.images.load(scene.render.filepath,check_existing=False)","'max_fingertip_IK_error_m'","reload_contact_{frame:03d}","camera.data.type='PERSP'","'Forearm_'"]:self.assertIn(token,s)
@@ -36,6 +36,17 @@ class FramingRegression(unittest.TestCase):
  def test_safe_core_has_finite_score(self):
   from pixel_evidence import core_fit_score
   self.assertLess(core_fit_score([.65,.05,.935,.32]),1)
+class CoreMetricRegression(unittest.TestCase):
+ def test_sleeve_width_is_not_core_width(self):
+  from pixel_evidence import core_target_fit
+  core=[.66,.04,.94,.31];full=[.5,0,1,.4]
+  self.assertTrue(core_target_fit(core,core));self.assertGreater(full[2]-full[0],.32)
+ def test_short_core_not_rescued_by_sleeve_height(self):
+  from pixel_evidence import core_target_fit
+  core=[.66,.06,.94,.30]
+  self.assertFalse(core_target_fit(core,core))
+ def test_contact_diagnostic_explicitly_not_full(self):
+  s=(ROOT/'build_weapon.py').read_text();self.assertIn("'full_asset_validation':False",s);self.assertIn("CONTACT_ONLY='--contact-only'",s);self.assertIn('obj.vertex_groups.clear()',s)
 class PixelBufferRegression(unittest.TestCase):
  def test_empty_buffer_rejected(self):
   from pixel_evidence import alpha_bounds
