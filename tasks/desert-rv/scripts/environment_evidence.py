@@ -15,11 +15,13 @@ from PIL import Image, ImageStat
 import verify_evidence as source
 
 REGIONS = ('FirstStation', 'Scrapyard', 'NightBeacon')
-VIEWS = ('overview', 'ground', 'landmark', 'cabin')
+VIEWS = ('overview', 'ground', 'landmark', 'cabin', 'motor-driving-editor', 'motor-walking-editor')
+CAMERAS = {view: ('regression-editor',fov) for view,fov in zip(VIEWS[:4],(54,58,58,68))}
+CAMERAS.update({'motor-driving-editor':('JourneyMotor-driving-editor',44), 'motor-walking-editor':('JourneyMotor-walking-editor',66)})
 IMAGES = {f'{r}-{v}.png' for r in REGIONS for v in VIEWS}
 CLEARANCE_FILES = {f'clearance-region-{i}.json' for i in (1,2,3)}
 GENERATED = 'Assets/DesertRV/Scenes/Journey'
-RENDER_TEST = 'DesertRV.Tests.JourneyEnvironmentRenderTests.AuthorAndCaptureTwelveRealEnvironmentViews'
+RENDER_TEST = 'DesertRV.Tests.JourneyEnvironmentRenderTests.AuthorAndCaptureEnvironmentViews'
 SNAPSHOT = source.TASK / 'environment-before.json'
 OUT = source.TASK / 'evidence/environment'
 PARTIAL = source.TASK / 'evidence/environment-unaccepted'
@@ -111,19 +113,23 @@ def inspect_capture(project):
     device = report.get('graphicsDeviceName', '')
     require(isinstance(device, str) and 'llvmpipe' in device.lower() and len(device) < 256, 'Expected software Mesa llvmpipe')
     records = report.get('images')
-    require(isinstance(records, list) and len(records) == 12, 'Twelve captures required')
+    require(isinstance(records, list) and len(records) == 18, 'Eighteen captures required')
     seen = set(); clean = []
     for record in records:
         require(record.get('region') in REGIONS and record.get('view') in VIEWS, 'Unknown viewpoint')
         name = record['region'] + '-' + record['view'] + '.png'
         require(name not in seen, 'Duplicate capture'); seen.add(name)
+        model,fov=CAMERAS[record['view']]
+        require(record.get('cameraModel')==model and type(record.get('fieldOfView')) in (float,int) and
+                math.isfinite(record['fieldOfView']) and abs(record['fieldOfView']-fov)<.001,
+                'Wrong editor camera provenance or FOV')
         require((record.get('width'), record.get('height')) == (1440, 900), 'Wrong reported size')
         low, high = record.get('minimum'), record.get('maximum')
         require(all(type(v) in (int, float) and math.isfinite(v) for v in (low, high)) and
                 0 <= low <= high <= 1 and high-low >= .06 and high >= .1, 'Invalid native pixel range')
         require(re.fullmatch('[a-f0-9]{32}', record.get('sceneHash', '')), 'Missing scene dependency hash')
         inspect_png(capture / name)
-        clean.append(dict(region=record['region'], view=record['view'], file=name,
+        clean.append(dict(region=record['region'], view=record['view'], file=name, cameraModel=model,fieldOfView=fov,
                           width=1440,height=900,sceneHash=record['sceneHash'],sha256=source.sha(capture/name)))
     require(seen == IMAGES, 'Incomplete regions/views')
     layout = source.read_json(project / 'JourneyEvidence/candidate-layout.json')
@@ -188,7 +194,7 @@ def package():
     (OUT/'receipt.json').write_text(json.dumps(receipt,indent=2)+'\n')
     hashes=[dict(path=p.relative_to(OUT).as_posix(),sha256=source.sha(p),size=p.stat().st_size) for p in sorted(OUT.rglob('*')) if p.is_file()]
     (OUT/'SHA256SUMS.json').write_text(json.dumps(hashes,indent=2)+'\n')
-    print('Verified twelve real captures and unchanged tracked source; sanitized allowlisted bundle ready.')
+    print('Verified eighteen real captures and unchanged tracked source; sanitized allowlisted bundle ready.')
 
 
 def protection_differences(before, after):

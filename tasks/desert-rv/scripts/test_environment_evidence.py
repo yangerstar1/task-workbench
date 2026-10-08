@@ -7,7 +7,7 @@ from pathlib import Path
 from PIL import Image
 from environment_evidence import (assert_preserved, valid_generated_name, inspect_png,
     inspect_capture, collect_generated, inspect_native_report, GENERATED, REGIONS, VIEWS, RENDER_TEST,
-    package_unaccepted, protection_differences, FAILED_STATUS, IMAGES, write_protection_diagnostic, validated_unity_dependencies, CLEARANCE_FILES, inspect_clearance)
+    package_unaccepted, protection_differences, FAILED_STATUS, IMAGES, write_protection_diagnostic, validated_unity_dependencies, CLEARANCE_FILES, inspect_clearance, CAMERAS)
 
 class EnvironmentContracts(unittest.TestCase):
     def setUp(self):
@@ -23,7 +23,7 @@ class EnvironmentContracts(unittest.TestCase):
         for r in REGIONS:
             for v in VIEWS:
                 self.image(d/f'{r}-{v}.png')
-                images.append(dict(region=r,view=v,width=1440,height=900,minimum=.1,maximum=.8,sceneHash='a'*32))
+                images.append(dict(region=r,view=v,cameraModel=CAMERAS[v][0],fieldOfView=CAMERAS[v][1],width=1440,height=900,minimum=.1,maximum=.8,sceneHash='a'*32))
         report=dict(status='captured-environment-only-not-gameplay-acceptance',graphicsDeviceType='OpenGLCore',graphicsDeviceName='llvmpipe',bufferSceneTransitionsChecked=3,captureBuffersReleased=True,images=images)
         (d/'capture-report.json').write_text(json.dumps(report))
         (d.parent/'candidate-layout.json').write_text(json.dumps(dict(passed=True,mode='candidate-layout-only-not-gameplay-approval',sceneDependencyHashes=['b'*32]*4)))
@@ -57,8 +57,8 @@ class EnvironmentContracts(unittest.TestCase):
     def test_symlink_rejected(self):
         p=self.root/'real.png';self.image(p);q=self.root/'alias.png';q.symlink_to(p)
         with self.assertRaises(ValueError):inspect_png(q)
-    def test_twelve_real_file_contract(self):
-        d,r=self.capture();self.assertEqual(len(inspect_capture(self.root)['images']),12)
+    def test_eighteen_real_file_contract(self):
+        d,r=self.capture();self.assertEqual(len(inspect_capture(self.root)['images']),18)
         self.assertNotIn('path',inspect_capture(self.root)['images'][0])
     def test_null_graphics_fails(self):
         d,r=self.capture();r['graphicsDeviceType']='Null';self.rewrite(d,r)
@@ -186,6 +186,14 @@ class EnvironmentContracts(unittest.TestCase):
         for patch in ({'passed':False},{'region':2},{'distantMeshes':0},{'checkedZones':['token']},{'extra':'secret'}):
             p.write_text(json.dumps(dict(original,**patch)))
             with self.assertRaises(ValueError):inspect_clearance(self.root)
+    def test_editor_camera_provenance_and_fov_are_required(self):
+        d,r=self.capture();r['images'][0]['cameraModel']='PlayMode';self.rewrite(d,r)
+        with self.assertRaises(ValueError):inspect_capture(self.root)
+        r['images'][0]['cameraModel']='regression-editor';r['images'][0]['fieldOfView']=66;self.rewrite(d,r)
+        with self.assertRaises(ValueError):inspect_capture(self.root)
+    def test_missing_motor_reference_view_rejected(self):
+        d,r=self.capture();(d/'Scrapyard-motor-driving-editor.png').unlink()
+        with self.assertRaises(ValueError):inspect_capture(self.root)
     def test_native_inventory_exact(self):
         p=self.root/'result.xml';p.write_text(f'<test-run result="Passed"><test-case fullname="{RENDER_TEST}" result="Passed"/></test-run>')
         inspect_native_report(self.root)

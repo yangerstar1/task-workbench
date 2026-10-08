@@ -85,7 +85,7 @@ namespace DesertRV.Editor
                 var bench = viewerBench(sourceScene);
                 binding.salvageSurface = ExactSurface(bench); binding.salvage = Point("Ram salvage interaction", binding.transform, binding.salvageSurface.bounds.center + Vector3.up * .18f);
                 binding.salvageVisual = CopyModule(motor.ram, binding.salvage.position, binding.transform, "Ram salvage assembly");
-                PopulateLayout(binding, manifest); DressEnvironment(sourceScene,binding); SetAtmosphere(sourceScene,1); CheckNewLayoutClearance(binding,motor,actions);
+                PopulateLayout(binding, manifest); DressEnvironment(sourceScene,binding,motor); SetAtmosphere(sourceScene,1); CheckNewLayoutClearance(binding,motor,actions);
                 Save(sourceScene, RegionPaths[0]);
                 // Reuse authored source geometry/materials, never regenerate the accepted RV.
                 for (int region = 2; region <= 3; region++)
@@ -96,7 +96,7 @@ namespace DesertRV.Editor
                     var light = new GameObject("Regional sunlight").AddComponent<Light>(); light.transform.SetParent(next.transform, false);
                     light.type = LightType.Directional; light.intensity = region == 3 ? .16f : 1.1f; light.color = region == 3 ? new Color(.38f,.5f,.8f) : new Color(1,.87f,.7f);
                     light.transform.rotation = Quaternion.Euler(45, -25, 0);
-                    DressEnvironment(sourceScene,next); SetAtmosphere(scene,region); CheckNewLayoutClearance(next,motor,actions);
+                    DressEnvironment(sourceScene,next,motor); SetAtmosphere(scene,region); CheckNewLayoutClearance(next,motor,actions);
                     Save(scene, RegionPaths[region - 1]);
                 }
                 AssetDatabase.SaveAssets();
@@ -118,7 +118,7 @@ namespace DesertRV.Editor
         public static void AuthorAndCaptureEnvironmentCandidates()
         { AuthorCandidateScenes(); JourneyContentChecks.CheckCandidateLayout(); CaptureEnvironmentCandidates(); }
 
-        [Serializable] sealed class ImageRecord { public string region, view, path, sceneHash; public int width,height; public float minimum,maximum; }
+        [Serializable] sealed class ImageRecord { public string region, view, path, sceneHash, cameraModel; public int width,height; public float minimum,maximum,fieldOfView; }
         [Serializable] sealed class ImageReport { public string status="captured-environment-only-not-gameplay-acceptance"; public string graphicsDeviceType, graphicsDeviceName; public int bufferSceneTransitionsChecked; public bool captureBuffersReleased; public ImageRecord[] images; }
         public static void CaptureEnvironmentCandidates()
         {
@@ -149,7 +149,7 @@ namespace DesertRV.Editor
                     var camera=motor.view; camera.enabled=false; camera.clearFlags=CameraClearFlags.Skybox;
                     camera.nearClipPlane=.04f; camera.farClipPlane=450; camera.allowHDR=true;
                     foreach(var particle in Components<ParticleSystem>(env)) particle.Simulate(7,true,true,true);
-                    foreach(var key in new[]{"overview","ground","landmark","cabin"})
+                    foreach(var key in new[]{"overview","ground","landmark","cabin","motor-driving-editor","motor-walking-editor"})
                     {
                         camera.fieldOfView=key=="cabin"?68:key=="overview"?54:58;
                         Vector3 at,look;
@@ -158,6 +158,21 @@ namespace DesertRV.Editor
                         else if(key=="landmark")
                         { var focus=i==0?b.salvage.position:b.powerPoint.position; var towardRV=motor.vehicle.position-focus;towardRV.y=0;
                           at=focus+towardRV.normalized*2.5f;at.y=b.spawn.position.y+1.65f;look=focus; }
+                        else if(key=="motor-driving-editor")
+                        {
+                            camera.fieldOfView=44;camera.nearClipPlane=.045f;
+                            Vector3 center=motor.vehicle.position+Vector3.up*1.3f+motor.Forward*2.2f;
+                            Quaternion rotation=Quaternion.Euler(74,Quaternion.LookRotation(motor.Forward).eulerAngles.y,0);
+                            at=center+rotation*new Vector3(0,0,-26);look=at+rotation*Vector3.forward;
+                        }
+                        else if(key=="motor-walking-editor")
+                        {
+                            camera.fieldOfView=66;camera.nearClipPlane=.045f;
+                            Vector3 entry=motor.entryStep.GetComponent<Renderer>().bounds.center;Vector3 right=Vector3.Cross(Vector3.up,motor.Forward);
+                            Vector3 outward=right*Mathf.Sign(Vector3.Dot(entry-motor.vehicle.position,right));
+                            Vector3 feet=entry+outward*.95f;feet.y=motor.vehicle.position.y+.04f;
+                            at=feet+Vector3.up*1.52f;look=at+motor.Forward; // A legal level forward look after dismount, not a running controller.
+                        }
                         else { at=motor.vehicle.position+Vector3.forward*.55f+Vector3.up*2.38f;look=at-Vector3.forward*3-Vector3.up*.35f; }
                         camera.transform.position=at;camera.transform.LookAt(look);Physics.SyncTransforms();
                         var request=new UniversalRenderPipeline.SingleCameraRequest{destination=target};
@@ -168,7 +183,7 @@ namespace DesertRV.Editor
                         for(int n=0;n<colors.Length;n+=97) { float value=(colors[n].r+colors[n].g+colors[n].b)/765f;min=Mathf.Min(min,value);max=Mathf.Max(max,value); }
                         if(max-min<.06f || max<.10f) throw new InvalidOperationException("Blank/near-black render rejected: "+env.name+"/"+key);
                         string file=Path.Combine(output,env.name+"-"+key+".png");File.WriteAllBytes(file,pixels.EncodeToPNG());
-                        records.Add(new ImageRecord{region=env.name,view=key,path=file,width=1440,height=900,minimum=min,maximum=max,sceneHash=AssetDatabase.GetAssetDependencyHash(RegionPaths[i]).ToString()});
+                        records.Add(new ImageRecord{region=env.name,view=key,path=file,width=1440,height=900,minimum=min,maximum=max,cameraModel=key=="motor-driving-editor"?"JourneyMotor-driving-editor":key=="motor-walking-editor"?"JourneyMotor-walking-editor":"regression-editor",fieldOfView=camera.fieldOfView,sceneHash=AssetDatabase.GetAssetDependencyHash(RegionPaths[i]).ToString()});
                         RenderTexture.active=previousTarget;
                     }
                 }
@@ -237,14 +252,14 @@ namespace DesertRV.Editor
             RenderSettings.ambientEquatorColor=region==3?new Color(.20f,.25f,.35f):horizon*.72f;
             RenderSettings.ambientGroundColor=region==3?new Color(.14f,.17f,.22f):new Color(.29f,.23f,.17f);
             RenderSettings.fog=true;RenderSettings.fogMode=FogMode.Linear;RenderSettings.fogColor=horizon;
-            RenderSettings.fogStartDistance=region==2?45:75;RenderSettings.fogEndDistance=region==2?180:280;
+            RenderSettings.fogStartDistance=region==2?90:140;RenderSettings.fogEndDistance=region==2?330:400;
             foreach(var light in Components<Light>(scene).Where(x=>x.type==LightType.Directional))
             {light.transform.rotation=Quaternion.Euler(region==3?35:region==2?21:25,-38,0);light.color=region==3?new Color(.55f,.68f,1):new Color(1,.84f,.65f);light.intensity=region==3?.62f:region==2?1.05f:1.4f;light.shadows=LightShadows.Soft;RenderSettings.sun=light;}
         }
         static readonly Color Sand = new Color(.89f,.70f,.45f), Asphalt = new Color(.31f,.31f,.29f),
             Rust = new Color(.48f,.27f,.16f), Steel = new Color(.25f,.32f,.32f), Cream = new Color(.77f,.72f,.59f),
             Ochre = new Color(.86f,.57f,.21f), Concrete = new Color(.57f,.53f,.44f), BeaconBlue = new Color(.25f,.75f,.86f);
-        static void DressEnvironment(Scene source,RegionBinding b)
+        static void DressEnvironment(Scene source,RegionBinding b,JourneyMotor motor)
         {
             // Source meshes contain world-baked vertices AND large mesa skirts. Every reused group
             // is normalized from actual renderer world bounds, never guessed from localScale.
@@ -256,8 +271,10 @@ namespace DesertRV.Editor
                     t.name.StartsWith("GEO-sand_drift",StringComparison.Ordinal) || t.name.StartsWith("GEO-floor_oil_stain",StringComparison.Ordinal))
                     t.gameObject.SetActive(false);
             }
-            var foundation=b.transform.Find("Route foundation");foundation.localScale=new Vector3(230,.4f,310);foundation.position=new Vector3(0,-.24f,85);
-            foundation.GetComponent<Renderer>().sharedMaterial=LayoutMaterial(Sand,"sand",new Vector2(46,62));
+            var foundation=b.transform.Find("Route foundation");foundation.localScale=new Vector3(2400,.4f,2400);foundation.position=new Vector3(0,-.24f,85);
+            // Far scenery is visual only. The physical playable ground footprint stays 230 x 310 m.
+            var groundCollider=foundation.GetComponent<BoxCollider>();groundCollider.size=new Vector3(230f/2400,1,310f/2400);
+            foundation.GetComponent<Renderer>().sharedMaterial=LayoutMaterial(Sand,"painted-sand",new Vector2(300,300));
             // A continuous drivable road with irregular shoulders, rather than disconnected slabs.
             var road=Solid("Road surface",b.transform,new Vector3(0,-.015f,30),new Vector3(8,.10f,94),Asphalt);
             road.GetComponent<Renderer>().sharedMaterial=LayoutMaterial(Asphalt,"asphalt",new Vector2(2,22));
@@ -265,22 +282,178 @@ namespace DesertRV.Editor
             {
                 Solid("Road paint "+i,b.transform,new Vector3(0,.043f,-12+i*5),new Vector3(.12f,.01f,1.45f),Ochre);
                 var edge=Solid("Road shoulder patch "+i,b.transform,new Vector3(i%2==0?-4.25f:4.25f,-.013f,-10+i*5.2f),new Vector3(.6f,.08f,2.8f),new Color(.90f,.71f,.46f));
-                edge.GetComponent<Renderer>().sharedMaterial=LayoutMaterial(new Color(.90f,.71f,.46f),"sand",new Vector2(1,2));
+                edge.GetComponent<Renderer>().sharedMaterial=LayoutMaterial(new Color(.90f,.71f,.46f),"painted-sand",new Vector2(.12f,.35f));
             }
             // Four smaller distant landforms leave an open roadside basin and an unobstructed horizon.
             Vector3[] mountains={new Vector3(-75,0,60),new Vector3(88,0,92),new Vector3(-98,0,148),new Vector3(62,0,186)};
             for(int i=0;i<mountains.Length;i++)
                 CopySized(source,b.transform,"DISTANT-Mesa-"+i,mountains[i],new Vector3(28,17,25),"GEO-weathered_mesa."+(i+2).ToString("000"));
-            for(int i=0;i<14;i++)
+            for(int i=0;i<20;i++)
             {
-                float side=i%2==0?-1:1;float z=-7+i*5.8f;
-                CopySized(source,b.transform,"Shoulder agave "+i,new Vector3(side*(12+i%3*2),0,z),new Vector3(1.35f,.9f,1.35f),Enumerable.Range(1,18).Select(n=>"GEO-agave_leaf."+n.ToString("000")).ToArray());
-                if(i%3==0) CopySized(source,b.transform,"Shoulder cactus "+i,new Vector3(side*20,0,z+3),new Vector3(1.7f,3.2f,1.7f),"GEO-saguaro_trunk.002","GEO-saguaro_arm.002");
-                if(i%2==0) CopySized(source,b.transform,"Shoulder stone "+i,new Vector3(side*17,0,z-2),new Vector3(1.4f,.8f,1.3f),"GEO-loose_stone.018");
+                float side=i%2==0?-1:1;float z=-9+i*4.4f;
+                CopySpatial(source,b.transform,"Shoulder agave "+i,new Vector3(side*(10.5f+i%4*1.3f),0,z),new Vector3(1.5f,1.0f,1.5f),"GEO-agave_leaf.001","GEO-agave_leaf",1.2f);
+                if(i%4==0) CopySpatial(source,b.transform,"Shoulder cactus "+i,new Vector3(side*(18+i%3),0,z+2),new Vector3(2.2f,3.7f,2.2f),"GEO-saguaro_trunk.002","GEO-saguaro_",1.9f);
+                if(i%3==0)
+                {
+                    var at=new Vector3(side*23,0,z+1);
+                    CopySized(source,b.transform,"Middle boulder "+i,at,new Vector3(3.8f,2.5f,3.3f),"GEO-loose_stone.018");
+                    for(int k=0;k<3;k++)CopySized(source,b.transform,"Boulder scatter "+i+"-"+k,at+new Vector3(k*1.6f-2,0,2.8f+k*.5f),new Vector3(.55f+k*.28f,.42f+k*.18f,.6f),"GEO-loose_stone.022");
+                }
             }
-            if(b.region==1) DressStation(source,b);
-            else if(b.region==2) DressScrapyard(source,b);
-            else DressBeacon(source,b);
+            ExtendSceneryRoad(b);
+            if(b.region==1) {DressStation(source,b);DressRamGate(b);}
+            else if(b.region==2) {DressScrapyard(source,b);DressScrapWork(source,b,motor);}
+            else {DressBeacon(source,b);DressSignalEquipment(source,b);}
+        }
+        static void ExtendSceneryRoad(RegionBinding b)
+        {
+            // Render-only continuation beyond the unchanged exit/safe-zone. No extra playable distance.
+            RenderOnlyBox("Far road continuation",b.transform,new Vector3(0,.002f,338.5f),new Vector3(8,.04f,523),Asphalt);
+            RenderOnlyBox("Road behind arrival",b.transform,new Vector3(0,.002f,-308.5f),new Vector3(8,.04f,583),Asphalt);
+            for(int i=0;i<20;i++)
+            {
+                float z=5+i*5.2f;float x=i%2==0?-4.1f:4.1f;
+                var drift=GameObject.CreatePrimitive(PrimitiveType.Sphere);drift.name="Roadside sand lobe "+i;drift.transform.SetParent(b.transform,false);
+                drift.transform.position=new Vector3(x,.012f,z);drift.transform.localScale=new Vector3(.8f+(i%3)*.3f,.06f,2.5f+(i%4)*.5f);
+                drift.GetComponent<Renderer>().sharedMaterial=LayoutMaterial(new Color(.90f,.71f,.46f),"painted-sand",new Vector2(.12f,.35f));
+                Object.DestroyImmediate(drift.GetComponent<Collider>());
+            }
+        }
+        static void DressRamGate(RegionBinding b)
+        {
+            var gate=b.ramGate;gate.GetComponent<Renderer>().enabled=false;
+            var intact=new GameObject("Ram gate supported intact assembly").transform;intact.SetParent(b.transform,false);
+            var damaged=new GameObject("Ram gate fallen assembly").transform;damaged.SetParent(b.transform,false);
+            for(int i=0;i<4;i++)
+            {
+                float x=-8.8f+i*5.85f;
+                RenderOnlyBox("Gate A-frame upright",intact,new Vector3(x,.95f,51),new Vector3(.24f,1.9f,.26f),Steel);
+                RenderOnlyRod("Gate rear brace",intact,new Vector3(x,1.5f,51),new Vector3(x,.06f,52.1f),.09f,Steel);
+                RenderOnlyBox("Gate ground shoe",intact,new Vector3(x,.08f,51.35f),new Vector3(.8f,.16f,1.65f),Rust);
+            }
+            for(int i=0;i<6;i++)
+            {
+                float x=-8.1f+i*3.24f;
+                var panel=RenderOnlyBox("Ram gate bolted panel "+i,intact,new Vector3(x,1.15f,50.9f),new Vector3(3.10f,.95f,.16f),i%2==0?Ochre:Cream);
+                for(int j=0;j<3;j++)
+                {
+                    var stripe=RenderOnlyBox("Gate hazard stripe",intact,new Vector3(x-1+j*.86f,1.15f,50.805f),new Vector3(.24f,.89f,.015f),Steel);
+                    stripe.transform.Rotate(0,0,-24);
+                }
+                foreach(float dx in new[]{-1.35f,1.35f}) RenderOnlyBox("Gate bolt",intact,new Vector3(x+dx,1.15f,50.79f),new Vector3(.07f,.07f,.02f),Steel);
+                var fallen=RenderOnlyBox("Broken gate panel "+i,damaged,new Vector3(x,.19f,52.2f+i%2*.8f),new Vector3(3.1f,.16f,.95f),i%2==0?Ochre:Cream);
+                fallen.transform.rotation=Quaternion.Euler(0,i%2==0?18:-22,i%3*3);
+            }
+            // Preserve world sizes when attaching beneath the original scaled collider object.
+            intact.SetParent(gate.transform,true);damaged.SetParent(gate.transform,true);damaged.gameObject.SetActive(false);
+            var visual=gate.gameObject.AddComponent<JourneyRamGateVisual>();visual.gate=gate;visual.intact=intact.gameObject;visual.damaged=damaged.gameObject;
+        }
+        static void DressScrapWork(Scene source,RegionBinding b,JourneyMotor motor)
+        {
+            var tire=motor.vehicle.GetComponentsInChildren<Transform>(true).Single(t=>t.name=="GEO-spare_tyre");
+            for(int i=0;i<8;i++) CopyLoosePart(tire,b.transform,"Salvaged tire stack "+i,new Vector3(-16.2f+(i%2)*1.25f,(i/2%2)*.36f,16+(i/4)*2),new Vector3(1.15f,.34f,1.15f),Quaternion.Euler(90,0,i*11));
+            // An original assembled stripped chassis, using self-authored tire mesh and new steel structure.
+            Vector3 chassis=new Vector3(-12,0,30);
+            foreach(float x in new[]{-1.15f,1.15f})RenderOnlyBox("Stripped chassis rail",b.transform,chassis+new Vector3(x,.72f,0),new Vector3(.16f,.25f,5.4f),Steel);
+            for(int i=0;i<4;i++)RenderOnlyBox("Stripped chassis crossmember",b.transform,chassis+new Vector3(0,.68f,-2+i*1.35f),new Vector3(2.5f,.18f,.18f),Rust);
+            foreach(float x in new[]{-1.65f,1.65f})foreach(float z in new[]{-1.9f,1.9f})CopyLoosePart(tire,b.transform,"Chassis salvaged wheel",chassis+new Vector3(x,.04f,z),new Vector3(.4f,1.05f,1.05f),Quaternion.Euler(0,90,0));
+            RenderOnlyBox("Exposed engine block",b.transform,chassis+new Vector3(0,1.08f,1.6f),new Vector3(.9f,.75f,1),Steel);
+            for(int i=0;i<6;i++)RenderOnlyRod("Engine cooling fin",b.transform,chassis+new Vector3(-.48f,1.15f+i*.065f,1.2f),chassis+new Vector3(.48f,1.15f+i*.065f,1.2f),.018f,Cream);
+            var door=RenderOnlyBox("Detached sheet metal door",b.transform,new Vector3(-15.3f,.6f,32),new Vector3(1.3f,1.1f,.08f),Rust);door.transform.Rotate(17,24,8);
+            for(int i=0;i<3;i++)
+            {
+                var at=new Vector3(12.5f+i*.85f,0,29);
+                var sheet=RenderOnlyBox("Sorted bent metal sheet",b.transform,at+Vector3.up*(.18f+i*.10f),new Vector3(.75f,.07f,1.9f),i%2==0?Steel:Cream);sheet.transform.Rotate(0,i*13,7);
+            }
+            RenderOnlyBox("Workshop dismantling table",b.transform,new Vector3(12,1.0f,26.5f),new Vector3(2.6f,.16f,1.1f),Steel);
+            CopySized(source,b.transform,"Bench gear assembly",new Vector3(12,1.09f,26.5f),new Vector3(.8f,.6f,.8f),"GEO-bench_drive_gear");
+            CopySized(source,b.transform,"Workshop self-authored tool case",new Vector3(13,0,24.7f),new Vector3(.8f,.5f,.65f),"GEO-garage_toolbox");
+            for(int i=0;i<3;i++)
+            {
+                var stain=CopySized(source,b.transform,"Workshop oil mark "+i,new Vector3(-12+i*12,i==1?.046f:.002f,27+i*4),new Vector3(2.4f,.012f,2),"GEO-floor_oil_stain.002");
+                foreach(var r in stain.GetComponentsInChildren<Renderer>(true)){r.sharedMaterial=LayoutMaterial(new Color(.24f,.205f,.155f),null,Vector2.one);r.shadowCastingMode=ShadowCastingMode.Off;}
+                foreach(var c in stain.GetComponentsInChildren<Collider>(true))Object.DestroyImmediate(c);
+            }
+            DressPowerControls(b); Lamp(b.transform,"Canopy warm work pool",new Vector3(12,2.9f,26.5f),new Color(1,.77f,.45f),1.6f,10);
+        }
+        static void DressSignalEquipment(Scene source,RegionBinding b)
+        {
+            Vector3 dish=new Vector3(-11,8.1f,31.9f);
+            var bowl=GameObject.CreatePrimitive(PrimitiveType.Sphere);bowl.name="Beacon directional signal reflector";bowl.transform.SetParent(b.transform,false);bowl.transform.position=dish;bowl.transform.localScale=new Vector3(2.5f,2.5f,.22f);
+            bowl.GetComponent<Renderer>().sharedMaterial=LayoutMaterial(Cream,null,Vector2.one);Object.DestroyImmediate(bowl.GetComponent<Collider>());
+            for(int i=0;i<12;i++)
+            {
+                float a=i*Mathf.PI/6,c=(i+1)*Mathf.PI/6;
+                RenderOnlyRod("Antenna rim",b.transform,dish+new Vector3(Mathf.Cos(a)*1.28f,Mathf.Sin(a)*1.28f,-.05f),dish+new Vector3(Mathf.Cos(c)*1.28f,Mathf.Sin(c)*1.28f,-.05f),.035f,Steel);
+            }
+            foreach(float angle in new[]{0f,120f,240f})
+            {float a=angle*Mathf.Deg2Rad;RenderOnlyRod("Signal feed support",b.transform,dish+new Vector3(Mathf.Cos(a)*1.1f,Mathf.Sin(a)*1.1f,-.15f),dish+Vector3.back*.75f,.03f,Steel);}
+            RenderOnlyBox("Antenna feed receiver",b.transform,dish+Vector3.back*.8f,new Vector3(.28f,.28f,.35f),Ochre);
+            RenderOnlyRod("Signal feeder conduit",b.transform,new Vector3(-9.9f,.12f,33),new Vector3(-9.9f,8,33),.055f,Steel);
+            for(int i=0;i<3;i++)
+            {
+                var rack=new Vector3(10+i*1.05f,0,33.2f);
+                RenderOnlyBox("Beacon relay accumulator",b.transform,rack+Vector3.up*.65f,new Vector3(.8f,1.3f,.85f),Steel);
+                RenderOnlyBox("Relay service panel",b.transform,rack+new Vector3(0,.7f,-.44f),new Vector3(.6f,.9f,.025f),Cream);
+                for(int k=0;k<4;k++)RenderOnlyBox("Relay cooling vent",b.transform,rack+new Vector3(0,.4f+k*.10f,-.46f),new Vector3(.45f,.025f,.025f),Rust);
+            }
+            Vector3[] cable={new Vector3(6.4f,.06f,23),new Vector3(8.8f,.06f,23),new Vector3(8.8f,.06f,33),new Vector3(-9.9f,.06f,33)};
+            for(int i=0;i<cable.Length-1;i++)RenderOnlyRod("Beacon ground power cable",b.transform,cable[i],cable[i+1],.035f,Steel);
+            DressPowerControls(b);
+            var workLamp=RenderOnlyBox("Beacon service lamp housing",b.transform,new Vector3(11,2.76f,31),new Vector3(.45f,.18f,.32f),Steel);
+            var diffuser=RenderOnlyBox("Beacon warm lamp diffuser",b.transform,new Vector3(11,2.65f,31),new Vector3(.35f,.035f,.25f),new Color(1,.76f,.38f));
+            diffuser.GetComponent<Renderer>().sharedMaterial=LayoutMaterial(new Color(1,.76f,.38f),null,Vector2.one,true);
+            Lamp(b.transform,"Beacon equipment worklight",new Vector3(11,2.6f,31),new Color(1,.73f,.37f),2.1f,12);
+            Lamp(b.transform,"Beacon base service light",new Vector3(-10,2.4f,31),new Color(1,.73f,.37f),1.6f,9);
+            for(int i=0;i<4;i++)
+            {
+                float z=42+i*5;
+                foreach(float sign in new[]{-1f,1f}){var arrow=RenderOnlyBox("Evacuation painted chevron",b.transform,new Vector3(sign*.28f,.043f,z),new Vector3(.13f,.012f,.8f),Cream);arrow.transform.Rotate(0,sign*-35,0);}
+            }
+        }
+        static void DressPowerControls(RegionBinding b)
+        {
+            Vector3 p=b.powerSurface.bounds.center;
+            foreach(float x in new[]{-.2f,.2f})
+            {
+                var dial=GameObject.CreatePrimitive(PrimitiveType.Cylinder);dial.name="Power analogue gauge";dial.transform.SetParent(b.transform,false);dial.transform.position=p+new Vector3(x,.10f,-.47f);dial.transform.rotation=Quaternion.Euler(90,0,0);dial.transform.localScale=new Vector3(.22f,.018f,.22f);dial.GetComponent<Renderer>().sharedMaterial=LayoutMaterial(Cream,null,Vector2.one);Object.DestroyImmediate(dial.GetComponent<Collider>());
+                var needle=RenderOnlyBox("Gauge needle",b.transform,p+new Vector3(x,.10f,-.495f),new Vector3(.025f,.12f,.01f),Steel);needle.transform.Rotate(0,0,-25);
+            }
+            RenderOnlyBox("Cabinet pull handle",b.transform,p+new Vector3(.34f,-.22f,-.49f),new Vector3(.035f,.22f,.06f),Steel);
+            for(int i=0;i<4;i++)RenderOnlyBox("Cabinet lower ventilation slot",b.transform,p+new Vector3(0,-.25f-i*.085f,-.475f),new Vector3(.44f,.023f,.012f),Steel);
+        }
+        static GameObject RenderOnlyBox(string name,Transform parent,Vector3 at,Vector3 size,Color color)
+        {var collider=Solid(name,parent,at,size,color);var go=collider.gameObject;Object.DestroyImmediate(collider);return go;}
+        static void RenderOnlyRod(string name,Transform parent,Vector3 start,Vector3 end,float radius,Color color)
+        {Rod(name,parent,start,end,radius,color);var child=parent.GetChild(parent.childCount-1);Object.DestroyImmediate(child.GetComponent<Collider>());}
+        static Transform CopyLoosePart(Transform part,Transform parent,string name,Vector3 at,Vector3 maximum,Quaternion rotation)
+        {
+            var root=new GameObject(name).transform;root.SetParent(parent,false);var copy=Object.Instantiate(part.gameObject,root,true);copy.SetActive(true);
+            foreach(var r in copy.GetComponentsInChildren<Renderer>(true)){r.lightmapIndex=-1;r.realtimeLightmapIndex=-1;}
+            foreach(var c in copy.GetComponentsInChildren<Collider>(true))Object.DestroyImmediate(c);
+            PlaceGeometry(root,Vector3.zero);root.rotation=rotation;FitGeometry(root,at,maximum);return root;
+        }
+        static Transform CopySpatial(Scene source,Transform parent,string name,Vector3 at,Vector3 maximum,string seedName,string prefix,float radius)
+        {
+            var seed=SourceGeometry(source).Single(t=>t.name==seedName).GetComponent<Renderer>().bounds.center;
+            var root=new GameObject(name).transform;root.SetParent(parent,false);
+            foreach(var t in SourceGeometry(source).Where(t=>t.name.StartsWith(prefix,StringComparison.Ordinal)&&t.GetComponent<Renderer>()))
+            {
+                Vector3 delta=t.GetComponent<Renderer>().bounds.center-seed;delta.y=0;if(delta.magnitude>radius)continue;
+                var copy=Object.Instantiate(t.gameObject,root,true);copy.SetActive(true);
+                foreach(var r in copy.GetComponentsInChildren<Renderer>(true)){r.lightmapIndex=-1;r.realtimeLightmapIndex=-1;}
+            }
+            PlaceGeometry(root,at);FitGeometry(root,at,maximum);
+            var visible=GeometryBounds(root);
+            if(visible.size.y<maximum.y*.25f || visible.size.x<maximum.x*.15f || visible.size.z<maximum.z*.15f)
+                throw new InvalidOperationException("Plant spatial cluster collapsed below visible authored dimensions: "+name);
+            return root;
+        }
+        static void FitGeometry(Transform root,Vector3 at,Vector3 maximum)
+        {
+            Bounds bounds=GeometryBounds(root);float scale=Mathf.Min(maximum.x/Mathf.Max(.001f,bounds.size.x),Mathf.Min(maximum.y/Mathf.Max(.001f,bounds.size.y),maximum.z/Mathf.Max(.001f,bounds.size.z)));
+            root.localScale*=scale;PlaceGeometry(root,at);Physics.SyncTransforms();bounds=GeometryBounds(root);
+            if(bounds.size.x>maximum.x+.02f||bounds.size.y>maximum.y+.02f||bounds.size.z>maximum.z+.02f)throw new InvalidOperationException("World bounds normalization failed: "+root.name);
         }
         static void DressStation(Scene source,RegionBinding b)
         {
@@ -389,7 +562,7 @@ namespace DesertRV.Editor
                 material=new Material(shader);material.SetColor("_BaseColor",color);material.SetFloat("_Smoothness",.12f);AssetDatabase.CreateAsset(material,path);
             }
             // This path is generated-only. Never mutate a shared source material or its importer.
-            if(tile!=null){var tex=AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/DesertRV/Art/Textures/polish-"+tile+"-albedo.png");if(!tex)throw new InvalidOperationException("Existing texture missing: "+tile);material.SetColor("_BaseColor",Color.white);material.SetTexture("_BaseMap",tex);material.SetTextureScale("_BaseMap",tiling);}
+            if(tile!=null){var tex=AssetDatabase.LoadAssetAtPath<Texture2D>(tile=="painted-sand"?"Assets/DesertRV/Art/sand-handpainted-v1.png":"Assets/DesertRV/Art/Textures/polish-"+tile+"-albedo.png");if(!tex)throw new InvalidOperationException("Existing texture missing: "+tile);material.SetColor("_BaseColor",Color.white);material.SetTexture("_BaseMap",tex);material.SetTextureScale("_BaseMap",tiling);}
             if(emission){material.EnableKeyword("_EMISSION");material.SetColor("_EmissionColor",color*2.5f);}
             EditorUtility.SetDirty(material);return material;
         }
@@ -426,7 +599,7 @@ namespace DesertRV.Editor
             }
             foreach(var r in b.GetComponentsInChildren<Renderer>(true))
             {
-                if(!r.enabled||!r.gameObject.activeInHierarchy||r.bounds.max.y<.18f||r.GetComponent<Collider>()==b.ramGate||r.GetComponent<Collider>()==b.salvageSurface||r.GetComponent<Collider>()==b.powerSurface||
+                if(!r.enabled||!r.gameObject.activeInHierarchy||r.bounds.max.y<.18f||(b.ramGate&&r.transform.IsChildOf(b.ramGate.transform))||r.GetComponent<Collider>()==b.salvageSurface||r.GetComponent<Collider>()==b.powerSurface||
                     (b.salvageVisual&&r.transform.IsChildOf(b.salvageVisual.transform))||r.GetComponentInParent<BeastActor>())continue;
                 foreach(var zone in zones)if(r.bounds.Intersects(zone.Value))throw new InvalidOperationException("New visible geometry blocks "+zone.Key+": "+r.name+" "+r.bounds);
             }

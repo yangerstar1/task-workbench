@@ -13,7 +13,7 @@ concurrency:
 
 jobs:
   environment:
-    name: Author three regions and capture twelve actual Unity views
+    name: Author three regions and capture eighteen actual Unity editor views
     if: >-
       github.repository == 'yangerstar1/task-workbench' &&
       github.ref == 'refs/heads/main' &&
