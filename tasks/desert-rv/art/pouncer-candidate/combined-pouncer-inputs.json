@@ -1,0 +1,26 @@
+{
+  "r3": {
+    "run": 37820278165,
+    "artifact": 11571751129,
+    "source": "78947d714ce9fb0ea6f2afdfa81633a8cf71697b",
+    "bytes": 19370624,
+    "zip_sha256": "2fe3d35fd2d97f4408d08f35d81e3bfe19a3a636ae21f2d6db1994df9a3045bc",
+    "original_result": "failure"
+  },
+  "technical": {
+    "run": 37854056191,
+    "artifact": 11582903139,
+    "source": "ec7a88493dcba5c1d0394218efc740926cd95ce1",
+    "bytes": 7954621,
+    "zip_sha256": "337bc8bb709d1b886bd3b9cd24b4265f52e00a62fb5c3f865bf411a0f5020f96",
+    "original_result": "success"
+  },
+  "opaque": {
+    "run": 37854673351,
+    "artifact": 11582829505,
+    "source": "16f346d8ceebfe46459addb676fd40414eb06560",
+    "bytes": 1865524,
+    "zip_sha256": "e9aafb99790c8557961bd73718528aeb834fac876aa34dd3f87baf44c36aad29",
+    "original_result": "success"
+  }
+}

@@ -1,0 +1,46 @@
+name: Desert RV combined seven-clip pouncer candidate
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: desert-rv-pouncer-combine
+  cancel-in-progress: false
+jobs:
+  package:
+    if: github.repository == 'yangerstar1/task-workbench' && github.actor == github.repository_owner && github.triggering_actor == github.repository_owner && github.event_name == 'workflow_dispatch' && github.event.repository.private == false && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+          lfs: false
+      - name: Retrieve only fixed source artifacts and verify server identities
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json,subprocess
+          from pathlib import Path
+          locks=json.loads(Path('tasks/desert-rv/art/pouncer-candidate/combined-pouncer-inputs.json').read_text())
+          out=Path('source-zips');out.mkdir()
+          for key,lock in locks.items():
+              url='repos/yangerstar1/task-workbench/actions/artifacts/'+str(lock['artifact'])
+              metadata=json.loads(subprocess.check_output(['gh','api',url]))
+              assert metadata['id']==lock['artifact'] and not metadata['expired']
+              assert metadata['workflow_run']['id']==lock['run'] and metadata['workflow_run']['head_sha']==lock['source']
+              assert metadata['digest']=='sha256:'+lock['zip_sha256'] and metadata['size_in_bytes']==lock['bytes']
+              with (out/(key+'.zip')).open('wb') as f:subprocess.run(['gh','api',url+'/zip'],stdout=f,check=True)
+          PY
+      - name: Verify equivalence and copy immutable candidate evidence
+        run: python3 tasks/desert-rv/art/pouncer-candidate/combine_pouncer_evidence.py --inputs source-zips --output combined-candidate
+      - name: Upload complete technical candidate for strict Unity import
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: pouncer-combined-candidate-${{ github.run_id }}
+          path: combined-candidate/
+          if-no-files-found: error
+          retention-days: 30
