@@ -1,4 +1,4 @@
-"""R2 original controlled-section creature. Blender execution is Actions-only.
+"""R3 original controlled-section creature. Blender execution is Actions-only.
 Blender Z up / forward -Y. Static review is a separate early artifact.
 """
 import argparse
@@ -11,6 +11,9 @@ import bpy
 from mathutils import Vector, Matrix
 HERE=Path(__file__).resolve().parent
 P=json.loads((HERE/'parameters.json').read_text())
+sys.path.insert(0,str(HERE))
+from geometry_frames import transport_frames
+from topology_report import inspect_mesh
 p=argparse.ArgumentParser(); p.add_argument('--output',required=True); p.add_argument('--phase',choices=['static','motion'],required=True)
 args=p.parse_args(sys.argv[sys.argv.index('--')+1:]); OUT=Path(args.output).resolve(); OUT.mkdir(parents=True,exist_ok=True)
 bpy.ops.object.select_all(action='SELECT'); bpy.ops.object.delete(use_global=False)
@@ -29,11 +32,9 @@ def loft(name, sections, sides=16, power=1):
     Frames follow each centerline segment; a single swept tube cannot self-bridge a hock.
     """
     verts=[]; faces=[]
+    frames=transport_frames([section[:3] for section in sections])
     for i,(x,y,z,w,h) in enumerate(sections):
-        prev=Vector(sections[max(0,i-1)][:3]); nex=Vector(sections[min(len(sections)-1,i+1)][:3])
-        tangent=(nex-prev).normalized()
-        right=Vector((1,0,0)); up=right.cross(tangent).normalized()
-        if up.z<0: up=-up
+        right,up,tangent=(Vector(v) for v in frames[i])
         for j in range(sides):
             a=j*math.tau/sides
             co=math.cos(a); si=math.sin(a)
@@ -63,19 +64,28 @@ for side,s in [('L',1),('R',-1)]:
         ('fore',[(s*.27,-.38,.69),(s*.335,-.24,.36),(s*.345,-.48,.12),(s*.345,-.60,.075)],[(.14,.17),(.085,.095),(.060,.067),(.095,.045)]),
         ('hind',[(s*.245,.61,.61),(s*.30,.38,.34),(s*.315,.69,.18),(s*.315,.55,.065)],[(.16,.18),(.078,.085),(.045,.050),(.069,.035)])]:
         leg_chains[pre+'.'+side]=[Vector(v) for v in points]
-        sections=[(*v,*r) for v,r in zip(points,radii)]
+        if pre=='fore':
+            sections=[(s*.17,-.38,.73,.115,.135),(s*.27,-.38,.69,.14,.17),(s*.29,-.365,.63,.14,.16),(s*.315,-.32,.55,.13,.14),(s*.33,-.275,.45,.115,.12),(s*.335,-.24,.36,.095,.103),(s*.34,-.34,.265,.086,.091),(s*.345,-.48,.12,.066,.070),(s*.345,-.60,.075,.095,.045)]
+        else:
+            sections=[(s*.15,.65,.66,.105,.115),(s*.245,.61,.61,.145,.165),(s*.275,.55,.50,.137,.145),(s*.295,.43,.38,.102,.112),(s*.30,.38,.34,.083,.089),(s*.307,.52,.26,.068,.075),(s*.315,.69,.18,.047,.052),(s*.315,.62,.11,.052,.042),(s*.315,.55,.065,.069,.035)]
         parts.append(loft(pre+side,sections,16,.85))
         x,y,z=points[-1]
         parts.append(loft(pre+'Paw'+side,[(x,y+.055,.052,.072,.041),(x,y-.03,.047,.115 if pre=='fore' else .09,.043),(x,y-.13,.037,.11 if pre=='fore' else .085,.037),(x,y-.16,.032,.073,.028)],12,.65))
+# Fused upper orbital ledges shade partially inset eyes without separate eyebrow plates.
+for side,s in [('L',1),('R',-1)]:
+    parts.append(loft('OrbitalLedge'+side,[(s*.19,-1.065,.687,.05,.022),(s*.25,-1.005,.702,.047,.026),(s*.245,-.94,.704,.045,.026),(s*.19,-.895,.688,.048,.022)],12,1))
 # The union only closes branch junctions. Much finer voxels and one gentle relax retain planes.
 bpy.ops.object.select_all(action='DESELECT')
 for o in parts:o.select_set(True)
 bpy.context.view_layer.objects.active=parts[0]; bpy.ops.object.join(); body=bpy.context.object; body.name='Pouncer_Skin_LOD0'
 rem=body.modifiers.new('BranchJunctionUnion','REMESH'); rem.mode='VOXEL'; rem.voxel_size=.010; rem.use_smooth_shade=True
 bpy.ops.object.modifier_apply(modifier=rem.name)
+topology_stages={'voxel_union':inspect_mesh(body.data)}
 sm=body.modifiers.new('SingleSurfaceRelax','SMOOTH'); sm.factor=.28; sm.iterations=1; bpy.ops.object.modifier_apply(modifier=sm.name)
 tri=body.modifiers.new('Triangles','TRIANGULATE'); bpy.ops.object.modifier_apply(modifier=tri.name)
 dec=body.modifiers.new('LODBudget','DECIMATE'); dec.ratio=min(1,7900/len(body.data.polygons)); bpy.ops.object.modifier_apply(modifier=dec.name)
+topology_stages['decimated_skin']=inspect_mesh(body.data)
+(OUT/'topology-stages.json').write_text(json.dumps(topology_stages,indent=2))
 for face in body.data.polygons:face.use_smooth=True
 
 def mat(name,color,rough=.8):
@@ -121,9 +131,9 @@ def ball(name,loc,scale,material,bone,segments=12,rings=8):
     o=bpy.context.object; o.name=name; o.scale=scale; bpy.ops.object.transform_apply(location=False,rotation=False,scale=True)
     o.data.materials.append(material); o['bind_bone']=bone; details.append(o); return o
 for side,s in [('L',1),('R',-1)]:
-    ball('DeepEyeSocket',(s*.273,-.965,.669),(.022,.075,.046),black,'head')
-    ball('AmberEye',(s*.29,-.985,.67),(.018,.046,.026),eye_mat,'head')
-    ball('SlitPupil',(s*.305,-.99,.67),(.009,.012,.020),black,'head')
+    ball('DeepEyeSocket',(s*.259,-.965,.669),(.013,.067,.032),black,'head')
+    ball('AmberEye',(s*.271,-.985,.668),(.012,.036,.018),eye_mat,'head')
+    ball('SlitPupil',(s*.280,-.99,.668),(.006,.008,.014),black,'head')
     ball('Nostril',(s*.125,-1.329,.56),(.030,.018,.012),black,'head')
     for pre in ('fore','hind'):
         x,y,z=leg_chains[pre+'.'+side][-1]
@@ -193,8 +203,8 @@ for key,pts in leg_chains.items():
     pb=rig.pose.bones[pre+'_lower.'+side]; con=pb.constraints.new('IK'); con.name='AuthoringFootLock'; con.target=rig; con.subtarget=pre+'_target.'+side; con.pole_target=rig; con.pole_subtarget=pre+'_pole.'+side; con.chain_count=2; con.use_stretch=False; con.influence=0
     # Pole angle is calibrated in Actions from resulting joint orientation below.
     con.pole_angle=0
-rig['candidate_status']='R2_unreviewed'; rig['root_motion']=False
-rig['attack_interrupt_contract']='Transient visual_body offset; dedicated baked interrupted recover examples are evidence, not proof of Unity transition. Runtime must reset visual offset over <=0.18s and settle.'
+rig['candidate_status']='R3_unreviewed'; rig['root_motion']=False
+rig['attack_interrupt_contract']='Current BeastActor uses CrossFade normalized 0.12, about 0.096s from 0.8s Attack. Current-duration and proposed 0.24s fixed-time comparison clips are evidence only. Actual Unity collision/transition integration remains unverified.'
 
 def setup_stage():
     scene.render.engine='CYCLES'; scene.cycles.samples=16; scene.cycles.use_denoising=True
@@ -207,14 +217,14 @@ def setup_stage():
     return cam
 
 def camera_at(cam,angle):
-    cam.location=(4*math.sin(angle),-4*math.cos(angle),1.65); cam.rotation_euler=(Vector((0,-.12,.40))-cam.location).to_track_quat('-Z','Y').to_euler()
+    cam.location=(6*math.sin(angle),-6*math.cos(angle),2.4); cam.rotation_euler=(Vector((0,-.12,.40))-cam.location).to_track_quat('-Z','Y').to_euler()
 
 if args.phase=='static':
     bpy.ops.wm.save_as_mainfile(filepath=str(OUT/'pouncer-static-source.blend'))
     cam=setup_stage(); review=OUT/'review'; review.mkdir(exist_ok=True); scene.render.image_settings.file_format='PNG'
     for i in range(8):
         camera_at(cam,i*math.tau/8); scene.render.filepath=str(review/f'turntable-{i:02}.png'); bpy.ops.render.render(write_still=True)
-    (OUT/'static-review.json').write_text(json.dumps({'candidate':P['candidate'],'visual_approval':False,'source':'original controlled cross sections','material':'UV PNG BaseColor standard Principled PBR','private_references_uploaded':False,'skin_euler_characteristic':len(body.data.vertices)-len(body.data.edges)+len(body.data.polygons),'render_triangles':sum(sum(len(p.vertices)-2 for p in o.data.polygons) for o in [body]+details),'rig_bones':len(rig.data.bones)},indent=2))
+    (OUT/'static-review.json').write_text(json.dumps({'candidate':P['candidate'],'visual_approval':False,'source':'original controlled cross sections','material':'UV PNG BaseColor standard Principled PBR','private_references_uploaded':False,'topology':topology_stages['decimated_skin'],'render_triangles':sum(sum(len(p.vertices)-2 for p in o.data.polygons) for o in [body]+details),'rig_bones':len(rig.data.bones)},indent=2))
     sys.exit(0)
 
 # Actions and motion evidence live in a second script to make the staging split explicit.

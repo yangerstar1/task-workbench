@@ -27,11 +27,11 @@ for directory in sorted(review.iterdir()):
     sheet(picks,review/(directory.name+'-contact-sheet.jpg'))
 # Match the upload allowlist; raw animation-frame directories stay runner-local.
 patterns=['*.blend','*.glb','*.fbx','*.json','*.png','source-commit.txt','blender-upstream.sha256',
-          'review/*.mp4','review/*-contact-sheet.jpg','review/turntable-*.png']
+          'review/*.mp4','review/*-contact-sheet.jpg','review/turntable-*.png','review/death-rest-*.png']
 files=sorted({p for pattern in patterns for p in out.glob(pattern) if p.is_file()})
 (out/'SHA256SUMS').write_text(''.join(hashlib.sha256(p.read_bytes()).hexdigest()+'  '+str(p.relative_to(out))+'\n' for p in files))
 print(json.dumps({'files':len(files),'output':str(out),'visual_approval':False}))
 
-early_patterns=['review/turntable-*.png','review/turntable-contact-sheet.jpg','static-review.json','pouncer-basecolor.png','source-commit.txt']
+early_patterns=['review/turntable-*.png','review/turntable-contact-sheet.jpg','static-review.json','topology-stages.json','pouncer-basecolor.png','source-commit.txt']
 early=sorted({p for pattern in early_patterns for p in out.glob(pattern) if p.is_file()})
 (out/'STATIC_SHA256SUMS').write_text(''.join(hashlib.sha256(p.read_bytes()).hexdigest()+'  '+str(p.relative_to(out))+'\n' for p in early))

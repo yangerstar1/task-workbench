@@ -1,11 +1,11 @@
 {
   "schema": 1,
-  "candidate": "pouncer-original-v002",
+  "candidate": "pouncer-original-v003",
   "blender": "4.2.3",
   "seed": 73119,
   "target_triangles": 11000,
   "voxel_size": 0.01,
-  "fps": 60,
+  "fps": 100,
   "render_size": 720,
   "clips": {
     "Idle": 2.0,
