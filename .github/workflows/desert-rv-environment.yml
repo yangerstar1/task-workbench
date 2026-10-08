@@ -38,6 +38,7 @@ jobs:
           /usr/bin/python3 tasks/desert-rv/scripts/backup/restore_unity_font.py
           /usr/bin/python3 tasks/desert-rv/scripts/backup/restore_unity_font.py --verify-only
       - name: Snapshot protected source before native execution
+        id: snapshot
         run: /usr/bin/python3 tasks/desert-rv/scripts/environment_evidence.py before
       - name: Prepare disposable standard runner
         env:
@@ -53,6 +54,7 @@ jobs:
           --tag desert-rv-environment:local
           tasks/desert-rv/scripts
       - name: Execute separate native EditorRender author and capture entry
+        id: native
         uses: game-ci/unity-test-runner@0ff419b913a3630032cbe0de48a0099b5a9f0ed9 # v4.3.1
         env:
           UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
@@ -68,11 +70,36 @@ jobs:
           dockerCpuLimit: 2
           dockerMemoryLimit: 12g
       - name: Reject altered originals, missing or blank captures; package allowlist only
+        id: package
         run: /usr/bin/python3 tasks/desert-rv/scripts/environment_evidence.py package
       - name: Upload only sanitized environmental evidence
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: desert-rv-environment-${{ github.run_id }}-${{ github.run_attempt }}
           path: tasks/desert-rv/evidence/environment/
+          if-no-files-found: error
+          retention-days: 7
+      - name: Diagnose protected source independently of image validation
+        id: source_diag
+        if: failure() && steps.snapshot.outcome == 'success'
+        run: /usr/bin/python3 tasks/desert-rv/scripts/environment_evidence.py diagnose
+      - name: Upload only independent source hash diagnosis
+        if: failure() && steps.source_diag.outputs.present == 'true'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: desert-rv-source-FAILED-NOT-ACCEPTED-${{ github.run_id }}-${{ github.run_attempt }}
+          path: tasks/desert-rv/evidence/environment-source-diagnostic/protected-source-failure.json
+          if-no-files-found: error
+          retention-days: 7
+      - name: Preserve unaccepted pixels only after a protected-source failure
+        id: partial
+        if: failure() && steps.native.outcome == 'success' && steps.package.outcome == 'failure'
+        run: /usr/bin/python3 tasks/desert-rv/scripts/environment_evidence.py partial
+      - name: Upload strictly unaccepted diagnostic evidence
+        if: failure() && steps.partial.outcome == 'success'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: desert-rv-environment-FAILED-NOT-ACCEPTED-${{ github.run_id }}-${{ github.run_attempt }}
+          path: tasks/desert-rv/evidence/environment-unaccepted/
           if-no-files-found: error
           retention-days: 7

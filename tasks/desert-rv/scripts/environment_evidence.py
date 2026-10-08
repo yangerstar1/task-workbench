@@ -5,6 +5,7 @@ import difflib
 import hashlib
 import json
 import math
+import os
 import re
 import shutil
 import subprocess
@@ -20,6 +21,9 @@ GENERATED = 'Assets/DesertRV/Scenes/Journey'
 RENDER_TEST = 'DesertRV.Tests.JourneyEnvironmentRenderTests.AuthorAndCaptureTwelveRealEnvironmentViews'
 SNAPSHOT = source.TASK / 'environment-before.json'
 OUT = source.TASK / 'evidence/environment'
+PARTIAL = source.TASK / 'evidence/environment-unaccepted'
+DIAGNOSTIC = source.TASK / 'evidence/environment-source-diagnostic'
+FAILED_STATUS = 'FAILED_PROTECTED_SOURCE_CHECK_NOT_ACCEPTED'
 
 
 def require(ok, message):
@@ -32,7 +36,8 @@ def tracked_snapshot(root):
 
 
 def assert_preserved(before, after):
-    require(before == after, 'Original tracked files changed during environment authoring')
+    changed = sorted(p for p in before.keys() | after.keys() if before.get(p) != after.get(p))
+    require(not changed, 'Original tracked files changed during environment authoring: ' + json.dumps(changed[:100]))
 
 
 def valid_generated_name(name):
@@ -163,6 +168,76 @@ def package():
     print('Verified twelve real captures and unchanged tracked source; sanitized allowlisted bundle ready.')
 
 
+def protection_differences(before, after):
+    changed = sorted(p for p in before.keys() | after.keys() if before.get(p) != after.get(p))
+    require(0 < len(changed) <= 2000, 'Partial evidence requires bounded actual source mismatch')
+    result=[]
+    for path in changed:
+        require(isinstance(path,str) and len(path)<=300 and not path.startswith('/') and
+                '..' not in Path(path).parts and Path(path).as_posix()==path and
+                not any(ord(c)<32 for c in path), 'Unsafe protection diagnostic path')
+        old,new=before.get(path),after.get(path)
+        require(all(x is None or (isinstance(x,str) and re.fullmatch('[a-f0-9]{64}',x)) for x in (old,new)),
+                'Invalid protection diagnostic hash')
+        result.append(dict(path=path,beforeSha256=old,afterSha256=new))
+    return result
+
+
+def package_unaccepted(project, destination, before, after, run_identity):
+    # No logs, XML, material contents, generated scenes, or arbitrary native JSON.
+    # Still require successful native pixels/layout. A failed source check never
+    # becomes a verified package or approval merely because screenshots exist.
+    require(not destination.exists(), 'Refuse stale unaccepted output')
+    differences=protection_differences(before,after)
+    capture=inspect_capture(project)
+    layout=source.read_json(project/'JourneyEvidence/candidate-layout.json')
+    hashes=layout.get('sceneDependencyHashes')
+    require(layout.get('mode')=='candidate-layout-only-not-gameplay-approval' and
+            isinstance(hashes,list) and len(hashes)==4 and
+            all(isinstance(h,str) and re.fullmatch('[a-f0-9]{32}',h) for h in hashes), 'Invalid layout provenance')
+    destination.mkdir(parents=True)
+    for name in sorted(IMAGES):shutil.copyfile(project/'JourneyEvidence/environment'/name,destination/name)
+    capture['status']=FAILED_STATUS
+    (destination/'capture-report.json').write_text(json.dumps(capture,indent=2)+'\n')
+    (destination/'candidate-layout.json').write_text(json.dumps(dict(status=FAILED_STATUS,
+        mode=layout['mode'],passed=True,sceneDependencyHashes=hashes),indent=2)+'\n')
+    diagnostic=dict(run_identity,status=FAILED_STATUS,accepted=False,
+                    protectedTrackedFilesUnchanged=False,changedFiles=differences)
+    (destination/'protected-source-failure.json').write_text(json.dumps(diagnostic,indent=2)+'\n')
+    allowed=IMAGES|{'capture-report.json','candidate-layout.json','protected-source-failure.json'}
+    require({p.name for p in destination.iterdir()}==allowed,'Unexpected partial export')
+    manifest=[dict(path=p.name,sha256=source.sha(p),size=p.stat().st_size) for p in sorted(destination.iterdir())]
+    (destination/'SHA256SUMS.json').write_text(json.dumps(dict(status=FAILED_STATUS,files=manifest),indent=2)+'\n')
+
+
+def write_protection_diagnostic(destination, before, after, run_identity):
+    require(not destination.exists(), 'Refuse stale source diagnostic')
+    differences=protection_differences(before,after)
+    destination.mkdir(parents=True)
+    payload=dict(run_identity,status=FAILED_STATUS,accepted=False,
+                 protectedTrackedFilesUnchanged=False,changedFiles=differences)
+    (destination/'protected-source-failure.json').write_text(json.dumps(payload,indent=2)+'\n')
+
+
+def diagnose():
+    before=source.read_json(SNAPSHOT);after=tracked_snapshot(source.ROOT)
+    if before==after:
+        print('No tracked source mismatch to export. Native failure, if any, remains a failure.')
+        return
+    ident=source.identity();ident['scope']='Protected source hash mismatch only; no image, scene or gameplay acceptance'
+    write_protection_diagnostic(DIAGNOSTIC,before,after,ident)
+    if os.environ.get('GITHUB_OUTPUT'):
+        with Path(os.environ['GITHUB_OUTPUT']).open('a') as output:output.write('present=true\n')
+    print(FAILED_STATUS + ': independent safe source mismatch JSON saved.')
+
+
+def partial():
+    inspect_native_report(source.TASK/'artifacts/environment')
+    ident=source.identity();ident['scope']='Unaccepted environment pixels for diagnosis; protected source check FAILED; gameplay/APK NOT_RUN'
+    package_unaccepted(source.PROJECT,PARTIAL,source.read_json(SNAPSHOT),tracked_snapshot(source.ROOT),ident)
+    print(FAILED_STATUS + ': bounded screenshots and source hash diagnosis only.')
+
+
 if __name__ == '__main__':
-    parser=argparse.ArgumentParser();parser.add_argument('mode',choices=('before','package'))
-    args=parser.parse_args(); {'before':before,'package':package}[args.mode]()
+    parser=argparse.ArgumentParser();parser.add_argument('mode',choices=('before','package','partial','diagnose'))
+    args=parser.parse_args(); {'before':before,'package':package,'partial':partial,'diagnose':diagnose}[args.mode]()

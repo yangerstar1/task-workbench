@@ -6,7 +6,8 @@ import unittest
 from pathlib import Path
 from PIL import Image
 from environment_evidence import (assert_preserved, valid_generated_name, inspect_png,
-    inspect_capture, collect_generated, inspect_native_report, GENERATED, REGIONS, VIEWS, RENDER_TEST)
+    inspect_capture, collect_generated, inspect_native_report, GENERATED, REGIONS, VIEWS, RENDER_TEST,
+    package_unaccepted, protection_differences, FAILED_STATUS, IMAGES, write_protection_diagnostic)
 
 class EnvironmentContracts(unittest.TestCase):
     def setUp(self):
@@ -25,7 +26,7 @@ class EnvironmentContracts(unittest.TestCase):
                 images.append(dict(region=r,view=v,width=1440,height=900,minimum=.1,maximum=.8,sceneHash='a'*32))
         report=dict(status='captured-environment-only-not-gameplay-acceptance',graphicsDeviceType='OpenGLCore',graphicsDeviceName='llvmpipe',bufferSceneTransitionsChecked=3,captureBuffersReleased=True,images=images)
         (d/'capture-report.json').write_text(json.dumps(report))
-        (d.parent/'candidate-layout.json').write_text('{"passed":true}')
+        (d.parent/'candidate-layout.json').write_text(json.dumps(dict(passed=True,mode='candidate-layout-only-not-gameplay-approval',sceneDependencyHashes=['b'*32]*4)))
         return d,report
     def rewrite(self,d,report):(d/'capture-report.json').write_text(json.dumps(report))
     def test_unchanged_source(self):assert_preserved({'a':'one'},{'a':'one'})
@@ -109,6 +110,44 @@ class EnvironmentContracts(unittest.TestCase):
         self.assertIn('try { if(pixels) Object.DestroyImmediate(pixels); }\n                    finally',s)
         self.assertIn('buffersReleased=true;\n                }\n                finally',s)
         self.assertIn('try { RestoreSceneSetup(setup); } finally { VerifyProtectedFiles(protectedFiles); }',s)
+    def test_unaccepted_export_is_exact_and_marked_failed(self):
+        self.capture();out=self.root/'partial'
+        package_unaccepted(self.root,out,{'Assets/a.mat':'a'*64},{'Assets/a.mat':'b'*64},{'commit':'c'*40})
+        self.assertEqual({p.name for p in out.iterdir()},IMAGES|{'capture-report.json','candidate-layout.json','protected-source-failure.json','SHA256SUMS.json'})
+        for name in ['capture-report.json','candidate-layout.json','protected-source-failure.json','SHA256SUMS.json']:
+            self.assertEqual(json.loads((out/name).read_text())['status'],FAILED_STATUS)
+        d=json.loads((out/'protected-source-failure.json').read_text());self.assertFalse(d['accepted'])
+    def test_unaccepted_export_cannot_bypass_no_mismatch(self):
+        self.capture()
+        with self.assertRaises(ValueError):package_unaccepted(self.root,self.root/'partial',{'a':'a'*64},{'a':'a'*64},{})
+    def test_unaccepted_export_still_rejects_black_pixels(self):
+        d,r=self.capture();self.image(d/'FirstStation-ground.png',True)
+        with self.assertRaises(ValueError):package_unaccepted(self.root,self.root/'partial',{'a':'a'*64},{'a':'b'*64},{})
+        self.assertFalse((self.root/'partial').exists())
+    def test_unaccepted_export_rejects_missing_layout_hash(self):
+        d,r=self.capture();(d.parent/'candidate-layout.json').write_text('{"passed":true}')
+        with self.assertRaises(ValueError):package_unaccepted(self.root,self.root/'partial',{'a':'a'*64},{'a':'b'*64},{})
+    def test_diagnostic_rejects_unsafe_paths_and_nonhash_contents(self):
+        for p in ['/secret','../secret','a\nsecret']:
+            with self.assertRaises(ValueError):protection_differences({p:'a'*64},{p:'b'*64})
+        with self.assertRaises(ValueError):protection_differences({'a':'password'},{'a':'b'*64})
+    def test_partial_workflow_is_failure_only(self):
+        r=Path(__file__).resolve().parents[3];w=(r/'.github/workflows/desert-rv-environment.yml').read_text()
+        self.assertIn("if: failure() && steps.native.outcome == 'success' && steps.package.outcome == 'failure'",w)
+        self.assertIn("if: failure() && steps.partial.outcome == 'success'",w)
+        self.assertIn('path: tasks/desert-rv/evidence/environment-unaccepted/',w)
+        self.assertNotIn('continue-on-error',w)
+    def test_source_diagnosis_survives_absent_or_corrupt_images(self):
+        out=self.root/'diagnostic'
+        write_protection_diagnostic(out,{'Assets/a.mat':'a'*64},{'Assets/a.mat':'b'*64},{'commit':'c'*40})
+        self.assertEqual({p.name for p in out.iterdir()},{'protected-source-failure.json'})
+        report=json.loads((out/'protected-source-failure.json').read_text())
+        self.assertEqual(report['status'],FAILED_STATUS)
+        self.assertEqual(report['changedFiles'],[dict(path='Assets/a.mat',beforeSha256='a'*64,afterSha256='b'*64)])
+    def test_source_diagnosis_upload_precedes_partial_validation(self):
+        r=Path(__file__).resolve().parents[3];w=(r/'.github/workflows/desert-rv-environment.yml').read_text()
+        self.assertLess(w.index('name: Upload only independent source hash diagnosis'),w.index('name: Preserve unaccepted pixels'))
+        self.assertIn("if: failure() && steps.source_diag.outputs.present == 'true'",w)
     def test_native_inventory_exact(self):
         p=self.root/'result.xml';p.write_text(f'<test-run result="Passed"><test-case fullname="{RENDER_TEST}" result="Passed"/></test-run>')
         inspect_native_report(self.root)

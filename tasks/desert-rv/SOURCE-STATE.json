@@ -28,8 +28,8 @@
     },
     {
       "path": ".github/workflows/desert-rv-environment.yml",
-      "sha256": "7320396c7e5590c483fd807ec4ce2811449ec591e60578f7e428d68303dda5f5",
-      "size": 3532
+      "sha256": "3c685bed43a1c5bdb4bfb59e1868bc2ac84a2ff69ef2cf8d457eaa09481ebe99",
+      "size": 5071
     },
     {
       "path": "tasks/desert-rv/ASSET-NOTICES.md",
@@ -53,8 +53,8 @@
     },
     {
       "path": "tasks/desert-rv/scripts/environment_evidence.py",
-      "sha256": "1a6946ffbfb7ee446f7a4e7e22ecadd574e7063da030e8f500e9e675618629f0",
-      "size": 9087
+      "sha256": "a164261d7b02d5a6730e6cf691214b8e7481e5c34599047c15b2977bf4a2db12",
+      "size": 13799
     },
     {
       "path": "tasks/desert-rv/scripts/expected_playmode_test_cases.json",
@@ -73,8 +73,8 @@
     },
     {
       "path": "tasks/desert-rv/scripts/test_environment_evidence.py",
-      "sha256": "aaf8a1d400c362ec1db54c2312ce60cecc560e509c11cd3a82b3f89817fbe595",
-      "size": 8484
+      "sha256": "6a31f5b2af3e9bd50122e0dcf43cde187f90f45abed21d1b9acdee95857d6d6a",
+      "size": 11942
     },
     {
       "path": "tasks/desert-rv/scripts/test_verification_scope.py",
