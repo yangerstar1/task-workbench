@@ -357,8 +357,7 @@ namespace DesertRV.Editor
             RejectKeys(clips,actor.animator.transform,new[]{root},true);
             Check(b.openEmission.maxColorComponent>0 && Finite(b.openEmission.r) && Finite(b.openEmission.g) && Finite(b.openEmission.b),"Explicit nonzero core emission required.");
             Check(b.openBaseColor.a>0 && b.openBaseColor.maxColorComponent>0 && Finite(b.openBaseColor.r) && Finite(b.openBaseColor.g) && Finite(b.openBaseColor.b),"Explicit candidate open base color required.");
-            var open=new Material(core.sharedMaterials[0]); open.SetColor("_BaseColor",b.openBaseColor); open.name="Candidate_Core_Open"; open.SetColor("_EmissionColor",b.openEmission); open.EnableKeyword("_EMISSION");
-            AssetDatabase.CreateAsset(open,destination+"/Materials/Core_Open.mat");
+            var open=CreatePersistedOpenCoreMaterial(core.sharedMaterials[0],b.openBaseColor,b.openEmission,destination+"/Materials/Core_Open.mat");
             var presenter=instance.AddComponent<BeastWeakPointPresentation>();
             var so=new SerializedObject(presenter);
             ObjectField(so,"actor",actor); ObjectField(so,"bodyRenderer",body); ObjectField(so,"weakPointRoot",root); ObjectField(so,"weakPointRenderer",core); ObjectField(so,"openMaterial",open);
@@ -368,6 +367,30 @@ namespace DesertRV.Editor
             so.ApplyModifiedPropertiesWithoutUndo();
             Check(presenter.ValidateBindings(out string reason),"Weakpoint candidate bindings failed: "+reason);
             var errors=new List<string>(); WeakPointContractChecks.Validate(presenter,"Imported candidate",errors); Check(errors.Count==0,string.Join("; ",errors));
+        }
+        // URP 17.3 rebuilds _EMISSION from AnyEmissive during material asset import.
+        // A keyword alone (or clearing EmissiveIsBlack to None) does not survive that pass.
+        internal static Material CreatePersistedOpenCoreMaterial(Material closed,Color baseColor,Color emission,string path)
+        {
+            Check(closed && closed.shader && closed.shader.name=="Universal Render Pipeline/Lit","Open core requires actual URP Lit closed source.");
+            Check(emission.maxColorComponent>0 && Finite(emission.r) && Finite(emission.g) && Finite(emission.b),"Nonzero finite open emission required.");
+            Check(!File.Exists(path) && !File.Exists(path+".meta"),"Open core asset already exists.");
+            var open=new Material(closed);
+            try
+            {
+                open.name="Candidate_Core_Open";open.SetColor("_BaseColor",baseColor);open.SetColor("_EmissionColor",emission);
+                open.globalIlluminationFlags=(open.globalIlluminationFlags & ~MaterialGlobalIlluminationFlags.EmissiveIsBlack) | MaterialGlobalIlluminationFlags.BakedEmissive;
+                MaterialEditor.FixupEmissiveFlag(open);open.EnableKeyword("_EMISSION");
+                AssetDatabase.CreateAsset(open,path);EditorUtility.SetDirty(open);AssetDatabase.SaveAssets();
+                AssetDatabase.ImportAsset(path,ImportAssetOptions.ForceUpdate|ImportAssetOptions.ForceSynchronousImport);
+                var persisted=AssetDatabase.LoadAssetAtPath<Material>(path);
+                Check(persisted && persisted.GetColor("_EmissionColor").maxColorComponent>0 && persisted.IsKeywordEnabled("_EMISSION") &&
+                    (persisted.globalIlluminationFlags & MaterialGlobalIlluminationFlags.AnyEmissive)!=0 &&
+                    (persisted.globalIlluminationFlags & MaterialGlobalIlluminationFlags.EmissiveIsBlack)==0,
+                    "Open core emission did not survive URP material save/reimport.");
+                return persisted;
+            }
+            catch {if(open && !EditorUtility.IsPersistent(open))UnityEngine.Object.DestroyImmediate(open);throw;}
         }
         static void RejectKeys(IEnumerable<AnimationClip> clips,Transform root,IEnumerable<Transform> targets,bool descendants)
         {

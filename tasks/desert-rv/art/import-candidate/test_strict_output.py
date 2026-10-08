@@ -52,7 +52,7 @@ class StrictExportTests(unittest.TestCase):
     q=dict(x=0,y=1 if state=='open' else 0,z=0,w=0 if state=='open' else 1)
     self.weak['samples'].append(dict(state=state,view=view,coreMaterial=self.prefix+'/Materials/'+('Core_Open' if state=='open' else 'Material_01')+'.mat',imageLabel='weakpoint-'+state+'-'+view,fieldOfView=60,distance=3,weakPointExposed=state=='open',bodyUnchanged=True,localPlateRotations=([s.unity_euler(v) for v in self.c['bindings']['openEuler']] if state=='open' else [q,q.copy()]),cameraPosition=dict(x=0,y=1.65,z=3)))
   native=self.root/'artifacts/candidate-art/results.xml';native.parent.mkdir(parents=True)
-  names=[s.NATIVE,'DesertRV.Tests.CandidateAnimationPolicyTests.OnlyArmoredAttackGetsTheSourceLoopException','DesertRV.Tests.CandidateAnimationPolicyTests.EqualKeyValuesDoNotExcuseUnsafeTangents','DesertRV.Tests.CandidateAnimationPolicyTests.MissingNativeAnimatorGetsCreatedAndReused']
+  names=[s.NATIVE,'DesertRV.Tests.CandidateAnimationPolicyTests.OnlyArmoredAttackGetsTheSourceLoopException','DesertRV.Tests.CandidateAnimationPolicyTests.EqualKeyValuesDoNotExcuseUnsafeTangents','DesertRV.Tests.CandidateAnimationPolicyTests.MissingNativeAnimatorGetsCreatedAndReused','DesertRV.Tests.CandidateAnimationPolicyTests.OpenCoreEmissionSurvivesRealSaveReimportAndReload']
   native.write_text('<test-run result="Passed">'+''.join('<test-case fullname="'+n+'" result="Passed"/>' for n in names)+'</test-run>')
   self.flush()
  def meta(self,p,texture=False):
@@ -78,7 +78,7 @@ class StrictExportTests(unittest.TestCase):
   self.assertIn('if(c.kind=="armored")RequireNeutralRootCurves',source)
   self.assertIn('Quaternion.Angle(rotation.normalized,root.localRotation.normalized)<=.001f',source)
  def test_valid_unreviewed_bounded_export(self):
-  r=self.run_export();self.assertEqual(r['images'],202);self.assertEqual(r['weakpointImages'],9);self.assertEqual(r['nativeCases'],4);self.assertFalse(r['approved']);self.assertNotIn('muzzle',json.loads((self.out/'import-report.json').read_text()))
+  r=self.run_export();self.assertEqual(r['images'],202);self.assertEqual(r['weakpointImages'],9);self.assertEqual(r['nativeCases'],5);self.assertFalse(r['approved']);self.assertNotIn('muzzle',json.loads((self.out/'import-report.json').read_text()))
   for f in r['files']:self.assertEqual(s.sha(self.out/f['path']),f['sha256'])
  def test_failed_native_only_safe_identity(self):self.rejected('STRICT_NATIVE_FAILED',native='failure')
  def test_failed_protected_only_safe_identity(self):self.rejected('STRICT_PROTECTED_SOURCE_FAILED',protected='failure')

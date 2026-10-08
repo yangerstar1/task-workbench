@@ -39,6 +39,11 @@ class CaptureSourceTests(unittest.TestCase):
         self.assertNotIn('GetComponent<Animator>() ??',IMPORT)
         self.assertIn('if(!animator)animator=root.gameObject.AddComponent<Animator>();',IMPORT)
         self.assertIn('var animator=EnsureNativeAnimator(animatorRoot); animator.applyRootMotion=false;',IMPORT)
+    def test_open_emission_is_persisted_with_urp_gi_flags(self):
+        self.assertIn('MaterialGlobalIlluminationFlags.BakedEmissive',IMPORT)
+        self.assertIn('MaterialEditor.FixupEmissiveFlag(open)',IMPORT)
+        self.assertIn('ForceUpdate|ImportAssetOptions.ForceSynchronousImport',IMPORT)
+        self.assertIn('persisted.IsKeywordEnabled("_EMISSION")',IMPORT)
     def test_no_approval_or_production_scene_write(self):
         for source in [CAPTURE,IMPORT]:
             self.assertNotIn('accepted=true',source)
