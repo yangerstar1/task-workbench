@@ -14,6 +14,6 @@
     "validate_runtime_contract.py": "a2d91b8bc8f947168778cfc4f9ffc4fbc3e92cb6e8a68b7e7131bad3c8d106da",
     "package_evidence.py": "f411010c0c4bc966f8c7018449a19592dc100651443245c2b85a43a631b4b04d",
     "write_provenance.py": "af2c297a8dfeacdc85833b9d1d2b1daa58ee355b494594272643159d15e088ea",
-    "test_pipeline.py": "1bff329fba337ec068dc3fba0f609897da0e2542c0dc5ab42cfc6c674e3fdf14"
+    "test_pipeline.py": "0a289711a457017a710d77a35dfa9e01811dbdfff124798f0378a896d2394c3d"
   }
 }

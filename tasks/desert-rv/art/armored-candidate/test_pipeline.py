@@ -18,6 +18,13 @@ class PipelineTests(unittest.TestCase):
         s=WORKFLOW.read_text()
         for fragment in ("github.actor == github.repository_owner","github.event.repository.private == false","github.ref == 'refs/heads/main'","runs-on: ubuntu-24.04","contents: read","persist-credentials: false","timeout-minutes: 120","sha256sum --check selected.sha256","20m blender","80m blender"):
             self.assertIn(fragment,s)
+        self.assertNotIn('${{ runner.temp }}',s)
+        self.assertIn('>> "$GITHUB_ENV"',s)
+        self.assertIn('ART_ROOT=%s/bulwark-%s-%s',s)
+        self.assertNotIn(".outcome != 'skipped'",s)
+        for step in ('static','motion'):
+            self.assertIn("steps."+step+".outcome == 'success'",s)
+            self.assertIn("steps."+step+".outcome == 'failure'",s)
         self.assertNotIn('secrets.',s); self.assertNotIn('contents: write',s); self.assertNotIn('pull_request:',s)
         for line in s.splitlines():
             if 'uses:' in line:
