@@ -1,0 +1,94 @@
+name: Desert RV candidate art import (no production approval)
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: Discovery enumerates actual imports; strict binding requires a later verified contract
+        required: true
+        type: choice
+        default: DISCOVERY_ONLY
+        options: [DISCOVERY_ONLY]
+      contract:
+        description: Checked-in tasks/desert-rv/art/import-candidate/contracts/<id>.json
+        required: true
+        type: string
+      contract_sha256:
+        description: Exact independently reviewed contract file SHA256
+        required: true
+        type: string
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: desert-rv-candidate-art-import
+  cancel-in-progress: false
+jobs:
+  import:
+    if: >-
+      github.repository == 'yangerstar1/task-workbench' && github.ref == 'refs/heads/main' &&
+      github.actor == 'yangerstar1' && github.triggering_actor == 'yangerstar1'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 50
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+          lfs: false
+      - name: Test offline stager
+        working-directory: tasks/desert-rv/art/import-candidate
+        run: python3 -m unittest -v test_stage_artifact test_capture_source test_verify_output
+      - name: Fetch and verify pinned candidate input
+        env:
+          GH_TOKEN: ${{ github.token }}
+          MODE: ${{ inputs.mode }}
+          CONTRACT: ${{ inputs.contract }}
+          CONTRACT_SHA: ${{ inputs.contract_sha256 }}
+        run: >-
+          python3 tasks/desert-rv/art/import-candidate/prepare_input.py
+          --mode "$MODE" --contract "$CONTRACT" --sha256 "$CONTRACT_SHA"
+          --output tasks/desert-rv/unity/CandidateImportInput
+      - name: Restore pinned font and prepare official Unity runner
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+        run: |
+          python3 tasks/desert-rv/scripts/backup/restore_unity_font.py
+          bash tasks/desert-rv/scripts/prepare_runner.sh
+          docker build --build-arg BASE_IMAGE=unityci/editor@sha256:17406791cf1e438bea2dac20671668e05d83db5ed38c916744815db4584a8264 --file tasks/desert-rv/scripts/Environment.Dockerfile --tag desert-rv-environment:local tasks/desert-rv/scripts
+      - id: native
+        name: Import pinned candidate and run selected diagnostics
+        uses: game-ci/unity-test-runner@0ff419b913a3630032cbe0de48a0099b5a9f0ed9
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+        with:
+          unityVersion: 6000.3.19f1
+          customImage: desert-rv-environment:local
+          projectPath: tasks/desert-rv/unity
+          testMode: editmode
+          artifactsPath: tasks/desert-rv/artifacts/candidate-art
+          customParameters: -assemblyNames DesertRV.CandidateArtTests -force-glcore -job-worker-count 2
+          dockerCpuLimit: 2
+          dockerMemoryLimit: 12g
+      - id: protected
+        name: Reject changes to any tracked source including Assets Packages and ProjectSettings
+        if: always()
+        run: |
+          git diff --quiet --exit-code
+          git diff --cached --quiet --exit-code
+      - name: Export only validated discovery files or safe failure code
+        if: always()
+        env:
+          NATIVE_RESULT: ${{ steps.native.outcome }}
+          PROTECTED_RESULT: ${{ steps.protected.outcome }}
+        run: python3 tasks/desert-rv/art/import-candidate/verify_output.py --native "$NATIVE_RESULT" --protected "$PROTECTED_RESULT"
+      - name: Upload candidate outputs only (never approval)
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: candidate-art-import-${{ github.run_id }}-${{ github.run_attempt }}
+          path: tasks/desert-rv/artifacts/candidate-art-export/
+          if-no-files-found: error
+          retention-days: 7

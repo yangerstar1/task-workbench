@@ -1,0 +1,27 @@
+{
+  "status": "zip-and-payload-byte-verified-discovery-input",
+  "mode": "DISCOVERY_ONLY",
+  "scope": "DEATH_DIAGNOSTIC_NOT_FULL",
+  "runUrl": "https://github.com/yangerstar1/task-workbench/actions/runs/37829068773",
+  "sourceCommitReadFromArtifact": "b904ed4b37b22f345c9e705caca409d1078300f8",
+  "files": [
+    {
+      "file": "pouncer-candidate.fbx",
+      "sha256": "ee09adc854401aff7589121c618897226c5155c27c9336493df7d2d0b106cadd"
+    },
+    {
+      "file": "pouncer-basecolor.png",
+      "sha256": "d771c6ddefb650959e1702359745b6ecc076a3df6f4aa1f09e99346db7e4a06b"
+    }
+  ],
+  "missing": [
+    "Actual Unity discovery execution and readback"
+  ],
+  "note": "Parent verified GitHub successful run/source/artifact identity; worker independently hashed original ZIP and all 34 internal manifest entries. No visual/motion acceptance. Workflow re-fetches and authenticates metadata at execution.",
+  "artifactId": 11573760750,
+  "artifactName": "pouncer-death-diagnostic-37829068773",
+  "archiveBytes": 18854616,
+  "archiveSha256": "67d92a92628c3331fd2c7ed522326b506288565c30952cedd8d322ac8efcd0e9",
+  "archiveEntries": 35,
+  "manifestFilesVerified": 34
+}
