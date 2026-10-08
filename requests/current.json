@@ -1,8 +1,8 @@
 {
   "schema": "task-workbench/request-v1",
   "task": "data-summary",
-  "mode": "complete",
-  "requestId": "complete-20261008-001",
+  "mode": "checkpoint",
+  "requestId": "checkpoint-20261008-001",
   "resumeRunId": "",
   "resumeRequestId": ""
 }
