@@ -264,6 +264,17 @@ class TestResolvedEditorPackages(unittest.TestCase):
         self.assertEqual(locked['com.unity.sysroot.base']['version'],'1.1.0')
 
 
+class TestDiagnosticCaptureModules(unittest.TestCase):
+    def test_official_capture_modules_are_explicit_builtins(self):
+        manifest=json.loads((evidence.PROJECT/'Packages/manifest.json').read_text())['dependencies']
+        locked=json.loads((evidence.PROJECT/'Packages/packages-lock.json').read_text())['dependencies']
+        for name in ('com.unity.modules.imageconversion','com.unity.modules.screencapture'):
+            self.assertEqual(manifest[name],'1.0.0')
+            self.assertEqual(locked[name]['source'],'builtin')
+            self.assertEqual(locked[name]['depth'],0)
+        self.assertEqual(locked['com.unity.modules.screencapture']['dependencies'],{'com.unity.modules.imageconversion':'1.0.0'})
+
+
 class TestSeparateModeInventories(unittest.TestCase):
     def test_separate_reviewed_inventories(self):
         edits = evidence.expected_cases('editmode')
