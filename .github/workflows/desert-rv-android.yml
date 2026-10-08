@@ -1,0 +1,133 @@
+name: Desert RV saved TraversalHarness Android
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: desert-rv-traversal-harness
+  cancel-in-progress: false
+
+jobs:
+  tests:
+    name: Native Desert RV EditMode rule tests
+    if: >-
+      github.repository == 'yangerstar1/task-workbench' &&
+      github.ref == 'refs/heads/main' &&
+      github.actor == 'yangerstar1' &&
+      github.triggering_actor == 'yangerstar1'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    outputs:
+      test_count: ${{ steps.verify.outputs.test_count }}
+      test_xml_sha256: ${{ steps.verify.outputs.test_xml_sha256 }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+          lfs: false
+      - name: Verify trusted dispatch and exported source bytes
+        id: guard
+        run: python3 tasks/desert-rv/scripts/verify_evidence.py guard
+      - name: Test independent evidence validator
+        run: python3 tasks/desert-rv/scripts/test_verify_evidence.py
+      - name: Restore and verify exact checkpoint font
+        run: |
+          python3 tasks/desert-rv/scripts/backup/restore_unity_font.py
+          python3 tasks/desert-rv/scripts/backup/restore_unity_font.py --verify-only
+      - name: Prepare disposable standard runner
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+        run: bash tasks/desert-rv/scripts/prepare_runner.sh
+      - name: Execute original game rule tests in Unity
+        uses: game-ci/unity-test-runner@0ff419b913a3630032cbe0de48a0099b5a9f0ed9 # v4.3.1
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+        with:
+          unityVersion: 6000.3.19f1
+          projectPath: tasks/desert-rv/unity
+          testMode: editmode
+          artifactsPath: tasks/desert-rv/artifacts/tests
+          customParameters: -assemblyNames DesertRV.EditModeTests -job-worker-count 2
+          dockerCpuLimit: 2
+          dockerMemoryLimit: 12g
+      - name: Require exact nonempty passing native test inventory
+        id: verify
+        if: always() && steps.guard.outcome == 'success'
+        run: python3 tasks/desert-rv/scripts/verify_evidence.py tests
+      - name: Upload only bounded sanitized test evidence
+        if: always() && steps.guard.outcome == 'success'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: desert-rv-tests-${{ github.run_id }}-${{ github.run_attempt }}
+          path: tasks/desert-rv/evidence/tests/test-results.json
+          if-no-files-found: ignore
+          retention-days: 7
+
+  android:
+    name: Build saved TraversalHarness test APK (not full game)
+    needs: tests
+    if: needs.tests.result == 'success'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 55
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+          lfs: false
+      - name: Verify identical trusted source and fresh output paths
+        run: python3 tasks/desert-rv/scripts/verify_evidence.py guard
+      - name: Restore and verify exact checkpoint font
+        run: |
+          python3 tasks/desert-rv/scripts/backup/restore_unity_font.py
+          python3 tasks/desert-rv/scripts/backup/restore_unity_font.py --verify-only
+      - name: Prepare disposable standard runner
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+        run: bash tasks/desert-rv/scripts/prepare_runner.sh
+      - name: Build original saved scene with Unity
+        uses: game-ci/unity-builder@d829bfc901f2347c8fe18898f06712b66916ef42 # v5.0.0
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+        with:
+          unityVersion: 6000.3.19f1
+          projectPath: tasks/desert-rv/unity
+          targetPlatform: Android
+          buildMethod: DesertRV.Editor.AndroidBuild.BuildTraversalHarness
+          manualExit: true
+          buildName: DesertRV-TraversalHarness
+          buildsPath: build
+          androidTargetSdkVersion: 35
+          androidExportType: androidPackage
+          versioning: Custom
+          version: 0.1.0
+          androidVersionCode: 1
+          dockerCpuLimit: 2
+          dockerMemoryLimit: 12g
+          customParameters: >-
+            -job-worker-count 2
+            -desertRvCommit ${{ github.sha }}
+            -desertRvRunId ${{ github.run_id }}
+            -desertRvRunAttempt ${{ github.run_attempt }}
+      - name: Independently verify new APK and native receipt
+        env:
+          EXPECTED_TEST_COUNT: ${{ needs.tests.outputs.test_count }}
+          EXPECTED_TEST_XML_SHA256: ${{ needs.tests.outputs.test_xml_sha256 }}
+        run: python3 tasks/desert-rv/scripts/verify_evidence.py apk
+      - name: Upload verified test package and safe evidence only
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: desert-rv-traversal-harness-android-${{ github.run_id }}-${{ github.run_attempt }}
+          path: tasks/desert-rv/evidence/android/
+          if-no-files-found: error
+          retention-days: 7
