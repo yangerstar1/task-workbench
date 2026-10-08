@@ -240,10 +240,10 @@ for clip,end in [('Idle',121),('Fire',14.2),('Reload',100)]:
  if clip=='Reload':
   # Count-driven reload: magazine stays attached. A genuinely new collated nail strip
   # travels from below the camera, through the open loading channel, into place.
-  strip_path=[(1,(-.12,-.10,-.24)),(35,(-.12,-.10,-.24)),(48,(-.10,0,.045)),(60,(0,0,.045)),(68,(0,0,0)),(100,(0,0,0))]
+  strip_path=[(1,(-.12,-.10,-.24)),(35,(-.12,-.10,-.24)),(48,(-.10,0,.045)),(60,(0,0,.025)),(68,(0,0,0)),(100,(0,0,0))]
   for f,d in strip_path:key('reload_strip',f,d)
   hand_path=[(1,(0,0,0)),(12,(.015,-.310,-.155)),(23,(.015,-.365,-.161)),
-   (35,(-.140,-.013,-.304967)),(48,(-.120,.087,-.019967)),(60,(-.020,.087,-.019967)),(68,(-.020,.087,-.064967)),
+   (35,(-.140,-.013,-.304967)),(48,(-.120,.087,-.019967)),(60,(-.020,.087,-.039967)),(68,(-.020,.087,-.064967)),
    (73,(-.06,0,.015)),(82,(.015,-.365,-.161)),(91,(.015,-.310,-.155)),(100,(0,0,0))]
   for f,d in hand_path:key('arm.L',f,d)
   # Keep a neutral wrist; the palm stays outside the left rail, not flipped through the barrel.

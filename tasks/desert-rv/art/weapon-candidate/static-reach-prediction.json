@@ -1,0 +1,30 @@
+{
+  "kind": "static analytic prediction, not Blender/Unity validation",
+  "samples_per_count": 100,
+  "report": [
+    {
+      "before": 0,
+      "peak_frame": 60,
+      "max_target_distance_m": 0.7080491869135929,
+      "fixed_reach_m": 0.7108031959161378,
+      "remaining_margin_m": 0.002754009002544966,
+      "all_100_frames_within_reach": true
+    },
+    {
+      "before": 3,
+      "peak_frame": 100,
+      "max_target_distance_m": 0.7013201836536576,
+      "fixed_reach_m": 0.7108031959161378,
+      "remaining_margin_m": 0.009483012262480273,
+      "all_100_frames_within_reach": true
+    },
+    {
+      "before": 11,
+      "peak_frame": 100,
+      "max_target_distance_m": 0.7013201836536576,
+      "fixed_reach_m": 0.7108031959161378,
+      "remaining_margin_m": 0.009483012262480273,
+      "all_100_frames_within_reach": true
+    }
+  ]
+}

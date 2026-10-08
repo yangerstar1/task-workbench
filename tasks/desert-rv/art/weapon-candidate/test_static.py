@@ -99,4 +99,18 @@ class ArtifactGateRegression(unittest.TestCase):
   self.assertGreater(first-11*pitch-.026-cap_radius,-.160)
  def test_fbx_single_export_path(self):
   s=(ROOT/'build_weapon.py').read_text();self.assertIn('bake_anim_use_all_actions=False,bake_anim_use_nla_strips=True',s)
+class ReachPathRegression(unittest.TestCase):
+ def test_actual_keyed_path_inside_fixed_left_arm_reach(self):
+  import math
+  tree=ast.parse((ROOT/'build_weapon.py').read_text())
+  keys=next(ast.literal_eval(n.value) for n in ast.walk(tree) if isinstance(n,ast.Assign) and any(isinstance(q,ast.Name) and q.id=='hand_path' for q in n.targets))
+  limit=math.sqrt(.145**2+.1**2+.285**2)+math.sqrt(.12**2+.22**2+.28**2)
+  for before in [0,3,11]:
+   for frame in range(1,101):
+    for (fa,a),(fb,b) in zip(keys,keys[1:]):
+     if fa<=frame<=fb:
+      t=(frame-fa)/(fb-fa);delta=[x+(y-x)*t for x,y in zip(a,b)];break
+    w=max(0,min(1,(frame-30)/5,(73-frame)/5));offset=[0,-.03*before*w,-.00321*before*w]
+    target=[base+d+o for base,d,o in zip([.265,.32,.565],delta,offset)]
+    self.assertLess(math.sqrt(sum(v*v for v in target)),limit,(before,frame))
 if __name__=='__main__':unittest.main()
