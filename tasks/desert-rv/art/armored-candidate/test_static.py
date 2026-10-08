@@ -19,7 +19,7 @@ class SourceTests(unittest.TestCase):
             for i in range(round(duration*240)+1):
                 p=motion.sample(clip,i/240)
                 for k in motion.LEGS:
-                    h=motion.add(motion.HIP[k],(0,0,p['z'])); f=p['feet'][k]; n=motion.knee(h,f,k)
+                    h=motion.add(motion.HIP[k],(0,0,p['z'])); f=p['feet'][k]; n=motion.knee(h,f,k,minimum_z=p.get('knee_clearance'))
                     self.assertAlmostEqual(motion.length(motion.sub(h,n)),motion.UPPER,places=8)
                     self.assertAlmostEqual(motion.length(motion.sub(f,n)),motion.LOWER,places=8)
                     self.assertGreaterEqual(f[2],motion.FOOT[k][2]-1e-9)
@@ -124,6 +124,29 @@ class SourceTests(unittest.TestCase):
         self.assertIn('require_full_body=False',(HERE/'fps_evidence.py').read_text())
         self.assertIn('core target outside safe viewport',(HERE/'fps_evidence.py').read_text())
         self.assertIn('bake_anim=False',(HERE/'animate.py').read_text())
+    def test_observed_greave_regression(self):
+        import floor_probe
+        report=json.loads((HERE/'floor-regression-observed.json').read_text())
+        self.assertEqual(len(report['failures']),99)
+        for r in report['failures']:
+            name,frame=r['label'].rsplit(':',1); t=(int(frame)-1)/60
+            if name.startswith('SYNTHETIC'):
+                phase=float(name.rsplit('_',1)[1]);lead=min(.35,phase)
+                pose=motion.sample('Attack',phase-lead+t) if t<lead else motion.interrupted(phase,t-lead)
+            else:pose=motion.sample(name,t)
+            old=floor_probe.diagnose(pose,guard=False); current=floor_probe.diagnose(pose)
+            self.assertLess(abs(old['min_z']-r['observed']),1e-6)
+            self.assertGreater(current['min_z'],0)
+            self.assertEqual(current['ankle'],pose['feet'][current['bone'].split('.',1)[1]])
+    def test_historical_unchanged_clip_equivalence(self):
+        evidence=json.loads((HERE/'historical-clip-equivalence.json').read_text())
+        for clip,expected in evidence['clips'].items():
+            data=[]
+            for i in range(expected['samples']):
+                p=motion.sample(clip,i/240);self.assertIsNone(p.pop('knee_clearance'))
+                p['knees']={k:motion.knee(motion.add(motion.HIP[k],(0,0,p['z'])),p['feet'][k],k) for k in motion.LEGS};data.append(p)
+            digest=hashlib.sha256(json.dumps(data,sort_keys=True,separators=(',',':')).encode()).hexdigest()
+            self.assertEqual(digest,expected['original_sha256']);self.assertEqual(digest,expected['current_sha256'])
     def test_source_manifest(self):
         manifest=json.loads((HERE/'source-manifest.json').read_text())
         for name,digest in manifest['sha256'].items(): self.assertEqual(hashlib.sha256((HERE/name).read_bytes()).hexdigest(),digest)

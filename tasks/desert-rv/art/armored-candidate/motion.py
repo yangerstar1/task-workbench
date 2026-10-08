@@ -22,7 +22,7 @@ def smooth(t):
     t=max(0,min(1,t)); return t*t*(3-2*t)
 def mix(a,b,t): return a+(b-a)*t
 
-def knee(hip,foot,key):
+def knee(hip,foot,key,minimum_z=None):
     """Exact two-link construction; rejects unreachable targets instead of stretching."""
     d=sub(foot,hip); r=length(d)
     if not 1e-6 < r < UPPER+LOWER-1e-5: raise ValueError((key,'unreachable',r))
@@ -30,7 +30,25 @@ def knee(hip,foot,key):
     bend=norm(sub(preferred,mul(axis,dot(preferred,axis))))
     along=(UPPER*UPPER-LOWER*LOWER+r*r)/(2*r)
     height=math.sqrt(max(0,UPPER*UPPER-along*along))
-    return add(add(hip,mul(axis,along)),mul(bend,height))
+    center=add(hip,mul(axis,along)); result=add(center,mul(bend,height))
+    if minimum_z is not None and result[2]<minimum_z:
+        # Rotate only the knee bend direction on the exact two-link solution circle.
+        # Hip, ankle, leg lengths and whole-body height remain unchanged.
+        up=norm(sub((0,0,1),mul(axis,axis[2])))
+        if center[2]+height*up[2]<minimum_z:raise ValueError((key,'knee clearance unreachable'))
+        cosine=max(-1,min(1,dot(bend,up))); theta=math.acos(cosine)
+        tangent=sub(up,mul(bend,cosine))
+        if length(tangent)<1e-8:
+            tangent=(axis[1]*bend[2]-axis[2]*bend[1],axis[2]*bend[0]-axis[0]*bend[2],axis[0]*bend[1]-axis[1]*bend[0])
+            if key.endswith('R'):tangent=mul(tangent,-1)
+        tangent=norm(tangent); lo=0.; hi=theta
+        for _ in range(40):
+            angle=(lo+hi)/2; direction=add(mul(bend,math.cos(angle)),mul(tangent,math.sin(angle)))
+            if center[2]+height*direction[2]<minimum_z:lo=angle
+            else:hi=angle
+        bend=add(mul(bend,math.cos(hi)),mul(tangent,math.sin(hi)))
+        result=add(center,mul(bend,height))
+    return result
 
 def gait(t,key,speed,period):
     phase=(t/period+(0 if key in ('fore.L','hind.R') else .5))%1
@@ -70,7 +88,7 @@ def sample(clip,t):
     elif clip=='Hit': z=-.065*math.sin(math.pi*min(t/P['clips']['Hit'],1))**2; ram=.10*math.sin(math.pi*min(t/P['clips']['Hit'],1))**2
     elif clip=='Death': z=P['death_settle_z']*smooth(t/.8); gate=P['gate_open_radians']*smooth(t/.7); ram=.18*smooth(t/.6)
     else: raise ValueError(clip)
-    return {'z':z,'gate':gate,'ram':ram,'feet':feet,'contact':contact}
+    return {'z':z,'gate':gate,'ram':ram,'feet':feet,'contact':contact,'knee_clearance':.14 if clip=='Recover' else None}
 
 def interrupted(phase,t):
     """Synthetic hard-stop settle from the EXACT sampled charge pose.
@@ -78,7 +96,7 @@ def interrupted(phase,t):
     This is preview evidence, not an implemented Unity transition controller.
     """
     a=sample('Attack',phase); u=smooth(t/.24)
-    out=dict(a); out['z']=mix(a['z'],-.18,u); out['gate']=mix(a['gate'],P['gate_open_radians'],u)
+    out=dict(a); out['knee_clearance']=.14; out['z']=mix(a['z'],-.18,u); out['gate']=mix(a['gate'],P['gate_open_radians'],u)
     out['feet']={k:(v[0],v[1],mix(v[2],FOOT[k][2],u)) for k,v in a['feet'].items()}
     out['contact']={k: a['contact'][k] or t>=.24 for k in LEGS}
     return out

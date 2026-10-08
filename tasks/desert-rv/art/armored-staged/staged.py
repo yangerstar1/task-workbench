@@ -11,19 +11,24 @@ from artifact_io import fresh_output
 def sha(path):return hashlib.sha256(path.read_bytes()).hexdigest()
 def verify_source():
     lock=json.loads((HERE/'art-lock.json').read_text())
-    if sha(ART/'source-manifest.json')!=lock['source_manifest_sha256']:raise ValueError('Immutable R3 art manifest changed')
+    if sha(ART/'source-manifest.json')!=lock['source_manifest_sha256']:raise ValueError('Pinned revised art manifest changed')
     for name,digest in lock['source_files'].items():
-        if sha(ART/name)!=digest:raise ValueError('Immutable R3 art changed: '+name)
+        if sha(ART/name)!=digest:raise ValueError('Pinned revised art changed: '+name)
     manifest=json.loads((HERE/'execution-manifest.json').read_text())
     for name,digest in manifest['sha256'].items():
         if sha(HERE/name)!=digest:raise ValueError('Executor changed: '+name)
+    proof=json.loads((ART/lock['historical_equivalence_proof']).read_text()) if lock.get('historical_equivalence_proof') else None
+    if proof:
+        if proof['historical_manifest_sha256']!=lock['reused_manifest_sha256']:raise ValueError('Historical proof identity mismatch')
+        for item in proof['clips'].values():
+            if item['original_sha256']!=item['current_sha256']:raise ValueError('Historical motion equivalence failed')
     return lock
 
 def atomic_json(path,value):
     tmp=path.with_suffix(path.suffix+'.tmp');tmp.write_text(json.dumps(value,indent=2)+'\n');tmp.replace(path)
 
 def base_receipt(stage,lock):
-    return {'stage':stage,'status':'PARTIAL_NOT_COMPLETE','art_source_commit':lock['source_commit'],'art_source_manifest_sha256':lock['source_manifest_sha256'],'execution_commit':os.environ.get('GITHUB_SHA'),'execution_manifest_sha256':sha(HERE/'execution-manifest.json'),'run_id':os.environ.get('GITHUB_RUN_ID'),'run_attempt':os.environ.get('GITHUB_RUN_ATTEMPT'),'blender_version':'4.2.3','quality':{'samples':24,'width':960,'height':540,'engine':'CYCLES','technical_hz':60,'new_diagnostic_nominal_hz':30,'endpoint_policy':'include exact final original frame; VFR retains original 1/60 final exposure'},'visual_approved':False,'unity_verified':False,'files':{}}
+    return {'stage':stage,'status':'PARTIAL_NOT_COMPLETE','art_source_commit':lock['source_commit'] or os.environ.get('GITHUB_SHA'),'art_source_manifest_sha256':lock['source_manifest_sha256'],'execution_commit':os.environ.get('GITHUB_SHA'),'execution_manifest_sha256':sha(HERE/'execution-manifest.json'),'run_id':os.environ.get('GITHUB_RUN_ID'),'run_attempt':os.environ.get('GITHUB_RUN_ATTEMPT'),'blender_version':'4.2.3','quality':{'samples':24,'width':960,'height':540,'engine':'CYCLES','technical_hz':60,'baked_subframe_floor_hz':240,'new_diagnostic_nominal_hz':30,'endpoint_policy':'include exact final original frame; VFR retains original 1/60 final exposure'},'visual_approved':False,'unity_verified':False,'files':{}}
 
 def verify_receipt(folder,stage,lock):
     folder=Path(folder);r=json.loads((folder/'stage-receipt.json').read_text())
@@ -67,7 +72,15 @@ def technical(env,tree,output):
     for clip in list(plan.P['clips'])+[c for c in plan.REMAINING if c.startswith('SYNTHETIC')]:
         duration,fn,travel=sampler(env,clip);act,n=env['create_action'](clip,duration,fn)
         start=len(env['checks']);env['validate_action'](clip,act,n,fn,travel)
-        atomic_json(output/('numeric-'+clip+'.json'),{'clip':clip,'checks':env['checks'][start:]})
+        # Additional true baked subframe floor test. This evaluates the actual fcurves,
+        # not another call to the analytic sampler, and never renders anything.
+        for frame in range(1,n):
+            for sub in (.25,.5,.75):
+                t=(frame-1+sub)/60;env['scene'].frame_set(frame,subframe=sub);env['rig'].location=(0,-travel(t),0)
+                env['bpy'].context.view_layer.update();env['camera'](math.pi*.65,(0,-travel(t)-.1,.55))
+                env['set_presentation'](clip=='Recover' or (clip.startswith('SYNTHETIC') and fn(t)['gate']>0))
+                row=env['validate_frame'](clip+':'+str(frame+sub));row['time']=t;row['baked_subframe']=True;env['checks'].append(row)
+        atomic_json(output/('numeric-'+clip+'.json'),{'clip':clip,'integer_hz':60,'baked_subframe_floor_hz':240,'checks':env['checks'][start:]})
         env['rig'].location=(0,0,0)
         if clip in plan.P['clips']:
             env['actions'].append(act);env['clip_rows'].append({'name':clip,'frames':n,'duration_seconds':(n-1)/60,'requested_seconds':duration,'loop':clip in ('Idle','Walk','Attack'),'root_motion':False})

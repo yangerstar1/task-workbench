@@ -4,12 +4,12 @@
   "source_origin": "original procedural authorship",
   "third_party_assets": [],
   "sha256": {
-    "README.md": "67fa070d2fe8b257afcba37a544343833f60f67bb1cc3c632bb3e3a3cc6308ed",
+    "README.md": "8e7f3b17e87ab74d7f94221b7d97a29b2afee7b9550cf609009ebe83b7d22095",
     "parameters.json": "6e7bd9eea7a5d18b9afd87ac290ebccd5e1b204d314924628da11e61f4237287",
-    "motion.py": "2852443caff1767545e204fdab3d2dd132d14d398e6217009364dc42bcc8416c",
-    "generate.py": "f2fa475c2a968acba9e318436f8e9dd48e940c4b15f35cf7727af10986f32ee3",
+    "motion.py": "4edc78bd7ff6ec22d8ad378a71871f983f76262857c8bf9cec03a06f8ed7e010",
+    "generate.py": "87ecb07298ddcf9653d651e74b12d14eb2e4089b78a0136ebe6f16771e0be9de",
     "animate.py": "159564c94eb0780bba0d0638d415aaa6e4e6a0a9b5f0ee3a98e6d3066563e339",
-    "test_static.py": "ff32b5b6deb6e4fb3530febfb2b573091206bf8f0553c2c143863dfeec446a55",
+    "test_static.py": "bfec3a0ae840615562a8a28fa050882c1a3361ccbc9bc055073362bd0be0f503",
     "artifact_io.py": "3a088520d8162c1beaa2c4fcf32275f8041e05db323344b1d82a1b263787a144",
     "validate_runtime_contract.py": "a2d91b8bc8f947168778cfc4f9ffc4fbc3e92cb6e8a68b7e7131bad3c8d106da",
     "package_evidence.py": "d755caf2cd1b584a54183bf3bde0c5b21ac2cf16d668842266b9c005f1346e63",
@@ -18,6 +18,10 @@
     "fps_evidence.py": "f336fd58a9726e14d03810e3e784aed518be1d0d3b2be56fa424eead66ccac14",
     "evidence_layout.py": "6f4e1d32cc0f7c872697b8ccf5b789a2b16846bd11f2c51d243dd2c912e9214c",
     "binding_contract.py": "c9eea0fa52490b47c3d36fc8df2b9662da67326755c5a932ca1704a16e360ff9",
-    "cavity_geometry.py": "c58030b6b9f77b9cacf5c944c816a5918484c4da49c1d9d877dfb36bba7a18d3"
-  }
+    "cavity_geometry.py": "c58030b6b9f77b9cacf5c944c816a5918484c4da49c1d9d877dfb36bba7a18d3",
+    "floor_probe.py": "5835d6aa583f35140837ad9364ac7d93c0966d377ada49f05acc05936302d1e5",
+    "floor-regression-observed.json": "9dce23b86a4fb6dd4048ab4abf47073dab17125d7d1cd31dc07f074d12d82e11",
+    "historical-clip-equivalence.json": "a52e7371e0ddb9bef1a501a913b8acd6a0bb00c7eba72742feca3bbadccef03c"
+  },
+  "revision": "measured-greave-clearance-fix"
 }

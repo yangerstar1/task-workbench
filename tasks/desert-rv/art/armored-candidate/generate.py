@@ -17,7 +17,7 @@ args=p.parse_args(sys.argv[sys.argv.index('--')+1:]); OUT=fresh_output(args.outp
 if bpy.app.version[:3]!=(4,2,3): raise RuntimeError('Pinned Blender 4.2.3 required')
 bpy.ops.object.select_all(action='SELECT'); bpy.ops.object.delete(use_global=False)
 scene=bpy.context.scene; scene.render.fps=P['fps']; scene.unit_settings.system='METRIC'
-assets=[]
+assets=[]; source_parts=[]
 def active(o):
     bpy.ops.object.select_all(action='DESELECT'); o.select_set(True); bpy.context.view_layer.objects.active=o
 # Palette: faded cream paint, oxide, dark iron, warm hide, vent amber, horn, slate, soot.
@@ -50,6 +50,10 @@ mat.node_tree.links.new(orm_node.outputs['Color'],channels.inputs['Color']); mat
 
 def mesh(name,verts,faces,bone,tile):
     me=bpy.data.meshes.new(name); me.from_pydata(verts,[],faces); me.update()
+    source_parts.append(name)
+    me.attributes.new(name='source_part_id',type='INT',domain='POINT'); me.attributes.new(name='source_vertex_id',type='INT',domain='POINT')
+    part_tag=me.attributes['source_part_id']; vertex_tag=me.attributes['source_vertex_id']
+    for i in range(len(me.vertices)):part_tag.data[i].value=len(source_parts)-1; vertex_tag.data[i].value=i
     o=bpy.data.objects.new(name,me); scene.collection.objects.link(o); assets.append(o); o['bone']=bone; o.data.materials.append(mat)
     tag=me.attributes.new(name='weakpoint_face',type='INT',domain='FACE')
     for value in tag.data:value.value=int(name.startswith('WeakpointTissue'))
@@ -174,7 +178,7 @@ def apply_pose(pose):
         pivot=rest_matrices[name].translation
         rig.pose.bones[name].matrix=translate(z)@Matrix.Translation(pivot)@Matrix.Rotation(angle,4,axis)@Matrix.Translation(-pivot)@rest_matrices[name]
     for k in motion.LEGS:
-        h=Vector(motion.add(motion.HIP[k],(0,0,z))); f=Vector(pose['feet'][k]); n=Vector(motion.knee(h,f,k))
+        h=Vector(motion.add(motion.HIP[k],(0,0,z))); f=Vector(pose['feet'][k]); n=Vector(motion.knee(h,f,k,minimum_z=pose.get('knee_clearance')))
         for name,a,b in [('upper.'+k,h,n),('lower.'+k,n,f)]:
             # Preserve rest roll: shortest rotation from original limb axis.
             rest_axis=rig.data.bones[name].tail_local-rig.data.bones[name].head_local
@@ -197,17 +201,24 @@ review=OUT/'review'; review.mkdir(exist_ok=True)
 def camera(angle,center=(0,-.1,.55)):
     target=Vector(center); cam.location=target+Vector((4*math.sin(angle),-4*math.cos(angle),2.6)); cam.rotation_euler=(target-cam.location).to_track_quat('-Z','Y').to_euler(); bpy.context.view_layer.update()
 def bounds():
-    deps=bpy.context.evaluated_depsgraph_get(); verts=[]
+    deps=bpy.context.evaluated_depsgraph_get(); verts=[]; lowest=None
     for obj in assets:
-        ob=obj.evaluated_get(deps); me=ob.to_mesh(); verts.extend(ob.matrix_world@v.co for v in me.vertices); ob.to_mesh_clear()
-    return verts
+        ob=obj.evaluated_get(deps); me=ob.to_mesh()
+        for v in me.vertices:
+            co=ob.matrix_world@v.co; verts.append(co)
+            if lowest is None or co.z<lowest['world_z']:
+                original=obj.data.vertices[v.index]; groups=sorted(original.groups,key=lambda g:g.weight,reverse=True)
+                part=me.attributes.get('source_part_id'); local=me.attributes.get('source_vertex_id')
+                lowest={'mesh':obj.name,'source_part':source_parts[part.data[v.index].value] if part else obj.name,'source_vertex':local.data[v.index].value if local else v.index,'mesh_vertex':v.index,'bone':obj.vertex_groups[groups[0].group].name if groups else None,'world_z':co.z,'world_position':list(co)}
+        ob.to_mesh_clear()
+    return verts,lowest
 def validate_frame(label,require_full_body=True):
-    vs=bounds(); min_z=min(v.z for v in vs); clip=[world_to_camera_view(scene,cam,v) for v in vs]
+    vs,lowest=bounds(); min_z=min(v.z for v in vs); clip=[world_to_camera_view(scene,cam,v) for v in vs]
     errors=[]
     if min_z< -P['floor_penetration_limit_m']: errors.append('floor penetration')
     body_clipped=any(v.z<=0 or min(v.x,v.y)<.035 or max(v.x,v.y)>.965 for v in clip)
     if require_full_body and body_clipped: errors.append('camera clipping')
-    return {'errors':errors,'whole_body_clipped_diagnostic':body_clipped,'whole_body_required':require_full_body,'label':label,'min_z':min_z,'screen_min':[min(v.x for v in clip),min(v.y for v in clip)],'screen_max':[max(v.x for v in clip),max(v.y for v in clip)]}
+    return {'lowest_vertex':lowest,'errors':errors,'whole_body_clipped_diagnostic':body_clipped,'whole_body_required':require_full_body,'label':label,'min_z':min_z,'screen_min':[min(v.x for v in clip),min(v.y for v in clip)],'screen_max':[max(v.x for v in clip),max(v.y for v in clip)]}
 def still(path):
     scene.render.image_settings.file_format='PNG'; scene.render.filepath=str(path); bpy.ops.render.render(write_still=True)
 apply_pose(motion.sample('Idle',0)); camera(0)

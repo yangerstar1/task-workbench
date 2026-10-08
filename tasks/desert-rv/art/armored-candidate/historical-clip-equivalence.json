@@ -1,0 +1,56 @@
+{
+  "status": "source_kinematic_equivalence_not_new_rendered_evidence",
+  "historical_run": "37827225328",
+  "historical_artifact": "11576761904",
+  "historical_source_commit": "4521975dc47d914959e274a197224d0af7a47b04",
+  "historical_manifest_sha256": "83a68739963727908fe037908e3f7255a3fa6e6c3a72359f789262ed7a7de4bf",
+  "sampling_hz": 240,
+  "scope": "Exact authored body/foot/ram/gate/support values and unconstrained knee solutions for the three unchanged clips; not a pixel-equivalence or new-source visual approval. Changed Recover/interruption knee solutions require fresh evidence.",
+  "clips": {
+    "Idle": {
+      "original_sha256": "72a0b27867c8ed9e0bcc1203216fab18672c00e78c5b803f84081c349c26d585",
+      "current_sha256": "72a0b27867c8ed9e0bcc1203216fab18672c00e78c5b803f84081c349c26d585",
+      "samples": 481
+    },
+    "Walk": {
+      "original_sha256": "5eda110eeffcd345bb480ceb59aec61d182c4742a38b7a8f4e21672f77d83fec",
+      "current_sha256": "5eda110eeffcd345bb480ceb59aec61d182c4742a38b7a8f4e21672f77d83fec",
+      "samples": 145
+    },
+    "Windup": {
+      "original_sha256": "8b5124ebc261194c475401eb834e28b047da75ac7469ab9cff2f7a869fcd89a9",
+      "current_sha256": "8b5124ebc261194c475401eb834e28b047da75ac7469ab9cff2f7a869fcd89a9",
+      "samples": 265
+    }
+  },
+  "all_seven_body_feet_unchanged": {
+    "Idle": {
+      "sha256": "152ff80cb827dbe7f3c1379f16691c0122114ee1c94fe57829b96ee57276f12e",
+      "samples": 481
+    },
+    "Walk": {
+      "sha256": "e7f0cca2a459d2a6a8e3a71f2e03564f6bb269df56ed1a2e7156fd7d2717d087",
+      "samples": 145
+    },
+    "Windup": {
+      "sha256": "41fdb4f0d6e46228a5a9a1b8fd2d211a5cb788711a9efcdf8f3348154ad18177",
+      "samples": 265
+    },
+    "Attack": {
+      "sha256": "0ed1a5d9047f998ef44d546caf1a1a9785f5e6507e5efb2ea781a528ae096aaf",
+      "samples": 289
+    },
+    "Recover": {
+      "sha256": "5a13b5e132db1774a2c44fa4260533b7c27c226c78bfb1ae69669f04d7b3763e",
+      "samples": 481
+    },
+    "Hit": {
+      "sha256": "1f55081e35c2ba6189b0b4094fc3d233b73d7d585ffc83b404516950735b5396",
+      "samples": 68
+    },
+    "Death": {
+      "sha256": "e05bc650526182845f30f8da40662c46cd88cbb5fb0b40618cc777a5230514c1",
+      "samples": 433
+    }
+  }
+}

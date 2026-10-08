@@ -29,3 +29,8 @@ Run 37827225328 reached the real 80-minute timeout (exit 124), not a reported ge
 Independent manual public owner/main workflow; standard ubuntu-24.04, contents/actions read as required for artifact retrieval, fixed actions commits, checkout credentials disabled, official checksum-verified Blender 4.2.3. Technical job <=15 minutes. Each <=24-frame render chunk <=15 minutes plus setup/upload buffer, max parallel 2. Per-clip assembly <=5 minutes. Each job uploads its own terminal or partial receipt and logs immediately. Do not replace the earlier full workflow or silently dispatch all clips again.
 
 No sources outside the exact new staged-directory allowlist need publishing. The copied armored-candidate folder in the preparation overlay exists only for tests and must not be republished. Geometry, timing, renderer quality, technical thresholds and original export logic are unchanged. These scripts have not themselves run Blender/Unity; technical and rendered outcomes remain pending real Actions execution.
+
+
+## Floor-fix source identity
+
+After real technical run 37841397139 found 99 greave floor penetrations, the art source was deliberately revised. This is no longer byte-identical R3. art-lock.json now pins the revised manifest and obtains its exact source commit from the actual workflow checkout. It separately retains the historical R3 commit/manifest/run/artifact and unchanged video bytes. Idle/Walk/Windup have a 240Hz source-kinematic equivalence proof, not a claim of new-rendered or pixel-equivalent evidence. Recovery/interruption knee solutions changed and require a fresh technical pass and new renders. Previous failed technical receipts cannot authorize rendering this revised source.

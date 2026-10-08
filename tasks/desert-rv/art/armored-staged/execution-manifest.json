@@ -1,11 +1,11 @@
 {
-  "kind": "execution_only_original_art_unchanged",
+  "kind": "staged_execution_revised_art_explicit_historical_evidence",
   "sha256": {
     "plan.py": "24a9045e360242014e877c23be325cf19f4d829e9bc869f99151c5b1354ca6eb",
-    "staged.py": "606ddf1f6d886222dadde82e7c582dc81168297510d59aa86b8a97a9a3d67d37",
-    "assemble.py": "9b9b3e1b7740505bbbc16d0fc1ee50a65e67557532e9fec3372b37123113b41c",
+    "staged.py": "ea8c4a47644554c0f3c9e1adfc8706b6f9ec942f5e50e0bf8f0ea361a8eb79ce",
+    "assemble.py": "f372c4d1f256132100c0aa93ae063113b32abc86bd7819c69cbd8c31ad4c9e88",
     "test_staged.py": "e9e8db530a43f86e58f231485ef43599581e6583de987f48e0f1d6614da7014c",
-    "README.md": "e769a999e804738b274a9eb89979813de59ea8fc6452afbc7e5d66ac9bda6e13",
-    "art-lock.json": "c702f2c7f123475703102fe211b878e83912ccda7bb6ec3f6e08cbba962dc549"
+    "README.md": "97aa703478205c79bfca94c0f493edd9d78de39f3a1ca3023c26687213b12559",
+    "art-lock.json": "130148fe80bfc3a528e049fc10d988cdeff079cabbdeb493e4e20d0e06cd0d4c"
   }
 }

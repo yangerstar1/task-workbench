@@ -47,7 +47,7 @@ def main():
                 shutil.copyfile(f,out/f.name)
             stats=probe(target)
             if int(stats['nb_frames'])!=plan.count(a.clip):raise ValueError('Incomplete legacy video')
-            r.update(reused=True,original_run_id=lock['reused_run_id'],original_artifact_id=lock['reused_artifact_id'],original_source_commit=lock['source_commit'],sampling='original completed 60fps video, byte-identical reuse')
+            r.update(reused=True,original_run_id=lock['reused_run_id'],original_artifact_id=lock['reused_artifact_id'],original_source_commit=lock.get('reused_source_commit',lock['source_commit']),historical_art_manifest_sha256=lock.get('reused_manifest_sha256',lock['source_manifest_sha256']),evidence_class='historical video; source-level kinematic equivalence only, not a render of the revised source',historical_equivalence_proof_sha256=sha(plan.ART/lock['historical_equivalence_proof']) if lock.get('historical_equivalence_proof') else None,sampling='original completed 60fps video, unchanged historical bytes')
         else:
             files,sources=validate_chunks(a.chunks,a.clip,lock);frame_numbers=plan.frames(a.clip);total_duration=plan.count(a.clip)/60
             concat=out/'frames.ffconcat';lines=['ffconcat version 1.0']
