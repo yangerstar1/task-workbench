@@ -78,6 +78,8 @@ def technical_failures(validation):
     elif any(v['forearm_length_error_m']>1e-4 or v['wrist_ik_error_m']>.003 or v['sleeve_wrist_gap_m']>.003 or v['target_reach_m']>v['maximum_rigid_reach_m']+.003 for v in reach):failures.append('arm_length_reach_or_seam')
     contacts=validation.get('reload_mechanism',{}).get('reference_contact_samples',[])
     if len(contacts)!=3 or any(c.get('max_fingertip_IK_error_m',99)>.002 for c in contacts):failures.append('finger_contact_residual')
+    slot=validation.get('slot_clearance',{})
+    if slot.get('all_twelve_slots_in_channel') is not True or slot.get('front_stop_clearance_m',-1)<.001:failures.append('twelve_slot_stop_clearance')
     return failures
 
 def delivered_file(path):

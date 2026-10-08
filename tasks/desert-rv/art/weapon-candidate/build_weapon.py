@@ -49,13 +49,13 @@ for x in [-.025,.025]:
 mag_objs.append(profile('Magazine_Lower_Spine',[(-.16,-.197),(.265,-.151),(.265,-.160),(-.16,-.206)],.038,dark))
 # Duplicate seated strip is a visual reload prop. Rest-loaded strip and incoming
 # strip swap at the action boundary without game ammunition changes.
-NAIL_CAPACITY=12; NAIL_PITCH=Vector((0,-.030,-.00321)); FIRST_NAIL=Vector((0,.223,-.135))
+NAIL_CAPACITY=12; NAIL_PITCH=Vector((0,-.030,-.00321)); FIRST_NAIL=Vector((0,.242,-.132967))
 for destination,prefix in [(nail_objs,'LoadedNail'),(strip_objs,'IncomingNail')]:
  for i in range(NAIL_CAPACITY):
   v=FIRST_NAIL+NAIL_PITCH*i; y,z=v.y,v.z
   shaft=cyl(prefix+'_%02d'%i,(0,y,z),(0,y,z+.028),.0017,steel,8)
   head=cyl(prefix+'_Head_%02d'%i,(0,y,z+.028),(0,y,z+.03),.0035,steel,12)
-  bond=cyl(prefix+'_Bond_%02d'%i,(0,y-.015,z+.027-.001605),(0,y+.015,z+.027+.001605),.0025,red,8)
+  bond=cyl(prefix+'_Bond_%02d'%i,(0,y-.026,z+.027-.002782),(0,y+.004,z+.027+.000428),.0025,red,8)
   bpy.ops.object.select_all(action='DESELECT')
   for part in [shaft,head,bond]:part.select_set(True)
   for part in [head,bond]:assets.remove(part); gun.remove(part)
@@ -203,13 +203,18 @@ for side,c in [('R',Vector((0,-.151,-.065))),('L',Vector((0,.13,-.023)))]:
 # Pinch IK changes the fingers' pose for strip carry and follower operation.
 # Targets are explicit opposing surfaces; constraints are sampled by exporters.
 ik_controls=[]; contact_targets={}
-for phase,parent,center in [('strip','reload_strip',(0,.223,-.106)),('follower','follower',(0,-.155,-.166))]:
- for digit,offset in [(0,(.004,0,0)),(1,(.004,.018,-.002)),(4,(-.004,0,0))]:
+for phase,parent,center in [('strip','reload_strip',(0,.242,-.103967)),('follower','follower',(0,-.155,-.166))]:
+ for digit,offset in [(0,(.004,0,0)),(1,(.004,-.006,-.002)),(4,(-.004,0,0))]:
   pos=Vector(center)+Vector(offset); target=bpy.data.objects.new('IK_'+phase+'_'+str(digit),None); scene.collection.objects.link(target)
   target.parent=rig; target.parent_type='BONE'; target.parent_bone=parent; bpy.context.view_layer.update(); target.matrix_world.translation=pos
   name='finger%d.%d.L'%(digit,1 if digit==4 else 2)
   con=rig.pose.bones[name].constraints.new('IK'); con.name='Pinch_'+phase; con.target=target; con.chain_count=2 if digit==4 else 3; con.use_rotation=False;con.use_stretch=False; con.influence=0
   ik_controls.append((phase,con)); contact_targets[(phase,digit)]=(name,target)
+# The ring/little fingers do not carry the strip: fold them against the palm
+# instead of leaving their tips below the incoming nail heads to sweep rails.
+for digit,pos in [(2,(-.040,.160,-.035)),(3,(-.046,.160,-.055))]:
+ target=bpy.data.objects.new('IK_Tucked_'+str(digit)+'.L',None);scene.collection.objects.link(target);target.parent=rig;target.parent_type='BONE';target.parent_bone='hand.L';bpy.context.view_layer.update();target.matrix_world.translation=Vector(pos)
+ con=rig.pose.bones['finger%d.2.L'%digit].constraints.new('IK');con.name='Fold_Unused_Digit';con.target=target;con.chain_count=3;con.use_rotation=False;con.use_stretch=False;con.influence=0;ik_controls.append(('tuck',con))
 # Stable bone-relative authoring anchors. Contact verification is sampled and reported,
 # never interpreted as a mesh-intersection or art-quality pass.
 anchors={}
@@ -235,15 +240,15 @@ for clip,end in [('Idle',121),('Fire',14.2),('Reload',100)]:
  if clip=='Reload':
   # Count-driven reload: magazine stays attached. A genuinely new collated nail strip
   # travels from below the camera, through the open loading channel, into place.
-  strip_path=[(1,(-.12,-.10,-.24)),(35,(-.12,-.10,-.24)),(48,(-.10,0,.075)),(60,(0,0,.045)),(68,(0,0,0)),(100,(0,0,0))]
+  strip_path=[(1,(-.12,-.10,-.24)),(35,(-.12,-.10,-.24)),(48,(-.10,0,.045)),(60,(0,0,.045)),(68,(0,0,0)),(100,(0,0,0))]
   for f,d in strip_path:key('reload_strip',f,d)
   hand_path=[(1,(0,0,0)),(12,(.015,-.310,-.155)),(23,(.015,-.365,-.161)),
-   (35,(-.140,-.032,-.307)),(48,(-.120,.068,.008)),(60,(-.020,.068,-.022)),(68,(-.020,.068,-.067)),
+   (35,(-.140,-.013,-.304967)),(48,(-.120,.087,-.019967)),(60,(-.020,.087,-.019967)),(68,(-.020,.087,-.064967)),
    (73,(-.06,0,.015)),(82,(.015,-.365,-.161)),(91,(.015,-.310,-.155)),(100,(0,0,0))]
   for f,d in hand_path:key('arm.L',f,d)
   # Keep a neutral wrist; the palm stays outside the left rail, not flipped through the barrel.
   for phase,con in ik_controls:
-   keys=[(1,0),(30,0),(35,1),(68,1),(73,0),(100,0)] if phase=='strip' else [(1,0),(8,0),(12,1),(23,1),(28,0),(77,0),(82,1),(91,1),(96,0),(100,0)]
+   keys=[(1,0),(30,0),(35,1),(68,1),(73,0),(100,0)] if phase in ['strip','tuck'] else [(1,0),(8,0),(12,1),(23,1),(28,0),(77,0),(82,1),(91,1),(96,0),(100,0)]
    for frame,value in keys:con.influence=value; con.keyframe_insert('influence',frame=frame)
   for f,d in [(1,(0,0,0)),(12,(0,0,0)),(23,(0,-.055,-.006)),(82,(0,-.055,-.006)),(91,(0,0,0)),(100,(0,0,0))]:key('follower',f,d)
  for fc in action.fcurves:
@@ -287,7 +292,7 @@ for label,objs,budget in [('weapon',gun,[8000,12000]),('hands',hands,[10000,1600
 # These measure kinematic alignment, NOT triangle penetration or anatomical quality.
 contact_report=[]
 rig.animation_data.action=bpy.data.actions['Reload']
-for phase,frames,target,ref in [('pull_follower',range(12,24),'follower',(.015,-.18,-.178)),('carry_and_seat_strip',range(35,69),'reload_strip',(-.020,.198,-.090)),('release_follower',range(82,92),'follower',(.015,-.18,-.178))]:
+for phase,frames,target,ref in [('pull_follower',range(12,24),'follower',(.015,-.18,-.178)),('carry_and_seat_strip',range(35,69),'reload_strip',(-.020,.217,-.087967)),('release_follower',range(82,92),'follower',(.015,-.18,-.178))]:
  errors=[]; fingertip_errors=[]
  for frame in frames:
   scene.frame_set(frame); bpy.context.view_layer.update()
@@ -300,12 +305,15 @@ for phase,frames,target,ref in [('pull_follower',range(12,24),'follower',(.015,-
  contact_report.append({'phase':phase,'frames':[frames.start,frames.stop-1],'max_authoring_reference_error_m':max(errors),'max_fingertip_IK_error_m':max(fingertip_errors),'surface_collision_tested':False})
 validation['reload_mechanism']={'type':'fixed_open_top_magazine_fresh_collated_strip','magazine_detaches':False,'new_nails_count':12,'gameplay_events':[],'reference_contact_samples':contact_report}
 rig.animation_data.action=bpy.data.actions['Idle']; scene.frame_set(1)
+feed=bpy.data.objects['Nail_Feed_Channel']; stop_y=min((feed.matrix_world@Vector(v)).y for v in feed.bound_box)
+strip_front=max((o.matrix_world@v.co).y for o in nail_objs for v in o.data.vertices);strip_rear=min((o.matrix_world@v.co).y for o in nail_objs for v in o.data.vertices)
+validation['slot_clearance']={'first_slot_xyz':list(FIRST_NAIL),'fixed_feed_stop_rear_y':stop_y,'actual_full_strip_front_y':strip_front,'actual_full_strip_rear_y':strip_rear,'front_stop_clearance_m':stop_y-strip_front,'rear_rail_limit_y':-.160,'all_twelve_slots_in_channel':strip_front<stop_y and strip_rear>-.160}
 validation['incoming_skin_contract']={'same_rig':all(o.parent==rig and sum(m.type=='ARMATURE' and m.object==rig for m in o.modifiers)==1 for o in strip_objs),'positive_weight_bones':sorted({o.vertex_groups[g.group].name for o in strip_objs for v in o.data.vertices for g in v.groups if g.weight>0}),'required_carrier_ancestor':'IncomingOffset','carrier_parent_of_reload_strip':rig.data.bones['reload_strip'].parent.name,'renderer_reparented':False}
 validation['muzzle']={'node':'Muzzle','parent':rig.data.bones['Muzzle'].parent.name,'head_xyz':list(rig.data.bones['Muzzle'].head_local),'tail_xyz':list(rig.data.bones['Muzzle'].tail_local),'source_forward_axis':'+Y','bone_local_forward_axis':'+Y'}
 (OUT/'clip-manifest.json').write_text(json.dumps(clips,indent=2))
 # Unity bridge contract: count/offset application occurs after Animator evaluation.
 # No authored animation curves target the two offset bones or visibility carriers.
-contract={'arm_reach':{'solver':'fixed-length two-bone IK after Animator and count offsets','left':['upperarm.L','forearm.L','WristTip.L','WristTarget.L'],'right':['upperarm.R','forearm.R','WristTip.R','WristTarget.R'],'axes':'Calibrate actual imported segment vectors and bind rotations; never assume Unity local forward','pose_authority':'Animator base then count carriers then arm rotations only; hand chain remains Animator/count-owned','fixed_lengths_source':{side:{'upperarm':rig.data.bones['upperarm.'+side].length,'forearm':rig.data.bones['forearm.'+side].length} for side in ['L','R']},'allow_stretch':False,'unity_runtime_verification':'REQUIRED; Blender constraints are baked, not imported live'},'muzzle':{'node':'Muzzle','parent_bone':'weapon','source_head_xyz':[0,.35,.072],'source_tail_xyz':[0,.385,.072],'source_forward_axis':'+Y','bone_local_forward_axis':[0,1,0],'unity_note':'Use actual imported Muzzle position; local +Y is the bone forward axis. Do not assume Transform.forward.'},'incoming_binding':{'mode':'skinned','same_rig_required':True,'positive_weight_bones_must_descend_from':'IncomingOffset','renderer_transform_may_be_at_rig_root':True,'never_reparent_skinned_mesh':True},'capacity':12,'loaded_nodes':['LoadedNail_%02d'%i for i in range(12)],'incoming_nodes':['IncomingNail_%02d'%i for i in range(12)],'incoming_offset':'IncomingOffset','left_reload_offset':'LeftReloadOffset','source_pitch_xyz':list(NAIL_PITCH),'source_axes':'+Y muzzle, +Z up','derive_imported_pitch':'Use transformed source vector or verify imported adjacent nail origins; do not assume Unity axes.','count_snapshot':['ReloadPresented.Epoch','ReloadPresented.Sequence','LoadedBefore','PlannedAdded'],'loaded_visible':'prefix[0,LoadedBefore) until authoritative completion; then prefix[0,actualLoaded)','incoming_visible':'prefix[0,PlannedAdded), frames 35..100; hidden on cancel/complete','offset':'LoadedBefore * source_pitch; IncomingOffset throughout reload; LeftReloadOffset blends 30..35, holds35..68, fades68..73','animation_events':[],'commit':'Game commits once at 1.65s; physical seating frame68 does not allow early fire','preview':{'loaded_before':3,'planned_added':5}}
+contract={'arm_reach':{'solver':'fixed-length two-bone IK after Animator and count offsets','left':['upperarm.L','forearm.L','WristTip.L','WristTarget.L'],'right':['upperarm.R','forearm.R','WristTip.R','WristTarget.R'],'axes':'Calibrate actual imported segment vectors and bind rotations; never assume Unity local forward','pose_authority':'Animator base then count carriers then arm rotations only; hand chain remains Animator/count-owned','fixed_lengths_source':{side:{'upperarm':rig.data.bones['upperarm.'+side].length,'forearm':rig.data.bones['forearm.'+side].length} for side in ['L','R']},'allow_stretch':False,'unity_runtime_verification':'REQUIRED; Blender constraints are baked, not imported live'},'muzzle':{'node':'Muzzle','parent_bone':'weapon','source_head_xyz':[0,.35,.072],'source_tail_xyz':[0,.385,.072],'source_forward_axis':'+Y','bone_local_forward_axis':[0,1,0],'unity_note':'Use actual imported Muzzle position; local +Y is the bone forward axis. Do not assume Transform.forward.'},'incoming_binding':{'mode':'skinned','same_rig_required':True,'positive_weight_bones_must_descend_from':'IncomingOffset','renderer_transform_may_be_at_rig_root':True,'never_reparent_skinned_mesh':True},'capacity':12,'loaded_nodes':['LoadedNail_%02d'%i for i in range(12)],'incoming_nodes':['IncomingNail_%02d'%i for i in range(12)],'incoming_offset':'IncomingOffset','left_reload_offset':'LeftReloadOffset','first_slot_source_xyz':list(FIRST_NAIL),'fixed_feed_stop_rear_y':.250,'full_strip_front_extent_y':.2485,'front_stop_clearance_m':.0015,'full_strip_rear_extent_y':-.1165,'source_pitch_xyz':list(NAIL_PITCH),'source_axes':'+Y muzzle, +Z up','derive_imported_pitch':'Use transformed source vector or verify imported adjacent nail origins; do not assume Unity axes.','count_snapshot':['ReloadPresented.Epoch','ReloadPresented.Sequence','LoadedBefore','PlannedAdded'],'loaded_visible':'prefix[0,LoadedBefore) until authoritative completion; then prefix[0,actualLoaded)','incoming_visible':'prefix[0,PlannedAdded), frames 35..100; hidden on cancel/complete','offset':'LoadedBefore * source_pitch; IncomingOffset throughout reload; LeftReloadOffset blends 30..35, holds35..68, fades68..73','animation_events':[],'commit':'Game commits once at 1.65s; physical seating frame68 does not allow early fire','preview':{'loaded_before':3,'planned_added':5}}
 (OUT/'weapon-presentation-contract.json').write_text(json.dumps(contract,indent=2))
 def preview_pose(clip,frame,loaded_before=3,planned_added=5):
  scene.frame_set(frame)
@@ -398,11 +406,12 @@ for before,added in [(0,12),(3,5),(11,1)]:
    validation['arm_reach_samples'].append({'loaded_before':before,'added':added,'frame':frame,'side':side,'forearm_length_error_m':abs((pb.tail-pb.head).length-rest),'wrist_ik_error_m':(tail-target).length,'sleeve_wrist_gap_m':(seam-target).length,'target_reach_m':(target-shoulder).length,'maximum_rigid_reach_m':maximum})
 reach_failed=any(v['forearm_length_error_m']>.0001 or v['wrist_ik_error_m']>.003 or v['sleeve_wrist_gap_m']>.003 or v['target_reach_m']>v['maximum_rigid_reach_m']+.003 for v in validation['arm_reach_samples'])
 fingertip_failed=any(c['max_fingertip_IK_error_m']>.002 for c in validation['reload_mechanism']['reference_contact_samples'])
+slot_failed=not validation['slot_clearance']['all_twelve_slots_in_channel'] or validation['slot_clearance']['front_stop_clearance_m']<.001
 if CONTACT_ONLY:
- diagnostic={'scope':'reload-contact-diagnostic','full_asset_validation':False,'approved':False,'sample_count':len(validation['loading_surface_samples']),'failed_samples':sum(bool(s['intersections']) for s in validation['loading_surface_samples']),'arm_reach_failed':reach_failed,'fingertip_contact_failed':fingertip_failed,'independent_visual_review':'required; no hand/arm distortion allowed'}
+ diagnostic={'scope':'reload-contact-diagnostic','full_asset_validation':False,'approved':False,'sample_count':len(validation['loading_surface_samples']),'failed_samples':sum(bool(s['intersections']) for s in validation['loading_surface_samples']),'arm_reach_failed':reach_failed,'fingertip_contact_failed':fingertip_failed,'slot_clearance_failed':slot_failed,'independent_visual_review':'required; no hand/arm distortion allowed'}
  (OUT/'contact-diagnostic.json').write_text(json.dumps(diagnostic,indent=2));(OUT/'validation.json').write_text(json.dumps(validation,indent=2))
  (OUT/'SHA256SUMS').write_text('\n'.join(hashlib.sha256(p.read_bytes()).hexdigest()+'  '+p.name for p in sorted(OUT.iterdir()) if delivered_file(p))+'\n')
- raise SystemExit(1 if diagnostic['failed_samples'] or reach_failed or fingertip_failed else 0)
+ raise SystemExit(1 if diagnostic['failed_samples'] or reach_failed or fingertip_failed or slot_failed else 0)
 rig.animation_data.action=bpy.data.actions['Idle']; preview_pose('Idle',1); scene.cycles.samples=24
 # Preserve useful partial evidence before potentially failing image readback.
 (OUT/'validation.json').write_text(json.dumps(validation,indent=2)); bpy.ops.wm.save_as_mainfile(filepath=str(OUT/'weapon_hands.blend'))

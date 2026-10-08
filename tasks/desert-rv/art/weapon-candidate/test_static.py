@@ -82,7 +82,7 @@ class ArtifactGateRegression(unittest.TestCase):
   with tempfile.TemporaryDirectory() as d:
    p=pathlib.Path(d)/'test.glb';p.write_bytes(raw);self.assertEqual(strip_carrier_animation_channels(p),{'Reload':2});_,out,_=read_glb(p);self.assertEqual([c['target']['node'] for c in out['animations'][0]['channels']],[2])
  def test_fixed_pose_and_continuous_connector(self):
-  s=(ROOT/'build_weapon.py').read_text();self.assertNotIn('best=None',s);self.assertIn("camera.data.sensor_fit='HORIZONTAL'",s);self.assertIn('y-.015,z+.027-.001605',s);self.assertIn('y+.015,z+.027+.001605',s)
+  s=(ROOT/'build_weapon.py').read_text();self.assertNotIn('best=None',s);self.assertIn("camera.data.sensor_fit='HORIZONTAL'",s);self.assertIn('y-.026,z+.027-.002782',s);self.assertIn('y+.004,z+.027+.000428',s)
  def test_carrier_gate_not_replaced_by_runtime_override(self):
   s=(ROOT/'package_evidence.py').read_text();self.assertIn("failures.append('fbx_carrier_channels_present')",s);self.assertIn("failures.append('glb_carrier_channels_present')",s)
   s=(ROOT/'build_weapon.py').read_text();self.assertIn("kwargs['force_keep']=False",s);self.assertIn('bake_anim_use_all_bones=False',s)
@@ -92,6 +92,11 @@ class ArtifactGateRegression(unittest.TestCase):
   s=(ROOT/'build_weapon.py').read_text();self.assertIn("con.name='Rigid_Length_Arm_Reach'",s);self.assertNotIn("constraints.new('STRETCH_TO')",s);self.assertIn('con.use_stretch=False',s);self.assertIn('sleeve_wrist_gap_m',s);self.assertIn('range(1,101)',s);self.assertNotIn('(35,math.pi)',s)
  def test_hash_seal_after_producer_exit(self):
   s=(ROOT.parents[3]/'.github/workflows/desert-rv-weapon-art.yml').read_text();self.assertLess(s.index('Generate export'),s.index('Seal delivered'));self.assertLess(s.index('Seal delivered'),s.index('Upload candidate'));self.assertIn('seal_artifacts.py weapon-output',s)
+ def test_twelve_slot_front_and_rear_clearance(self):
+  first=.242;pitch=.030;cap_radius=.0025
+  self.assertAlmostEqual(.026+.004,pitch)
+  self.assertGreaterEqual(.250-(first+.004+cap_radius),.0014)
+  self.assertGreater(first-11*pitch-.026-cap_radius,-.160)
  def test_fbx_single_export_path(self):
   s=(ROOT/'build_weapon.py').read_text();self.assertIn('bake_anim_use_all_actions=False,bake_anim_use_nla_strips=True',s)
 if __name__=='__main__':unittest.main()
