@@ -34,8 +34,9 @@ jobs:
       QA_MODE: ${{ inputs.mode }}
       SOURCE_RUN_ID: ${{ inputs.source_run_id }}
       QA_OUT: ${{ github.workspace }}/android-qa-evidence
-      QA_WORK: ${{ runner.temp }}/desert-rv-android-qa
     steps:
+      - name: Set disposable runner work path
+        run: echo "QA_WORK=$RUNNER_TEMP/desert-rv-android-qa" >> "$GITHUB_ENV"
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           persist-credentials: false
