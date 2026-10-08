@@ -91,7 +91,7 @@ def native_report(root):
   require(safe(p).stat().st_size<=10*1024**2,'STRICT_NATIVE_OVERSIZE');r=ET.parse(p).getroot()
   if r.tag=='test-run':reports.append((p,r))
  require(len(reports)==1,'STRICT_NATIVE_COUNT');p,r=reports[0];cases=list(r.iter('test-case'))
- require(r.get('result')=='Passed' and len(cases)==3 and {c.get('fullname') for c in cases}=={NATIVE,'DesertRV.Tests.CandidateAnimationPolicyTests.OnlyArmoredAttackGetsTheSourceLoopException','DesertRV.Tests.CandidateAnimationPolicyTests.EqualKeyValuesDoNotExcuseUnsafeTangents'} and all(c.get('result')=='Passed' for c in cases),'STRICT_NATIVE_FAILED')
+ require(r.get('result')=='Passed' and len(cases)==4 and {c.get('fullname') for c in cases}=={NATIVE,'DesertRV.Tests.CandidateAnimationPolicyTests.OnlyArmoredAttackGetsTheSourceLoopException','DesertRV.Tests.CandidateAnimationPolicyTests.EqualKeyValuesDoNotExcuseUnsafeTangents','DesertRV.Tests.CandidateAnimationPolicyTests.MissingNativeAnimatorGetsCreatedAndReused'} and all(c.get('result')=='Passed' for c in cases),'STRICT_NATIVE_FAILED')
  return sha(p)
 
 def inspect_png(path,size=(960,540)):
@@ -307,7 +307,7 @@ def export_strict(root,output,c,summary,native,protected):
    d=staged/dest;d.parent.mkdir(parents=True,exist_ok=True);shutil.copyfile(p,d);records.append({'path':dest.as_posix(),'sha256':sha(d),'bytes':d.stat().st_size})
   for name,obj in [('import-report.json',imp),('capture-report.json',capture),('weakpoint-fixture-report.json',weak)]:
    d=staged/name;d.write_text(json.dumps(obj,indent=2)+'\n');records.append({'path':name,'sha256':sha(d),'bytes':d.stat().st_size})
-  result=dict(summary,status='STRICT_CANDIDATE_CAPTURED_NOT_ACCEPTED',approved=False,errorCode=None,files=records,nativeXmlSha256=native_hash,nativeCases=3,images=202,weakpointImages=9,protectedSource='UNCHANGED',rawReportSha256={n:sha(evidence/n) for n in ('import-report.json','capture-report.json','weakpoint-fixture-report.json')})
+  result=dict(summary,status='STRICT_CANDIDATE_CAPTURED_NOT_ACCEPTED',approved=False,errorCode=None,files=records,nativeXmlSha256=native_hash,nativeCases=4,images=202,weakpointImages=9,protectedSource='UNCHANGED',rawReportSha256={n:sha(evidence/n) for n in ('import-report.json','capture-report.json','weakpoint-fixture-report.json')})
   (staged/'receipt.json').write_text(json.dumps(result,indent=2)+'\n')
   require(not any(output.iterdir()),'STRICT_EXPORT_NOT_EMPTY')
   # Linux atomically replaces the empty runner-owned directory. No payload is visible before this commit.

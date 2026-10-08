@@ -52,8 +52,8 @@
     },
     {
       "path": "tasks/desert-rv/art/import-candidate/README.md",
-      "sha256": "89ed5a6bef6d5df0e0e13567b7f8a8be4d33e4effce3f2fbd8affbbe1643e42b",
-      "size": 20473
+      "sha256": "872826aed51c4aa63ca44f5c8f2263fc0d40e71a4922cab8c2f2795fbba6666f",
+      "size": 20934
     },
     {
       "path": "tasks/desert-rv/art/import-candidate/contracts/armored-floorfix-discovery-37843918724.json",
@@ -92,13 +92,13 @@
     },
     {
       "path": "tasks/desert-rv/art/import-candidate/strict_output.py",
-      "sha256": "a5497101373f62b9a149a8476b78e7aa2ee34c7cae9ccb819cca20ce008cd3a9",
-      "size": 29106
+      "sha256": "7e3c28cad29935556e82a55494c1fed25e7d6f0e068649b90779300e69c1e676",
+      "size": 29195
     },
     {
       "path": "tasks/desert-rv/art/import-candidate/test_capture_source.py",
-      "sha256": "2f690462462d3d96ef3c13912d8a8b982ab8137d2ea45752d75f148363180d4b",
-      "size": 2950
+      "sha256": "0b63f2c5c3b3db0b3006520b0d40d029eabec1b4860560861e93deb05cf2d0a4",
+      "size": 3292
     },
     {
       "path": "tasks/desert-rv/art/import-candidate/test_stage_artifact.py",
@@ -107,8 +107,8 @@
     },
     {
       "path": "tasks/desert-rv/art/import-candidate/test_strict_output.py",
-      "sha256": "899388c65aa12290b049fad592cc0d7bf8c7337a75cb5dc408ce729f127fa7cc",
-      "size": 16747
+      "sha256": "a6ec36b009364ec1e95fd48259ec87e0f3e72e0d4f368638bfaebc1faecc6e3f",
+      "size": 16836
     },
     {
       "path": "tasks/desert-rv/art/import-candidate/test_verify_output.py",
@@ -3607,8 +3607,8 @@
     },
     {
       "path": "tasks/desert-rv/unity/Assets/DesertRV/Editor/JourneyCandidateArtImport.cs",
-      "sha256": "64758f30aa54d0dc2fd40037fc1e28fe6bb7044a4202bc9c756fbdb6da5c28d2",
-      "size": 37061
+      "sha256": "71ba170e341cd0ba2842c4cdf4eb4431ca352f98ee03d2df6942cec1597e4e13",
+      "size": 37407
     },
     {
       "path": "tasks/desert-rv/unity/Assets/DesertRV/Editor/JourneyCandidateArtImport.cs.meta",
@@ -4372,8 +4372,8 @@
     },
     {
       "path": "tasks/desert-rv/unity/Assets/DesertRV/Tests/CandidateArt/CandidateAnimationPolicyTests.cs",
-      "sha256": "7c50d72473de5041b08fb781b0e444d48cc49a7feb16bb6e4a57cb3ff8f5f5a6",
-      "size": 1311
+      "sha256": "96e38dfb2fc306bed2c7bdd25588d74936b205b9f89285dad40f909ebb70d158",
+      "size": 2632
     },
     {
       "path": "tasks/desert-rv/unity/Assets/DesertRV/Tests/CandidateArt/CandidateAnimationPolicyTests.cs.meta",

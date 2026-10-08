@@ -97,7 +97,7 @@ namespace DesertRV.Editor
                 var animators=visual.GetComponentsInChildren<Animator>(true);
                 report.importedAnimatorPaths=animators.Select(a=>AnimationUtility.CalculateTransformPath(a.transform,visual.transform)).ToArray();
                 foreach(var a in animators) Check(a.transform==animatorRoot,"Unexpected imported Animator: actual=["+AnimationUtility.CalculateTransformPath(a.transform,visual.transform)+"] expected=["+c.bindings.animatorPath+"]. No automatic relocation.");
-                var animator=animatorRoot.GetComponent<Animator>() ?? animatorRoot.gameObject.AddComponent<Animator>(); animator.applyRootMotion=false;
+                var animator=EnsureNativeAnimator(animatorRoot); animator.applyRootMotion=false;
                 var clips=ReadClips(c,destination,animatorRoot,report);
                 BindMaterials(c,destination,visual,report);
                 string controllerPath=destination+"/Candidate.controller";
@@ -221,6 +221,14 @@ namespace DesertRV.Editor
                 }
             }
             return result;
+        }
+        static Animator EnsureNativeAnimator(Transform root)
+        {
+            Check(root,"Declared Animator root is missing.");
+            var animator=root.GetComponent<Animator>();
+            if(!animator)animator=root.gameObject.AddComponent<Animator>();
+            Check(animator,"Actual native Animator could not be created on the declared root.");
+            return animator;
         }
         static void RequireNeutralRootCurves(string state,RootCurveReadback[] rows,Transform root)
         {

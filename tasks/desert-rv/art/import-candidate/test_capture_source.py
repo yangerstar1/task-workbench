@@ -35,6 +35,10 @@ class CaptureSourceTests(unittest.TestCase):
         for required in ['DISCOVERY_ONLY','CandidateArtDiscovery/','defaultClipAnimations','mesh.bindposes','DEATH_DIAGNOSTIC_NOT_FULL']:
             self.assertIn(required,discovery)
         self.assertIn('c.scope=="FULL_CANDIDATE"',IMPORT)
+    def test_missing_native_animator_uses_unity_object_boolean(self):
+        self.assertNotIn('GetComponent<Animator>() ??',IMPORT)
+        self.assertIn('if(!animator)animator=root.gameObject.AddComponent<Animator>();',IMPORT)
+        self.assertIn('var animator=EnsureNativeAnimator(animatorRoot); animator.applyRootMotion=false;',IMPORT)
     def test_no_approval_or_production_scene_write(self):
         for source in [CAPTURE,IMPORT]:
             self.assertNotIn('accepted=true',source)
