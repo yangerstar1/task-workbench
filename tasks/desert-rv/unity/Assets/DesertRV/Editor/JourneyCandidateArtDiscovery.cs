@@ -20,6 +20,19 @@ namespace DesertRV.Editor
             public string rendererPath, rendererType, rootBone; public string[] materials, materialAssetPaths, bones;
             public int vertices, subMeshes, bindPoseCount, boneWeightCount; public Matrix4x4[] bindPoses;
             public Bounds localBounds, worldBounds; public bool readable;
+            public MaterialObservation[] materialObservations;
+        }
+        [Serializable] public sealed class MaterialPropertyObservation
+        {
+            public string name,type,textureName,texturePath,textureFileSha256,textureGuid;
+            public long textureLocalId;
+            public float scalar; public Color color; public Vector4 vector;
+            public Vector2 textureScale,textureOffset;
+        }
+        [Serializable] public sealed class MaterialObservation
+        {
+            public string name,path,shaderName,shaderPath; public string[] keywords;
+            public List<MaterialPropertyObservation> properties=new List<MaterialPropertyObservation>();
         }
         [Serializable] public sealed class Take { public string name,takeName; public float firstFrame,lastFrame; public bool loop; }
         [Serializable] public sealed class Curve { public string path, property, type; }
@@ -130,6 +143,7 @@ namespace DesertRV.Editor
                         var skin=renderer as SkinnedMeshRenderer;var filter=renderer.GetComponent<MeshFilter>();var mesh=skin?skin.sharedMesh:filter?filter.sharedMesh:null;
                         Check(mesh,"Unsupported/non-mesh model renderer.");
                         var r=new MeshRecord{rendererPath=AnimationUtility.CalculateTransformPath(renderer.transform,model.transform),rendererType=renderer.GetType().Name,vertices=mesh.vertexCount,subMeshes=mesh.subMeshCount,localBounds=mesh.bounds,worldBounds=renderer.bounds,readable=mesh.isReadable,
+                            materialObservations=renderer.sharedMaterials.Select(ObserveMaterial).ToArray(),
                             materials=renderer.sharedMaterials.Select(m=>m?m.name:"<null>").ToArray(),materialAssetPaths=renderer.sharedMaterials.Select(m=>m?AssetDatabase.GetAssetPath(m):"").ToArray(),bindPoses=mesh.bindposes,bindPoseCount=mesh.bindposes.Length};
                         if(skin) {r.rootBone=skin.rootBone?AnimationUtility.CalculateTransformPath(skin.rootBone,model.transform):"<null>";r.bones=skin.bones.Select(b=>b?AnimationUtility.CalculateTransformPath(b,model.transform):"<null>").ToArray();r.boneWeightCount=mesh.GetAllBoneWeights().Length;}
                         record.renderers.Add(r);
@@ -143,6 +157,38 @@ namespace DesertRV.Editor
             }
             catch(Exception e){report.failures.Add(e.ToString());throw;}
             finally {File.WriteAllText("JourneyEvidence/CandidateArtDiscovery/discovery-report.json",JsonUtility.ToJson(report,true));}
+        }
+        // Read the actual imported material; no shader changes, copied colors or texture remapping.
+        static MaterialObservation ObserveMaterial(Material material)
+        {
+            if(!material)return new MaterialObservation{name="<null>"};
+            var shader=material.shader;
+            var observation=new MaterialObservation{name=material.name,path=AssetDatabase.GetAssetPath(material),shaderName=shader?shader.name:"<null>",shaderPath=shader?AssetDatabase.GetAssetPath(shader):"",keywords=material.shaderKeywords};
+            if(!shader)return observation;
+            for(int i=0;i<shader.GetPropertyCount();i++)
+            {
+                string name=shader.GetPropertyName(i);var type=shader.GetPropertyType(i);
+                var p=new MaterialPropertyObservation{name=name,type=type.ToString()};
+                switch(type)
+                {
+                    case UnityEngine.Rendering.ShaderPropertyType.Color:p.color=material.GetColor(name);break;
+                    case UnityEngine.Rendering.ShaderPropertyType.Vector:p.vector=material.GetVector(name);break;
+                    case UnityEngine.Rendering.ShaderPropertyType.Float:
+                    case UnityEngine.Rendering.ShaderPropertyType.Range:p.scalar=material.GetFloat(name);break;
+                    case UnityEngine.Rendering.ShaderPropertyType.Int:p.scalar=material.GetInteger(name);break;
+                    case UnityEngine.Rendering.ShaderPropertyType.Texture:
+                        var texture=material.GetTexture(name);p.textureScale=material.GetTextureScale(name);p.textureOffset=material.GetTextureOffset(name);
+                        if(texture)
+                        {
+                            p.textureName=texture.name;p.texturePath=AssetDatabase.GetAssetPath(texture);
+                            if(AssetDatabase.TryGetGUIDAndLocalFileIdentifier(texture,out string guid,out long localId)){p.textureGuid=guid;p.textureLocalId=localId;}
+                            if(!string.IsNullOrEmpty(p.texturePath) && File.Exists(p.texturePath))p.textureFileSha256=Sha(p.texturePath);
+                        }
+                        break;
+                }
+                observation.properties.Add(p);
+            }
+            return observation;
         }
     }
 }

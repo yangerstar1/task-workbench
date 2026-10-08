@@ -1,0 +1,11 @@
+{
+  "name": "DesertRV.SupplyRenderTests",
+  "references": [],
+  "includePlatforms": [
+    "Editor"
+  ],
+  "autoReferenced": false,
+  "optionalUnityReferences": [
+    "TestAssemblies"
+  ]
+}
