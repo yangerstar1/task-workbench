@@ -1,3 +1,4 @@
+using System;
 using UnityEngine;
 
 namespace DesertRV
@@ -5,6 +6,45 @@ namespace DesertRV
     // Shared actions retain exact self-collider filtering for shots and interactions.
     public sealed class JourneyActions : MonoBehaviour
     {
+        public event Action<ShotPresentationEvent> ShotPresented;
+        public event Action<ArcPresentationEvent> ArcPresented;
+        public event Action<ReloadPresentationEvent> ReloadPresented;
+        public event Action PresentationReset;
+        public Transform shotMuzzle, arcOrigin;
+        public int PresentationEpoch { get; private set; }
+        public int PresentationGeneration { get; private set; }
+        public bool PresentationCurrent => journey && journey.State != null && Region && PresentationGeneration == journey.Generation && Region.region == journey.State.SceneId;
+        public int ReloadLoadedBefore { get; private set; }
+        public int ReloadPlannedAdded { get; private set; }
+        public bool ArcSourceReady
+        {
+            get
+            {
+                if (!arcOrigin || !motor || !motor.arc || !motor.vehicle || !arcOrigin.IsChildOf(motor.arc.transform)) return false;
+                foreach (var collider in motor.vehicle.GetComponentsInChildren<Collider>(true))
+                    if (collider.enabled && !collider.isTrigger && collider.gameObject.activeInHierarchy &&
+                        (collider.ClosestPoint(arcOrigin.position) - arcOrigin.position).sqrMagnitude < .000001f) return false;
+                return true;
+            }
+        }
+        public float FireRemaining => fireClock;
+        public float ReloadRemaining => Mathf.Max(0, reloadRemaining);
+        public bool PresentationPlaying => PresentationCurrent && journey.State.Status == SessionStatus.Playing;
+        int shotSequence, arcSequence, reloadSequence;
+        // Bad visual listeners cannot stop authoritative combat or frame processing.
+        void Emit<T>(Action<T> listeners, T value)
+        {
+            if (listeners == null) return;
+            foreach (Action<T> listener in listeners.GetInvocationList())
+                try { listener(value); } catch (Exception error) { Debug.LogException(error, this); }
+        }
+        void ResetPresentation()
+        {
+            PresentationEpoch++; shotSequence = arcSequence = reloadSequence = 0;
+            if (PresentationReset == null) return;
+            foreach (Action listener in PresentationReset.GetInvocationList())
+                try { listener(); } catch (Exception error) { Debug.LogException(error, this); }
+        }
         public JourneySession journey;
         public JourneyMotor motor;
         public Transform cabinWorkbench;
@@ -23,7 +63,7 @@ namespace DesertRV
         ArcCombatState arc;
         float fireClock, reloadRemaining, installRemaining, noticeRemaining, hitFlash, damageFlash;
         int lastHealth;
-        AudioSource effects, wind;
+        AudioSource effects, wind, reloadAudio;
         LineRenderer tracer;
         float tracerRemaining;
         int interaction;
@@ -32,6 +72,7 @@ namespace DesertRV
         void Awake()
         {
             effects = gameObject.AddComponent<AudioSource>(); effects.spatialBlend = 0; effects.playOnAwake = false;
+            reloadAudio = gameObject.AddComponent<AudioSource>(); reloadAudio.spatialBlend = 0; reloadAudio.playOnAwake = false;
             wind = gameObject.AddComponent<AudioSource>(); wind.spatialBlend = 0; wind.playOnAwake = false;
             wind.clip = windSound; wind.loop = true; wind.volume = .16f;
             tracer = new GameObject("Nail trajectory").AddComponent<LineRenderer>();
@@ -42,17 +83,19 @@ namespace DesertRV
         }
         public void Bind(RegionBinding region, RegionProgressState progress)
         {
-            Region = region; Progress = progress;
+            effects.Stop(); wind.Stop(); CancelReloadPresentation();
+            Region = region; Progress = progress; PresentationGeneration = journey.Generation;
             arc = new ArcCombatState(journey.State, region.region, journey.Generation, 3, .2);
             fireClock = reloadRemaining = installRemaining = hitFlash = damageFlash = tracerRemaining = 0;
             tracer.enabled = false; Prompt = Notice = "";
+            ResetPresentation();
             lastHealth = journey.State.PlayerHealth;
             if (windSound) wind.Play();
         }
         public void SetPaused(bool paused)
         {
-            if (paused) { wind.Pause(); effects.Pause(); }
-            else { if (windSound && !wind.isPlaying) wind.UnPause(); effects.UnPause(); }
+            if (paused) { wind.Pause(); effects.Pause(); reloadAudio.Pause(); tracerRemaining = 0; tracer.enabled = false; }
+            else { if (windSound && !wind.isPlaying) wind.UnPause(); effects.UnPause(); reloadAudio.UnPause(); }
         }
         public void Tick(float delta)
         {
@@ -88,9 +131,20 @@ namespace DesertRV
             if (state.Control == ControlMode.OnFoot && !Installing)
             {
                 if (journey.Input.Reload && reloadRemaining <= 0 && state.LoadedAmmo < 12 && state.ReserveAmmo > 0)
-                { reloadRemaining = 1.65f; Play(reloadSound, .4f); }
+                {
+                    ReloadLoadedBefore = state.LoadedAmmo;
+                    ReloadPlannedAdded = ReloadPresentationPlan.Added(state.LoadedAmmo, state.ReserveAmmo);
+                    reloadRemaining = 1.65f;
+                    if (reloadSound) reloadAudio.PlayOneShot(reloadSound, .4f);
+                    Emit(ReloadPresented, new ReloadPresentationEvent(PresentationEpoch, ++reloadSequence, ReloadLoadedBefore, ReloadPlannedAdded));
+                }
                 if (journey.Input.Fire && fireClock <= 0 && reloadRemaining <= 0) Fire();
             }
+        }
+        void CancelReloadPresentation()
+        {
+            reloadRemaining = 0; ReloadLoadedBefore = ReloadPlannedAdded = 0;
+            if (reloadAudio) reloadAudio.Stop();
         }
         bool Near(Transform point, float distance)
         {
@@ -128,7 +182,7 @@ namespace DesertRV
                     if ((Region.region == 1 ? Progress.TryAcquireRam(Region.region, journey.Generation, Region.pickupId) : Progress.TryAcquireCoil(Region.region, journey.Generation, Region.pickupId)))
                     { if (Region.salvageVisual) Region.salvageVisual.SetActive(false); Play(pickupSound, .6f); Say("组件已收好，回房车工作台安装。", 4); }
                     break;
-                case 3: installPart = journey.State.HasPart(ComponentPart.RamPart) ? ComponentPart.RamPart : ComponentPart.Coil; reloadRemaining = 0; installRemaining = 5; break;
+                case 3: installPart = journey.State.HasPart(ComponentPart.RamPart) ? ComponentPart.RamPart : ComponentPart.Coil; CancelReloadPresentation(); installRemaining = 5; break;
                 case 4: motor.TryEnterDriver(); break;
                 case 5: if (journey.State.TryRepair()) Say("房车修复 +95。", 3); break;
                 case 6:
@@ -139,10 +193,11 @@ namespace DesertRV
         }
         void TickArc(float delta)
         {
+            if (!ArcSourceReady) return; // Missing/embedded socket cannot spend a pulse or bypass roof geometry.
             arc.Tick(delta);
             int pulse = arc.TryBeginPulse(Region.region, journey.Generation);
             if (pulse == 0) return;
-            Vector3 origin = motor.vehicle.position + Vector3.up * 2.5f;
+            Vector3 origin = arcOrigin.position;
             foreach (var collider in Physics.OverlapSphere(origin, 5, ~0, QueryTriggerInteraction.Ignore))
             {
                 var beast = collider.GetComponentInParent<BeastActor>();
@@ -151,7 +206,10 @@ namespace DesertRV
                 if (Physics.Linecast(origin, target, out var obstruction, ~0, QueryTriggerInteraction.Ignore) &&
                     obstruction.collider.GetComponentInParent<BeastActor>() != beast) continue;
                 if (arc.TryHitTarget(Region.region, journey.Generation, pulse, beast.GetInstanceID().ToString()))
-                    beast.TakeHit(40, (target - origin).normalized);
+                {
+                    if (beast.TakeHit(40, (target - origin).normalized) > 0)
+                        Emit(ArcPresented, new ArcPresentationEvent(PresentationEpoch, ++arcSequence, pulse, beast, origin, target));
+                }
             }
         }
         void Fire()
@@ -169,8 +227,10 @@ namespace DesertRV
                 var beast = hit.collider.GetComponentInParent<BeastActor>();
                 if (beast && beast.TakeHit(24, direction) > 0) { Play(hitSound, .35f); hitFlash = .1f; }
             }
-            tracer.SetPosition(0, start + motor.view.transform.right * .2f - motor.view.transform.up * .18f + direction * .4f);
-            tracer.SetPosition(1, end); tracerRemaining = .06f; tracer.enabled = true;
+            // Aim/damage remain camera based; only the visible tracer starts at the authored muzzle.
+            tracer.SetPosition(0, shotMuzzle ? shotMuzzle.position : start);
+            tracer.SetPosition(1, end); tracerRemaining = shotMuzzle ? .06f : 0; tracer.enabled = tracerRemaining > 0;
+            Emit(ShotPresented, new ShotPresentationEvent(PresentationEpoch, ++shotSequence, end));
         }
         void Play(AudioClip clip, float volume) { if (clip) effects.PlayOneShot(clip, volume); }
         public void Say(string message, float seconds) { Notice = message; noticeRemaining = seconds; }

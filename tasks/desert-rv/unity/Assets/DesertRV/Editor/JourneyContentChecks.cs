@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
+using System.Reflection;
 using UnityEditor;
 using UnityEditor.Animations;
 using UnityEditor.Build;
@@ -114,6 +115,7 @@ namespace DesertRV.Editor
             {
                 Require(m.armoredWeakpointPresentation.transform.IsChildOf(m.armored.prefab.transform),"Weakpoint presenter must belong to the independent armored prefab.",errors);
                 Require(References(m.armoredWeakpointPresentation,m.armored.prefab.GetComponent<BeastActor>()) && ReferencesType<Renderer>(m.armoredWeakpointPresentation),"Weakpoint presenter requires actual actor and visible renderer references.",errors);
+                ValidatePresenter(m.armoredWeakpointPresentation,"Armored prefab weakpoint",errors);
             }
         }
         static void ValidateAsset(JourneyAssetReview review, string label, bool enemy, bool armored, List<string> errors)
@@ -129,7 +131,12 @@ namespace DesertRV.Editor
             Require(modelPath.EndsWith(".fbx",StringComparison.OrdinalIgnoreCase) && AssetDatabase.GetDependencies(path,true).Contains(modelPath),label+": source FBX must exist and be an actual prefab dependency.",errors);
             Require(!string.IsNullOrWhiteSpace(review.reviewedDependencySha256) && review.reviewedDependencySha256 == DependencySha256(path),label+": exact reviewed dependency SHA256 missing or stale.",errors);
             Require(Uri.TryCreate(review.generationRunUrl,UriKind.Absolute,out var run) && run.Scheme == "https" && run.Host == "github.com" && run.AbsolutePath.Contains("/actions/runs/"),label+": exact generation Actions run URL missing.",errors);
-            if (!enemy) return;
+            if (!enemy)
+            {
+                var viewAnimator=go.GetComponentInChildren<Animator>(true);
+                ValidateWeaponAnimation(viewAnimator ? viewAnimator.runtimeAnimatorController as AnimatorController : null,label,errors);
+                return;
+            }
             var actor = go.GetComponent<BeastActor>(); Require(actor && actor.armored == armored,label+": wrong or missing actor identity.",errors);
             var collider = go.GetComponent<Collider>(); Require(collider && collider.enabled && !collider.isTrigger,label+": enabled physical root collider required.",errors);
             if (collider)
@@ -189,8 +196,19 @@ namespace DesertRV.Editor
             foreach (var clip in new[] { a.shotSound,a.hitSound,a.reloadSound,a.pickupSound,a.upgradeSound,a.windSound }) Require(clip && clip.length > 0,"Missing/nonplayable shot, hit, reload, pickup, upgrade or wind audio.",errors);
             if (!m) return;
             var scripts = d.GetComponentsInChildren<MonoBehaviour>(true);
-            Require(m.weapon?.prefab && scripts.Any(s => s && m.weaponPresentation && s.GetType() == m.weaponPresentation.GetType() && References(s,a) && ReferencesType<Renderer>(s)),"Weapon presenter is not wired to live actions and visible viewmodel.",errors);
-            Require(scripts.Any(s => s && m.arcPresentation && s.GetType() == m.arcPresentation.GetType() && References(s,a) && References(s,motor.arc) && ReferencesType<AudioClip>(s)),"Arc presenter is not wired to live actions and retained arc module.",errors);
+            var weapons=scripts.Where(s=>s && m.weaponPresentation && s.GetType()==m.weaponPresentation.GetType()).ToArray();
+            var arcs=scripts.Where(s=>s && m.arcPresentation && s.GetType()==m.arcPresentation.GetType()).ToArray();
+            Require(weapons.Length==1 && m.weapon?.prefab && References(weapons[0],a) && ReferencesType<Renderer>(weapons[0]),"Exactly one weapon presenter must be wired to live actions and visible viewmodel.",errors);
+            Require(arcs.Length==1 && References(arcs[0],a) && motor.arc && References(arcs[0],motor.arc.transform) && ReferencesType<AudioClip>(arcs[0]),"Exactly one arc presenter must be wired to live actions, retained arc module Transform and real audio.",errors);
+            foreach(var presenter in weapons.Concat(arcs)) ValidatePresenter(presenter,"Bootstrap "+presenter.GetType().Name,errors);
+            foreach(var weapon in weapons.OfType<WeaponPresentation>()) ValidateReloadMeshContract(weapon,errors);
+            if(motor.view && m.weapon?.prefab)
+            {
+                var instance=motor.view.GetComponentsInChildren<Transform>(true).FirstOrDefault(t=>PrefabUtility.GetCorrespondingObjectFromSource(t.gameObject)==m.weapon.prefab);
+                var animator=instance?instance.GetComponentInChildren<Animator>(true):null;
+                ValidateWeaponAnimation(animator?animator.runtimeAnimatorController as AnimatorController:null,"Live weapon instance",errors);
+                Require(instance && new HashSet<Mesh>(Meshes(m.weapon.prefab)).SetEquals(Meshes(instance.gameObject)),"Live weapon geometry must match the reviewed prefab.",errors);
+            }
             if (motor.view && m.weapon?.prefab) Require(motor.view.GetComponentsInChildren<Transform>(true).Any(t => PrefabUtility.GetCorrespondingObjectFromSource(t.gameObject) == m.weapon.prefab),"Real weapon prefab must be instantiated beneath the persistent camera.",errors);
         }
         static void ValidateSceneEnemy(BeastActor actor, JourneyContentManifest m, List<string> errors)
@@ -203,6 +221,70 @@ namespace DesertRV.Editor
             Require(new HashSet<Mesh>(Meshes(expected)).SetEquals(Meshes(actor.gameObject)),"Scene enemy geometry differs from reviewed prefab: "+actor.name,errors);
             var collider = actor.GetComponent<Collider>();
             Require(collider && collider.enabled && !collider.isTrigger,"Scene enemy physical root collider missing/disabled: "+actor.name,errors);
+            if(actor.armored && m.armoredWeakpointPresentation)
+            {
+                var presenters=actor.GetComponentsInChildren<MonoBehaviour>(true).Where(s=>s && s.GetType()==m.armoredWeakpointPresentation.GetType()).ToArray();
+                Require(presenters.Length==1,"Scene armored actor requires exactly one real weakpoint presenter: "+actor.name,errors);
+                foreach(var presenter in presenters) ValidatePresenter(presenter,"Scene armored weakpoint "+actor.name,errors);
+            }
+        }
+        static void ValidateWeaponAnimation(AnimatorController controller,string label,List<string> errors)
+        {
+            if(!controller || controller.layers.Length==0 || controller.layers[0].name!="Base Layer")
+            { errors.Add(label+": weapon requires real Base Layer controller.");return; }
+            // Runtime resolves full paths, so similarly named nested states do not satisfy the contract.
+            var states=controller.layers[0].stateMachine.states.Select(s=>s.state).ToArray();
+            foreach(string state in new[]{"Idle","Fire","Reload"})
+            {
+                var matches=states.Where(s=>s.name==state).ToArray();
+                Require(matches.Length==1 && matches[0].motion && HasMotion(matches[0].motion),label+": missing/duplicate animated Base Layer."+state,errors);
+                if(matches.Length!=1) continue;
+                var clip=matches[0].motion as AnimationClip;
+                if(!clip) { errors.Add(label+": timed weapon "+state+" requires a direct AnimationClip.");continue; }
+                Require(AnimationUtility.GetAnimationEvents(clip).Length==0,label+": AnimationEvents forbidden on weapon "+state+"; actions own ammo/damage/audio.",errors);
+                bool validRate=clip.frameRate>0 && !float.IsNaN(clip.frameRate) && !float.IsInfinity(clip.frameRate);
+                Require(validRate,label+": invalid weapon clip frame rate for "+state,errors);
+                float duration=state=="Fire"?.22f:state=="Reload"?1.65f:2f;
+                float tolerance=validRate?1f/clip.frameRate:.0001f;
+                if(state=="Idle") tolerance=Mathf.Max(.1f,tolerance);
+                Require(Mathf.Abs(clip.length-duration)<=tolerance+.0001f,label+": "+state+" clip length does not match authoritative presentation duration.",errors);
+                Require(state=="Idle"?clip.isLooping:!clip.isLooping,label+": only Idle may loop; Fire/Reload must be one-shot.",errors);
+            }
+        }
+        static void ValidateReloadMeshContract(WeaponPresentation weapon,List<string> errors)
+        {
+            if (!weapon.animator || !weapon.incomingOffset || !weapon.leftReloadOffset ||
+                weapon.loadedNails == null || weapon.incomingNails == null) return; // Missing bindings already fail above.
+            string incomingPath=AnimationUtility.CalculateTransformPath(weapon.incomingOffset,weapon.animator.transform);
+            string leftPath=AnimationUtility.CalculateTransformPath(weapon.leftReloadOffset,weapon.animator.transform);
+            var nails=weapon.loadedNails.Concat(weapon.incomingNails).Where(n=>n).ToArray();
+            Require(nails.Length==24 && nails.Distinct().Count()==24,"Partial reload requires exactly 24 independent round renderers.",errors);
+            var nailPaths=nails.Select(n=>AnimationUtility.CalculateTransformPath(n.transform,weapon.animator.transform)).ToArray();
+            foreach(var clip in weapon.animator.runtimeAnimatorController.animationClips.Distinct())
+            foreach(var binding in AnimationUtility.GetCurveBindings(clip))
+            {
+                Require(binding.path!=incomingPath && binding.path!=leftPath,"Reload carrier offsets must be unkeyed: "+binding.path,errors);
+                bool affectsNail=nailPaths.Any(path=>path==binding.path || path.StartsWith(binding.path+"/",StringComparison.Ordinal) || binding.path=="");
+                if(!affectsNail) continue;
+                Require(binding.propertyName!="m_Enabled" && binding.propertyName!="m_IsActive","Clips cannot override runtime nail visibility.",errors);
+                if(binding.propertyName.StartsWith("m_LocalScale",StringComparison.Ordinal))
+                {
+                    var curve=AnimationUtility.GetEditorCurve(clip,binding);
+                    Require(curve!=null && curve.keys.All(k=>k.value>.001f),"Clips cannot scale away runtime old/new nail geometry.",errors);
+                }
+            }
+        }
+        static void ValidatePresenter(MonoBehaviour presenter,string label,List<string> errors)
+        {
+            if(!presenter || !presenter.enabled) { errors.Add(label+": presenter is missing or disabled.");return; }
+            var method=presenter.GetType().GetMethod("ValidateBindings",BindingFlags.Public|BindingFlags.Instance,null,new[]{typeof(string).MakeByRefType()},null);
+            if(method==null || method.ReturnType!=typeof(bool)) { errors.Add(label+": pure ValidateBindings(out string) contract missing.");return; }
+            try
+            {
+                object[] args={null};bool valid=(bool)method.Invoke(presenter,args);
+                Require(valid,label+": "+(args[0] as string ?? "presenter binding validation failed"),errors);
+            }
+            catch(Exception error) { errors.Add(label+": binding validation threw "+(error.InnerException??error).Message); }
         }
         static bool References(MonoBehaviour source, UnityEngine.Object target)
         { if (!source || !target) return false; var p = new SerializedObject(source).GetIterator(); while (p.Next(true)) if (p.propertyType == SerializedPropertyType.ObjectReference && p.objectReferenceValue == target) return true; return false; }

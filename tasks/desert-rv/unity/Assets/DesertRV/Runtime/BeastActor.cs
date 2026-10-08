@@ -12,6 +12,11 @@ namespace DesertRV
         public int Health { get; private set; }
         public BeastPhase Phase { get; private set; }
         public bool Dead => Phase == BeastPhase.Dead;
+        // Exposes the real fenced recovery window; pause freezes its visible pose.
+        public bool WeakPointExposed => armored && !Dead && Phase == BeastPhase.Recover &&
+            combat != null && combat.WeakPointOpen && journey && journey.State != null &&
+            combatRegion == journey.State.SceneId && combatGeneration == journey.Generation &&
+            (journey.State.Status == SessionStatus.Playing || journey.State.Status == SessionStatus.Paused);
         public bool KilledByRam { get; private set; }
         Vector3 home, attackDirection;
         float phaseTime, lastHit, attackClock;

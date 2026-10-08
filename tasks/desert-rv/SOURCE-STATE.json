@@ -63,8 +63,8 @@
     },
     {
       "path": "tasks/desert-rv/scripts/expected_test_cases.json",
-      "sha256": "98d5cac42a22a10a49807e55829e0c6e5282b7ab768513068ce0e4a75807aab4",
-      "size": 6867
+      "sha256": "2fb465b827160f6f2a409b4ecad11d40ced3be136d0f044e24682608d70811d0",
+      "size": 7942
     },
     {
       "path": "tasks/desert-rv/scripts/prepare_runner.sh",
@@ -83,7 +83,7 @@
     },
     {
       "path": "tasks/desert-rv/scripts/test_verify_evidence.py",
-      "sha256": "69d49a2490cd3ddb614e2b47a222bc0ac4a2ddb0d2a992787a0bab4f0147a97d",
+      "sha256": "d87bcd55800707bc1ec4996ba8d08c85edf21b4302cf52c50fd1dc66183c2d42",
       "size": 15039
     },
     {
@@ -3433,8 +3433,8 @@
     },
     {
       "path": "tasks/desert-rv/unity/Assets/DesertRV/Editor/JourneyContentChecks.cs",
-      "sha256": "1de64aa2e3cf587780d43805bd54c591015191b3a27839b03df8d35cbc400521",
-      "size": 23487
+      "sha256": "9efb1a139ad83d0722a703d242b7b1a7b83fdabff5c7bbba25640379ccbb2f95",
+      "size": 30388
     },
     {
       "path": "tasks/desert-rv/unity/Assets/DesertRV/Editor/JourneyContentChecks.cs.meta",
@@ -3567,9 +3567,19 @@
       "size": 60
     },
     {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Runtime/ArcPresentation.cs",
+      "sha256": "6538ab3e2db983651edb93d10aa997c03c0bc99f2877ddd7b5c89839f0cb5a38",
+      "size": 5131
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Runtime/ArcPresentation.cs.meta",
+      "sha256": "77aeaeae906d31c88b409ed823badb5333f5a830e80f02efdd6b80131b1deea7",
+      "size": 240
+    },
+    {
       "path": "tasks/desert-rv/unity/Assets/DesertRV/Runtime/BeastActor.cs",
-      "sha256": "e2eba615820def380c6e1fc0734e93d9b6569f7aa3a3d5cbd638b01071146f51",
-      "size": 7744
+      "sha256": "9a9bf1d70278ca15676efb442636dc12e2dcdd829cb63dc433f3744072d53231",
+      "size": 8213
     },
     {
       "path": "tasks/desert-rv/unity/Assets/DesertRV/Runtime/BeastActor.cs.meta",
@@ -3585,6 +3595,16 @@
       "path": "tasks/desert-rv/unity/Assets/DesertRV/Runtime/BeastCombatState.cs.meta",
       "sha256": "bbd6e12a199be7426e83f95af30ff4f187bdfcd0619e58caadaacb079f5536cf",
       "size": 60
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Runtime/BeastWeakPointPresentation.cs",
+      "sha256": "8b1f1f0d19eb5b4b2233f8967a7d6357cd495f5865c390e581e5511d2efdaac0",
+      "size": 2811
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Runtime/BeastWeakPointPresentation.cs.meta",
+      "sha256": "7e99b12f1df4fd043a7347691d6bcc1fdb988d7b71789529d1ecf19d87c6d11c",
+      "size": 240
     },
     {
       "path": "tasks/desert-rv/unity/Assets/DesertRV/Runtime/BodyViewer.cs",
@@ -3618,8 +3638,8 @@
     },
     {
       "path": "tasks/desert-rv/unity/Assets/DesertRV/Runtime/JourneyActions.cs",
-      "sha256": "48b5c3ddc964febcf3e5be28ce51bba6af25f92624dde66cbd30f281faa87197",
-      "size": 10381
+      "sha256": "b0199dc0b3ae086d33e2a19532292275c70b2c6b8ebf0a69c581f9b77bd3c7ae",
+      "size": 14160
     },
     {
       "path": "tasks/desert-rv/unity/Assets/DesertRV/Runtime/JourneyActions.cs.meta",
@@ -3737,6 +3757,16 @@
       "size": 60
     },
     {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Runtime/PresentationSignals.cs",
+      "sha256": "81e0d2d1526b0b490aff4fbf87a269b44624135458ebf42fb41198a151153917",
+      "size": 3447
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Runtime/PresentationSignals.cs.meta",
+      "sha256": "3173aaafb5e14cbc8440dae6e0c88ba1228b7f8f9b7f7cd6c7a26516eeeec6fd",
+      "size": 240
+    },
+    {
       "path": "tasks/desert-rv/unity/Assets/DesertRV/Runtime/RegionBinding.cs",
       "sha256": "3e58c5e696c25b5c32a655421f0ed4f2ef7ff757ec0207cfd90d4e033b79ee5d",
       "size": 4034
@@ -3785,6 +3815,16 @@
       "path": "tasks/desert-rv/unity/Assets/DesertRV/Runtime/TouchInputState.cs.meta",
       "sha256": "78e9b9653b868a1dde78d9d472db808a5eb66aaa299262af1154d077768b0598",
       "size": 60
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Runtime/WeaponPresentation.cs",
+      "sha256": "eefbd7cc73d7d834ff102fdd6b50a7725dee5f133c8ed3fb2d771c031dfc3ce9",
+      "size": 10863
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Runtime/WeaponPresentation.cs.meta",
+      "sha256": "62a575aa82ed35eecb5c041eab9754381c4c82eb6a025dd0686206d73027cc66",
+      "size": 240
     },
     {
       "path": "tasks/desert-rv/unity/Assets/DesertRV/Runtime/WebPreflight.cs",
@@ -4080,6 +4120,16 @@
       "path": "tasks/desert-rv/unity/Assets/DesertRV/Tests/EditMode/JourneyRaycastTests.cs.meta",
       "sha256": "0454ebe4c19001aaf619bb09251faa0efec1d7f28055bdd8f846285a38ac2819",
       "size": 60
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Tests/EditMode/PresentationContractTests.cs",
+      "sha256": "ccb86641d0c36ec836c6678c4f5410174efc3b1cbf3ea00710abbf13ca8e4d17",
+      "size": 21653
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Tests/EditMode/PresentationContractTests.cs.meta",
+      "sha256": "34cdd65a07679ca237332e4fc29e89bed8ca46527962ecd61936ac2682abcc02",
+      "size": 240
     },
     {
       "path": "tasks/desert-rv/unity/Assets/DesertRV/Tests/EditorRender.meta",
