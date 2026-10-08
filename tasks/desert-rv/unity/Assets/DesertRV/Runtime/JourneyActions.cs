@@ -96,11 +96,33 @@ namespace DesertRV
         }
         public void SetPaused(bool paused)
         {
-            if (paused) { wind.Pause(); effects.Pause(); reloadAudio.Pause(); tracerRemaining = 0; tracer.enabled = false; }
-            else { if (windSound && !wind.isPlaying) wind.UnPause(); effects.UnPause(); reloadAudio.UnPause(); }
+            // Only a current on-foot play/pause can preserve the in-progress reload.
+            // Director calls this even when terminal/loading states no longer call Tick.
+            if (!PresentationCurrent || journey.State.Control != ControlMode.OnFoot ||
+                (journey.State.Status != SessionStatus.Playing && journey.State.Status != SessionStatus.Paused))
+                CancelReloadPresentation();
+            if (paused)
+            {
+                if (wind) wind.Pause(); if (effects) effects.Pause(); if (reloadAudio) reloadAudio.Pause();
+                tracerRemaining = 0; if (tracer) tracer.enabled = false;
+            }
+            else
+            {
+                if (windSound && wind && !wind.isPlaying) wind.UnPause();
+                if (effects) effects.UnPause();
+                if (reloadAudio && Reloading) reloadAudio.UnPause();
+            }
+        }
+        void OnDisable()
+        {
+            CancelReloadPresentation();
+            if (effects) effects.Stop(); if (wind) wind.Pause();
+            tracerRemaining = 0; if (tracer) tracer.enabled = false;
         }
         public void Tick(float delta)
         {
+            // The external director may retain this component after it is disabled.
+            if (!isActiveAndEnabled) { CancelReloadPresentation(); return; }
             var state = journey.State;
             if (!PresentationPlaying || !Region.gameObject.scene.IsValid() || !Region.gameObject.scene.isLoaded) { SetPaused(true); return; }
             SetPaused(false);
@@ -109,11 +131,7 @@ namespace DesertRV
             noticeRemaining -= delta; if (noticeRemaining <= 0) Notice = "";
             if (state.PlayerHealth < lastHealth) { damageFlash = .3f; installRemaining = 0; }
             lastHealth = state.PlayerHealth;
-            if (reloadRemaining > 0)
-            {
-                reloadRemaining -= delta;
-                if (reloadRemaining <= 0) state.Reload();
-            }
+            AdvanceReload(delta);
             if (installRemaining > 0)
             {
                 if (!motor.InsideCabin || !Near(cabinWorkbench, 2.1f) || state.Control != ControlMode.OnFoot) { installRemaining = 0; Say("改装中断，组件仍在。", 2); }
@@ -134,19 +152,35 @@ namespace DesertRV
             {
                 if (journey.Input.Reload && reloadRemaining <= 0 && state.LoadedAmmo < 12 && state.ReserveAmmo > 0)
                 {
-                    ReloadLoadedBefore = state.LoadedAmmo;
-                    ReloadPlannedAdded = ReloadPresentationPlan.Added(state.LoadedAmmo, state.ReserveAmmo);
-                    reloadRemaining = 1.65f;
-                    if (reloadSound) reloadAudio.PlayOneShot(reloadSound, .4f);
-                    Emit(ReloadPresented, new ReloadPresentationEvent(PresentationEpoch, ++reloadSequence, ReloadLoadedBefore, ReloadPlannedAdded));
+                    BeginReloadPresentation();
                 }
                 if (journey.Input.Fire && fireClock <= 0 && reloadRemaining <= 0) Fire();
             }
         }
+        void AdvanceReload(float delta)
+        {
+            if (reloadRemaining <= 0) return;
+            reloadRemaining -= delta;
+            if (reloadRemaining <= 0) { journey.State.Reload(); CancelReloadPresentation(); }
+        }
+        void BeginReloadPresentation()
+        {
+            ReloadLoadedBefore = journey.State.LoadedAmmo;
+            ReloadPlannedAdded = ReloadPresentationPlan.Added(journey.State.LoadedAmmo, journey.State.ReserveAmmo);
+            reloadRemaining = 1.65f;
+            if (reloadSound && reloadAudio)
+            {
+                // A single seekable voice, not an overlapping fire-and-forget one-shot.
+                reloadAudio.Stop(); reloadAudio.clip = reloadSound;
+                reloadAudio.loop = false; reloadAudio.pitch = 1; reloadAudio.volume = .4f;
+                reloadAudio.Play();
+            }
+            Emit(ReloadPresented, new ReloadPresentationEvent(PresentationEpoch, ++reloadSequence, ReloadLoadedBefore, ReloadPlannedAdded));
+        }
         void CancelReloadPresentation()
         {
             reloadRemaining = 0; ReloadLoadedBefore = ReloadPlannedAdded = 0;
-            if (reloadAudio) reloadAudio.Stop();
+            if (reloadAudio) { reloadAudio.Stop(); reloadAudio.clip = null; }
         }
         bool Near(Transform point, float distance)
         {
@@ -192,7 +226,7 @@ namespace DesertRV
                     { if (Region.salvageVisual) Region.salvageVisual.SetActive(false); Play(pickupSound, .6f); Say("组件已收好，回房车工作台安装。", 4); }
                     break;
                 case 3: installPart = journey.State.HasPart(ComponentPart.RamPart) ? ComponentPart.RamPart : ComponentPart.Coil; CancelReloadPresentation(); installRemaining = 5; break;
-                case 4: motor.TryEnterDriver(); break;
+                case 4: if (motor.TryEnterDriver()) CancelReloadPresentation(); break;
                 case 5: if (journey.State.TryRepair()) Say("房车修复 +95。", 3); break;
                 case 7:
                     if (Reloading || Installing)
@@ -288,4 +322,5 @@ namespace DesertRV
         public void Say(string message, float seconds) { Notice = message; noticeRemaining = seconds; }
     }
 }
+
 

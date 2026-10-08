@@ -14,7 +14,8 @@
     ".github/workflows/desert-rv-android.yml",
     ".github/workflows/desert-rv-environment.yml",
     ".github/workflows/desert-rv-candidate-art-import.yml",
-    ".github/workflows/desert-rv-supplies.yml"
+    ".github/workflows/desert-rv-supplies.yml",
+    "tasks/desert-rv/art/reload-audio/generated-candidate.json"
   ],
   "restoredFiles": [
     {
@@ -100,6 +101,11 @@
       "size": 6629
     },
     {
+      "path": "tasks/desert-rv/art/reload-audio/generated-candidate.json",
+      "sha256": "ab1ad0c3f7581b4f865d09da7f90e48b50d7e5b0dce194036ec94882167cf072",
+      "size": 11580
+    },
+    {
       "path": "tasks/desert-rv/backup-assets/fonts/NotoSansCJKsc-Regular.otf.xz",
       "sha256": "e8affaf0b8f8e8fccecf5476bf05999c891f94ef66ef9b55474fda32ce1ec786",
       "size": 10847296
@@ -136,8 +142,8 @@
     },
     {
       "path": "tasks/desert-rv/scripts/expected_test_cases.json",
-      "sha256": "77f5697c9dcaae75e46f5ee1e812c0bc8b0576f27f831ecab56f3e164876beda",
-      "size": 14224
+      "sha256": "c7002e9b6ad4a590ddc7ad9a49c84e693e52fd6015e9fdb04585faab1f5bc67c",
+      "size": 15661
     },
     {
       "path": "tasks/desert-rv/scripts/prepare_runner.sh",
@@ -181,7 +187,7 @@
     },
     {
       "path": "tasks/desert-rv/scripts/test_verify_evidence.py",
-      "sha256": "472c1070a7e4052e99a471177d8d7eef790a15842ee5f31cf8e265b1f9332599",
+      "sha256": "7be56459a7a293a0414383db6e59f5340720b3e5e4110a821eb66d6540baea49",
       "size": 17776
     },
     {
@@ -196,8 +202,8 @@
     },
     {
       "path": "tasks/desert-rv/scripts/verify_evidence.py",
-      "sha256": "ab6068ab67ae03ba16d2aa8ee09a157b2211f93c8ea5dcc747ed36b644655d8b",
-      "size": 15894
+      "sha256": "24d9a4dfc7b2f22f53718a007025f1f2573d4924bf04961cd1b50dbe89bde61a",
+      "size": 15955
     },
     {
       "path": "tasks/desert-rv/unity/Assets/DefaultVolumeProfile.asset",
@@ -3425,6 +3431,16 @@
       "size": 485
     },
     {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Audio/reload.wav",
+      "sha256": "126ed22d50e3b9ec84ef54718de6992d290fdbe7a48ff15f901ca92cac7c438f",
+      "size": 158444
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Audio/reload.wav.meta",
+      "sha256": "f390dfa2200e466a59940b9fcccada1c408ffc965ff5871110f8237ee9f92f76",
+      "size": 559
+    },
+    {
       "path": "tasks/desert-rv/unity/Assets/DesertRV/Audio/shot.wav",
       "sha256": "6f93137abe2303138ba452e3421e0eb1b54b86004853074d6505173163b6819d",
       "size": 12832
@@ -3841,8 +3857,8 @@
     },
     {
       "path": "tasks/desert-rv/unity/Assets/DesertRV/Runtime/JourneyActions.cs",
-      "sha256": "c61b1bd8714bdb0b963e6b9e276f38e032a77f7f8859f43fa489278cb68c6935",
-      "size": 18374
+      "sha256": "669ad4c9a6a17dd0dc8aa017c7d43e29d2a6cc1fe4b8cd325ba16ccc4d016c08",
+      "size": 19949
     },
     {
       "path": "tasks/desert-rv/unity/Assets/DesertRV/Runtime/JourneyActions.cs.meta",
@@ -4491,12 +4507,22 @@
     },
     {
       "path": "tasks/desert-rv/unity/Assets/DesertRV/Tests/EditMode/PresentationContractTests.cs",
-      "sha256": "93af1a0da7d9d6d09d464ae4664ed097e228c1252d9d161868a9dd77ec4c7c30",
-      "size": 25382
+      "sha256": "b6abc0fd9a8c2686b634ab6792e42d52597896c8de81caaee9ec1a879adb0a63",
+      "size": 25464
     },
     {
       "path": "tasks/desert-rv/unity/Assets/DesertRV/Tests/EditMode/PresentationContractTests.cs.meta",
       "sha256": "34cdd65a07679ca237332e4fc29e89bed8ca46527962ecd61936ac2682abcc02",
+      "size": 240
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Tests/EditMode/ReloadAudioLifecycleTests.cs",
+      "sha256": "d360508bbb40e2e083a12eee643e7d255b21660089ecaca81cf3ca76dffbb390",
+      "size": 11567
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Tests/EditMode/ReloadAudioLifecycleTests.cs.meta",
+      "sha256": "b20aba70565377ba59eb876a42f50baaa722b65765a36b0038e0ed931624f6d9",
       "size": 240
     },
     {

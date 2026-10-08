@@ -181,6 +181,7 @@ namespace DesertRV.Tests
         {
             using(var f=new Fixture())
             {
+                Call(f.State,"SetControl",Enum.Parse(T("ControlMode"),"OnFoot"));
                 Set(f.Actions,"effects",f.Root.AddComponent<AudioSource>());
                 Set(f.Actions,"wind",f.Root.AddComponent<AudioSource>());
                 Set(f.Actions,"reloadAudio",f.Root.AddComponent<AudioSource>());

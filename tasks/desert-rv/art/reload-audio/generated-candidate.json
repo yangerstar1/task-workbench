@@ -1,0 +1,383 @@
+{
+  "schema": "desert-rv-generated-reload-candidate/v1",
+  "wav_persisted_as": "tasks/desert-rv/unity/Assets/DesertRV/Audio/reload.wav",
+  "generated_on": "2026-10-08T21:29:10Z",
+  "source_commit": "c58a536269f52a08014b5dee786285981581fff4",
+  "run_url": "https://github.com/yangerstar1/task-workbench/actions/runs/37847087140",
+  "artifact_url": "https://github.com/yangerstar1/task-workbench/actions/runs/37847087140/artifacts/11580590275",
+  "artifact_zip_sha256": "f36e227d341e68d0074ff2da493d9238c95cd29329a94e9cd73dade5fb66efa7",
+  "origin": "Original deterministic mathematical mechanical synthesis, no external samples or paid API",
+  "existing_audio_untouched": 9,
+  "candidate_only": true,
+  "auditioned": false,
+  "unity_import_verified": false,
+  "visual_sync_approved": false,
+  "commercial_quality_approved": false,
+  "provenance": {
+    "origin": "Original deterministic mathematical synthesis; no third-party samples",
+    "duration_seconds": 1.65,
+    "sample_rate": 48000,
+    "channels": 1,
+    "format": "PCM signed 16-bit",
+    "clip_reference": "Fixed-magazine Reload frames 1..100 at 60 fps",
+    "generator_sha256": "d0046c05f5ea6f2ea805bcfdcf4dad33956eee8b19359b13518386c39164f9b3",
+    "source_commit": "c58a536269f52a08014b5dee786285981581fff4",
+    "github_run_id": "37847087140",
+    "cues": [
+      {
+        "frame": 12,
+        "seconds": 0.18333333333333332,
+        "duration_seconds": 0.035,
+        "action": "glove_contact",
+        "frequency_hz": 240,
+        "gain": 0.11
+      },
+      {
+        "frame": 23,
+        "seconds": 0.36666666666666664,
+        "duration_seconds": 0.06,
+        "action": "follower_latch",
+        "frequency_hz": 1650,
+        "gain": 0.38
+      },
+      {
+        "frame": 35,
+        "seconds": 0.5666666666666667,
+        "duration_seconds": 0.045,
+        "action": "strip_pickup",
+        "frequency_hz": 950,
+        "gain": 0.13
+      },
+      {
+        "frame": 48,
+        "seconds": 0.7833333333333333,
+        "duration_seconds": 0.08,
+        "action": "strip_guide",
+        "frequency_hz": 2700,
+        "gain": 0.14
+      },
+      {
+        "frame": 60,
+        "seconds": 0.9833333333333333,
+        "duration_seconds": 0.1,
+        "action": "strip_slide",
+        "frequency_hz": 1150,
+        "gain": 0.18
+      },
+      {
+        "frame": 68,
+        "seconds": 1.1166666666666667,
+        "duration_seconds": 0.075,
+        "action": "strip_seat",
+        "frequency_hz": 780,
+        "gain": 0.32
+      },
+      {
+        "frame": 82,
+        "seconds": 1.35,
+        "duration_seconds": 0.035,
+        "action": "follower_touch",
+        "frequency_hz": 310,
+        "gain": 0.1
+      },
+      {
+        "frame": 91,
+        "seconds": 1.5,
+        "duration_seconds": 0.095,
+        "action": "spring_release",
+        "frequency_hz": 1350,
+        "gain": 0.3
+      }
+    ],
+    "sha256": "126ed22d50e3b9ec84ef54718de6992d290fdbe7a48ff15f901ca92cac7c438f",
+    "auditioned": false,
+    "visual_sync_approved": false,
+    "note": "Review exact generated WAV against actual imported clip before approval."
+  },
+  "objective_analysis": {
+    "file": "reload.wav",
+    "objective_checks_passed": true,
+    "auditioned": false,
+    "perceptual_quality_approved": false,
+    "unity_import_verified": false,
+    "visual_sync_approved": false,
+    "failures": [],
+    "sha256": "126ed22d50e3b9ec84ef54718de6992d290fdbe7a48ff15f901ca92cac7c438f",
+    "bytes": 158444,
+    "channels": 1,
+    "sample_width_bytes": 2,
+    "sample_rate": 48000,
+    "frame_count": 79200,
+    "duration_seconds": 1.65,
+    "compression": "NONE",
+    "peak_linear": 0.282601397747734,
+    "peak_dbfs": -10.9765,
+    "rms_dbfs": -36.043,
+    "dc_offset": 2.908352299508035e-05,
+    "clipped_sample_count": 0,
+    "crest_factor_db": 25.0665,
+    "exact_zero_fraction": 0.6909848484848485,
+    "events": [
+      {
+        "frame": 12,
+        "action": "glove_contact",
+        "start_seconds": 0.18333333333333332,
+        "duration_seconds": 0.035,
+        "peak_dbfs": -24.3667,
+        "rms_dbfs": -38.7379,
+        "onset_delay_seconds": 2.0833333333333333e-05,
+        "peak_seconds": 0.1865,
+        "boundary_step_linear": 0.0,
+        "rms_10ms_linear": [
+          0.0214039,
+          0.0031129,
+          0.0004668,
+          8.12e-05
+        ],
+        "runtime_gain": 0.4,
+        "estimated_runtime_peak_dbfs": -32.3255
+      },
+      {
+        "frame": 23,
+        "action": "follower_latch",
+        "start_seconds": 0.36666666666666664,
+        "duration_seconds": 0.06,
+        "peak_dbfs": -10.9765,
+        "rms_dbfs": -27.3717,
+        "onset_delay_seconds": 2.0833333333333333e-05,
+        "peak_seconds": 0.36802083333333335,
+        "boundary_step_linear": 0.0,
+        "rms_10ms_linear": [
+          0.0982821,
+          0.0346924,
+          0.0106939,
+          0.0033482,
+          0.0010363,
+          0.0003063
+        ],
+        "runtime_gain": 0.4,
+        "estimated_runtime_peak_dbfs": -18.9353
+      },
+      {
+        "frame": 35,
+        "action": "strip_pickup",
+        "start_seconds": 0.5666666666666667,
+        "duration_seconds": 0.045,
+        "peak_dbfs": -22.1338,
+        "rms_dbfs": -37.0166,
+        "onset_delay_seconds": 2.0833333333333333e-05,
+        "peak_seconds": 0.5683958333333333,
+        "boundary_step_linear": 0.0,
+        "rms_10ms_linear": [
+          0.0290144,
+          0.0070879,
+          0.0015072,
+          0.0003172,
+          6.75e-05
+        ],
+        "runtime_gain": 0.4,
+        "estimated_runtime_peak_dbfs": -30.0926
+      },
+      {
+        "frame": 48,
+        "action": "strip_guide",
+        "start_seconds": 0.7833333333333333,
+        "duration_seconds": 0.08,
+        "peak_dbfs": -19.7819,
+        "rms_dbfs": -35.8027,
+        "onset_delay_seconds": 2.0833333333333333e-05,
+        "peak_seconds": 0.7847083333333333,
+        "boundary_step_linear": 0.0,
+        "rms_10ms_linear": [
+          0.0409388,
+          0.0188077,
+          0.0077639,
+          0.0032666,
+          0.0013613,
+          0.0005676,
+          0.0002345,
+          9.16e-05
+        ],
+        "runtime_gain": 0.4,
+        "estimated_runtime_peak_dbfs": -27.7407
+      },
+      {
+        "frame": 60,
+        "action": "strip_slide",
+        "start_seconds": 0.9833333333333333,
+        "duration_seconds": 0.1,
+        "peak_dbfs": -17.365,
+        "rms_dbfs": -33.5244,
+        "onset_delay_seconds": 2.0833333333333333e-05,
+        "peak_seconds": 0.9852708333333333,
+        "boundary_step_linear": 0.0,
+        "rms_10ms_linear": [
+          0.0566312,
+          0.0304349,
+          0.0152574,
+          0.007546,
+          0.0037652,
+          0.0018549,
+          0.0009202,
+          0.000455,
+          0.0002285,
+          0.0001037
+        ],
+        "runtime_gain": 0.4,
+        "estimated_runtime_peak_dbfs": -25.3238
+      },
+      {
+        "frame": 68,
+        "action": "strip_seat",
+        "start_seconds": 1.1166666666666667,
+        "duration_seconds": 0.075,
+        "peak_dbfs": -12.4635,
+        "rms_dbfs": -28.7478,
+        "onset_delay_seconds": 2.0833333333333333e-05,
+        "peak_seconds": 1.1176458333333332,
+        "boundary_step_linear": 0.0,
+        "rms_10ms_linear": [
+          0.0900829,
+          0.0400791,
+          0.0155631,
+          0.006009,
+          0.0024327,
+          0.0009476,
+          0.0003644,
+          0.0001389
+        ],
+        "runtime_gain": 0.4,
+        "estimated_runtime_peak_dbfs": -20.4223
+      },
+      {
+        "frame": 82,
+        "action": "follower_touch",
+        "start_seconds": 1.35,
+        "duration_seconds": 0.035,
+        "peak_dbfs": -24.2925,
+        "rms_dbfs": -39.6004,
+        "onset_delay_seconds": 2.0833333333333333e-05,
+        "peak_seconds": 1.3523125,
+        "boundary_step_linear": 0.0,
+        "rms_10ms_linear": [
+          0.0193277,
+          0.0031594,
+          0.0004299,
+          6.59e-05
+        ],
+        "runtime_gain": 0.4,
+        "estimated_runtime_peak_dbfs": -32.2513
+      },
+      {
+        "frame": 91,
+        "action": "spring_release",
+        "start_seconds": 1.5,
+        "duration_seconds": 0.095,
+        "peak_dbfs": -12.0303,
+        "rms_dbfs": -29.0765,
+        "onset_delay_seconds": 2.0833333333333333e-05,
+        "peak_seconds": 1.5016458333333333,
+        "boundary_step_linear": 0.0,
+        "rms_10ms_linear": [
+          0.0932906,
+          0.0485208,
+          0.0230752,
+          0.0111506,
+          0.005323,
+          0.0025347,
+          0.0012199,
+          0.0005796,
+          0.0002792,
+          0.0001145
+        ],
+        "runtime_gain": 0.4,
+        "estimated_runtime_peak_dbfs": -19.9891
+      }
+    ],
+    "nonzero_samples_outside_authored_events": 0,
+    "leading_silence_seconds": 0.18335416666666668,
+    "trailing_silence_seconds": 0.05533333333333333,
+    "source_commit": "c58a536269f52a08014b5dee786285981581fff4",
+    "github_run_id": "37847087140",
+    "byte_identical_repeat": true
+  },
+  "independent_verification": {
+    "source_commit": "c58a536269f52a08014b5dee786285981581fff4",
+    "run_id": "37847087140",
+    "artifact_id": 11580590275,
+    "wav_sha256": "126ed22d50e3b9ec84ef54718de6992d290fdbe7a48ff15f901ca92cac7c438f",
+    "bytes": 158444,
+    "samples": 79200,
+    "rate": 48000,
+    "channels": 1,
+    "bits": 16,
+    "duration_seconds": 1.65,
+    "peak_dbfs": -10.976513889195292,
+    "rms_dbfs": -36.04297226731481,
+    "clipped_samples": 0,
+    "sample_onsets": [
+      {
+        "frame": 12,
+        "expected_sample": 8800,
+        "actual_first_two_lsb_sample": 8801,
+        "offset_samples": 1
+      },
+      {
+        "frame": 23,
+        "expected_sample": 17600,
+        "actual_first_two_lsb_sample": 17601,
+        "offset_samples": 1
+      },
+      {
+        "frame": 35,
+        "expected_sample": 27200,
+        "actual_first_two_lsb_sample": 27201,
+        "offset_samples": 1
+      },
+      {
+        "frame": 48,
+        "expected_sample": 37600,
+        "actual_first_two_lsb_sample": 37601,
+        "offset_samples": 1
+      },
+      {
+        "frame": 60,
+        "expected_sample": 47200,
+        "actual_first_two_lsb_sample": 47201,
+        "offset_samples": 1
+      },
+      {
+        "frame": 68,
+        "expected_sample": 53600,
+        "actual_first_two_lsb_sample": 53601,
+        "offset_samples": 1
+      },
+      {
+        "frame": 82,
+        "expected_sample": 64800,
+        "actual_first_two_lsb_sample": 64801,
+        "offset_samples": 1
+      },
+      {
+        "frame": 91,
+        "expected_sample": 72000,
+        "actual_first_two_lsb_sample": 72001,
+        "offset_samples": 1
+      }
+    ],
+    "sha256sums_all_passed": true,
+    "source_hashes_verified": true,
+    "listened": false,
+    "unity_import_verified": false,
+    "visual_sync_approved": false,
+    "method": "Read the real Actions WAV bytes using Python wave/struct independently; no synthesis or playback executed.",
+    "downloaded_report_reproduced_exactly": true
+  },
+  "mix_review_note": "Soft glove/follower contact first-10ms RMS after 0.4 gain is near original wind mixed RMS. This is a signal-only observation, not listening/masking proof. Prioritize these two cues in real phone mix review.",
+  "remaining": [
+    "Import this actual WAV and meta through the authorized Unity scene/build pipeline",
+    "Run 13 new native lifecycle cases and full existing suite",
+    "Measure real paused playback cursor and no leaked/replayed cues on interruption",
+    "Listen to this hash in the real game mix and verify visual contact synchronization"
+  ]
+}

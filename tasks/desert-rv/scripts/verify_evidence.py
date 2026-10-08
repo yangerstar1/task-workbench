@@ -69,7 +69,7 @@ def identity():
 BASELINE_EXPORT_SHA = '003d3ba2c39fc626e85053371a7b454358a35f291d5a82e30ff5be1999aec2f9'
 BASELINE_COMMIT = '6dc675517db262c72dcb8c1507239d4bf10acc5d'
 SOURCE_ROOTS = ('tasks/desert-rv/unity', 'tasks/desert-rv/backup-assets', 'tasks/desert-rv/scripts', 'tasks/desert-rv/art/import-candidate')
-SOURCE_FILES = ('tasks/desert-rv/ASSET-NOTICES.md', '.github/workflows/desert-rv-android.yml', '.github/workflows/desert-rv-environment.yml', '.github/workflows/desert-rv-candidate-art-import.yml', '.github/workflows/desert-rv-supplies.yml')
+SOURCE_FILES = ('tasks/desert-rv/ASSET-NOTICES.md', '.github/workflows/desert-rv-android.yml', '.github/workflows/desert-rv-environment.yml', '.github/workflows/desert-rv-candidate-art-import.yml', '.github/workflows/desert-rv-supplies.yml', 'tasks/desert-rv/art/reload-audio/generated-candidate.json')
 FONT_PATH = 'tasks/desert-rv/unity/Assets/DesertRV/UI/Fonts/NotoSansCJKsc-Regular.otf'
 FONT_SHA = 'a6a530f3e7e7a2c299470c42efff2e109fcc0a5be92686b96d5e84a05f3ecb2b'
 
