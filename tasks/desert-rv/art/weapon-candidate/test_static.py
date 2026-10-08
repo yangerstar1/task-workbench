@@ -50,4 +50,31 @@ class PixelBufferRegression(unittest.TestCase):
  def test_rgb_image_rejected(self):
   from pixel_evidence import alpha_bounds
   with self.assertRaisesRegex(ValueError,'RGBA'):alpha_bounds([0.0]*12,2,2,3)
+class ArtifactGateRegression(unittest.TestCase):
+ def test_historical_failure_not_success(self):
+  from asset_validation import technical_failures
+  self.assertIn('missing_aspect_evidence',technical_failures({}))
+  failures=technical_failures({'mesh_groups':{'weapon':{'in_budget':False},'hands':{'in_budget':False}}})
+  self.assertIn('triangle_budget:weapon',failures)
+ def test_backup_not_published_or_hashed(self):
+  from asset_validation import delivered_file
+  import tempfile
+  with tempfile.TemporaryDirectory() as d:
+   for name,expect in [('x.blend1',False),('x.blend',True),('x.png',True),('SHA256SUMS',False)]:
+    p=pathlib.Path(d)/name;p.write_bytes(b'x');self.assertEqual(delivered_file(p),expect)
+ def test_carrier_channel_cleanup_preserves_other_motion(self):
+  from asset_validation import strip_carrier_animation_channels,read_glb
+  import tempfile,json,struct
+  doc={'nodes':[{'name':'IncomingOffset'},{'name':'LeftReloadOffset'},{'name':'hand.L'}],'animations':[{'name':'Reload','channels':[{'target':{'node':i,'path':'translation'},'sampler':0} for i in range(3)],'samplers':[]}]}
+  data=json.dumps(doc).encode();data+=b' '*((-len(data))%4)
+  raw=b'glTF'+struct.pack('<II',2,20+len(data))+struct.pack('<II',len(data),0x4E4F534A)+data
+  with tempfile.TemporaryDirectory() as d:
+   p=pathlib.Path(d)/'test.glb';p.write_bytes(raw);self.assertEqual(strip_carrier_animation_channels(p),{'Reload':2});_,out,_=read_glb(p);self.assertEqual([c['target']['node'] for c in out['animations'][0]['channels']],[2])
+ def test_fixed_pose_and_continuous_connector(self):
+  s=(ROOT/'build_weapon.py').read_text();self.assertNotIn('best=None',s);self.assertIn("camera.data.sensor_fit='HORIZONTAL'",s);self.assertIn('y-.015,z+.027-.001605',s);self.assertIn('y+.015,z+.027+.001605',s)
+ def test_carrier_gate_not_replaced_by_runtime_override(self):
+  s=(ROOT/'package_evidence.py').read_text();self.assertIn("failures.append('fbx_carrier_channels_present')",s);self.assertIn("failures.append('glb_carrier_channels_present')",s)
+  s=(ROOT/'build_weapon.py').read_text();self.assertIn("kwargs['force_keep']=False",s);self.assertIn('bake_anim_use_all_bones=False',s)
+ def test_fbx_single_export_path(self):
+  s=(ROOT/'build_weapon.py').read_text();self.assertIn('bake_anim_use_all_actions=False,bake_anim_use_nla_strips=True',s)
 if __name__=='__main__':unittest.main()

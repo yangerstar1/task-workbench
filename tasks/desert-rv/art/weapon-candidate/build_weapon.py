@@ -3,10 +3,13 @@ Blender 4.2.3; no downloaded art; units metres; +Y muzzle, +Z up, +X right.
 """
 import bpy, math, json, pathlib, sys, hashlib
 from mathutils import Vector
+from mathutils.bvhtree import BVHTree
 from bpy_extras.object_utils import world_to_camera_view
 sys.path.insert(0,str(pathlib.Path(__file__).resolve().parent))
+from asset_validation import strip_carrier_animation_channels, delivered_file
 from pixel_evidence import alpha_bounds, is_core_asset, core_fully_visible, core_fit_score
 OUT=pathlib.Path(sys.argv[sys.argv.index('--')+1] if '--' in sys.argv else 'output'); OUT.mkdir(parents=True,exist_ok=True)
+bpy.context.preferences.filepaths.save_version=0
 bpy.ops.object.select_all(action='SELECT'); bpy.ops.object.delete(use_global=False)
 scene=bpy.context.scene; scene.render.engine='CYCLES'; scene.cycles.samples=24
 scene.render.resolution_percentage=100; scene.render.image_settings.file_format='PNG'; scene.render.image_settings.color_mode='RGBA'; scene.render.fps=60
@@ -17,17 +20,17 @@ def mat(name,c,metal=0,rough=.45):
  p=m.node_tree.nodes.get('Principled BSDF'); p.inputs['Base Color'].default_value=(*c,1); p.inputs['Metallic'].default_value=metal; p.inputs['Roughness'].default_value=rough
  return m
 cream=mat('Powdercoat_Ivory',(.72,.64,.43),.18,.67); red=mat('Oxide_Red',(.38,.065,.028),.18,.61); dark=mat('Graphite_Parkerized',(.043,.05,.05),.6,.47); steel=mat('Brushed_Steel',(.32,.37,.39),.85,.27); rubber=mat('Glove_Graphite',(.036,.043,.047),0,.82); orange=mat('Cuff_Safety_Orange',(.68,.16,.018),0,.62); seam=mat('Glove_Seam',(.14,.15,.13),0,.77)
-def finish(o,name,m,group=gun,bevel=0):
+def finish(o,name,m,group=gun,bevel=0,bevel_segments=2):
  o.name=name; o.data.materials.append(m)
  if bevel:
-  mod=o.modifiers.new('Manufactured_Edge_Radius','BEVEL'); mod.width=bevel; mod.segments=3
+  mod=o.modifiers.new('Manufactured_Edge_Radius','BEVEL'); mod.width=bevel; mod.segments=bevel_segments
   bpy.context.view_layer.objects.active=o; bpy.ops.object.modifier_apply(modifier=mod.name)
  for p in o.data.polygons:p.use_smooth=len(p.vertices)<=4
  assets.append(o); group.append(o); return o
 def cube(name,loc,scale,m,bevel=.004,group=gun):
  bpy.ops.mesh.primitive_cube_add(size=1,location=loc); o=bpy.context.object; o.dimensions=scale; bpy.ops.object.transform_apply(location=False,rotation=False,scale=True); return finish(o,name,m,group,bevel)
-def cyl(name,a,b,r,m,vertices=32,group=gun):
- a,b=Vector(a),Vector(b); d=b-a; bpy.ops.mesh.primitive_cylinder_add(vertices=vertices,radius=r,depth=d.length,location=(a+b)/2); o=bpy.context.object; o.rotation_euler=d.to_track_quat('Z','Y').to_euler(); return finish(o,name,m,group,.001)
+def cyl(name,a,b,r,m,vertices=24,group=gun):
+ a,b=Vector(a),Vector(b); d=b-a; bpy.ops.mesh.primitive_cylinder_add(vertices=vertices,radius=r,depth=d.length,location=(a+b)/2); o=bpy.context.object; o.rotation_euler=d.to_track_quat('Z','Y').to_euler(); return finish(o,name,m,group,.0008 if r>.008 else 0,bevel_segments=1)
 def profile(name,points,width,m):
  # Hand-authored YZ outline extruded along X, with real tapered housing silhouette.
  vs=[(x,y,z) for x in [-width/2,width/2] for y,z in points]; n=len(points)
@@ -51,7 +54,7 @@ for destination,prefix in [(nail_objs,'LoadedNail'),(strip_objs,'IncomingNail')]
   v=FIRST_NAIL+NAIL_PITCH*i; y,z=v.y,v.z
   shaft=cyl(prefix+'_%02d'%i,(0,y,z),(0,y,z+.028),.0017,steel,8)
   head=cyl(prefix+'_Head_%02d'%i,(0,y,z+.028),(0,y,z+.03),.0035,steel,12)
-  bond=cyl(prefix+'_Bond_%02d'%i,(0,y-.004,z+.027),(0,y+.004,z+.028),.003,red,12)
+  bond=cyl(prefix+'_Bond_%02d'%i,(0,y-.015,z+.027-.001605),(0,y+.015,z+.027+.001605),.0025,red,8)
   bpy.ops.object.select_all(action='DESELECT')
   for part in [shaft,head,bond]:part.select_set(True)
   for part in [head,bond]:assets.remove(part); gun.remove(part)
@@ -117,7 +120,7 @@ def glove(side,center):
  rem=o.modifiers.new('Continuous_Anatomy_Union','REMESH'); rem.mode='VOXEL'; rem.voxel_size=.0018; bpy.ops.object.modifier_apply(modifier=rem.name)
  sm=o.modifiers.new('Leather_Form_Relaxation','SMOOTH'); sm.factor=.32; sm.iterations=2; bpy.ops.object.modifier_apply(modifier=sm.name)
  o.data.calc_loop_triangles(); count=len(o.data.loop_triangles)
- dec=o.modifiers.new('Export_Topology_Budget','DECIMATE'); dec.ratio=min(1,6500/count); bpy.ops.object.modifier_apply(modifier=dec.name)
+ dec=o.modifiers.new('Export_Topology_Budget','DECIMATE'); dec.ratio=min(1,5200/count); bpy.ops.object.modifier_apply(modifier=dec.name)
  finish(o,o.name,rubber,hands)
  cuff=cyl('Cuff_'+side,c+Vector((s*.035,-.065,-.09)),c+Vector((s*.035,-.11,-.12)),.035,rubber,32,hands)
  cyl('Cuff_Orange_Band_'+side,c+Vector((s*.035,-.075,-.097)),c+Vector((s*.035,-.088,-.105)),.036,orange,32,hands)
@@ -205,7 +208,7 @@ for clip,end in [('Idle',121),('Fire',14.2),('Reload',100)]:
   strip_path=[(1,(-.12,-.10,-.24)),(35,(-.12,-.10,-.24)),(48,(-.10,0,.075)),(60,(0,0,.045)),(68,(0,0,0)),(100,(0,0,0))]
   for f,d in strip_path:key('reload_strip',f,d)
   hand_path=[(1,(0,0,0)),(12,(.015,-.310,-.155)),(23,(.015,-.365,-.161)),
-   (35,(-.105,-.032,-.340)),(48,(-.085,.068,-.025)),(60,(.015,.068,-.055)),(68,(.015,.068,-.100)),
+   (35,(-.127,-.032,-.340)),(48,(-.107,.068,-.025)),(60,(-.007,.068,-.055)),(68,(-.007,.068,-.100)),
    (73,(-.06,0,.015)),(82,(.015,-.365,-.161)),(91,(.015,-.310,-.155)),(100,(0,0,0))]
   for f,d in hand_path:key('arm.L',f,d)
   for phase,con in ik_controls:
@@ -223,7 +226,21 @@ bpy.context.view_layer.objects.active=rig
 for tr in rig.animation_data.nla_tracks:tr.mute=False
 rig.animation_data.action=None
 bpy.ops.export_scene.gltf(filepath=str(OUT/'weapon_hands.glb'),use_selection=True,export_format='GLB',export_animation_mode='NLA_TRACKS',export_nla_strips=True,export_skins=True)
-bpy.ops.export_scene.fbx(filepath=str(OUT/'weapon_hands.fbx'),use_selection=True,add_leaf_bones=False,bake_anim=True,bake_anim_use_all_actions=True,axis_forward='-Z',axis_up='Y')
+carrier_cleanup=strip_carrier_animation_channels(OUT/'weapon_hands.glb')
+(OUT/'carrier-channel-cleanup.json').write_text(json.dumps(carrier_cleanup,indent=2))
+# Blender 4.2.3 forces constant NLA channels via force_keep=True even when
+# bake_anim_use_all_bones=False. Disable only that forced retention during this
+# export; actual sampled motion remains, and package validation inspects links.
+from io_scene_fbx import export_fbx_bin
+original_fbx_animation_sampler=export_fbx_bin.fbx_animations_do
+def export_motion_without_forced_constants(*args,**kwargs):
+ kwargs['force_keep']=False
+ return original_fbx_animation_sampler(*args,**kwargs)
+export_fbx_bin.fbx_animations_do=export_motion_without_forced_constants
+try:
+ bpy.ops.export_scene.fbx(filepath=str(OUT/'weapon_hands.fbx'),use_selection=True,add_leaf_bones=False,bake_anim=True,bake_anim_use_all_actions=False,bake_anim_use_nla_strips=True,bake_anim_use_all_bones=False,bake_anim_simplify_factor=1.0,axis_forward='-Z',axis_up='Y')
+finally:export_fbx_bin.fbx_animations_do=original_fbx_animation_sampler
+
 for tr in rig.animation_data.nla_tracks:tr.mute=True
 rig.animation_data.action=bpy.data.actions['Idle']; scene.frame_set(1)
 validation={'candidate_only':True,'approved':False,'blender':bpy.app.version_string,'coordinate_system':'+Y muzzle, +Z up, +X right; export converts axes','clips':clips,'mesh_groups':{},'weight_errors':[],'limitations':['Human visual acceptance required. Continuous glove voxel topology is a first candidate, not final hand retopology.','Reload visual preview is loadedBefore=3, added=5. Runtime must drive 12 individual nail renderers and synchronized offset bones from the authoritative count snapshot.','Follower contact and mesh penetration have not been certified. Candidate must not enter production scene.'],'quality_gate':'PENDING_RENDER_REVIEW'}
@@ -234,12 +251,12 @@ for label,objs,budget in [('weapon',gun,[8000,12000]),('hands',hands,[10000,1600
   for v in o.data.vertices:
    ws=[g.weight for g in v.groups if g.weight>1e-6]
    if len(ws)>4 or abs(sum(ws)-1)>1e-5:validation['weight_errors'].append([o.name,v.index,len(ws),sum(ws)])
- validation['mesh_groups'][label]={'triangles':tris,'initial_budget':budget,'in_budget':budget[0]<=tris<=budget[1]}
+ validation['mesh_groups'][label]={'triangles':tris,'per_mesh_triangles':{o.name:len(o.data.loop_triangles) for o in objs},'initial_budget':budget,'in_budget':budget[0]<=tris<=budget[1]}
 # Sample shared-grip authoring references throughout each contact phase.
 # These measure kinematic alignment, NOT triangle penetration or anatomical quality.
 contact_report=[]
 rig.animation_data.action=bpy.data.actions['Reload']
-for phase,frames,target,ref in [('pull_follower',range(12,24),'follower',(.015,-.18,-.178)),('carry_and_seat_strip',range(35,69),'reload_strip',(.015,.198,-.123)),('release_follower',range(82,92),'follower',(.015,-.18,-.178))]:
+for phase,frames,target,ref in [('pull_follower',range(12,24),'follower',(.015,-.18,-.178)),('carry_and_seat_strip',range(35,69),'reload_strip',(-.007,.198,-.123)),('release_follower',range(82,92),'follower',(.015,-.18,-.178))]:
  errors=[]; fingertip_errors=[]
  for frame in frames:
   scene.frame_set(frame); bpy.context.view_layer.update()
@@ -284,17 +301,34 @@ for clip in clips:
   preview_pose(clip,f); scene.render.filepath=str(folder/('%04d.png'%f)); bpy.ops.render.render(write_still=True)
 # Two-sided static contact witnesses: approach, acquired strip, guide, seated, release.
 rig.animation_data.action=bpy.data.actions['Reload']; camera.data.ortho_scale=.85
-for frame in [30,35,60,68,91]:
+for frame in [30,35,*range(55,69),91]:
  preview_pose('Reload',frame)
  for side in [-1,1]:
   camera.location=(side*1.1,-.12,.13); look(camera,(0,.02,-.18)); scene.render.filepath=str(OUT/f'reload_contact_{frame:03d}_{side:+d}.png'); bpy.ops.render.render(write_still=True)
 # Countable empty / partial / nearly-full magazine boundary evidence.
+for frame in [55,60,64,68]:
+ preview_pose('Reload',frame,11,1)
+ for side in [-1,1]:
+  camera.location=(side*1.1,-.12,.13); look(camera,(0,.02,-.18)); scene.render.filepath=str(OUT/f'nearly_full_contact_{frame:03d}_{side:+d}.png'); bpy.ops.render.render(write_still=True)
 validation['count_evidence']=[]
 for before,added in [(0,12),(3,5),(11,1)]:
  for frame in [1,60,100]:
   preview_pose('Reload',frame,before,added); camera.location=(-1.1,-.12,.13); look(camera,(0,.02,-.18))
   name=f'reload_count_{before:02d}_plus_{added:02d}_frame_{frame:03d}.png'; scene.render.filepath=str(OUT/name); bpy.ops.render.render(write_still=True)
   validation['count_evidence'].append({'image':name,'loaded_before':before,'planned_added':added,'frame':frame,'visible_loaded':sum(not o.hide_render for o in nail_objs),'visible_incoming':sum(not o.hide_render for o in strip_objs)})
+# Actual triangle-surface overlap samples, distinct from fingertip IK residuals.
+# Test only fixed magazine rails/spine and the other glove; collated nails are
+# intentional fingertip contact and are not included in this obstruction test.
+def evaluated_bvh(obj):
+ deps=bpy.context.evaluated_depsgraph_get(); ev=obj.evaluated_get(deps); mesh=ev.to_mesh()
+ try:return BVHTree.FromPolygons([ev.matrix_world@v.co for v in mesh.vertices],[tuple(p.vertices) for p in mesh.polygons],all_triangles=False,epsilon=0)
+ finally:ev.to_mesh_clear()
+validation['loading_surface_samples']=[]
+for before,added in [(0,12),(3,5),(11,1)]:
+ for frame in range(55,69):
+  preview_pose('Reload',frame,before,added); hand_tree=evaluated_bvh(left)
+  blocked=[{'object':obj.name,'triangle_pairs':len(hand_tree.overlap(evaluated_bvh(obj)))} for obj in [*filter(lambda o:o!=follower,mag_objs),right]]
+  validation['loading_surface_samples'].append({'loaded_before':before,'added':added,'frame':frame,'intersections':[b for b in blocked if b['triangle_pairs']>0]})
 rig.animation_data.action=bpy.data.actions['Idle']; preview_pose('Idle',1); scene.cycles.samples=24
 # Preserve useful partial evidence before potentially failing image readback.
 (OUT/'validation.json').write_text(json.dumps(validation,indent=2)); bpy.ops.wm.save_as_mainfile(filepath=str(OUT/'weapon_hands.blend'))
@@ -307,19 +341,18 @@ def projected_bounds(core_only=False):
  bpy.context.view_layer.update(); deps=bpy.context.evaluated_depsgraph_get()
  pts=[world_to_camera_view(scene,camera,o.evaluated_get(deps).matrix_world@Vector(v)) for o in assets if not(core_only and not is_core_asset(o.name)) for v in o.evaluated_get(deps).bound_box]
  return [min(p.x for p in pts),min(p.y for p in pts),max(p.x for p in pts),max(p.y for p in pts)]
+# One immutable pose selected from static projection of the actual #3 GLB.
+# Both aspects share model/camera transform and horizontal FOV. Only off-axis
+# vertical lens shift compensates for aspect ratio to preserve the lower safe zone.
+# No per-size search and no inf/invalid fallback selection.
+rig.location=(.76484,2.44693,-.44683)
+rig.rotation_euler=tuple(math.radians(a) for a in (-10,-30,55))
+camera.data.sensor_fit='HORIZONTAL'
+base_aspect=16/9; target_center_y=.178
 for w,h in [(1280,720),(1600,720)]:
  scene.render.resolution_x=w; scene.render.resolution_y=h
- best=None
- for yaw in [25,30,35,40,45,50,55]:
-  for distance in [1.0+i*.09 for i in range(25)]:
-   rig.rotation_euler=(math.radians(9),0,math.radians(yaw)); rig.location=(.48,distance,-.30)
-   for _ in range(5):
-    b=projected_bounds(core_only=True); rig.location.x+=(.805-(b[0]+b[2])/2)*distance*36/35
-    rig.location.z+=(.185-(b[1]+b[3])/2)*distance*36/35*h/w
-   b=projected_bounds(core_only=True); width=b[2]-b[0]; height=b[3]-b[1]
-   score=core_fit_score(b)
-   if best is None or score<best[0]:best=(score,tuple(rig.location),tuple(rig.rotation_euler))
- rig.location=best[1]; rig.rotation_euler=best[2]; b=projected_bounds(core_only=True)
+ aspect=w/h; camera.data.shift_y=(target_center_y-.5)/base_aspect-(target_center_y-.5)/aspect
+ b=projected_bounds(core_only=True)
  scene.render.filepath=str(OUT/f'viewmodel_{w}x{h}.png'); bpy.ops.render.render(write_still=True)
  # Exact alpha-pixel footprint from the actual render, not only projected boxes.
  # Headless Render Result may expose no pixel buffer after write_still.
@@ -330,8 +363,8 @@ for w,h in [(1280,720),(1600,720)]:
   pixel_bounds=alpha_bounds(evidence.pixels[:],w,h,evidence.channels)
  finally:bpy.data.images.remove(evidence)
  width=pixel_bounds[2]-pixel_bounds[0]; height=pixel_bounds[3]-pixel_bounds[1]
- validation['viewmodels'][f'{w}x{h}']={'normalized_bounds':pixel_bounds,'unclipped_core_bounds':b,'core_fully_visible':core_fully_visible(b),'width_fraction':width,'height_fraction':height,'target_fit':core_fully_visible(b) and .25<=width<=.32 and .25<=height<=.35,'camera':'fixed +Y perspective 35mm, no rotation trick','rig_location':list(rig.location),'rig_euler':list(rig.rotation_euler),'center_clear':not(pixel_bounds[0]<=.5<=pixel_bounds[2] and pixel_bounds[1]<=.5<=pixel_bounds[3]),'sleeves_reach_lower_edge':pixel_bounds[1]<=1/h,'ui_buttons':'Requires actual game HUD overlay review.'}
+ validation['viewmodels'][f'{w}x{h}']={'normalized_bounds':pixel_bounds,'unclipped_core_bounds':b,'core_fully_visible':core_fully_visible(b),'width_fraction':width,'height_fraction':height,'target_fit':core_fully_visible(b) and .25<=width<=.32 and .25<=height<=.35,'camera':'fixed +Y perspective 35mm, no rotation trick','rig_location':list(rig.location),'rig_euler':list(rig.rotation_euler),'camera_shift_y':camera.data.shift_y,'stable_pose_id':'R4_shared_pose_-10_-30_55','center_clear':not(pixel_bounds[0]<=.5<=pixel_bounds[2] and pixel_bounds[1]<=.5<=pixel_bounds[3]),'sleeves_reach_lower_edge':pixel_bounds[1]<=1/h,'ui_buttons':'Requires actual game HUD overlay review.'}
 rig.location=(0,0,0); rig.rotation_euler=(0,0,0)
 (OUT/'validation.json').write_text(json.dumps(validation,indent=2)); bpy.ops.wm.save_as_mainfile(filepath=str(OUT/'weapon_hands.blend'))
-(OUT/'SHA256SUMS').write_text('\n'.join(hashlib.sha256(p.read_bytes()).hexdigest()+'  '+p.name for p in sorted(OUT.iterdir()) if p.is_file() and p.name!='SHA256SUMS')+'\n')
+(OUT/'SHA256SUMS').write_text('\n'.join(hashlib.sha256(p.read_bytes()).hexdigest()+'  '+p.name for p in sorted(OUT.iterdir()) if delivered_file(p))+'\n')
 if validation['weight_errors']:raise RuntimeError('Skin weight validation failed')
