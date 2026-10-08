@@ -123,8 +123,15 @@ namespace DesertRV.Tests
             {
                 object[] args={f.Skin,f.Rig.transform,null,null};
                 Assert.That(Helper.GetMethod("TryGetAnimationTargets").Invoke(null,args),Is.True);
-                var targets=(Transform[])args[2];Assert.That(targets,Has.Member(f.Skin.transform));Assert.That(targets,Has.Member(f.Bones[0]));
-                Assert.That(targets,Has.No.Member(f.Bones[2]));Assert.That(targets.Length,Is.EqualTo(2));
+                var targets=(Transform[])args[2];
+                // Transform implements IEnumerable over its children. NUnit collection
+                // constraints can compare two leaf Transforms as equal empty sequences;
+                // compare Unity object identity explicitly instead.
+                Assert.That(f.Bones[2] == f.Bones[0],Is.False);
+                Assert.That(targets.Any(t=>t==f.Skin.transform),Is.True);
+                Assert.That(targets.Any(t=>t==f.Bones[0]),Is.True);
+                Assert.That(targets.Any(t=>t==f.Bones[2]),Is.False);
+                Assert.That(targets.Length,Is.EqualTo(2));
             }
         }
     }
