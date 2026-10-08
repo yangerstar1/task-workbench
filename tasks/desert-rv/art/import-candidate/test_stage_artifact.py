@@ -39,6 +39,14 @@ class StageTests(unittest.TestCase):
     def test_discovery_rejects_invented_takes(self):
         self.contract['clips']=[{'take':'guessed'}]
         with self.assertRaisesRegex(ValueError,'Discovery cannot'):self.call()
+    def test_discovery_rejects_explicit_empty_or_null_keys(self):
+        for key in ('bindings','clips','materials'):
+            for value in (None,[],{}):
+                self.contract[key]=value
+                with self.assertRaisesRegex(ValueError,'Discovery cannot'):self.call()
+            del self.contract[key]
+    def test_discovery_allows_strict_words_in_value(self):
+        self.contract['note']='bindings clips materials';self.call()
     def test_partial_cannot_promote_to_strict(self):
         self.contract['mode']='STRICT_BINDING'
         with self.assertRaisesRegex(ValueError,'Partial diagnostic'):self.call()

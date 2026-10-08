@@ -33,7 +33,7 @@ def verify(contract, run, artifact, archive):
     if mode=='STRICT_BINDING':
         require(scope=='FULL_CANDIDATE', 'Partial diagnostic cannot enter strict binding')
     else:
-        require(not contract.get('bindings') and not contract.get('clips') and not contract.get('materials'), 'Discovery cannot claim strict bindings')
+        require(not any(key in contract for key in ('bindings','clips','materials')), 'Discovery cannot contain strict binding keys')
     require(contract['repository'] == REPO, 'Repository mismatch')
     require(re.fullmatch(r'[a-f0-9]{40}', contract['sourceCommit']), 'Exact source SHA required')
     require(run['repository']['full_name'] == REPO and run['head_sha'] == contract['sourceCommit'], 'Run source mismatch')

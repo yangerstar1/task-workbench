@@ -91,5 +91,5 @@ def export(root,output,native='success',protected='success'):
 if __name__=='__main__':
     import argparse
     p=argparse.ArgumentParser();p.add_argument('--native',required=True);p.add_argument('--protected',required=True);a=p.parse_args()
-    try: export(Path('tasks/desert-rv'),Path('tasks/desert-rv/artifacts/candidate-art-export'),a.native,a.protected)
+    try: export(Path('tasks/desert-rv'),Path('tasks/desert-rv/candidate-art-export'),a.native,a.protected)
     except EvidenceError as e: raise SystemExit(str(e))

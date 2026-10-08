@@ -30,8 +30,8 @@
     },
     {
       "path": ".github/workflows/desert-rv-candidate-art-import.yml",
-      "sha256": "ac2ae9f16e1eceb59fb0f121b88fd140edc3406237b8a1c47cffa84fb098791b",
-      "size": 4158
+      "sha256": "e030e30c58a384bcbb2aa5173ea28521b590e9429b015231322a9adab827d1c0",
+      "size": 4148
     },
     {
       "path": ".github/workflows/desert-rv-environment.yml",
@@ -65,8 +65,8 @@
     },
     {
       "path": "tasks/desert-rv/art/import-candidate/stage_artifact.py",
-      "sha256": "ad9585683a250616b1827abbadf66a8236e70f0f322edee7f770d9eb41f4f1df",
-      "size": 5019
+      "sha256": "3cb6057394dfe06a50fa0368a28a1711d3531dee841e02ea9720caeca14b8735",
+      "size": 5001
     },
     {
       "path": "tasks/desert-rv/art/import-candidate/test_capture_source.py",
@@ -75,8 +75,8 @@
     },
     {
       "path": "tasks/desert-rv/art/import-candidate/test_stage_artifact.py",
-      "sha256": "e8ae1a312b569ac96c53e10170876b3a267d406567e5c972f8bf369322ad7ee8",
-      "size": 4587
+      "sha256": "d593395de12274e800723ad7f67f115fb1046f21972e91be608f168f038b5d1d",
+      "size": 5036
     },
     {
       "path": "tasks/desert-rv/art/import-candidate/test_verify_output.py",
@@ -85,8 +85,8 @@
     },
     {
       "path": "tasks/desert-rv/art/import-candidate/verify_output.py",
-      "sha256": "e9f4a4e51f9179c0c71e4774e7a592d305f7d32d9f4b9c521e869f09a4d8f262",
-      "size": 6492
+      "sha256": "71b2540d107eda7b3a21b202ff59ec31dcd4a8ed9205fda44aba7fec12276fc4",
+      "size": 6482
     },
     {
       "path": "tasks/desert-rv/backup-assets/fonts/NotoSansCJKsc-Regular.otf.xz",
@@ -3495,8 +3495,8 @@
     },
     {
       "path": "tasks/desert-rv/unity/Assets/DesertRV/Editor/JourneyCandidateArtDiscovery.cs",
-      "sha256": "1e770d318c4f9ab5b8e1be54710e124b50ef6788248f0429936238c877f708a2",
-      "size": 8659
+      "sha256": "f25c44151f6d9ebd14afa339fb9336c897254a940ab745a86bcd9fa31c154bb5",
+      "size": 11612
     },
     {
       "path": "tasks/desert-rv/unity/Assets/DesertRV/Editor/JourneyCandidateArtDiscovery.cs.meta",
@@ -4175,8 +4175,8 @@
     },
     {
       "path": "tasks/desert-rv/unity/Assets/DesertRV/Tests/CandidateArt/CandidateArtImportTests.cs",
-      "sha256": "3cd4d15accc0013bdf316eecc33d6707b2c4c6cf675a8f1d29c73cf0dab39543",
-      "size": 825
+      "sha256": "ca29662b0da459b75e48c7f6878438c3d743dae2b6e45459d08e7291e196c58b",
+      "size": 1540
     },
     {
       "path": "tasks/desert-rv/unity/Assets/DesertRV/Tests/CandidateArt/CandidateArtImportTests.cs.meta",

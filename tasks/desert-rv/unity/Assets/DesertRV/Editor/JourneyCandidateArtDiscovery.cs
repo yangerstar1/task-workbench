@@ -41,6 +41,57 @@ namespace DesertRV.Editor
             public string limitation="Raw imported structure only. No final material mapping, weakpoint axis calibration, motion/visual acceptance or gameplay verification. Muzzle basis is observed, not certified barrel direction.";
             public List<Model> models=new List<Model>(); public List<string> failures=new List<string>();
         }
+        // Scan actual top-level JSON property names. Escapes and nested/string values
+        // are consumed structurally; value text is never mistaken for a key.
+        public static bool ContainsStrictRootFields(string json)
+        {
+            int depth=0; bool keyExpected=false;
+            for(int i=0;i<json.Length;i++)
+            {
+                char ch=json[i];
+                if(ch=='"')
+                {
+                    var token=new System.Text.StringBuilder(); bool closed=false;
+                    while(++i<json.Length)
+                    {
+                        ch=json[i];
+                        if(ch=='"'){closed=true;break;}
+                        if(ch=='\\')
+                        {
+                            if(++i>=json.Length)throw new FormatException("Invalid JSON escape.");
+                            ch=json[i];
+                            if(ch=='u')
+                            {
+                                if(i+4>=json.Length)throw new FormatException("Invalid Unicode escape.");
+                                token.Append((char)Convert.ToInt32(json.Substring(i+1,4),16));i+=4;continue;
+                            }
+                            switch(ch)
+                            {
+                                case '"':case '\\':case '/':token.Append(ch);break;
+                                case 'b':token.Append('\b');break;case 'f':token.Append('\f');break;
+                                case 'n':token.Append('\n');break;case 'r':token.Append('\r');break;case 't':token.Append('\t');break;
+                                default:throw new FormatException("Invalid JSON escape.");
+                            }
+                        }
+                        else token.Append(ch);
+                    }
+                    if(!closed)throw new FormatException("Unclosed JSON string.");
+                    if(depth==1 && keyExpected)
+                    {
+                        int next=i+1;while(next<json.Length && char.IsWhiteSpace(json[next]))next++;
+                        if(next>=json.Length || json[next]!=':')throw new FormatException("JSON property colon required.");
+                        string key=token.ToString();if(key=="bindings" || key=="clips" || key=="materials")return true;
+                        keyExpected=false;
+                    }
+                    continue;
+                }
+                if(ch=='{' || ch=='['){depth++;if(depth==1)keyExpected=true;}
+                else if(ch=='}' || ch==']'){depth--;if(depth<0)throw new FormatException("Invalid JSON nesting.");}
+                else if(ch==',' && depth==1)keyExpected=true;
+            }
+            if(depth!=0)throw new FormatException("Unclosed JSON container.");
+            return false;
+        }
         public static void Discover()
         {
             string folder=Path.GetFullPath("CandidateImportInput"); string contractFile=Path.Combine(folder,"contract.json");
@@ -48,10 +99,13 @@ namespace DesertRV.Editor
             try
             {
                 Check(Application.unityVersion=="6000.3.19f1","Exact Unity version required.");
-                var c=JsonUtility.FromJson<Contract>(File.ReadAllText(contractFile)); ValidateSourceContract(c);
+                string contractJson=File.ReadAllText(contractFile);
+                var c=JsonUtility.FromJson<Contract>(contractJson); ValidateSourceContract(c);
                 Check(c.mode=="DISCOVERY_ONLY","Discovery entry requires explicit DISCOVERY_ONLY contract.");
                 Check(c.scope=="DEATH_DIAGNOSTIC_NOT_FULL" || c.scope=="FULL_CANDIDATE" || c.scope=="PARTIAL_DIAGNOSTIC_NOT_FULL","Explicit bounded source scope required.");
-                Check(c.bindings==null && (c.clips==null || c.clips.Length==0) && (c.materials==null || c.materials.Length==0),"Discovery must not contain inferred strict bindings/takes/material mappings.");
+                // JsonUtility can materialize absent serializable fields as default objects.
+                // Reject strict keys in the reviewed raw JSON, not serializer-created defaults.
+                Check(!ContainsStrictRootFields(contractJson),"Discovery must not contain strict bindings/takes/material mapping keys.");
                 report.scope=c.scope;report.runUrl=c.runUrl;report.sourceCommit=c.sourceCommit;report.artifactName=c.artifactName;report.artifactSha256=c.artifactSha256;report.contractSha256=Sha(contractFile);
                 Check(Sha(Path.Combine(folder,"artifact.zip"))==c.artifactSha256,"Artifact archive mismatch.");
                 string destination="Assets/DesertRV/CandidateArtDiscovery/"+c.id;
