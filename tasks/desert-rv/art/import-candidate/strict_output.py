@@ -91,7 +91,7 @@ def native_report(root):
   require(safe(p).stat().st_size<=10*1024**2,'STRICT_NATIVE_OVERSIZE');r=ET.parse(p).getroot()
   if r.tag=='test-run':reports.append((p,r))
  require(len(reports)==1,'STRICT_NATIVE_COUNT');p,r=reports[0];cases=list(r.iter('test-case'))
- require(r.get('result')=='Passed' and len(cases)==5 and {c.get('fullname') for c in cases}=={NATIVE,'DesertRV.Tests.CandidateAnimationPolicyTests.OnlyArmoredAttackGetsTheSourceLoopException','DesertRV.Tests.CandidateAnimationPolicyTests.EqualKeyValuesDoNotExcuseUnsafeTangents','DesertRV.Tests.CandidateAnimationPolicyTests.MissingNativeAnimatorGetsCreatedAndReused','DesertRV.Tests.CandidateAnimationPolicyTests.OpenCoreEmissionSurvivesRealSaveReimportAndReload'} and all(c.get('result')=='Passed' for c in cases),'STRICT_NATIVE_FAILED')
+ require(r.get('result')=='Passed' and len(cases)==6 and {c.get('fullname') for c in cases}=={NATIVE,'DesertRV.Tests.CandidateAnimationPolicyTests.OnlyArmoredAttackGetsTheSourceLoopException','DesertRV.Tests.CandidateAnimationPolicyTests.EqualKeyValuesDoNotExcuseUnsafeTangents','DesertRV.Tests.CandidateAnimationPolicyTests.MissingNativeAnimatorGetsCreatedAndReused','DesertRV.Tests.CandidateAnimationPolicyTests.OpenCoreEmissionSurvivesRealSaveReimportAndReload','DesertRV.Tests.CandidateAnimationPolicyTests.RenderTargetCleanupDetachesCameraBeforeDestroy'} and all(c.get('result')=='Passed' for c in cases),'STRICT_NATIVE_FAILED')
  return sha(p)
 
 def inspect_png(path,size=(960,540)):
@@ -138,7 +138,7 @@ def derived_record(project,prefix,record,m,index,files):
 
 def validate_import(project,c,contract_path,report):
  required=('mode','scope','kind','status','contractSha256','prefab','dependencyHash','dependencySha256','dependencies','runUrl','sourceCommit','artifactName','artifactSha256','candidateOnly','visualReviewed','gameplayReviewed','derivedTextures','rootCurves','clips','failures','stillRequired','importedAnimatorPaths')
- keys(report,required,('muzzle',))
+ keys(report,required,('muzzle','weaponCalibration'))
  require(report['mode']=='STRICT_BINDING' and report['scope']=='FULL_CANDIDATE' and report['kind']=='armored' and report['status']=='candidate-structure-imported-unreviewed' and report['failures']==[],'STRICT_IMPORT_STATUS')
  require(report['candidateOnly'] is True and report['visualReviewed'] is False and report['gameplayReviewed'] is False,'STRICT_APPROVAL_FORBIDDEN')
  for k in ('runUrl','sourceCommit','artifactName','artifactSha256'):require(report[k]==c[k],'STRICT_IMPORT_SOURCE_MISMATCH')
@@ -186,7 +186,7 @@ def expected_labels():
 
 
 def validate_capture(folder,prefix,imp,capture,baseline):
- keys(capture,('graphicsDeviceType','graphicsDeviceName','status','scope','prefab','dependencySha256','visualAccepted','gameplayAccepted','armoredAttackLoopIntent','notCovered','frames','neutralRoot','neutralMeshWorldMin','neutralMeshWorldMax','neutralMeshWorldSize'))
+ keys(capture,('graphicsDeviceType','graphicsDeviceName','status','scope','prefab','dependencySha256','visualAccepted','gameplayAccepted','armoredAttackLoopIntent','notCovered','frames','neutralRoot','neutralMeshWorldMin','neutralMeshWorldMax','neutralMeshWorldSize'),('weapon',))
  require(capture['status']=='captured-unreviewed' and capture['scope']=='real-Animator-pose-diagnostics-only' and capture['visualAccepted'] is False and capture['gameplayAccepted'] is False,'STRICT_CAPTURE_STATUS')
  require(capture['graphicsDeviceType']=='OpenGLCore' and isinstance(capture['graphicsDeviceName'],str) and re.fullmatch(r'[A-Za-z0-9 ().,_/+\-]{1,240}',capture['graphicsDeviceName']) and 'llvmpipe' in capture['graphicsDeviceName'].lower(),'STRICT_REAL_SOFTWARE_GRAPHICS_REQUIRED')
  require(capture['prefab']==prefix+'/Candidate.prefab' and capture['dependencySha256']==imp['dependencySha256'],'STRICT_CAPTURE_DEPENDENCY')
@@ -202,6 +202,7 @@ def validate_capture(folder,prefix,imp,capture,baseline):
   inspect_png(folder/f['image'])
   for k in ('advanceSeconds','normalizedTime','worldMinY','groundReferenceY'):require(finite(f[k]),'STRICT_FRAME_NUMBER')
   require(0<=f['advanceSeconds']<=.5 and f['groundDiagnosticApplicable'] is True and type(f['transitioning']) is bool and type(f['stateHash']) is int and -2**31<=f['stateHash']<2**31,'STRICT_FRAME_STATE')
+  require(f['worldMinY']>=f['groundReferenceY']-.004,'STRICT_GROUND_PENETRATION')
   require(type(f['sampledVertices']) is int and 1<=f['sampledVertices']<=20000000,'STRICT_MESH_COUNT')
   for k in ('outsideViewportVertices','behindCameraVertices','belowReferenceVertices'):require(type(f[k]) is int and 0<=f[k]<=f['sampledVertices'],'STRICT_MESH_DIAGNOSTIC')
   for k,limit in [('rootLocalPositionDelta',1e-5),('rootLocalScaleDelta',1e-5),('rootLocalAngleDelta',.001)]:require(finite(f[k],0,limit),'STRICT_ROOT_SAMPLE_DRIFT')
@@ -298,6 +299,8 @@ def export_strict(root,output,c,summary,native,protected):
  payload.extend((evidence/f['image'],Path('frames')/f['image']) for f in capture['frames'])
  # Armored has no muzzle observation. Exclude the nullable weapon-only field rather than export unrelated default text.
  imp.pop('muzzle',None)
+ imp.pop('weaponCalibration',None)
+ capture.pop('weapon',None)
  require(imp['stillRequired']==['Actual Unity camera rendering and human visual review','Interrupted/repeated runtime flows','Full three-region playthrough','Android device acceptance','Explicit production review and unchanged production gate'],'STRICT_IMPORT_LIMITATIONS')
  require(sum(safe(p).stat().st_size for p,_ in payload)<512*1024**2,'STRICT_EXPORT_SIZE')
  staged=Path(tempfile.mkdtemp(prefix='.strict-safe-',dir=output.parent))
@@ -307,7 +310,7 @@ def export_strict(root,output,c,summary,native,protected):
    d=staged/dest;d.parent.mkdir(parents=True,exist_ok=True);shutil.copyfile(p,d);records.append({'path':dest.as_posix(),'sha256':sha(d),'bytes':d.stat().st_size})
   for name,obj in [('import-report.json',imp),('capture-report.json',capture),('weakpoint-fixture-report.json',weak)]:
    d=staged/name;d.write_text(json.dumps(obj,indent=2)+'\n');records.append({'path':name,'sha256':sha(d),'bytes':d.stat().st_size})
-  result=dict(summary,status='STRICT_CANDIDATE_CAPTURED_NOT_ACCEPTED',approved=False,errorCode=None,files=records,nativeXmlSha256=native_hash,nativeCases=5,images=202,weakpointImages=9,protectedSource='UNCHANGED',rawReportSha256={n:sha(evidence/n) for n in ('import-report.json','capture-report.json','weakpoint-fixture-report.json')})
+  result=dict(summary,status='STRICT_CANDIDATE_CAPTURED_NOT_ACCEPTED',approved=False,errorCode=None,files=records,nativeXmlSha256=native_hash,nativeCases=6,images=202,weakpointImages=9,protectedSource='UNCHANGED',rawReportSha256={n:sha(evidence/n) for n in ('import-report.json','capture-report.json','weakpoint-fixture-report.json')})
   (staged/'receipt.json').write_text(json.dumps(result,indent=2)+'\n')
   require(not any(output.iterdir()),'STRICT_EXPORT_NOT_EMPTY')
   # Linux atomically replaces the empty runner-owned directory. No payload is visible before this commit.

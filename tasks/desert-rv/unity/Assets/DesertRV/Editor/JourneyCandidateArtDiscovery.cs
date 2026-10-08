@@ -93,7 +93,7 @@ namespace DesertRV.Editor
                     {
                         int next=i+1;while(next<json.Length && char.IsWhiteSpace(json[next]))next++;
                         if(next>=json.Length || json[next]!=':')throw new FormatException("JSON property colon required.");
-                        string key=token.ToString();if(key=="bindings" || key=="clips" || key=="materials")return true;
+                        string key=token.ToString();if(key=="bindings" || key=="clips" || key=="materials" || key=="weapon")return true;
                         keyExpected=false;
                     }
                     continue;

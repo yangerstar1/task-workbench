@@ -3,7 +3,7 @@ on:
   workflow_dispatch:
     inputs:
       mode:
-        description: Discovery enumerates actual imports; Armored strict captures reviewed technical candidates
+        description: Discovery enumerates actual imports; strict captures reviewed technical candidates
         required: true
         type: choice
         default: DISCOVERY_ONLY
@@ -20,7 +20,9 @@ permissions:
   contents: read
   actions: read
 concurrency:
-  group: desert-rv-candidate-art-import
+  # The checked-in path and exact hash are validated before any licensed Unity step.
+  # Runs have separate hosted workspaces and run-ID artifacts; identical contracts stay serialized.
+  group: desert-rv-candidate-art-import-${{ inputs.contract }}
   cancel-in-progress: false
 jobs:
   import:
@@ -38,7 +40,7 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y --no-install-recommends python3-pil python3-yaml
       - name: Test offline stager
         working-directory: tasks/desert-rv/art/import-candidate
-        run: /usr/bin/python3 -m unittest -v test_stage_artifact test_capture_source test_verify_output test_strict_output
+        run: /usr/bin/python3 -m unittest -v test_stage_artifact test_capture_source test_verify_output test_strict_output test_weapon_output
       - name: Fetch and verify pinned candidate input
         env:
           GH_TOKEN: ${{ github.token }}

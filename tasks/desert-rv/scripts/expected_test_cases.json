@@ -2,6 +2,7 @@
   "DesertRV.Tests.BeastActorCombatIntegrationTests.ActorDamageUsesRecoveringWeakPointThenRestoresArmor",
   "DesertRV.Tests.BeastActorCombatIntegrationTests.ActorDeathAndResetPreservePublicCombatContract",
   "DesertRV.Tests.BeastActorCombatIntegrationTests.ActorRejectsNegativePausedAndStaleGenerationDamage",
+  "DesertRV.Tests.CandidateMuzzleAxisTests.SourceYAdapterDoesNotRotateTheAuthoredMuzzle",
   "DesertRV.Tests.CombatTimingRulesTests.ArcCooldownAndHitWindowFreezeDuringPause",
   "DesertRV.Tests.CombatTimingRulesTests.ArcDeduplicatesTargetsPerPulseAndRejectsExpiredPulse",
   "DesertRV.Tests.CombatTimingRulesTests.ArcRequiresUpgradeDrivingAndCorrectRegionGeneration",
@@ -162,5 +163,13 @@
   "DesertRV.Tests.WeaponArmReachTests.Math_RejectsUnreachableZeroDistanceAndUnresolvedPole",
   "DesertRV.Tests.WeaponArmReachTests.PausedRepeatedSamples_DoNotAccumulateRotationOrCountOffset",
   "DesertRV.Tests.WeaponArmReachTests.RestoreAndDisable_ClearCorrectionsWithoutMovingHandOrTarget",
-  "DesertRV.Tests.WeaponArmReachTests.Synthetic600ArmSamples_PreserveLengthsShouldersAndHandTargets"
+  "DesertRV.Tests.WeaponArmReachTests.Synthetic600ArmSamples_PreserveLengthsShouldersAndHandTargets",
+  "DesertRV.Tests.WeaponPitchSpaceTests.DifferentCarrierParentsPreserveTheSameWorldOffset",
+  "DesertRV.Tests.WeaponPitchSpaceTests.NullSingularAndNonfiniteInputsFailClosed",
+  "DesertRV.Tests.WeaponPitchSpaceTests.PhysicalPitchAtScaleOne",
+  "DesertRV.Tests.WeaponPitchSpaceTests.PhysicalPitchAtScaleOneHundred",
+  "DesertRV.Tests.WeaponPitchSpaceTests.RejectOversizeWorldPitchAtScaleOneHundred",
+  "DesertRV.Tests.WeaponPitchSpaceTests.RejectSubmillimetreWorldPitchAtScaleOneHundred",
+  "DesertRV.Tests.WeaponPitchSpaceTests.SharedCarrierParentKeepsOriginalLocalVector",
+  "DesertRV.Tests.WeaponPitchSpaceTests.TinyUnscaledPitchRemainsInvalid"
 ]

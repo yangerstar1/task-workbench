@@ -27,8 +27,12 @@ def export(root,output,native='success',protected='success'):
         contract_path=root/'unity/CandidateImportInput/contract.json';safe_file(contract_path)
         contract=strict_read(contract_path)
         if contract.get('mode')=='STRICT_BINDING':
+            if contract.get('kind')=='weapon':
+                from weapon_output import export_weapon
+                return export_weapon(root,output,contract,summary,native,protected)
             return export_strict(root,output,contract,summary,native,protected)
         require(contract.get('mode')=='DISCOVERY_ONLY','DISCOVERY_ONLY_EXPORT')
+        require(not any(k in contract for k in ('bindings','clips','materials','weapon')),'DISCOVERY_STRICT_FIELDS_FORBIDDEN')
         require(re.fullmatch('[a-z0-9][a-z0-9-]{3,79}',contract.get('id','')),'INVALID_ID')
         require(re.fullmatch('[a-f0-9]{40}',contract.get('sourceCommit','')),'INVALID_SOURCE')
         require(re.fullmatch('[a-f0-9]{64}',contract.get('artifactSha256','')),'INVALID_HASH')

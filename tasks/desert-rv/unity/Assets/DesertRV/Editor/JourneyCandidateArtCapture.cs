@@ -31,6 +31,7 @@ namespace DesertRV.Editor
             public string armoredAttackLoopIntent="Only source-authored Armored Attack loops to cover attackClock>1.2 and normalized CrossFade overrun. Gameplay clock/movement/damage unchanged.";
             public string[] notCovered={"Authoritative combat/weakpoint event state", "Gameplay interruption and reload counts", "Whole-session restart", "Three-region walkthrough", "Android device"};
             public List<Frame> frames=new List<Frame>();
+            public CandidateWeaponDiagnostics.Readback weapon;
         }
         // Entry is called inside the dedicated native NUnit assembly, not a build method.
         public static void ImportAndCapture()
@@ -45,7 +46,7 @@ namespace DesertRV.Editor
             var contract=JsonUtility.FromJson<JourneyCandidateArtImport.Contract>(File.ReadAllText(Path.Combine(folder,"contract.json")));
             var evidence=new Evidence{prefab=import.prefab,dependencySha256=import.dependencySha256,graphicsDeviceType=SystemInfo.graphicsDeviceType.ToString(),graphicsDeviceName=SystemInfo.graphicsDeviceName};
             var scene=EditorSceneManager.NewPreviewScene();
-            GameObject subject=null; RenderTexture target=null; Texture2D pixels=null;
+            GameObject subject=null; RenderTexture target=null; Texture2D pixels=null; Camera camera=null;
             try
             {
                 subject=(GameObject)PrefabUtility.InstantiatePrefab(AssetDatabase.LoadAssetAtPath<GameObject>(import.prefab),scene);
@@ -54,6 +55,7 @@ namespace DesertRV.Editor
                 var animator=subject.GetComponentInChildren<Animator>();
                 // Lock and compare the genuine imported neutral before any Rebind/Update can overwrite it.
                 var rootPosition=animator.transform.localPosition;var rootRotation=animator.transform.localRotation;var rootScale=animator.transform.localScale;
+                if(contract.kind=="weapon")CandidateWeaponDiagnostics.Prepare(subject);
                 var initialRenderers=subject.GetComponentsInChildren<Renderer>(true).Where(r=>r.enabled && !(r is ParticleSystemRenderer)).ToArray();
                 if(initialRenderers.Length==0)throw new InvalidOperationException("Missing neutral geometry.");
                 var initialBounds=initialRenderers[0].bounds;foreach(var r in initialRenderers)initialBounds.Encapsulate(r.bounds);
@@ -61,7 +63,7 @@ namespace DesertRV.Editor
                 if(contract.kind=="armored")RequireNeutral(contract.bindings.neutralBaseline,evidence.neutralRoot);
                 animator.cullingMode=AnimatorCullingMode.AlwaysAnimate;animator.applyRootMotion=false;
                 var cameraObject=new GameObject("CandidateReviewCamera"); UnityEngine.SceneManagement.SceneManager.MoveGameObjectToScene(cameraObject,scene);
-                var camera=cameraObject.AddComponent<Camera>(); camera.scene=scene; camera.backgroundColor=new Color(.12f,.14f,.17f); camera.clearFlags=CameraClearFlags.SolidColor;
+                camera=cameraObject.AddComponent<Camera>(); camera.scene=scene; camera.backgroundColor=new Color(.12f,.14f,.17f); camera.clearFlags=CameraClearFlags.SolidColor;
                 target=new RenderTexture(960,540,24); target.Create(); camera.targetTexture=target;
                 pixels=new Texture2D(960,540,TextureFormat.RGB24,false);
                 var lightObject=new GameObject("CandidateReviewLight"); UnityEngine.SceneManagement.SceneManager.MoveGameObjectToScene(lightObject,scene);
@@ -73,7 +75,20 @@ namespace DesertRV.Editor
                 animator.Rebind();animator.Update(0);
                 RequireRootUnchanged();
                 var states=((AnimatorController)animator.runtimeAnimatorController).layers[0].stateMachine.states.Select(x=>x.state.name).ToArray();
-                foreach(string state in states)
+                if(contract.kind=="weapon")
+                {
+                    evidence.notCovered[1]="Authoritative gameplay interruptions and reload commits";
+                    evidence.weapon=new CandidateWeaponDiagnostics.Readback();
+                    var fixedLocalCameraPosition=subject.transform.InverseTransformPoint(camera.transform.position);
+                    var fixedLocalCameraRotation=Quaternion.Inverse(subject.transform.rotation)*camera.transform.rotation;
+                    CandidateWeaponDiagnostics.Capture(subject,evidence.weapon,(label,state)=>
+                    {
+                        // Same instance-relative view/projection at 0/100/200m; no per-pose reframing.
+                        camera.transform.SetPositionAndRotation(subject.transform.TransformPoint(fixedLocalCameraPosition),subject.transform.rotation*fixedLocalCameraRotation);
+                        Capture(label,state,0);
+                    },contract.clips);
+                }
+                else foreach(string state in states)
                 {
                     int start=evidence.frames.Count;
                     foreach(float time in new[]{0f,.25f,.5f,.75f,.999f})
@@ -145,6 +160,8 @@ namespace DesertRV.Editor
                     MeasureMeshes(renderers,camera,frame);
                     frame.meshSizeRatioToNeutral=new Vector3(frame.meshWorldSize.x/evidence.neutralMeshWorldSize.x,frame.meshWorldSize.y/evidence.neutralMeshWorldSize.y,frame.meshWorldSize.z/evidence.neutralMeshWorldSize.z);
                     evidence.frames.Add(frame);
+                    if(frame.groundDiagnosticApplicable && frame.worldMinY<frame.groundReferenceY-.004f)
+                        throw new InvalidOperationException("Ground penetration exceeds 0.004m: "+frame.requestedState+" minY="+frame.worldMinY.ToString("G9")+" referenceY="+frame.groundReferenceY.ToString("G9"));
                 }
             }
             finally
@@ -152,7 +169,7 @@ namespace DesertRV.Editor
                 try { File.WriteAllText("JourneyEvidence/CandidateArt/capture-report.json",JsonUtility.ToJson(evidence,true)); }
                 finally
                 {
-                    try { if(target) { try { target.Release(); } finally { UnityEngine.Object.DestroyImmediate(target); } } }
+                    try { ReleaseCandidateRenderTarget(camera,target); }
                     finally
                     {
                         try { if(pixels)UnityEngine.Object.DestroyImmediate(pixels); }
@@ -160,6 +177,18 @@ namespace DesertRV.Editor
                     }
                 }
                 // No normal scene opened or saved.
+            }
+        }
+        static void ReleaseCandidateRenderTarget(Camera camera,RenderTexture target)
+        {
+            try
+            {
+                if(camera && camera.targetTexture==target)camera.targetTexture=null;
+                if(RenderTexture.active==target)RenderTexture.active=null;
+            }
+            finally
+            {
+                if(target) {try {target.Release();}finally {UnityEngine.Object.DestroyImmediate(target);}}
             }
         }
         static JourneyCandidateArtImport.RootNeutralBaseline ObserveNeutral(GameObject subject,Animator animator,Renderer[] renderers)
@@ -213,6 +242,7 @@ namespace DesertRV.Editor
                 }
                 if(frame.sampledVertices==0)throw new InvalidOperationException("No mesh diagnostic samples.");
                 frame.worldMinY=minY;frame.meshWorldMin=minimum;frame.meshWorldMax=maximum;frame.meshWorldSize=maximum-minimum;writer.Flush();
+
                 using(var sha=System.Security.Cryptography.SHA256.Create())frame.meshPoseSha256=BitConverter.ToString(sha.ComputeHash(bytes.ToArray())).Replace("-","").ToLowerInvariant();
             }
         }

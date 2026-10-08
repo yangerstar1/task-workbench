@@ -32,8 +32,8 @@
     },
     {
       "path": ".github/workflows/desert-rv-candidate-art-import.yml",
-      "sha256": "5204e29abc676333c2aee9d3279388f1c450476827312bdef7ad968514c087df",
-      "size": 4374
+      "sha256": "2b885087979daef650edbacb73980c1951f479a22ca60cb42707c6d048acf18b",
+      "size": 4593
     },
     {
       "path": ".github/workflows/desert-rv-environment.yml",
@@ -52,8 +52,8 @@
     },
     {
       "path": "tasks/desert-rv/art/import-candidate/README.md",
-      "sha256": "eee258cfed5ea1e1e8e3850845e2241e2577434c0cedf402f9aafc58af272890",
-      "size": 21534
+      "sha256": "8c2a1326e4c1814599780b7a6f600ab953b60650f2f10b2de3c394f4bbf5ac77",
+      "size": 23530
     },
     {
       "path": "tasks/desert-rv/art/import-candidate/contracts/armored-floorfix-discovery-37843918724.json",
@@ -81,39 +81,44 @@
       "size": 661
     },
     {
+      "path": "tasks/desert-rv/art/import-candidate/contracts/weapon-combined-strict-37849553855.json",
+      "sha256": "586078060dfae95e41914da6c05494a5205b4e88d3860875520de649f9044d85",
+      "size": 5676
+    },
+    {
       "path": "tasks/desert-rv/art/import-candidate/pouncer-death-input-inventory.json",
       "sha256": "2bcbc9ef3b83e28c351989f8a025a61d3f0ec9916a5f4ce501f8d26c7a1c2fa9",
       "size": 1158
     },
     {
       "path": "tasks/desert-rv/art/import-candidate/prepare_input.py",
-      "sha256": "64f596ce76a57d2755ba46955496d30d22e57a4b6cfc8168f448c9ed67b99016",
-      "size": 3094
+      "sha256": "465f1882613c17479cd1fe531c6c6139cca2aefcaec0b36cc1c67024246a2b20",
+      "size": 3208
     },
     {
       "path": "tasks/desert-rv/art/import-candidate/stage_artifact.py",
-      "sha256": "3cb6057394dfe06a50fa0368a28a1711d3531dee841e02ea9720caeca14b8735",
-      "size": 5001
+      "sha256": "1d83d3b4c3c6136932702593efff7937ec3cb394248b1882ec3ae93d3800cf90",
+      "size": 5010
     },
     {
       "path": "tasks/desert-rv/art/import-candidate/strict_output.py",
-      "sha256": "ee0ae3fe0caedfe76b95a76bf6ff5a0eab151ef6e0bd0ace303fed995bc2b46b",
-      "size": 29292
+      "sha256": "8102af1d432034dd7d6d403043d2dda581023a23f5ac2cf7ec3404ffbf2f0f20",
+      "size": 29562
     },
     {
       "path": "tasks/desert-rv/art/import-candidate/test_capture_source.py",
-      "sha256": "8c2a35ff00dac4ca8ef3d29585c0fcd315baf01c028bdf15314a4d19cf4c84b5",
-      "size": 3664
+      "sha256": "e485caac2628fb7e27f076ffc7fc7b637433bbf501bd42527e71a2b44986751b",
+      "size": 4484
     },
     {
       "path": "tasks/desert-rv/art/import-candidate/test_stage_artifact.py",
-      "sha256": "d593395de12274e800723ad7f67f115fb1046f21972e91be608f168f038b5d1d",
-      "size": 5036
+      "sha256": "2248dee084e85549af8b4d8b5ea3ebe019299d3e1e5a33587b5b613225843c44",
+      "size": 5045
     },
     {
       "path": "tasks/desert-rv/art/import-candidate/test_strict_output.py",
-      "sha256": "cabba8e748a348089f8f2235cf65ea1213db5ed34863bb5e3a6e9e2f9ca92579",
-      "size": 16933
+      "sha256": "d637e08b9b93222b80375896974a10454d70fb4d390bbf249fa48514e004a9fb",
+      "size": 17456
     },
     {
       "path": "tasks/desert-rv/art/import-candidate/test_verify_output.py",
@@ -121,9 +126,19 @@
       "size": 5881
     },
     {
+      "path": "tasks/desert-rv/art/import-candidate/test_weapon_output.py",
+      "sha256": "cbef2ebf64a8491df1d068ba756d62b5447e4194d87f2d8f7e65e877dc944e3d",
+      "size": 32367
+    },
+    {
       "path": "tasks/desert-rv/art/import-candidate/verify_output.py",
-      "sha256": "af48e87e7ea0c11d48ee1ebe18db480763b0b185710333699cb71d4f6869e7db",
-      "size": 6931
+      "sha256": "a438a0327389347f5d34022a17fe3d498bb6bf1735d412775710a25eb17ea8bb",
+      "size": 7245
+    },
+    {
+      "path": "tasks/desert-rv/art/import-candidate/weapon_output.py",
+      "sha256": "f784b2da0264f84e39a9564ca331d2fe8fc3d4145dd01b243ba65b3aec254e0d",
+      "size": 45118
     },
     {
       "path": "tasks/desert-rv/art/reload-audio/generated-candidate.json",
@@ -167,8 +182,8 @@
     },
     {
       "path": "tasks/desert-rv/scripts/expected_test_cases.json",
-      "sha256": "c7002e9b6ad4a590ddc7ad9a49c84e693e52fd6015e9fdb04585faab1f5bc67c",
-      "size": 15661
+      "sha256": "5170c74c88ad8ac1f67c9b81b3bbde45fb8f460edf5dd175f455fd2c15a23aba",
+      "size": 16398
     },
     {
       "path": "tasks/desert-rv/scripts/prepare_runner.sh",
@@ -212,7 +227,7 @@
     },
     {
       "path": "tasks/desert-rv/scripts/test_verify_evidence.py",
-      "sha256": "7be56459a7a293a0414383db6e59f5340720b3e5e4110a821eb66d6540baea49",
+      "sha256": "203113ff79146be0668453b89e58aaf51204079e25dfbb12048ac5a7dd86ce59",
       "size": 17776
     },
     {
@@ -3581,6 +3596,26 @@
       "size": 240
     },
     {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Editor/CandidateWeaponBinding.cs",
+      "sha256": "202d7cc5f16054cec205aede49ba887ba10cd9583df72b0dee5e3ee6e8da7879",
+      "size": 10282
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Editor/CandidateWeaponBinding.cs.meta",
+      "sha256": "d8676f5a4442800d34d18a0e57936fb3bae3809ba45a4fd5c55d8cc91a8a7234",
+      "size": 243
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Editor/CandidateWeaponDiagnostics.cs",
+      "sha256": "69cebbbd9d2428d91f12767e3ac26b2fe67852af690b29dfb4abf66bee4e1514",
+      "size": 12863
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Editor/CandidateWeaponDiagnostics.cs.meta",
+      "sha256": "c7981287f540fa796287a79ccc605c2a8ce5399b2f1f71eba99bc9b30e034236",
+      "size": 243
+    },
+    {
       "path": "tasks/desert-rv/unity/Assets/DesertRV/Editor/JourneyBuild.cs",
       "sha256": "2aa143ddc7c11e459151b3f9cf06cb8a4ba1522b758a930ca5a008990685aa4d",
       "size": 8178
@@ -3592,8 +3627,8 @@
     },
     {
       "path": "tasks/desert-rv/unity/Assets/DesertRV/Editor/JourneyCandidateArtCapture.cs",
-      "sha256": "fc1e05315a09439eb782dfa5612c363aa873a5498b177d9fb77e53c1468083b5",
-      "size": 20569
+      "sha256": "8826674084f99e55f5a08a7ce44b8c76cb6288eaa39533f9f9cbd627542f0176",
+      "size": 22458
     },
     {
       "path": "tasks/desert-rv/unity/Assets/DesertRV/Editor/JourneyCandidateArtCapture.cs.meta",
@@ -3602,8 +3637,8 @@
     },
     {
       "path": "tasks/desert-rv/unity/Assets/DesertRV/Editor/JourneyCandidateArtDiscovery.cs",
-      "sha256": "88ca41341c377d115673564f323536a10f62346fc1caf054f4ee6688c21d8542",
-      "size": 14689
+      "sha256": "8cf2e2b2d502c15ca7b686d121d636485f410648306f4782ea5121f17101e566",
+      "size": 14706
     },
     {
       "path": "tasks/desert-rv/unity/Assets/DesertRV/Editor/JourneyCandidateArtDiscovery.cs.meta",
@@ -3612,8 +3647,8 @@
     },
     {
       "path": "tasks/desert-rv/unity/Assets/DesertRV/Editor/JourneyCandidateArtImport.cs",
-      "sha256": "705852cd21f4616b55fbd41b43571442cfa8f89bf16aa11b1467f20165d2defd",
-      "size": 39365
+      "sha256": "271824d763817ac3534d015c0e59ab7f321ae749bd6a713f5e81fcc534ec4c38",
+      "size": 40037
     },
     {
       "path": "tasks/desert-rv/unity/Assets/DesertRV/Editor/JourneyCandidateArtImport.cs.meta",
@@ -4141,9 +4176,19 @@
       "size": 240
     },
     {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Runtime/WeaponPitchSpace.cs",
+      "sha256": "bbd2df5151fc210cb1ea01081ab9ffc1e25b77825c89ce9f75bb4d9cb9835b1a",
+      "size": 1419
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Runtime/WeaponPitchSpace.cs.meta",
+      "sha256": "2930664127ffa6315564b34ec0642bf287d85bbbbd224263c8b138d0f1d92b0b",
+      "size": 243
+    },
+    {
       "path": "tasks/desert-rv/unity/Assets/DesertRV/Runtime/WeaponPresentation.cs",
-      "sha256": "163055994caf8c9f204336b0ca03baa8c9bd8911d6418b0688139ff751c4a79c",
-      "size": 15038
+      "sha256": "22c6b0c72b2580e83ac0e1d1e32b7ac69aed77c9686622f75860ff65a65ed3e2",
+      "size": 15942
     },
     {
       "path": "tasks/desert-rv/unity/Assets/DesertRV/Runtime/WeaponPresentation.cs.meta",
@@ -4377,8 +4422,8 @@
     },
     {
       "path": "tasks/desert-rv/unity/Assets/DesertRV/Tests/CandidateArt/CandidateAnimationPolicyTests.cs",
-      "sha256": "1212dd5d0012ee3e285e3db78f6a33fb40949d5c63712bc8a9a4775a48207658",
-      "size": 5537
+      "sha256": "cf74daa8522a162bd697772a52885b8861f31bba7ac2116df5e7b6cba39deeb9",
+      "size": 6728
     },
     {
       "path": "tasks/desert-rv/unity/Assets/DesertRV/Tests/CandidateArt/CandidateAnimationPolicyTests.cs.meta",
@@ -4387,8 +4432,8 @@
     },
     {
       "path": "tasks/desert-rv/unity/Assets/DesertRV/Tests/CandidateArt/CandidateArtImportTests.cs",
-      "sha256": "ca29662b0da459b75e48c7f6878438c3d743dae2b6e45459d08e7291e196c58b",
-      "size": 1540
+      "sha256": "ca4b14d3222c2da8cdc345722de282eca81aa2e1d01adde28147084e9592becd",
+      "size": 1549
     },
     {
       "path": "tasks/desert-rv/unity/Assets/DesertRV/Tests/CandidateArt/CandidateArtImportTests.cs.meta",
@@ -4409,6 +4454,16 @@
       "path": "tasks/desert-rv/unity/Assets/DesertRV/Tests/EditMode.meta",
       "sha256": "aca50d53fd0c83774f6aa3dde19b6187f06e25b4c101a5d83e41a8c6dc277a09",
       "size": 116
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Tests/EditMode/CandidateMuzzleAxisTests.cs",
+      "sha256": "e64764fcd3bd95b5380f27e929ccb2968d4ddf663f47a32ce2e1e37c5477b430",
+      "size": 1690
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Tests/EditMode/CandidateMuzzleAxisTests.cs.meta",
+      "sha256": "5722e5a32a9b4b67b6e9f0c57b25ffae585a092dc5de0fbf102313ec05297149",
+      "size": 243
     },
     {
       "path": "tasks/desert-rv/unity/Assets/DesertRV/Tests/EditMode/CombatTimingRulesTests.cs",
@@ -4599,6 +4654,16 @@
       "path": "tasks/desert-rv/unity/Assets/DesertRV/Tests/EditMode/WeaponArmReachTests.cs.meta",
       "sha256": "6cb592f9b4cb9809382aa884af84131b7f14eab4bf587a84540e25926cb6a5a9",
       "size": 240
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Tests/EditMode/WeaponPitchSpaceTests.cs",
+      "sha256": "f2e6b1f03c3b7004b1186063c2a46895c542b575ec2b0c56f47080a948870845",
+      "size": 4863
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Tests/EditMode/WeaponPitchSpaceTests.cs.meta",
+      "sha256": "21beedee8ff38a239ebb5dec12e604e3be3cf58c936963a545ef31cf0aa5e43b",
+      "size": 243
     },
     {
       "path": "tasks/desert-rv/unity/Assets/DesertRV/Tests/EditorRender.meta",

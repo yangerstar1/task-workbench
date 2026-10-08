@@ -40,7 +40,7 @@ class StageTests(unittest.TestCase):
         self.contract['clips']=[{'take':'guessed'}]
         with self.assertRaisesRegex(ValueError,'Discovery cannot'):self.call()
     def test_discovery_rejects_explicit_empty_or_null_keys(self):
-        for key in ('bindings','clips','materials'):
+        for key in ('bindings','clips','materials','weapon'):
             for value in (None,[],{}):
                 self.contract[key]=value
                 with self.assertRaisesRegex(ValueError,'Discovery cannot'):self.call()

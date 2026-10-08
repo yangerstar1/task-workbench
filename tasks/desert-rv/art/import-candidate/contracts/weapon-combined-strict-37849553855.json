@@ -1,0 +1,204 @@
+{
+  "schema": 1,
+  "mode": "STRICT_BINDING",
+  "scope": "FULL_CANDIDATE",
+  "id": "weapon-combined-strict-37849553855",
+  "kind": "weapon",
+  "repository": "yangerstar1/task-workbench",
+  "runUrl": "https://github.com/yangerstar1/task-workbench/actions/runs/37849553855",
+  "sourceCommit": "137de37644dc64692fe44affbe0fdac9d67196f4",
+  "artifactId": 11581960473,
+  "artifactName": "weapon-combined-candidate-37849553855",
+  "artifactSha256": "cf474231b9207401669bc223d85733ca9936fb46d40887a807189ad75b19d7f3",
+  "files": [
+    {
+      "file": "weapon_hands.fbx",
+      "sha256": "f8074e248393e67c3453dfd158312592cd4192314c38e320632acfa13ef22d4a"
+    }
+  ],
+  "modelFile": "weapon_hands.fbx",
+  "bindings": {
+    "animatorPath": "",
+    "body": "Forged_Main_Housing",
+    "leftHand": "DesertRV_WeaponHands_Rig/root/LeftReloadOffset/arm.L/hand.L",
+    "rightHand": "DesertRV_WeaponHands_Rig/root/arm.R/hand.R",
+    "muzzle": "DesertRV_WeaponHands_Rig/root/weapon/Muzzle",
+    "incomingOffset": "DesertRV_WeaponHands_Rig/root/IncomingOffset",
+    "leftReloadOffset": "DesertRV_WeaponHands_Rig/root/LeftReloadOffset",
+    "loadedNails": [
+      "LoadedNail_00",
+      "LoadedNail_01",
+      "LoadedNail_02",
+      "LoadedNail_03",
+      "LoadedNail_04",
+      "LoadedNail_05",
+      "LoadedNail_06",
+      "LoadedNail_07",
+      "LoadedNail_08",
+      "LoadedNail_09",
+      "LoadedNail_10",
+      "LoadedNail_11"
+    ],
+    "incomingNails": [
+      "IncomingNail_00",
+      "IncomingNail_01",
+      "IncomingNail_02",
+      "IncomingNail_03",
+      "IncomingNail_04",
+      "IncomingNail_05",
+      "IncomingNail_06",
+      "IncomingNail_07",
+      "IncomingNail_08",
+      "IncomingNail_09",
+      "IncomingNail_10",
+      "IncomingNail_11"
+    ]
+  },
+  "clips": [
+    {
+      "state": "Fire",
+      "file": "weapon_hands.fbx",
+      "take": "Fire",
+      "seconds": 0.22,
+      "loop": false,
+      "poseExpectation": "varying"
+    },
+    {
+      "state": "Idle",
+      "file": "weapon_hands.fbx",
+      "take": "Idle",
+      "seconds": 2.0,
+      "loop": true,
+      "poseExpectation": "varying"
+    },
+    {
+      "state": "Reload",
+      "file": "weapon_hands.fbx",
+      "take": "Reload",
+      "seconds": 1.65,
+      "loop": false,
+      "poseExpectation": "varying"
+    }
+  ],
+  "materials": [
+    {
+      "sourceName": "Graphite_Parkerized",
+      "baseColor": {
+        "r": 0.22935718297958374,
+        "g": 0.24780043959617615,
+        "b": 0.24780043959617615,
+        "a": 1.0
+      },
+      "metallic": 0.6000000238418579,
+      "smoothness": 0.5300000011920929,
+      "doubleSided": true
+    },
+    {
+      "sourceName": "Brushed_Steel",
+      "baseColor": {
+        "r": 0.601243257522583,
+        "g": 0.6421664357185364,
+        "b": 0.6576276421546936,
+        "a": 1.0
+      },
+      "metallic": 0.8500000238418579,
+      "smoothness": 0.7299999892711639,
+      "doubleSided": true
+    },
+    {
+      "sourceName": "Glove_Graphite",
+      "baseColor": {
+        "r": 0.2090655267238617,
+        "g": 0.22935718297958374,
+        "b": 0.24009361863136292,
+        "a": 1.0
+      },
+      "metallic": 0,
+      "smoothness": 0.18000000715255737,
+      "doubleSided": true
+    },
+    {
+      "sourceName": "Cuff_Safety_Orange",
+      "baseColor": {
+        "r": 0.8433891534805298,
+        "g": 0.43662697076797485,
+        "b": 0.1428256332874298,
+        "a": 1.0
+      },
+      "metallic": 0,
+      "smoothness": 0.3799999952316284,
+      "doubleSided": true
+    },
+    {
+      "sourceName": "Glove_Seam",
+      "baseColor": {
+        "r": 0.4100207984447479,
+        "g": 0.4235827922821045,
+        "b": 0.39588117599487305,
+        "a": 1.0
+      },
+      "metallic": 0,
+      "smoothness": 0.23000001907348633,
+      "doubleSided": true
+    },
+    {
+      "sourceName": "Powdercoat_Ivory",
+      "baseColor": {
+        "r": 0.865041971206665,
+        "g": 0.8209797739982605,
+        "b": 0.6872170567512512,
+        "a": 1.0
+      },
+      "metallic": 0.18000000715255737,
+      "smoothness": 0.32999998331069946,
+      "doubleSided": true
+    },
+    {
+      "sourceName": "Oxide_Red",
+      "baseColor": {
+        "r": 0.6499563455581665,
+        "g": 0.2827792167663574,
+        "b": 0.18281260132789612,
+        "a": 1.0
+      },
+      "metallic": 0.18000000715255737,
+      "smoothness": 0.38999998569488525,
+      "doubleSided": true
+    }
+  ],
+  "weapon": {
+    "rigRoot": "DesertRV_WeaponHands_Rig/root",
+    "left": {
+      "upperArm": "DesertRV_WeaponHands_Rig/root/upperarm.L",
+      "forearm": "DesertRV_WeaponHands_Rig/root/upperarm.L/forearm.L",
+      "wristTip": "DesertRV_WeaponHands_Rig/root/upperarm.L/forearm.L/WristTip.L",
+      "wristTarget": "DesertRV_WeaponHands_Rig/root/LeftReloadOffset/arm.L/hand.L/WristTarget.L"
+    },
+    "right": {
+      "upperArm": "DesertRV_WeaponHands_Rig/root/upperarm.R",
+      "forearm": "DesertRV_WeaponHands_Rig/root/upperarm.R/forearm.R",
+      "wristTip": "DesertRV_WeaponHands_Rig/root/upperarm.R/forearm.R/WristTip.R",
+      "wristTarget": "DesertRV_WeaponHands_Rig/root/arm.R/hand.R/WristTarget.R"
+    },
+    "neutralState": "Idle",
+    "neutralTimeSeconds": 0,
+    "discoveryReportSha256": "0df7e5ed696af8e0a1069a933c593299b4f6061da4762d95a371bff0c70cebe3",
+    "sourceToRigScale": 0.01,
+    "leftUpperSource": 0.3757658898830414,
+    "leftForeSource": 0.33503732085227966,
+    "rightUpperSource": 0.4036087393760681,
+    "rightForeSource": 0.3350372910499573,
+    "positionToleranceRig": 1e-05,
+    "numericToleranceRig": 1e-07,
+    "sourceMuzzleForwardLocal": {
+      "x": 0,
+      "y": 1,
+      "z": 0
+    },
+    "sourceMuzzleUpLocal": {
+      "x": 0,
+      "y": 0,
+      "z": 1
+    }
+  }
+}

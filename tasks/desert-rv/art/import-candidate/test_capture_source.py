@@ -44,6 +44,14 @@ class CaptureSourceTests(unittest.TestCase):
         self.assertIn('MaterialEditor.FixupEmissiveFlag(open)',IMPORT)
         self.assertIn('ForceUpdate|ImportAssetOptions.ForceSynchronousImport',IMPORT)
         self.assertIn('persisted.IsKeywordEnabled("_EMISSION")',IMPORT)
+    def test_enemy_ground_gate_does_not_apply_to_weapon(self):
+        self.assertIn('groundDiagnosticApplicable=contract.kind!="weapon"',CAPTURE)
+        self.assertIn('if(frame.groundDiagnosticApplicable && frame.worldMinY<frame.groundReferenceY-.004f)',CAPTURE)
+        self.assertLess(CAPTURE.index('evidence.frames.Add(frame)'),CAPTURE.index('Ground penetration exceeds 0.004m'))
+    def test_camera_target_is_detached_before_render_release(self):
+        helper=CAPTURE[CAPTURE.index('static void ReleaseCandidateRenderTarget'):CAPTURE.index('static JourneyCandidateArtImport.RootNeutralBaseline ObserveNeutral')]
+        self.assertLess(helper.index('camera.targetTexture=null'),helper.index('target.Release()'))
+        self.assertLess(helper.index('RenderTexture.active=null'),helper.index('target.Release()'))
     def test_no_approval_or_production_scene_write(self):
         for source in [CAPTURE,IMPORT]:
             self.assertNotIn('accepted=true',source)

@@ -19,7 +19,7 @@ namespace DesertRV.Editor
         [Serializable] public sealed class MaterialSpec
         {
             public string sourceName, baseColorFile, normalFile, metallicSmoothnessFile, occlusionFile, ormFile;
-            public Color baseColor = Color.white; public float metallic, smoothness;
+            public Color baseColor = Color.white; public float metallic, smoothness; public bool doubleSided;
             // Only Unity packed metallic R/smoothness A is accepted, never raw ORM.
         }
         [Serializable] public sealed class RendererNeutralBaseline { public string path; public Vector3 worldCenter,worldExtents; }
@@ -37,15 +37,17 @@ namespace DesertRV.Editor
         {
             public int schema; public string mode, scope; public string id, kind, repository, runUrl, sourceCommit, artifactName, artifactSha256;
             public string modelFile; public InputFile[] files; public ClipSpec[] clips; public MaterialSpec[] materials; public Bindings bindings;
+            public CandidateWeaponBinding.Spec weapon;
         }
         [Serializable] public sealed class ClipReadback { public string state, file, take, poseExpectation; public float seconds, frameRate; public int floatBindings, objectBindings; public bool loop; }
         [Serializable] public sealed class MuzzleObservation
         {
-            public bool calibratedForScene = false;
+            public bool calibratedForScene = false, sourceAxisDerived = false;
+            public string forwardAdapterPath; public Vector3 forwardAdapterWorld;
             public string sourceBoneLocalForwardAxis = "+Y";
             public Vector3 sourceHead = new Vector3(0,.35f,.072f), sourceTail = new Vector3(0,.385f,.072f);
             public Vector3 importedWorldPosition, importedBasisX, importedBasisY, importedBasisZ;
-            public string gate = "BLOCKED: verify actual exported head/tail or imported basis against barrel geometry before creating forward-aligned ShotMuzzle/flash adapter. No flash is bound; WeaponPresentation.ValidateBindings must fail until completed.";
+            public string gate = "BLOCKED: source-axis-derived adapter only; verify actual barrel geometry, gameplay camera, obstruction/reticle alignment and author the flash before scene use. No flash is bound; WeaponPresentation.ValidateBindings must fail until completed.";
         }
         [Serializable] public sealed class RootCurveReadback { public string state,property; public int keys; public float minimum,maximum; public bool constant,tangentsSafe; }
         [Serializable] public sealed class Report
@@ -54,7 +56,7 @@ namespace DesertRV.Editor
             public string status = "failed-candidate-import", contractSha256, prefab, dependencyHash, dependencySha256;
             public string runUrl, sourceCommit, artifactName, artifactSha256;
             public bool candidateOnly = true, visualReviewed = false, gameplayReviewed = false;
-            public MuzzleObservation muzzle;
+            public MuzzleObservation muzzle; public CandidateWeaponBinding.Readback weaponCalibration;
             public string[] importedAnimatorPaths,dependencies;
             public List<CandidateOrmConversion.Record> derivedTextures=new List<CandidateOrmConversion.Record>();
             public List<RootCurveReadback> rootCurves=new List<RootCurveReadback>();
@@ -156,6 +158,7 @@ namespace DesertRV.Editor
                 Check(s.loop==AllowedLoop(c.kind,s.state),"Only Idle/Walk and source-authored Armored Attack may loop; runtime still owns attack duration.");
             }
             Check(c.bindings!=null && c.materials!=null && c.materials.Length>0 && c.materials.Select(m=>m.sourceName).Distinct().Count()==c.materials.Length,"Explicit bindings/material mappings required.");
+            if(c.kind=="weapon") Check(c.weapon!=null,"Measured arm/muzzle weapon contract required.");
             if(c.kind!="weapon") Check(c.bindings.colliderRadius>=.15f && c.bindings.colliderRadius<=1.5f && c.bindings.colliderHeight>=.4f && c.bindings.colliderHeight<=4 && c.bindings.colliderHeight>=2*c.bindings.colliderRadius,"Explicit physical collider dimensions invalid.");
         }
         static float ExpectedSeconds(string kind,string state)
@@ -270,6 +273,7 @@ namespace DesertRV.Editor
             {
                 var s=c.materials[i]; Check(!string.IsNullOrWhiteSpace(s.sourceName),"Material source name required.");
                 var material=new Material(shader); material.name=s.sourceName+"_Candidate"; material.SetColor("_BaseColor",s.baseColor); material.SetFloat("_Metallic",s.metallic); material.SetFloat("_Smoothness",s.smoothness);
+                if(s.doubleSided)material.SetFloat("_Cull",0);
                 SetTexture(material,"_BaseMap",s.baseColorFile,destination,null);
                 SetTexture(material,"_BumpMap",s.normalFile,destination,"_NORMALMAP");
                 SetTexture(material,"_MetallicGlossMap",s.metallicSmoothnessFile,destination,"_METALLICSPECGLOSSMAP");
@@ -324,7 +328,7 @@ namespace DesertRV.Editor
             foreach(var nail in p.loadedNails.Concat(p.incomingNails))
                 Check(NailRigOwnership.TryGetAnimationTargets(nail,animator.transform,out _,out string targetReason),targetReason);
             p.nailPitch=p.incomingOffset.parent.InverseTransformVector(pitchWorld);
-            Check(p.nailPitch.sqrMagnitude>.000001f && p.nailPitch.sqrMagnitude<.01f,"Imported pitch outside runtime limits.");
+            Check(WeaponPitchSpace.ValidPitch(p.incomingOffset.parent,p.nailPitch) && WeaponPitchSpace.ValidParent(p.leftReloadOffset.parent),"Imported world-space pitch outside unchanged physical runtime limits.");
             RejectKeys(clips,animator.transform,new[]{p.incomingOffset,p.leftReloadOffset},false);
             report.muzzle=new MuzzleObservation
             {
@@ -337,6 +341,7 @@ namespace DesertRV.Editor
             // Intentionally leave flash unbound: normal ValidateBindings/production preflight cannot pass
             // before an explicit scene integration calibrates the imported barrel axis and authors the FX.
             p.muzzleFlash=null;
+            report.weaponCalibration=CandidateWeaponBinding.Bind(c.weapon,p,visual,destination+"/Source/"+c.modelFile,clips,c.materials,report.muzzle);
         }
         static Vector3 Center(Renderer renderer)
         {

@@ -47,7 +47,7 @@ namespace DesertRV
             if (reason == null && (!incomingOffset || !leftReloadOffset || incomingOffset == leftReloadOffset ||
                 !incomingOffset.IsChildOf(animator.transform) || !leftReloadOffset.IsChildOf(animator.transform) ||
                 !leftHand.IsChildOf(leftReloadOffset) || rightHand.IsChildOf(leftReloadOffset) ||
-                !FinitePitch(nailPitch) || !ValidNails(loadedNails, animator.transform, animator.transform) || !ValidNails(incomingNails, incomingOffset, animator.transform)))
+                !WeaponPitchSpace.ValidPitch(incomingOffset.parent,nailPitch) || !WeaponPitchSpace.ValidParent(leftReloadOffset.parent) || !ValidNails(loadedNails, animator.transform, animator.transform) || !ValidNails(incomingNails, incomingOffset, animator.transform)))
                 reason = "Partial reload requires 12 separate old/new round meshes, unkeyed strip/left-hand carriers and finite nail pitch.";
             if (reason == null)
                 foreach (var oldNail in loadedNails)
@@ -67,8 +67,6 @@ namespace DesertRV
             }
             return reason == null;
         }
-        static bool FinitePitch(Vector3 pitch) => !float.IsNaN(pitch.x) && !float.IsNaN(pitch.y) && !float.IsNaN(pitch.z) &&
-            !float.IsInfinity(pitch.x) && !float.IsInfinity(pitch.y) && !float.IsInfinity(pitch.z) && pitch.sqrMagnitude > .000001f && pitch.sqrMagnitude < .01f;
         static bool ValidNails(Renderer[] nails, Transform owner, Transform rig)
         {
             if (nails == null || nails.Length != ReloadPresentationPlan.Capacity) return false;
@@ -173,6 +171,10 @@ namespace DesertRV
             int before = reloading ? actions.ReloadLoadedBefore : actions.journey.State.LoadedAmmo;
             int added = reloading ? actions.ReloadPlannedAdded : 0;
             float normalized = reloading ? Mathf.Clamp01(1 - actions.ReloadRemaining / 1.65f) : 0;
+            ApplyCountPose(visible,reloading,before,added,normalized,incomingRest,leftRest);
+        }
+        void ApplyCountPose(bool visible,bool reloading,int before,int added,float normalized,Vector3 incomingBase,Vector3 leftBase)
+        {
             bool carrying = reloading && normalized >= 34f / 99f;
             for (int i = 0; i < ReloadPresentationPlan.Capacity; i++)
             {
@@ -180,11 +182,22 @@ namespace DesertRV
                 incomingNails[i].enabled = visible && carrying && i < added;
             }
             Vector3 stripOffset = reloading ? nailPitch * before : Vector3.zero;
-            incomingOffset.localPosition = incomingRest + stripOffset;
+            incomingOffset.localPosition = incomingBase + stripOffset;
             // The two carrier parents can have different imported rotations/scales.
-            Vector3 worldOffset = incomingOffset.parent.TransformVector(stripOffset);
-            leftReloadOffset.localPosition = leftRest + leftReloadOffset.parent.InverseTransformVector(worldOffset) * ReloadPresentationPlan.GripWeight(normalized);
+            Vector3 leftOffset = WeaponPitchSpace.InOtherParent(stripOffset,incomingOffset.parent,leftReloadOffset.parent);
+            leftReloadOffset.localPosition = leftBase + leftOffset * ReloadPresentationPlan.GripWeight(normalized);
         }
+#if UNITY_EDITOR
+        // Executes the very same count projection as runtime; never changes ammo/gameplay state.
+        // Only the disabled candidate presenter may use this bounded EditMode-only entry.
+        public void ApplyCandidateCountPose(bool reloading,int before,int added,float normalized,Vector3 incomingBase,Vector3 leftBase)
+        {
+            if(Application.isPlaying || enabled || before<0 || before>ReloadPresentationPlan.Capacity || added<0 ||
+                added>ReloadPresentationPlan.Capacity-before || float.IsNaN(normalized) || float.IsInfinity(normalized) || normalized<0 || normalized>1)
+                throw new System.InvalidOperationException("Only a disabled EditMode candidate may sample valid count snapshots.");
+            ApplyCountPose(true,reloading,before,added,normalized,incomingBase,leftBase);
+        }
+#endif
         void LateUpdate()
         {
             if (!owns || !actions || !actions.journey) return;

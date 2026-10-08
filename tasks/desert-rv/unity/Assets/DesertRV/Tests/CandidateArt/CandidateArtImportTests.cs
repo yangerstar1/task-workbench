@@ -12,7 +12,7 @@ namespace DesertRV.Tests
             var scan=Type.GetType("DesertRV.Editor.JourneyCandidateArtDiscovery, Assembly-CSharp-Editor",true).GetMethod("ContainsStrictRootFields");
             Assert.That(scan.Invoke(null,new object[]{"{\"mode\":\"DISCOVERY_ONLY\",\"files\":[]}"}),Is.False);
             Assert.That(scan.Invoke(null,new object[]{"{\"note\":\"bindings\",\"nested\":{\"clips\":null}}"}),Is.False);
-            foreach(string key in new[]{"bindings","clips","materials"})
+            foreach(string key in new[]{"bindings","clips","materials","weapon"})
                 foreach(string value in new[]{"null","[]","{}"})
                     Assert.That(scan.Invoke(null,new object[]{"{\""+key+"\":"+value+"}"}),Is.True);
             Assert.That(scan.Invoke(null,new object[]{"{\"\\u0062indings\":null}"}),Is.True);

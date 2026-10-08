@@ -7,6 +7,24 @@ namespace DesertRV.Tests
     public sealed class CandidateAnimationPolicyTests
     {
         static bool Call(string method,params object[] args)=> (bool)Type.GetType("DesertRV.Editor.JourneyCandidateArtImport, Assembly-CSharp-Editor",true).GetMethod(method,BindingFlags.Static|BindingFlags.NonPublic).Invoke(null,args);
+        [Test] public void RenderTargetCleanupDetachesCameraBeforeDestroy()
+        {
+            var host=new GameObject("Candidate render cleanup regression");var camera=host.AddComponent<Camera>();
+            RenderTexture target=null;var previous=RenderTexture.active;
+            try
+            {
+                target=new RenderTexture(16,16,16);Assert.That(target.Create(),Is.True);
+                camera.targetTexture=target;RenderTexture.active=target;
+                var method=Type.GetType("DesertRV.Editor.JourneyCandidateArtCapture, Assembly-CSharp-Editor",true).GetMethod("ReleaseCandidateRenderTarget",BindingFlags.Static|BindingFlags.NonPublic);
+                method.Invoke(null,new object[]{camera,target});
+                Assert.That((bool)camera.targetTexture,Is.False);Assert.That((bool)RenderTexture.active,Is.False);Assert.That((bool)target,Is.False);
+            }
+            finally
+            {
+                try {camera.targetTexture=null;RenderTexture.active=previous;}
+                finally {try {if(target){target.Release();UnityEngine.Object.DestroyImmediate(target);}}finally {UnityEngine.Object.DestroyImmediate(host);}}
+            }
+        }
         [Test] public void OpenCoreEmissionSurvivesRealSaveReimportAndReload()
         {
             string path="Assets/__OpenCoreEmission_"+Guid.NewGuid().ToString("N")+".mat";

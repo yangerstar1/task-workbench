@@ -52,7 +52,7 @@ class StrictExportTests(unittest.TestCase):
     q=dict(x=0,y=1 if state=='open' else 0,z=0,w=0 if state=='open' else 1)
     self.weak['samples'].append(dict(state=state,view=view,coreMaterial=self.prefix+'/Materials/'+('Core_Open' if state=='open' else 'Material_01')+'.mat',imageLabel='weakpoint-'+state+'-'+view,fieldOfView=60,distance=3,weakPointExposed=state=='open',bodyUnchanged=True,localPlateRotations=([s.unity_euler(v) for v in self.c['bindings']['openEuler']] if state=='open' else [q,q.copy()]),cameraPosition=dict(x=0,y=1.65,z=3)))
   native=self.root/'artifacts/candidate-art/results.xml';native.parent.mkdir(parents=True)
-  names=[s.NATIVE,'DesertRV.Tests.CandidateAnimationPolicyTests.OnlyArmoredAttackGetsTheSourceLoopException','DesertRV.Tests.CandidateAnimationPolicyTests.EqualKeyValuesDoNotExcuseUnsafeTangents','DesertRV.Tests.CandidateAnimationPolicyTests.MissingNativeAnimatorGetsCreatedAndReused','DesertRV.Tests.CandidateAnimationPolicyTests.OpenCoreEmissionSurvivesRealSaveReimportAndReload']
+  names=[s.NATIVE,'DesertRV.Tests.CandidateAnimationPolicyTests.OnlyArmoredAttackGetsTheSourceLoopException','DesertRV.Tests.CandidateAnimationPolicyTests.EqualKeyValuesDoNotExcuseUnsafeTangents','DesertRV.Tests.CandidateAnimationPolicyTests.MissingNativeAnimatorGetsCreatedAndReused','DesertRV.Tests.CandidateAnimationPolicyTests.OpenCoreEmissionSurvivesRealSaveReimportAndReload','DesertRV.Tests.CandidateAnimationPolicyTests.RenderTargetCleanupDetachesCameraBeforeDestroy']
   native.write_text('<test-run result="Passed">'+''.join('<test-case fullname="'+n+'" result="Passed"/>' for n in names)+'</test-run>')
   self.flush()
  def meta(self,p,texture=False):
@@ -78,7 +78,7 @@ class StrictExportTests(unittest.TestCase):
   self.assertIn('if(c.kind=="armored")RequireNeutralRootCurves',source)
   self.assertIn('Quaternion.Angle(rotation.normalized,root.localRotation.normalized)<=.001f',source)
  def test_valid_unreviewed_bounded_export(self):
-  r=self.run_export();self.assertEqual(r['images'],202);self.assertEqual(r['weakpointImages'],9);self.assertEqual(r['nativeCases'],5);self.assertFalse(r['approved']);self.assertNotIn('muzzle',json.loads((self.out/'import-report.json').read_text()))
+  r=self.run_export();self.assertEqual(r['images'],202);self.assertEqual(r['weakpointImages'],9);self.assertEqual(r['nativeCases'],6);self.assertFalse(r['approved']);self.assertNotIn('muzzle',json.loads((self.out/'import-report.json').read_text()))
   for f in r['files']:self.assertEqual(s.sha(self.out/f['path']),f['sha256'])
  def test_failed_native_only_safe_identity(self):self.rejected('STRICT_NATIVE_FAILED',native='failure')
  def test_failed_protected_only_safe_identity(self):self.rejected('STRICT_PROTECTED_SOURCE_FAILED',protected='failure')
@@ -108,6 +108,10 @@ class StrictExportTests(unittest.TestCase):
  def test_frame_size_ratio_refused(self):self.cap['frames'][0]['meshSizeRatioToNeutral']['y']=.01;self.rejected('STRICT_MESH_RATIO')
  def test_frame_mesh_size_refused(self):self.cap['frames'][0]['meshWorldSize']['z']=2;self.rejected('STRICT_MESH_DIMENSIONS')
  def test_missing_frame_refused(self):self.cap['frames'].pop();self.rejected('STRICT_FRAME_COUNT')
+ def test_enemy_ground_below_four_mm_refused(self):self.cap['frames'][0]['worldMinY']=-.00401;self.rejected('STRICT_GROUND_PENETRATION')
+ def test_enemy_ground_four_mm_boundary_is_allowed(self):
+  f=self.cap['frames'][0];f['worldMinY']=-.004;f['meshWorldMin']['y']=-.004;f['meshWorldSize']['y']=2.004;f['meshSizeRatioToNeutral']['y']=1.002
+  self.assertEqual(self.run_export()['status'],'STRICT_CANDIDATE_CAPTURED_NOT_ACCEPTED')
  def test_frame_drift_refused(self):self.cap['frames'][0]['rootLocalPositionDelta']=.001;self.rejected('STRICT_ROOT_SAMPLE_DRIFT')
  def test_null_graphics_refused(self):self.cap['graphicsDeviceType']='Null';self.rejected('STRICT_REAL_SOFTWARE_GRAPHICS_REQUIRED')
  def test_approval_refused(self):self.cap['visualAccepted']=True;self.rejected('STRICT_CAPTURE_STATUS')

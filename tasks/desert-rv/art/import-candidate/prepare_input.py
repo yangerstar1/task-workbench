@@ -13,7 +13,10 @@ def prepare(contract_path, expected_sha, output, mode):
     contract=json.loads(contract_path.read_text())
     require(contract.get('mode')==mode,'Dispatch mode differs from reviewed contract')
     if mode=='STRICT_BINDING':
-        from strict_output import contract_shape
+        if contract.get('kind')=='weapon':
+            from weapon_output import contract_shape
+        else:
+            from strict_output import contract_shape
         contract_shape(contract)
     require(contract['repository']=='yangerstar1/task-workbench','Wrong repository')
     repo=api('/repos/yangerstar1/task-workbench'); require(repo['private'] is False,'Free public repository required')
