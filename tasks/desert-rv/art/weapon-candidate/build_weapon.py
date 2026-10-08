@@ -4,10 +4,12 @@ Blender 4.2.3; no downloaded art; units metres; +Y muzzle, +Z up, +X right.
 import bpy, math, json, pathlib, sys, hashlib
 from mathutils import Vector
 from bpy_extras.object_utils import world_to_camera_view
+sys.path.insert(0,str(pathlib.Path(__file__).resolve().parent))
+from pixel_evidence import alpha_bounds, is_core_asset, core_fully_visible, core_fit_score
 OUT=pathlib.Path(sys.argv[sys.argv.index('--')+1] if '--' in sys.argv else 'output'); OUT.mkdir(parents=True,exist_ok=True)
 bpy.ops.object.select_all(action='SELECT'); bpy.ops.object.delete(use_global=False)
 scene=bpy.context.scene; scene.render.engine='CYCLES'; scene.cycles.samples=24
-scene.render.resolution_percentage=100; scene.render.image_settings.file_format='PNG'; scene.render.fps=60
+scene.render.resolution_percentage=100; scene.render.image_settings.file_format='PNG'; scene.render.image_settings.color_mode='RGBA'; scene.render.fps=60
 scene.world.color=(.18,.18,.18); scene.view_settings.view_transform='AgX'
 assets=[]; gun=[]; hands=[]; bone_defs={}
 def mat(name,c,metal=0,rough=.45):
@@ -43,12 +45,18 @@ for x in [-.025,.025]:
 mag_objs.append(profile('Magazine_Lower_Spine',[(-.16,-.197),(.265,-.151),(.265,-.160),(-.16,-.206)],.038,dark))
 # Duplicate seated strip is a visual reload prop. Rest-loaded strip and incoming
 # strip swap at the action boundary without game ammunition changes.
-for destination,prefix in [(nail_objs,'Loaded'),(strip_objs,'Incoming')]:
- for i in range(27):
-  y=-.136+i*.0138; z=-.175+(y+.155)*.107
-  destination.append(cyl(prefix+'_Collated_Nail_%02d'%i,(0,y,z),(0,y,z+.028),.0017,steel,8))
-  destination.append(cyl(prefix+'_Nail_Head_%02d'%i,(0,y,z+.028),(0,y,z+.03),.0035,steel,12))
- destination.append(cyl(prefix+'_Collation_Bond',(0,-.136,-.147),(0,.223,-.1086),.003,red,12))
+NAIL_CAPACITY=12; NAIL_PITCH=Vector((0,-.030,-.00321)); FIRST_NAIL=Vector((0,.223,-.135))
+for destination,prefix in [(nail_objs,'LoadedNail'),(strip_objs,'IncomingNail')]:
+ for i in range(NAIL_CAPACITY):
+  v=FIRST_NAIL+NAIL_PITCH*i; y,z=v.y,v.z
+  shaft=cyl(prefix+'_%02d'%i,(0,y,z),(0,y,z+.028),.0017,steel,8)
+  head=cyl(prefix+'_Head_%02d'%i,(0,y,z+.028),(0,y,z+.03),.0035,steel,12)
+  bond=cyl(prefix+'_Bond_%02d'%i,(0,y-.004,z+.027),(0,y+.004,z+.028),.003,red,12)
+  bpy.ops.object.select_all(action='DESELECT')
+  for part in [shaft,head,bond]:part.select_set(True)
+  for part in [head,bond]:assets.remove(part); gun.remove(part)
+  bpy.context.view_layer.objects.active=shaft; bpy.ops.object.join(); shaft.name=prefix+'_%02d'%i
+  destination.append(shaft)
 follower=cube('Magazine_Follower',(.0,-.155,-.178),(.061,.022,.04),red); mag_objs.append(follower)
 cyl('Driver_Piston', (0,.12,.072),(0,.29,.072),.029,steel)
 cyl('Nose_Safety_Sleeve',(0,.258,.072),(0,.32,.072),.036,dark)
@@ -119,7 +127,7 @@ def glove(side,center):
   cube('Knuckle_Leather_'+side+'_'+str(idx),c+Vector((s*.059,.007,z)),(.004,.019,.013),rubber,.0018,hands)
   cyl('Finger_Seam_'+side+'_'+str(idx),c+Vector((s*.058,-.001,z-.005)),c+Vector((s*.058,.015,z-.005)),.0008,seam,8,hands)
  # Tapered, continuous sleeve reaching back/down far beyond the game viewport.
- start=c+Vector((s*.035,-.080,-.105)); end=c+Vector((s*.12,-.58,-.52))
+ start=c+Vector((s*.035,-.080,-.105)); end=c+Vector((-.22,-.46,-.72))
  direction=(end-start).normalized(); axis=direction.cross(Vector((1,0,0))).normalized(); cross=direction.cross(axis).normalized()
  vs=[]; fs=[]; rings=9; sides=24
  for row in range(rings):
@@ -137,9 +145,9 @@ def bone(name,a,b,parent=None):
  e=rig.data.edit_bones.new(name); e.head=a; e.tail=b
  if parent:e.parent=rig.data.edit_bones[parent]
  bone_defs[name]=(Vector(a),Vector(b)); return e
-bone('root',(0,0,-.35),(0,0,-.25)); bone('weapon',(0,-.15,.03),(0,.12,.03),'root'); bone('magazine',(0,-.1,-.18),(0,.15,-.15),'weapon'); bone('trigger',(0,-.092,-.01),(0,-.097,-.045),'weapon'); bone('follower',(0,-.155,-.178),(0,-.125,-.175),'magazine'); bone('loaded_nails',(0,.13,-.14),(0,.16,-.137),'magazine'); bone('reload_strip',(0,.13,-.14),(0,.16,-.137),'root'); bone('safety_tip',(0,.32,.072),(0,.35,.072),'weapon')
+bone('root',(0,0,-.35),(0,0,-.25)); bone('IncomingOffset',(0,0,0),(0,.1,0),'root'); bone('LeftReloadOffset',(0,0,0),(0,.1,0),'root'); bone('weapon',(0,-.15,.03),(0,.12,.03),'root'); bone('magazine',(0,-.1,-.18),(0,.15,-.15),'weapon'); bone('trigger',(0,-.092,-.01),(0,-.097,-.045),'weapon'); bone('follower',(0,-.155,-.178),(0,-.125,-.175),'magazine'); bone('loaded_nails',(0,.13,-.14),(0,.16,-.137),'magazine'); bone('reload_strip',(0,.13,-.14),(0,.16,-.137),'IncomingOffset'); bone('safety_tip',(0,.32,.072),(0,.35,.072),'weapon')
 for side,c in [('R',Vector((0,-.151,-.065))),('L',Vector((0,.13,-.023)))]:
- s=1 if side=='R' else -1; bone('arm.'+side,c+Vector((s*.035,-.11,-.12)),c,'root'); bone('hand.'+side,c,c+Vector((0,.045,0)),'arm.'+side)
+ s=1 if side=='R' else -1; bone('arm.'+side,c+Vector((s*.035,-.11,-.12)),c,'LeftReloadOffset' if side=='L' else 'root'); bone('hand.'+side,c,c+Vector((0,.045,0)),'arm.'+side)
  for idx in range(5):
   p=finger_paths[(side,idx)]
   for j,(a,b) in enumerate(zip(p,p[1:])):bone('finger%d.%d.%s'%(idx,j,side),a,b,'hand.'+side if j==0 else 'finger%d.%d.%s'%(idx,j-1,side))
@@ -156,14 +164,14 @@ for o in gun:skin(o,['safety_tip' if o==safety_tip else 'loaded_nails' if o in n
 for o in hands:
  side='R' if '_R' in o.name else 'L'; names=['hand.'+side,'arm.'+side]+[n for n in bone_defs if n.startswith('finger') and n.endswith(side)] if o in [right,left] else ['hand.'+side,'root'] if o.name.startswith('Forearm_') else ['hand.'+side]; skin(o,names)
  if o.name.startswith('Forearm_'):
-  c=bone_defs['hand.'+side][0]; sign=1 if side=='R' else -1; start=c+Vector((sign*.035,-.080,-.105)); end=c+Vector((sign*.12,-.58,-.52)); span=end-start
+  c=bone_defs['hand.'+side][0]; sign=1 if side=='R' else -1; start=c+Vector((sign*.035,-.080,-.105)); end=c+Vector((-.22,-.46,-.72)); span=end-start
   for v in o.data.vertices:
    t=max(0,min(1,((o.matrix_world@v.co)-start).dot(span)/span.length_squared)); t=t*t*(3-2*t)
    o.vertex_groups['hand.'+side].add([v.index],1-t,'REPLACE'); o.vertex_groups['root'].add([v.index],t,'REPLACE')
 # Pinch IK changes the fingers' pose for strip carry and follower operation.
 # Targets are explicit opposing surfaces; constraints are sampled by exporters.
 ik_controls=[]; contact_targets={}
-for phase,parent,center in [('strip','reload_strip',(0,.13,-.116)),('follower','follower',(0,-.155,-.166))]:
+for phase,parent,center in [('strip','reload_strip',(0,.223,-.106)),('follower','follower',(0,-.155,-.166))]:
  for digit,offset in [(0,(.004,0,0)),(1,(.004,.018,-.002)),(4,(-.004,0,0))]:
   pos=Vector(center)+Vector(offset); target=bpy.data.objects.new('IK_'+phase+'_'+str(digit),None); scene.collection.objects.link(target)
   target.parent=rig; target.parent_type='BONE'; target.parent_bone=parent; bpy.context.view_layer.update(); target.matrix_world.translation=pos
@@ -179,13 +187,11 @@ for name,pos,parent in [('Grip',(0,-.15,-.07),'weapon'),('Trigger',(0,-.095,-.03
 # Bone local locations are converted from requested world-space deltas.
 def key(name,frame,delta=(0,0,0),rot=(0,0,0)):
  p=rig.pose.bones[name]; basis=rig.data.bones[name].matrix_local.to_3x3(); p.location=basis.inverted()@Vector(delta); p.rotation_mode='XYZ'; p.rotation_euler=rot; p.keyframe_insert('location',frame=frame); p.keyframe_insert('rotation_euler',frame=frame)
-def key_scale(name,frame,scale):
- p=rig.pose.bones[name]; p.scale=(scale,scale,scale); p.keyframe_insert('scale',frame=frame)
 clips={}
 for clip,end in [('Idle',121),('Fire',14.2),('Reload',100)]:
  action=bpy.data.actions.new(clip); rig.animation_data_create(); rig.animation_data.action=action
- for n in bone_defs:key(n,1); key(n,end); key_scale(n,1,1); key_scale(n,end,1)
- key_scale('reload_strip',1,.0001); key_scale('reload_strip',end,.0001)
+ for n in bone_defs:
+  if n not in ['IncomingOffset','LeftReloadOffset']:key(n,1); key(n,end)
  for phase,con in ik_controls:
   con.influence=0; con.keyframe_insert('influence',frame=1); con.keyframe_insert('influence',frame=end)
  if clip=='Idle':
@@ -194,14 +200,12 @@ for clip,end in [('Idle',121),('Fire',14.2),('Reload',100)]:
   for f,d in [(1,0),(3,-.032),(7,-.009),(14.2,0)]:key('root',f,(0,d,0))
   key('safety_tip',3,(0,-.012,0)); key('safety_tip',7); key('trigger',3,rot=(.12,0,0)); key('trigger',8); key('finger0.1.R',3,rot=(.1,0,0)); key('finger0.1.R',8)
  if clip=='Reload':
-  # Empty reload: magazine stays attached. A genuinely new collated nail strip
+  # Count-driven reload: magazine stays attached. A genuinely new collated nail strip
   # travels from below the camera, through the open loading channel, into place.
-  key_scale('loaded_nails',1,.0001); key_scale('loaded_nails',100,.0001)
-  for f,scale in [(1,.0001),(34,.0001),(35,1),(100,1)]:key_scale('reload_strip',f,scale)
   strip_path=[(1,(-.12,-.10,-.24)),(35,(-.12,-.10,-.24)),(48,(-.10,0,.075)),(60,(0,0,.045)),(68,(0,0,0)),(100,(0,0,0))]
   for f,d in strip_path:key('reload_strip',f,d)
   hand_path=[(1,(0,0,0)),(12,(.015,-.310,-.155)),(23,(.015,-.365,-.161)),
-   (35,(-.105,-.125,-.350)),(48,(-.085,-.025,-.035)),(60,(.015,-.025,-.065)),(68,(.015,-.025,-.110)),
+   (35,(-.105,-.032,-.340)),(48,(-.085,.068,-.025)),(60,(.015,.068,-.055)),(68,(.015,.068,-.100)),
    (73,(-.06,0,.015)),(82,(.015,-.365,-.161)),(91,(.015,-.310,-.155)),(100,(0,0,0))]
   for f,d in hand_path:key('arm.L',f,d)
   for phase,con in ik_controls:
@@ -222,7 +226,7 @@ bpy.ops.export_scene.gltf(filepath=str(OUT/'weapon_hands.glb'),use_selection=Tru
 bpy.ops.export_scene.fbx(filepath=str(OUT/'weapon_hands.fbx'),use_selection=True,add_leaf_bones=False,bake_anim=True,bake_anim_use_all_actions=True,axis_forward='-Z',axis_up='Y')
 for tr in rig.animation_data.nla_tracks:tr.mute=True
 rig.animation_data.action=bpy.data.actions['Idle']; scene.frame_set(1)
-validation={'candidate_only':True,'approved':False,'blender':bpy.app.version_string,'coordinate_system':'+Y muzzle, +Z up, +X right; export converts axes','clips':clips,'mesh_groups':{},'weight_errors':[],'limitations':['Human visual acceptance required. Continuous glove voxel topology is a first candidate, not final hand retopology.','Reload is an empty-magazine cosmetic action with a fresh visible nail strip. Tactical partial reload needs separate integration review.','Follower contact and mesh penetration have not been certified. Candidate must not enter production scene.'],'quality_gate':'PENDING_RENDER_REVIEW'}
+validation={'candidate_only':True,'approved':False,'blender':bpy.app.version_string,'coordinate_system':'+Y muzzle, +Z up, +X right; export converts axes','clips':clips,'mesh_groups':{},'weight_errors':[],'limitations':['Human visual acceptance required. Continuous glove voxel topology is a first candidate, not final hand retopology.','Reload visual preview is loadedBefore=3, added=5. Runtime must drive 12 individual nail renderers and synchronized offset bones from the authoritative count snapshot.','Follower contact and mesh penetration have not been certified. Candidate must not enter production scene.'],'quality_gate':'PENDING_RENDER_REVIEW'}
 for label,objs,budget in [('weapon',gun,[8000,12000]),('hands',hands,[10000,16000])]:
  tris=0
  for o in objs:
@@ -235,7 +239,7 @@ for label,objs,budget in [('weapon',gun,[8000,12000]),('hands',hands,[10000,1600
 # These measure kinematic alignment, NOT triangle penetration or anatomical quality.
 contact_report=[]
 rig.animation_data.action=bpy.data.actions['Reload']
-for phase,frames,target,ref in [('pull_follower',range(12,24),'follower',(.015,-.18,-.178)),('carry_and_seat_strip',range(35,69),'reload_strip',(.015,.105,-.133)),('release_follower',range(82,92),'follower',(.015,-.18,-.178))]:
+for phase,frames,target,ref in [('pull_follower',range(12,24),'follower',(.015,-.18,-.178)),('carry_and_seat_strip',range(35,69),'reload_strip',(.015,.198,-.123)),('release_follower',range(82,92),'follower',(.015,-.18,-.178))]:
  errors=[]; fingertip_errors=[]
  for frame in frames:
   scene.frame_set(frame); bpy.context.view_layer.update()
@@ -246,9 +250,24 @@ for phase,frames,target,ref in [('pull_follower',range(12,24),'follower',(.015,-
   for digit in [0,1,4]:
    name,ob=contact_targets[(kind,digit)]; fingertip_errors.append(((rig.matrix_world@rig.pose.bones[name].tail)-ob.matrix_world.translation).length)
  contact_report.append({'phase':phase,'frames':[frames.start,frames.stop-1],'max_authoring_reference_error_m':max(errors),'max_fingertip_IK_error_m':max(fingertip_errors),'surface_collision_tested':False})
-validation['reload_mechanism']={'type':'fixed_open_top_magazine_fresh_collated_strip','magazine_detaches':False,'new_nails_count':27,'gameplay_events':[],'reference_contact_samples':contact_report}
+validation['reload_mechanism']={'type':'fixed_open_top_magazine_fresh_collated_strip','magazine_detaches':False,'new_nails_count':12,'gameplay_events':[],'reference_contact_samples':contact_report}
 rig.animation_data.action=bpy.data.actions['Idle']; scene.frame_set(1)
 (OUT/'clip-manifest.json').write_text(json.dumps(clips,indent=2))
+# Unity bridge contract: count/offset application occurs after Animator evaluation.
+# No authored animation curves target the two offset bones or visibility carriers.
+contract={'capacity':12,'loaded_nodes':['LoadedNail_%02d'%i for i in range(12)],'incoming_nodes':['IncomingNail_%02d'%i for i in range(12)],'incoming_offset':'IncomingOffset','left_reload_offset':'LeftReloadOffset','source_pitch_xyz':list(NAIL_PITCH),'source_axes':'+Y muzzle, +Z up','derive_imported_pitch':'Use transformed source vector or verify imported adjacent nail origins; do not assume Unity axes.','count_snapshot':['ReloadPresented.Epoch','ReloadPresented.Sequence','LoadedBefore','PlannedAdded'],'loaded_visible':'prefix[0,LoadedBefore) until authoritative completion; then prefix[0,actualLoaded)','incoming_visible':'prefix[0,PlannedAdded), frames 35..100; hidden on cancel/complete','offset':'LoadedBefore * source_pitch; IncomingOffset throughout reload; LeftReloadOffset blends 30..35, holds35..68, fades68..73','animation_events':[],'commit':'Game commits once at 1.65s; physical seating frame68 does not allow early fire','preview':{'loaded_before':3,'planned_added':5}}
+(OUT/'weapon-presentation-contract.json').write_text(json.dumps(contract,indent=2))
+def preview_pose(clip,frame,loaded_before=3,planned_added=5):
+ scene.frame_set(frame)
+ before,added=(loaded_before,planned_added) if clip=='Reload' else (12,0)
+ if not(0<=before<=12 and 0<=added<=12-before):raise ValueError('Invalid cosmetic reload count snapshot')
+ for i,o in enumerate(nail_objs):o.hide_render=i>=before
+ for i,o in enumerate(strip_objs):o.hide_render=not(clip=='Reload' and frame>=35 and i<added)
+ weight=max(0,min(1,(frame-30)/5,(73-frame)/5)) if clip=='Reload' else 0
+ rig.pose.bones['IncomingOffset'].location=NAIL_PITCH*before if clip=='Reload' else Vector((0,0,0))
+ rig.pose.bones['LeftReloadOffset'].location=NAIL_PITCH*before*weight
+ bpy.context.view_layer.update()
+preview_pose('Idle',1)
 # Studio lighting and scene: presentation objects excluded from exchange exports.
 def look(o,target):o.rotation_euler=(Vector(target)-o.location).to_track_quat('-Z','Y').to_euler()
 for name,pos,power,size in [('Key',(1,-1.5,2),180,2),('Fill',(-1,-.5,.7),100,1.5),('Rim',(0,1.5,1.2),200,1)]:
@@ -262,45 +281,56 @@ camera.location=(-1.1,.1,.12); look(camera,(0,.04,-.15)); scene.render.resolutio
 for clip in clips:
  rig.animation_data.action=bpy.data.actions[clip]; folder=OUT/('frames_'+clip); folder.mkdir(exist_ok=True)
  for f in range(1,math.ceil(clips[clip]['frames'][1])+1):
-  scene.frame_set(f); scene.render.filepath=str(folder/('%04d.png'%f)); bpy.ops.render.render(write_still=True)
+  preview_pose(clip,f); scene.render.filepath=str(folder/('%04d.png'%f)); bpy.ops.render.render(write_still=True)
 # Two-sided static contact witnesses: approach, acquired strip, guide, seated, release.
 rig.animation_data.action=bpy.data.actions['Reload']; camera.data.ortho_scale=.85
 for frame in [30,35,60,68,91]:
- scene.frame_set(frame)
+ preview_pose('Reload',frame)
  for side in [-1,1]:
   camera.location=(side*1.1,-.12,.13); look(camera,(0,.02,-.18)); scene.render.filepath=str(OUT/f'reload_contact_{frame:03d}_{side:+d}.png'); bpy.ops.render.render(write_still=True)
-rig.animation_data.action=bpy.data.actions['Idle']; scene.frame_set(1); scene.cycles.samples=24
+# Countable empty / partial / nearly-full magazine boundary evidence.
+validation['count_evidence']=[]
+for before,added in [(0,12),(3,5),(11,1)]:
+ for frame in [1,60,100]:
+  preview_pose('Reload',frame,before,added); camera.location=(-1.1,-.12,.13); look(camera,(0,.02,-.18))
+  name=f'reload_count_{before:02d}_plus_{added:02d}_frame_{frame:03d}.png'; scene.render.filepath=str(OUT/name); bpy.ops.render.render(write_still=True)
+  validation['count_evidence'].append({'image':name,'loaded_before':before,'planned_added':added,'frame':frame,'visible_loaded':sum(not o.hide_render for o in nail_objs),'visible_incoming':sum(not o.hide_render for o in strip_objs)})
+rig.animation_data.action=bpy.data.actions['Idle']; preview_pose('Idle',1); scene.cycles.samples=24
+# Preserve useful partial evidence before potentially failing image readback.
+(OUT/'validation.json').write_text(json.dumps(validation,indent=2)); bpy.ops.wm.save_as_mainfile(filepath=str(OUT/'weapon_hands.blend'))
 # Natural viewmodel: fixed perspective camera looking +Y, no camera roll/yaw.
 # Tool itself is held obliquely toward the reticle; sleeves continue below frame.
 validation['viewmodels']={}; scene.render.film_transparent=True
 camera.data.type='PERSP'; camera.data.lens=35; camera.data.sensor_width=36
 camera.location=(0,0,0); look(camera,(0,1,0))
-def projected_bounds():
+def projected_bounds(core_only=False):
  bpy.context.view_layer.update(); deps=bpy.context.evaluated_depsgraph_get()
- pts=[world_to_camera_view(scene,camera,o.evaluated_get(deps).matrix_world@Vector(v)) for o in assets for v in o.evaluated_get(deps).bound_box]
- return [max(0,min(p.x for p in pts)),max(0,min(p.y for p in pts)),min(1,max(p.x for p in pts)),min(1,max(p.y for p in pts))]
+ pts=[world_to_camera_view(scene,camera,o.evaluated_get(deps).matrix_world@Vector(v)) for o in assets if not(core_only and not is_core_asset(o.name)) for v in o.evaluated_get(deps).bound_box]
+ return [min(p.x for p in pts),min(p.y for p in pts),max(p.x for p in pts),max(p.y for p in pts)]
 for w,h in [(1280,720),(1600,720)]:
  scene.render.resolution_x=w; scene.render.resolution_y=h
  best=None
- for yaw in [25,30,35,40,45]:
-  for distance in [1.15+i*.07 for i in range(17)]:
+ for yaw in [25,30,35,40,45,50,55]:
+  for distance in [1.0+i*.09 for i in range(25)]:
    rig.rotation_euler=(math.radians(9),0,math.radians(yaw)); rig.location=(.48,distance,-.30)
-   for _ in range(4):
-    b=projected_bounds(); rig.location.x+=(.815-(b[0]+b[2])/2)*distance*36/35
-    rig.location.z+=(.325-b[3])*distance*36/35*h/w
-   b=projected_bounds(); width=b[2]-b[0]; height=b[3]-b[1]
-   score=abs(width-.29)+abs(height-.325)+max(0,b[0]-.69)+max(0,.94-b[2])
+   for _ in range(5):
+    b=projected_bounds(core_only=True); rig.location.x+=(.805-(b[0]+b[2])/2)*distance*36/35
+    rig.location.z+=(.185-(b[1]+b[3])/2)*distance*36/35*h/w
+   b=projected_bounds(core_only=True); width=b[2]-b[0]; height=b[3]-b[1]
+   score=core_fit_score(b)
    if best is None or score<best[0]:best=(score,tuple(rig.location),tuple(rig.rotation_euler))
- rig.location=best[1]; rig.rotation_euler=best[2]; b=projected_bounds()
+ rig.location=best[1]; rig.rotation_euler=best[2]; b=projected_bounds(core_only=True)
  scene.render.filepath=str(OUT/f'viewmodel_{w}x{h}.png'); bpy.ops.render.render(write_still=True)
  # Exact alpha-pixel footprint from the actual render, not only projected boxes.
- pixels=bpy.data.images['Render Result'].pixels[:]; xs=[]; ys=[]
- for y in range(h):
-  for x in range(w):
-   if pixels[(y*w+x)*4+3]>.05:xs.append(x); ys.append(y)
- pixel_bounds=[min(xs)/w,min(ys)/h,(max(xs)+1)/w,(max(ys)+1)/h] if xs else [0,0,0,0]
+ # Headless Render Result may expose no pixel buffer after write_still.
+ # Load the persisted evidence PNG and validate dimensions/alpha explicitly.
+ evidence=bpy.data.images.load(scene.render.filepath,check_existing=False)
+ try:
+  if tuple(evidence.size)!=(w,h):raise RuntimeError(f'Evidence PNG dimensions {tuple(evidence.size)} != {(w,h)}')
+  pixel_bounds=alpha_bounds(evidence.pixels[:],w,h,evidence.channels)
+ finally:bpy.data.images.remove(evidence)
  width=pixel_bounds[2]-pixel_bounds[0]; height=pixel_bounds[3]-pixel_bounds[1]
- validation['viewmodels'][f'{w}x{h}']={'normalized_bounds':pixel_bounds,'width_fraction':width,'height_fraction':height,'target_fit':.25<=width<=.32 and .25<=height<=.35,'camera':'fixed +Y perspective 35mm, no rotation trick','rig_location':list(rig.location),'rig_euler':list(rig.rotation_euler),'center_clear':not(pixel_bounds[0]<=.5<=pixel_bounds[2] and pixel_bounds[1]<=.5<=pixel_bounds[3]),'sleeves_reach_lower_edge':pixel_bounds[1]<=1/h,'ui_buttons':'Requires actual game HUD overlay review.'}
+ validation['viewmodels'][f'{w}x{h}']={'normalized_bounds':pixel_bounds,'unclipped_core_bounds':b,'core_fully_visible':core_fully_visible(b),'width_fraction':width,'height_fraction':height,'target_fit':core_fully_visible(b) and .25<=width<=.32 and .25<=height<=.35,'camera':'fixed +Y perspective 35mm, no rotation trick','rig_location':list(rig.location),'rig_euler':list(rig.rotation_euler),'center_clear':not(pixel_bounds[0]<=.5<=pixel_bounds[2] and pixel_bounds[1]<=.5<=pixel_bounds[3]),'sleeves_reach_lower_edge':pixel_bounds[1]<=1/h,'ui_buttons':'Requires actual game HUD overlay review.'}
 rig.location=(0,0,0); rig.rotation_euler=(0,0,0)
 (OUT/'validation.json').write_text(json.dumps(validation,indent=2)); bpy.ops.wm.save_as_mainfile(filepath=str(OUT/'weapon_hands.blend'))
 (OUT/'SHA256SUMS').write_text('\n'.join(hashlib.sha256(p.read_bytes()).hexdigest()+'  '+p.name for p in sorted(OUT.iterdir()) if p.is_file() and p.name!='SHA256SUMS')+'\n')

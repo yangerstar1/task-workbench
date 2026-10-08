@@ -38,7 +38,7 @@ jobs:
           mkdir -p weapon-output
           printf '%s\n' "$GITHUB_SHA" > weapon-output/source-commit.txt
           cp /tmp/blender-selected.sha256 weapon-output/blender-upstream.sha256
-          /tmp/blender-4.2.3-linux-x64/blender --background --factory-startup --threads 2 --python-exit-code 1 --python tasks/desert-rv/art/weapon-candidate/build_weapon.py -- "$GITHUB_WORKSPACE/weapon-output"
+          /tmp/blender-4.2.3-linux-x64/blender --background --factory-startup --threads 2 --python-exit-code 1 --python tasks/desert-rv/art/weapon-candidate/build_weapon.py -- "$GITHUB_WORKSPACE/weapon-output" 2>&1 | tee weapon-output/blender.log
       - name: Encode complete side motion evidence
         shell: bash
         run: |
@@ -53,6 +53,7 @@ jobs:
         with:
           name: desert-rv-weapon-hands-candidate-${{ github.run_id }}
           path: |
+            weapon-output/*.log
             weapon-output/*.png
             weapon-output/*.mp4
             weapon-output/*.json
