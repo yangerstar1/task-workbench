@@ -1,0 +1,110 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Trusted task catalog",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "tasks"
+  ],
+  "properties": {
+    "schema": {
+      "const": "task-workbench/catalog-v1"
+    },
+    "tasks": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "data-summary",
+        "unity-proof"
+      ],
+      "properties": {
+        "data-summary": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "runner",
+            "stages",
+            "secrets",
+            "timeoutMinutes",
+            "input",
+            "inputSha256",
+            "workflow",
+            "status"
+          ],
+          "properties": {
+            "runner": {
+              "const": "ubuntu-24.04"
+            },
+            "stages": {
+              "const": [
+                "index",
+                "report"
+              ]
+            },
+            "secrets": {
+              "const": []
+            },
+            "timeoutMinutes": {
+              "const": 10
+            },
+            "input": {
+              "const": "tasks/data-summary/input.csv"
+            },
+            "inputSha256": {
+              "const": "8d57c57e0a6286d7d6c640e79c52728b22053d80cccc1d44a461380294adeaa3"
+            },
+            "workflow": {
+              "const": ".github/workflows/workbench.yml"
+            },
+            "status": {
+              "const": "SOURCE_CANDIDATE_CI_NOT_RUN"
+            }
+          }
+        },
+        "unity-proof": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "runner",
+            "stages",
+            "secrets",
+            "timeoutMinutes",
+            "workflow",
+            "status"
+          ],
+          "properties": {
+            "runner": {
+              "const": "ubuntu-24.04"
+            },
+            "stages": {
+              "const": [
+                "four-native-tests",
+                "android-build"
+              ]
+            },
+            "secrets": {
+              "const": [
+                "UNITY_LICENSE",
+                "UNITY_EMAIL",
+                "UNITY_PASSWORD"
+              ]
+            },
+            "timeoutMinutes": {
+              "const": [
+                30,
+                45
+              ]
+            },
+            "workflow": {
+              "const": ".github/workflows/unity-proof.yml"
+            },
+            "status": {
+              "const": "SOURCE_REVIEWED_NATIVE_NOT_RUN"
+            }
+          }
+        }
+      }
+    }
+  }
+}

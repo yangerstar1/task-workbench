@@ -1,0 +1,8 @@
+{
+  "schema": "task-workbench/request-v1",
+  "task": "data-summary",
+  "mode": "recover",
+  "requestId": "recover-example-001",
+  "resumeRunId": "123456789",
+  "resumeRequestId": "checkpoint-example-001"
+}

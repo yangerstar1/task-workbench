@@ -1,0 +1,72 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "task-workbench-request-v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "task",
+    "mode",
+    "requestId",
+    "resumeRunId",
+    "resumeRequestId"
+  ],
+  "properties": {
+    "schema": {
+      "const": "task-workbench/request-v1"
+    },
+    "task": {
+      "const": "data-summary"
+    },
+    "mode": {
+      "enum": [
+        "complete",
+        "checkpoint",
+        "recover"
+      ]
+    },
+    "requestId": {
+      "type": "string",
+      "pattern": "^[a-zA-Z0-9_-]{1,48}$"
+    },
+    "resumeRunId": {
+      "type": "string",
+      "pattern": "^([1-9][0-9]{0,19})?$"
+    },
+    "resumeRequestId": {
+      "type": "string",
+      "pattern": "^([a-zA-Z0-9_-]{1,48})?$"
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "mode": {
+            "const": "recover"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "resumeRunId": {
+            "minLength": 1
+          },
+          "resumeRequestId": {
+            "minLength": 1
+          }
+        }
+      },
+      "else": {
+        "properties": {
+          "resumeRunId": {
+            "const": ""
+          },
+          "resumeRequestId": {
+            "const": ""
+          }
+        }
+      }
+    }
+  ]
+}

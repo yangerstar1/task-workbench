@@ -1,0 +1,17 @@
+/UnityProof/[Ll]ibrary/
+/UnityProof/[Tt]emp/
+/UnityProof/[Oo]bj/
+/UnityProof/[Ll]ogs/
+/UnityProof/UserSettings/
+/UnityProof/Assets/Generated/
+/UnityProof/Assets/Generated.meta
+/artifacts/
+/evidence/
+/build/
+*.csproj
+*.sln
+*.ulf
+*.alf
+*.keystore
+*.jks
+

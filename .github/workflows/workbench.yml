@@ -1,0 +1,80 @@
+name: Trusted task workbench
+
+on:
+  push:
+    branches: [main]
+    paths: [requests/current.json]
+  workflow_dispatch:
+    inputs:
+      task:
+        type: choice
+        options: [data-summary]
+        default: data-summary
+      mode:
+        type: choice
+        options: [complete, checkpoint, recover]
+        default: complete
+      resume_run_id:
+        description: Source run ID for recovery only
+        type: string
+        default: ''
+      resume_request_id:
+        description: Source request ID for recovery only
+        type: string
+        default: ''
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: trusted-task-workbench
+  cancel-in-progress: false
+  queue: max
+
+jobs:
+  task:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    outputs:
+      checkpoint: ${{ steps.execute.outputs.checkpoint }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+          lfs: false
+      - name: Execute allowlisted finite task
+        id: execute
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TASK_ID: ${{ inputs.task }}
+          TASK_MODE: ${{ inputs.mode }}
+          RESUME_RUN_ID: ${{ inputs.resume_run_id }}
+          RESUME_REQUEST_ID: ${{ inputs.resume_request_id }}
+        run: python3 scripts/workbench.py run
+      - name: Save checkpoint and bounded evidence even on task failure
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: workbench-${{ github.run_id }}-${{ github.run_attempt }}
+          path: workbench-out/
+          retention-days: 7
+          if-no-files-found: ignore
+
+  evidence:
+    needs: task
+    if: always() && needs.task.outputs.checkpoint == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: write
+      actions: read
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+          lfs: false
+      - name: Verify fixed data files and publish durable state evidence
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 scripts/workbench.py publish

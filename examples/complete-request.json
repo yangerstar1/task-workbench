@@ -1,0 +1,8 @@
+{
+  "schema": "task-workbench/request-v1",
+  "task": "data-summary",
+  "mode": "complete",
+  "requestId": "complete-example-001",
+  "resumeRunId": "",
+  "resumeRequestId": ""
+}

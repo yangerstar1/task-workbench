@@ -1,0 +1,36 @@
+{
+  "schema": "task-workbench/catalog-v1",
+  "tasks": {
+    "data-summary": {
+      "runner": "ubuntu-24.04",
+      "stages": [
+        "index",
+        "report"
+      ],
+      "secrets": [],
+      "timeoutMinutes": 10,
+      "input": "tasks/data-summary/input.csv",
+      "inputSha256": "8d57c57e0a6286d7d6c640e79c52728b22053d80cccc1d44a461380294adeaa3",
+      "workflow": ".github/workflows/workbench.yml",
+      "status": "SOURCE_CANDIDATE_CI_NOT_RUN"
+    },
+    "unity-proof": {
+      "runner": "ubuntu-24.04",
+      "stages": [
+        "four-native-tests",
+        "android-build"
+      ],
+      "secrets": [
+        "UNITY_LICENSE",
+        "UNITY_EMAIL",
+        "UNITY_PASSWORD"
+      ],
+      "timeoutMinutes": [
+        30,
+        45
+      ],
+      "workflow": ".github/workflows/unity-proof.yml",
+      "status": "SOURCE_REVIEWED_NATIVE_NOT_RUN"
+    }
+  }
+}

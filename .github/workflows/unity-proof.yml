@@ -1,0 +1,117 @@
+name: Unity 6000.3.19f1 free CI proof
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: unity-personal-proof
+  cancel-in-progress: false
+
+jobs:
+  tests:
+    name: Four native EditMode tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    outputs:
+      test_count: ${{ steps.verify.outputs.test_count }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+          lfs: false
+      - name: Require trusted public manual dispatch
+        run: python3 scripts/workbench.py guard-unity
+      - name: Check secrets and prepare disposable runner
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+        run: bash tasks/unity-proof/scripts/prepare_runner.sh
+      - name: Execute Unity tests
+        uses: game-ci/unity-test-runner@0ff419b913a3630032cbe0de48a0099b5a9f0ed9 # v4.3.1
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+        with:
+          unityVersion: 6000.3.19f1
+          projectPath: tasks/unity-proof/UnityProof
+          testMode: editmode
+          artifactsPath: tasks/unity-proof/artifacts/tests
+          customParameters: -assemblyNames CIProof.EditorTests -job-worker-count 2
+          dockerCpuLimit: 2
+          dockerMemoryLimit: 12g
+      - name: Require actual nonempty passing NUnit report
+        if: always()
+        id: verify
+        working-directory: tasks/unity-proof
+        run: python3 scripts/verify_evidence.py tests
+      - name: Upload only test evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: proof-tests-${{ github.run_id }}-${{ github.run_attempt }}
+          path: tasks/unity-proof/evidence/
+          if-no-files-found: ignore
+          retention-days: 7
+
+  android:
+    name: Build original ARM64 APK
+    needs: tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+          lfs: false
+      - name: Require trusted public manual dispatch
+        run: python3 scripts/workbench.py guard-unity
+      - name: Check secrets and prepare disposable runner
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+        run: bash tasks/unity-proof/scripts/prepare_runner.sh
+      - name: Build with Unity
+        uses: game-ci/unity-builder@d829bfc901f2347c8fe18898f06712b66916ef42 # v5.0.0
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+        with:
+          unityVersion: 6000.3.19f1
+          projectPath: tasks/unity-proof/UnityProof
+          targetPlatform: Android
+          buildMethod: ProofBuild.BuildAndroid
+          buildName: Proof
+          buildsPath: build
+          androidTargetSdkVersion: 35
+          androidExportType: androidPackage
+          versioning: Custom
+          version: 0.0.1
+          androidVersionCode: 1
+          dockerCpuLimit: 2
+          dockerMemoryLimit: 12g
+          customParameters: >-
+            -job-worker-count 2
+            -proofCommit ${{ github.sha }}
+            -proofRunId ${{ github.run_id }}
+            -proofTestCount ${{ needs.tests.outputs.test_count }}
+      - name: Independently verify APK bytes and native receipt
+        working-directory: tasks/unity-proof
+        run: python3 scripts/verify_evidence.py apk
+      - name: Upload APK and bounded evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: proof-android-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            tasks/unity-proof/build/Android/Proof.apk
+            tasks/unity-proof/build/Android/build-receipt.json
+            tasks/unity-proof/evidence/
+          if-no-files-found: ignore
+          retention-days: 7
