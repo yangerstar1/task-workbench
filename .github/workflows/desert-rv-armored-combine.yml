@@ -1,0 +1,50 @@
+name: Desert RV combined armored candidate evidence
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: desert-rv-armored-combine
+  cancel-in-progress: false
+jobs:
+  package:
+    if: github.actor == github.repository_owner && github.event_name == 'workflow_dispatch' && github.event.repository.private == false && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+          lfs: false
+      - name: Retrieve only pinned technical and completed clip archives
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir source-zips
+          python3 - <<'PY'
+          import json,subprocess
+          from pathlib import Path
+          locks=json.load(open('tasks/desert-rv/art/armored-staged/combined-inputs.json'))
+          for item in locks:
+              route='repos/yangerstar1/task-workbench/actions/artifacts/'+str(item['id'])
+              meta=json.loads(subprocess.check_output(['gh','api',route]))
+              assert meta['id']==item['id'] and not meta['expired']
+              assert meta['workflow_run']['id']==item['run'] and meta['workflow_run']['head_sha']==item['source']
+              assert meta['digest']=='sha256:'+item['digest'] and meta['size_in_bytes']==item['bytes']
+              with open('source-zips/'+str(item['id'])+'.zip','wb') as out:
+                  subprocess.run(['gh','api',route+'/zip'],stdout=out,check=True,timeout=120)
+          PY
+      - name: Install official video verification tool
+        run: sudo apt-get update -qq && sudo apt-get install -y --no-install-recommends ffmpeg
+      - name: Verify complete original-timebase clips and copy immutable assets
+        run: python3 tasks/desert-rv/art/armored-staged/combine_candidate.py --archives source-zips --work verified-inputs --output combined-candidate
+      - name: Upload verified FULL candidate, never production approval
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: armored-combined-candidate-${{ github.run_id }}
+          path: combined-candidate/
+          if-no-files-found: error
+          retention-days: 30

@@ -1,0 +1,100 @@
+[
+  {
+    "id": 11578643282,
+    "run": 37843918724,
+    "source": "decc49e3b443256d890c77a85eaf337ae1b7e897",
+    "bytes": 1730576,
+    "digest": "fe3f42452b951886f3ec37d0fa2fff3699f6aefde39eca53c865e60f15d45c17",
+    "kind": "technical"
+  },
+  {
+    "id": 11581930235,
+    "run": 37844880645,
+    "source": "19cc064551488607caf6cd7b9139f7be90bfd707",
+    "bytes": 2482503,
+    "digest": "10dbc14cf00900aeda117c325075123a86fc1e08518406514afd3012af7e741d",
+    "kind": "clip",
+    "clip": "Windup"
+  },
+  {
+    "id": 11581561195,
+    "run": 37844880645,
+    "source": "19cc064551488607caf6cd7b9139f7be90bfd707",
+    "bytes": 17367137,
+    "digest": "b1ccada061688bbea0baa155732486b87c52083b1ab6e4fda3c70d96c4ddde39",
+    "kind": "clip",
+    "clip": "SYNTHETIC_Interrupt_0.42"
+  },
+  {
+    "id": 11581466241,
+    "run": 37844880645,
+    "source": "19cc064551488607caf6cd7b9139f7be90bfd707",
+    "bytes": 2530049,
+    "digest": "e0271b36d3f9d9231013c5f1765c20eee52ed0134a791c2a75abf6c5fa29dbbc",
+    "kind": "clip",
+    "clip": "Idle"
+  },
+  {
+    "id": 11581466156,
+    "run": 37844880645,
+    "source": "19cc064551488607caf6cd7b9139f7be90bfd707",
+    "bytes": 11964954,
+    "digest": "dc0a011b70aa711aa9f3c4eeb585470b5e9cebdb3caffe16c6dd6849b4a1f20d",
+    "kind": "clip",
+    "clip": "SYNTHETIC_Interrupt_0.07"
+  },
+  {
+    "id": 11581306552,
+    "run": 37844880645,
+    "source": "19cc064551488607caf6cd7b9139f7be90bfd707",
+    "bytes": 2482733,
+    "digest": "28bbf51210460a5cfb0c95c000622225a4deaa47be1873779919d0c2f4372314",
+    "kind": "clip",
+    "clip": "Walk"
+  },
+  {
+    "id": 11581271576,
+    "run": 37844880645,
+    "source": "19cc064551488607caf6cd7b9139f7be90bfd707",
+    "bytes": 17374725,
+    "digest": "feb570798301f0dd1f0b199b4380008bd8ea63bccbb1d3c5b3eb4bb1f6bf7b36",
+    "kind": "clip",
+    "clip": "SYNTHETIC_Interrupt_0.91"
+  },
+  {
+    "id": 11580667696,
+    "run": 37844880645,
+    "source": "19cc064551488607caf6cd7b9139f7be90bfd707",
+    "bytes": 5698462,
+    "digest": "f03eec3cc8b387985026ee867782c639bc58c7b9610f31093baa9df0ab71d012",
+    "kind": "clip",
+    "clip": "Hit"
+  },
+  {
+    "id": 11580622642,
+    "run": 37844880645,
+    "source": "19cc064551488607caf6cd7b9139f7be90bfd707",
+    "bytes": 35036217,
+    "digest": "d241272e4a28b27289d539162b4d3eb2552316f365718f36bf7991a54ddd1155",
+    "kind": "clip",
+    "clip": "Recover"
+  },
+  {
+    "id": 11580433128,
+    "run": 37844880645,
+    "source": "19cc064551488607caf6cd7b9139f7be90bfd707",
+    "bytes": 20679338,
+    "digest": "bef896eed6165192a79980db27be2b1277ef5badf9539b225fb26416843d7100",
+    "kind": "clip",
+    "clip": "Attack"
+  },
+  {
+    "id": 11580299981,
+    "run": 37844880645,
+    "source": "19cc064551488607caf6cd7b9139f7be90bfd707",
+    "bytes": 31000555,
+    "digest": "a4f57ef6a2a59e95c96310a73354ad9a54168cc3f6d46888e766e84f755c49c8",
+    "kind": "clip",
+    "clip": "Death"
+  }
+]
