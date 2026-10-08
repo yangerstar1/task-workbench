@@ -41,21 +41,26 @@ namespace DesertRV
             if (reason == null && (!incomingOffset || !leftReloadOffset || incomingOffset == leftReloadOffset ||
                 !incomingOffset.IsChildOf(animator.transform) || !leftReloadOffset.IsChildOf(animator.transform) ||
                 !leftHand.IsChildOf(leftReloadOffset) || rightHand.IsChildOf(leftReloadOffset) ||
-                !FinitePitch(nailPitch) || !ValidNails(loadedNails, animator.transform) || !ValidNails(incomingNails, incomingOffset)))
+                !FinitePitch(nailPitch) || !ValidNails(loadedNails, animator.transform, animator.transform) || !ValidNails(incomingNails, incomingOffset, animator.transform)))
                 reason = "Partial reload requires 12 separate old/new round meshes, unkeyed strip/left-hand carriers and finite nail pitch.";
             if (reason == null)
-                foreach (var oldNail in loadedNails) foreach (var incomingNail in incomingNails)
-                    if (oldNail == incomingNail || oldNail.transform.IsChildOf(incomingOffset)) reason = "Old/new nail geometry must be disjoint.";
+                foreach (var oldNail in loadedNails)
+                {
+                    if (!NailRigOwnership.ValidateLoaded(oldNail, incomingOffset, animator.transform, out var ownershipReason))
+                        reason = "Loaded nail ownership invalid: " + ownershipReason;
+                    foreach (var incomingNail in incomingNails)
+                        if (oldNail == incomingNail) reason = "Old/new nail geometry must be disjoint.";
+                }
             return reason == null;
         }
         static bool FinitePitch(Vector3 pitch) => !float.IsNaN(pitch.x) && !float.IsNaN(pitch.y) && !float.IsNaN(pitch.z) &&
             !float.IsInfinity(pitch.x) && !float.IsInfinity(pitch.y) && !float.IsInfinity(pitch.z) && pitch.sqrMagnitude > .000001f && pitch.sqrMagnitude < .01f;
-        static bool ValidNails(Renderer[] nails, Transform owner)
+        static bool ValidNails(Renderer[] nails, Transform owner, Transform rig)
         {
             if (nails == null || nails.Length != ReloadPresentationPlan.Capacity) return false;
             for (int i = 0; i < nails.Length; i++)
             {
-                if (!nails[i] || !nails[i].transform.IsChildOf(owner)) return false;
+                if (!NailRigOwnership.Validate(nails[i], owner, rig, out _)) return false;
                 for (int j = 0; j < i; j++) if (nails[j] == nails[i]) return false;
             }
             return true;

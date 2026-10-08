@@ -63,8 +63,8 @@
     },
     {
       "path": "tasks/desert-rv/scripts/expected_test_cases.json",
-      "sha256": "6229fd296fb48fd3f3f3476528ba1712ae3e659b6c6872acf2b6391b7b89719a",
-      "size": 10741
+      "sha256": "865c1ff3dc41a9505be841db01d4c74fba5efc52f61c894ad40fdcc8238c7e17",
+      "size": 11662
     },
     {
       "path": "tasks/desert-rv/scripts/prepare_runner.sh",
@@ -83,7 +83,7 @@
     },
     {
       "path": "tasks/desert-rv/scripts/test_verify_evidence.py",
-      "sha256": "5fb4fd7aea8d0a4dc15dae2bfa0dc36bbc7496ce3423cb6c1f59fb166af9033d",
+      "sha256": "a86282c7df4d6420a9a529d1eec33816baee3ac57a66a554c31a19b7b7ccd395",
       "size": 15949
     },
     {
@@ -3433,8 +3433,8 @@
     },
     {
       "path": "tasks/desert-rv/unity/Assets/DesertRV/Editor/JourneyContentChecks.cs",
-      "sha256": "9efb1a139ad83d0722a703d242b7b1a7b83fdabff5c7bbba25640379ccbb2f95",
-      "size": 30388
+      "sha256": "b4707b234d0b899fbd4a546556d30229427b1f52a47f03c1abed4a616a901c54",
+      "size": 30910
     },
     {
       "path": "tasks/desert-rv/unity/Assets/DesertRV/Editor/JourneyContentChecks.cs.meta",
@@ -3522,6 +3522,16 @@
       "size": 59
     },
     {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Editor/WeakPointContractChecks.cs",
+      "sha256": "0662a864f88a81f1b6e6ff4a7cb9b8c7766afb2b4d046ba595c0d7bf8cb9f6e5",
+      "size": 2955
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Editor/WeakPointContractChecks.cs.meta",
+      "sha256": "34dde99d71f5c87884c1e2b185d575eab3136113f7694407b5fce0e9b7d845e9",
+      "size": 240
+    },
+    {
       "path": "tasks/desert-rv/unity/Assets/DesertRV/Editor/WebBuild.cs",
       "sha256": "80ed47be2b8dd921b16d09ebb9466c482d8bd3794d39b905086ac1360d81295c",
       "size": 6889
@@ -3598,8 +3608,8 @@
     },
     {
       "path": "tasks/desert-rv/unity/Assets/DesertRV/Runtime/BeastWeakPointPresentation.cs",
-      "sha256": "8b1f1f0d19eb5b4b2233f8967a7d6357cd495f5865c390e581e5511d2efdaac0",
-      "size": 2811
+      "sha256": "2b7a495376aad677ae8f92b47c63c0444d5dd05a8cb232f991fbade1b4df8a1c",
+      "size": 6729
     },
     {
       "path": "tasks/desert-rv/unity/Assets/DesertRV/Runtime/BeastWeakPointPresentation.cs.meta",
@@ -3747,6 +3757,16 @@
       "size": 60
     },
     {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Runtime/NailRigOwnership.cs",
+      "sha256": "465ec6e28a23a4f5264c3ee81e02a09cd2ffbc988ec48ea2dc85fbf8945b3880",
+      "size": 7152
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Runtime/NailRigOwnership.cs.meta",
+      "sha256": "762740b779d89d404d9aaaf3d07b96d355af1077b73e669a582cd27129d5f387",
+      "size": 240
+    },
+    {
       "path": "tasks/desert-rv/unity/Assets/DesertRV/Runtime/PauseGate.cs",
       "sha256": "f96c413f64f780bb4d2f35442b4973e8910d6f8cbca74930fdbb3bc38672f713",
       "size": 1550
@@ -3828,8 +3848,8 @@
     },
     {
       "path": "tasks/desert-rv/unity/Assets/DesertRV/Runtime/WeaponPresentation.cs",
-      "sha256": "eefbd7cc73d7d834ff102fdd6b50a7725dee5f133c8ed3fb2d771c031dfc3ce9",
-      "size": 10863
+      "sha256": "773abda4b54c9aa627e69f3431bdd8d8c9daa8d894ec4d5aafdeaa8ed8f7e197",
+      "size": 11151
     },
     {
       "path": "tasks/desert-rv/unity/Assets/DesertRV/Runtime/WeaponPresentation.cs.meta",
@@ -4162,13 +4182,33 @@
       "size": 60
     },
     {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Tests/EditMode/NailRigOwnershipTests.cs",
+      "sha256": "f2d99e3e1c6ab7d8bb18cc768f7e9bac91d39dcdbd6d0a380e7ba90430c34846",
+      "size": 9590
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Tests/EditMode/NailRigOwnershipTests.cs.meta",
+      "sha256": "7f9cf62fb2fff10cefc214616dff4c4bdbd2604bd0d3ef4289374a8b51992a63",
+      "size": 240
+    },
+    {
       "path": "tasks/desert-rv/unity/Assets/DesertRV/Tests/EditMode/PresentationContractTests.cs",
-      "sha256": "ccb86641d0c36ec836c6678c4f5410174efc3b1cbf3ea00710abbf13ca8e4d17",
-      "size": 21653
+      "sha256": "fa523d6bfc71eb1a2b3322f17fe715ca90514259ab8383b84907f5011f018769",
+      "size": 21955
     },
     {
       "path": "tasks/desert-rv/unity/Assets/DesertRV/Tests/EditMode/PresentationContractTests.cs.meta",
       "sha256": "34cdd65a07679ca237332e4fc29e89bed8ca46527962ecd61936ac2682abcc02",
+      "size": 240
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Tests/EditMode/WeakPointPresentationTests.cs",
+      "sha256": "b10c72577de04fe258108d68f7991510e03701a8cc9f573948c2c0b0fb10b041",
+      "size": 11259
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Tests/EditMode/WeakPointPresentationTests.cs.meta",
+      "sha256": "c5b7aa325c392a37ccefdecafc3b1589e15ce6e4a9b07705e0a844b13900d591",
       "size": 240
     },
     {

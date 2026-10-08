@@ -83,6 +83,12 @@
   "DesertRV.Tests.JourneySupplyRulesTests.SupplyRejectsDrivingAndAllowsOnFootAfterwards",
   "DesertRV.Tests.JourneySupplyRulesTests.SupplyRejectsInvalidAmountsKindsAndBlankIdsWithoutConsumingAnything",
   "DesertRV.Tests.JourneySupplyRulesTests.SupplyRejectsWrongRegionWrongGenerationAndAllNonplayingStates",
+  "DesertRV.Tests.NailRigOwnershipTests.AnimationTargets_IncludeActualPositiveBonesNotUnusedBoneReferences",
+  "DesertRV.Tests.NailRigOwnershipTests.LoadedNail_CannotHaveIncomingBoneInfluence",
+  "DesertRV.Tests.NailRigOwnershipTests.MeshAndWeightTable_RejectEmptyUnreadableAndMalformedData",
+  "DesertRV.Tests.NailRigOwnershipTests.RigidMesh_StillRequiresRealTransformOwnership",
+  "DesertRV.Tests.NailRigOwnershipTests.SkinnedAtRigRoot_AcceptsPositiveOwnerBonesIncludingMoreThanFour",
+  "DesertRV.Tests.NailRigOwnershipTests.Skinned_RejectsExternalReferencesAndMixedOwnerWeights",
   "DesertRV.Tests.PresentationContractTests.Arc_OnlyEventEndpointsOnceAndNeverMutatesCombat",
   "DesertRV.Tests.PresentationContractTests.Arc_PauseDoesNotAdvanceLifetimeAndResetClears",
   "DesertRV.Tests.PresentationContractTests.Cursor_ConsumesOnceAndRejectsOldEpoch",
@@ -114,5 +120,8 @@
   "DesertRV.Tests.TouchRulesTests.OverlayRejectsGameplayControls",
   "DesertRV.Tests.TouchRulesTests.PointerOwnershipCannotBeStolen",
   "DesertRV.Tests.TouchRulesTests.PointerReleaseClearsHeldControlsAndMovement",
-  "DesertRV.Tests.TouchRulesTests.QuickTapRetainsExactlyOneFrameEdge"
+  "DesertRV.Tests.TouchRulesTests.QuickTapRetainsExactlyOneFrameEdge",
+  "DesertRV.Tests.WeakPointPresentationTests.Binding_RejectsLegacyPlateWholeBodyAndSharedGeometry",
+  "DesertRV.Tests.WeakPointPresentationTests.Gate_RejectsConstantAssemblyCurvesMaterialKeysAndBodyEmissionLeak",
+  "DesertRV.Tests.WeakPointPresentationTests.Lifecycle_OnlyCoreAndBothPlatesFollowRealWindowAcrossPauseDisableDeathRestart"
 ]

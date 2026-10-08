@@ -214,6 +214,7 @@ namespace DesertRV.Tests
         {
             string path="Assets/__PresentationLifecycle_"+Guid.NewGuid().ToString("N")+".controller";
             var cameraObject=new GameObject("lifecycle camera fixture");
+            var nailFixtureMesh=new Mesh { vertices=new[]{Vector3.zero,Vector3.right*.03f,Vector3.up*.03f}, triangles=new[]{0,1,2} };
             try
             {
                 var controller=UnityEditor.Animations.AnimatorController.CreateAnimatorControllerAtPath(path);
@@ -243,8 +244,8 @@ namespace DesertRV.Tests
                     var loaded=new Renderer[12]; var fresh=new Renderer[12];
                     for(int i=0;i<12;i++)
                     {
-                        var a=new GameObject("loaded "+i); a.transform.SetParent(rig.transform); loaded[i]=a.AddComponent<MeshRenderer>();
-                        var b=new GameObject("incoming "+i); b.transform.SetParent(incoming); fresh[i]=b.AddComponent<MeshRenderer>();
+                        var a=new GameObject("loaded "+i); a.transform.SetParent(rig.transform); a.AddComponent<MeshFilter>().sharedMesh=nailFixtureMesh; loaded[i]=a.AddComponent<MeshRenderer>();
+                        var b=new GameObject("incoming "+i); b.transform.SetParent(incoming); b.AddComponent<MeshFilter>().sharedMesh=nailFixtureMesh; fresh[i]=b.AddComponent<MeshRenderer>();
                     }
                     var motor=Add(f.Root,"JourneyMotor"); Set(motor,"view",camera); Set(f.Actions,"motor",motor); Set(f.Actions,"shotMuzzle",muzzle);
                     var presenter=Add(rig,"WeaponPresentation"); Set(presenter,"actions",f.Actions); Set(presenter,"animator",animator);
@@ -276,7 +277,7 @@ namespace DesertRV.Tests
                     UnityEngine.Object.DestroyImmediate(rig);
                 }
             }
-            finally { UnityEngine.Object.DestroyImmediate(cameraObject); UnityEditor.AssetDatabase.DeleteAsset(path); }
+            finally { UnityEngine.Object.DestroyImmediate(cameraObject); UnityEngine.Object.DestroyImmediate(nailFixtureMesh); UnityEditor.AssetDatabase.DeleteAsset(path); }
         }
         [Test] public void MissingAssets_FailClosedWithoutCreatingChildren()
         {

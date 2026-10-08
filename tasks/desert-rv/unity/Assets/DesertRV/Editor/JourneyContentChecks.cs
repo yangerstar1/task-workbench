@@ -259,7 +259,14 @@ namespace DesertRV.Editor
             string leftPath=AnimationUtility.CalculateTransformPath(weapon.leftReloadOffset,weapon.animator.transform);
             var nails=weapon.loadedNails.Concat(weapon.incomingNails).Where(n=>n).ToArray();
             Require(nails.Length==24 && nails.Distinct().Count()==24,"Partial reload requires exactly 24 independent round renderers.",errors);
-            var nailPaths=nails.Select(n=>AnimationUtility.CalculateTransformPath(n.transform,weapon.animator.transform)).ToArray();
+            var targets=new HashSet<Transform>();
+            foreach(var nail in nails)
+            {
+                if(!NailRigOwnership.TryGetAnimationTargets(nail,weapon.animator.transform,out var affected,out var reason))
+                { errors.Add("Nail animation ownership unverifiable: "+reason);continue; }
+                foreach(var target in affected) targets.Add(target);
+            }
+            var nailPaths=targets.Select(t=>AnimationUtility.CalculateTransformPath(t,weapon.animator.transform)).ToArray();
             foreach(var clip in weapon.animator.runtimeAnimatorController.animationClips.Distinct())
             foreach(var binding in AnimationUtility.GetCurveBindings(clip))
             {
@@ -283,6 +290,7 @@ namespace DesertRV.Editor
             {
                 object[] args={null};bool valid=(bool)method.Invoke(presenter,args);
                 Require(valid,label+": "+(args[0] as string ?? "presenter binding validation failed"),errors);
+                if(presenter is BeastWeakPointPresentation weakpoint) WeakPointContractChecks.Validate(weakpoint,label,errors);
             }
             catch(Exception error) { errors.Add(label+": binding validation threw "+(error.InnerException??error).Message); }
         }
