@@ -14,7 +14,7 @@ using Object = UnityEngine.Object;
 namespace DesertRV.Editor
 {
     // Explicit Actions authoring step. Never called by build/preprocess or on import.
-    public static class JourneySceneAuthoring
+    public static partial class JourneySceneAuthoring
     {
         public const string SourcePath = "Assets/DesertRV/Scenes/BodyStudy.unity";
         public const string Folder = "Assets/DesertRV/Scenes/Journey";
@@ -304,6 +304,7 @@ namespace DesertRV.Editor
             if(b.region==1) {DressStation(source,b);DressRamGate(b);}
             else if(b.region==2) {DressScrapyard(source,b);DressScrapWork(source,b,motor);}
             else {DressBeacon(source,b);DressSignalEquipment(source,b);}
+            AuthorOptionalSupplies(source,b,motor);
         }
         static void ExtendSceneryRoad(RegionBinding b)
         {
@@ -608,6 +609,7 @@ namespace DesertRV.Editor
                 if(!collider.enabled||!collider.gameObject.activeInHierarchy||collider.isTrigger||collider.bounds.max.y<.18f||collider==b.ramGate||collider==b.salvageSurface||collider==b.powerSurface||collider.GetComponentInParent<BeastActor>())continue;
                 foreach(var zone in zones)if(collider.bounds.Intersects(zone.Value))throw new InvalidOperationException("New collider blocks "+zone.Key+": "+collider.name);
             }
+            CheckOptionalSupplyApproaches(b);
             var mesas=b.GetComponentsInChildren<Transform>(true).Where(t=>t.name.StartsWith("DISTANT-Mesa-",StringComparison.Ordinal)).ToArray();
             foreach(var mesa in mesas){var bounds=GeometryBounds(mesa);if(bounds.min.x<35&&bounds.max.x>-35&&bounds.min.z<85)throw new InvalidOperationException("Mesa invades the open play basin: "+mesa.name);}
             Directory.CreateDirectory("JourneyEvidence");File.WriteAllText("JourneyEvidence/clearance-region-"+b.region+".json",JsonUtility.ToJson(new ClearanceReport{region=b.region,passed=true,checkedZones=zones.Keys.ToArray(),distantMeshes=mesas.Length},true));

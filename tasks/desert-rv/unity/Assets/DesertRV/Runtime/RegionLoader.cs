@@ -30,6 +30,14 @@ namespace DesertRV
             catch (Exception e) { error = "地区激活失败：" + e.Message; }
             return false;
         }
+        static bool ValidateForLoad(RegionBinding binding, out string reason)
+        {
+#if UNITY_EDITOR
+            if (Editor.JourneyDiagnosticScope.Active)
+                return Editor.JourneyDiagnosticScope.ValidateRegion(binding, out reason);
+#endif
+            return binding.Validate(out reason);
+        }
         static void RestoreActive(Scene rejected, Scene previous)
         {
             // Do not overwrite another owner's newer active scene.
@@ -65,7 +73,7 @@ namespace DesertRV
                 foreach (var candidate in root.GetComponentsInChildren<RegionBinding>(true)) { binding = candidate; bindings++; }
             }
             string reason = "地区必须具有唯一且匹配的 RegionBinding。";
-            if (!session.IsCurrentLoad(ticket) || !scene.IsValid() || !scene.isLoaded || duplicateJourney || bindings != 1 || binding.region != ticket.Scene || !binding.Validate(out reason))
+            if (!session.IsCurrentLoad(ticket) || !scene.IsValid() || !scene.isLoaded || duplicateJourney || bindings != 1 || binding.region != ticket.Scene || !ValidateForLoad(binding, out reason))
             {
                 if (scene.IsValid() && scene.isLoaded) yield return SceneManager.UnloadSceneAsync(scene);
                 Busy = false;

@@ -44,9 +44,15 @@ namespace DesertRV
         }
         public bool Validate(out string reason)
         {
+            if (!environmentVerified || !combatAssetsVerified)
+            { reason = "地区场景或战斗资产尚未验收。"; return false; }
+            return ValidateStructure(out reason);
+        }
+        // Structure is independently inspectable; production Validate still requires visual approval.
+        public bool ValidateStructure(out string reason)
+        {
             reason = null;
-            if (!environmentVerified || !combatAssetsVerified) reason = "地区场景或战斗资产尚未验收。";
-            else if (region < 1 || region > 3 || !spawn || !exitVolume || progressDirection.sqrMagnitude < .99f || float.IsNaN(progressDirection.sqrMagnitude) || float.IsInfinity(progressDirection.sqrMagnitude) ||
+            if (region < 1 || region > 3 || !spawn || !exitVolume || progressDirection.sqrMagnitude < .99f || float.IsNaN(progressDirection.sqrMagnitude) || float.IsInfinity(progressDirection.sqrMagnitude) ||
                 double.IsNaN(regionOffset) || double.IsInfinity(regionOffset)) reason = "地区坐标或出生/出口绑定不完整。";
             else if (region == 1 && (!salvage || !salvageSurface || !ramGate || guards == null || guards.Length == 0 || roadBeasts == null || roadBeasts.Length == 0)) reason = "第一地区缺少拾取、撞门或真实敌人。";
             else if (region >= 2 && (!powerPoint || !powerSurface || waves == null || waves.Length == 0 || chargeSeconds <= 0 || float.IsNaN(chargeSeconds) || float.IsInfinity(chargeSeconds))) reason = "供电遭遇缺少真实波次。";

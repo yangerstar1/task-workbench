@@ -1,5 +1,8 @@
 [
   "DesertRV.Tests.JourneyLoaderPlayModeTests.MissingRegion_RemainsLoadingAndSameTicketCanRetry",
+  "DesertRV.Tests.JourneyReplayInputTests.ContextCancellation_HeldReplayRequiresLiftBeforeRepress",
+  "DesertRV.Tests.JourneyReplayInputTests.HeldFire_SurvivesAdapterSampleWithoutNewPressedEdge",
+  "DesertRV.Tests.JourneyReplayInputTests.ScopeRequestHashChange_InvalidatesAndCloseClearsCapability",
   "DesertRV.Tests.RegionLoaderActiveSceneTests.LoadedRegion_IsActiveWithItsRenderSettingsBeforeReady",
   "DesertRV.Tests.RegionLoaderActiveSceneTests.ReadyException_RestoresActiveReleasesBusyAndKeepsTicket",
   "DesertRV.Tests.RegionLoaderActiveSceneTests.RejectedSameNameReload_RestoresPreviousActiveAndAllowsSameTicketRetry",

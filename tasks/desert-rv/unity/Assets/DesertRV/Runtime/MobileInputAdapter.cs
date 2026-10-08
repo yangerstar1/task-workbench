@@ -38,6 +38,29 @@ namespace DesertRV
 
         void OnDisable() => ReleaseAll();
 
+#if UNITY_EDITOR
+        UnityEngine.Object editorReplayOwner;
+        readonly HashSet<int> editorReplayFingers = new HashSet<int>();
+        public bool EditorReplayActive => editorReplayOwner;
+        public void AttachEditorReplay(UnityEngine.Object owner)
+        {
+            if (!Application.isPlaying || !owner || editorReplayOwner)
+                throw new System.InvalidOperationException("One explicit Editor replay owner is required.");
+            ReleaseAll(); editorReplayOwner = owner; editorReplayFingers.Clear();
+        }
+        public void SetEditorReplayFingers(UnityEngine.Object owner, IEnumerable<int> fingers)
+        {
+            if (!owner || owner != editorReplayOwner) throw new System.InvalidOperationException("Replay owner mismatch.");
+            editorReplayFingers.Clear();
+            foreach (int id in fingers) editorReplayFingers.Add(id);
+        }
+        public void DetachEditorReplay(UnityEngine.Object owner)
+        {
+            if (owner != editorReplayOwner) return;
+            ReleaseAll(); editorReplayFingers.Clear(); editorReplayOwner = null;
+        }
+#endif
+
         // Called exactly once by the journey simulation, before reading controls.
         // Does not own the game's pause policy or consume action edges itself.
         public void Sample()
@@ -46,6 +69,14 @@ namespace DesertRV
             {
                 ReleaseAll(); screenWidth = Screen.width; screenHeight = Screen.height; safeArea = Screen.safeArea;
             }
+#if UNITY_EDITOR
+            if (editorReplayOwner)
+            {
+                keyboardArmed = false;
+                State.ReconcileFingers(editorReplayFingers);
+                return; // Only the explicit replay source owns pointers; no real/synthetic mixing.
+            }
+#endif
             active.Clear();
             for (int i = 0; i < Input.touchCount; i++)
             {
