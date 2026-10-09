@@ -1,0 +1,38 @@
+name: Desert RV 30-second rendered GameView smoke (no gameplay claim)
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: desert-rv-rendered-editor
+  cancel-in-progress: false
+jobs:
+  window:
+    if: >-
+      github.repository == 'yangerstar1/task-workbench' && github.ref == 'refs/heads/main' &&
+      github.actor == 'yangerstar1' && github.triggering_actor == 'yangerstar1' &&
+      github.event.repository.visibility == 'public'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 55
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+          lfs: false
+      - name: Exercise saved BodyStudy window only for thirty seconds
+        id: rendered
+        uses: ./.github/actions/desert-rv-rendered
+        with:
+          mode: window-smoke
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+      - name: Upload only guarded source-verified window evidence or fixed failure status
+        if: always() && steps.rendered.outputs.export_ready == 'true'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: desert-rv-WINDOW-SMOKE-NOT-GAMEPLAY-${{ github.run_id }}-${{ github.run_attempt }}
+          path: tasks/desert-rv/rendered-public-export/
+          if-no-files-found: error
+          retention-days: 7

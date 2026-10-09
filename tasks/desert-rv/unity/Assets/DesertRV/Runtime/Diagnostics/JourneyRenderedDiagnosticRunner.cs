@@ -13,6 +13,9 @@ namespace DesertRV.Editor
     public static class JourneyRenderedDiagnosticRunner
     {
         public const string Entry = "DesertRV.Editor.JourneyRenderedDiagnosticRunner.Run";
+        public const string SmokeEntry = "DesertRV.Editor.JourneyRenderedDiagnosticRunner.RunWindowSmoke";
+        static bool Smoke => Environment.GetCommandLineArgs().Contains(SmokeEntry);
+        static JourneyWindowSmokeEvidence smokeRecorder;
         [Serializable] sealed class CaptureRequest { public string title; public int pid; }
         [Serializable] sealed class CaptureReady { public string title, windowId; public int pid; public bool valid; }
         static JourneyInputEvidence recorder;
@@ -26,22 +29,24 @@ namespace DesertRV.Editor
             EditorApplication.playModeStateChanged += OnPlayMode;
             EditorApplication.update += Poll;
         }
-        static bool ExplicitInvocation => Environment.GetCommandLineArgs().Contains(Entry);
+        static bool ExplicitInvocation => Environment.GetCommandLineArgs().Contains(Entry) || Smoke;
         static string Required(string name)
         {
             string value = Environment.GetEnvironmentVariable(name);
             if (string.IsNullOrWhiteSpace(value)) throw new InvalidOperationException("Missing explicit " + name);
             return value;
         }
+        public static void RunWindowSmoke() => Run();
         public static void Run()
         {
             if (!ExplicitInvocation || Application.isBatchMode || SystemInfo.graphicsDeviceType == GraphicsDeviceType.Null)
                 throw new InvalidOperationException("Use explicit rendered non-batch Editor under Xvfb.");
-            Required("DESERTRV_DIAGNOSTIC_SCOPE"); Required("DESERTRV_INPUT_PLAN"); Required("DESERTRV_EVIDENCE_DIR"); Required("DESERTRV_CAPTURE_HANDSHAKE_DIR");
+            if (!Smoke) { Required("DESERTRV_DIAGNOSTIC_SCOPE"); Required("DESERTRV_INPUT_PLAN"); }
+            Required("DESERTRV_EVIDENCE_DIR"); Required("DESERTRV_CAPTURE_HANDSHAKE_DIR");
             if (EditorApplication.isPlayingOrWillChangePlaymode) throw new InvalidOperationException("Start from EditMode.");
             for (int i = 0; i < UnityEngine.SceneManagement.SceneManager.sceneCount; i++)
                 if (UnityEngine.SceneManagement.SceneManager.GetSceneAt(i).isDirty) throw new InvalidOperationException("Refusing to discard scene edits.");
-            EditorSceneManager.OpenScene(JourneyDiagnosticScope.Scenes[0], OpenSceneMode.Single);
+            EditorSceneManager.OpenScene(Smoke ? JourneyWindowSmokeEvidence.ScenePath : JourneyDiagnosticScope.Scenes[0], OpenSceneMode.Single);
             EditorApplication.EnterPlaymode();
         }
         static void OnPlayMode(PlayModeStateChange state)
@@ -51,7 +56,7 @@ namespace DesertRV.Editor
             {
                 if (Application.isBatchMode || SystemInfo.graphicsDeviceType == GraphicsDeviceType.Null)
                     throw new InvalidOperationException("Rendered Editor required.");
-                JourneyDiagnosticScope.Open(Required("DESERTRV_DIAGNOSTIC_SCOPE"));
+                if (!Smoke) JourneyDiagnosticScope.Open(Required("DESERTRV_DIAGNOSTIC_SCOPE"));
                 // A new floating GameView owns a separate native window; never record the main Editor desktop.
                 var type = typeof(EditorWindow).Assembly.GetType("UnityEditor.GameView", true);
                 captureView = ScriptableObject.CreateInstance(type) as EditorWindow;
@@ -74,6 +79,11 @@ namespace DesertRV.Editor
         }
         static void BeginAfterVideoReady()
         {
+            if (Smoke)
+            {
+                smokeRecorder = JourneyWindowSmokeEvidence.StartCapture(Required("DESERTRV_EVIDENCE_DIR"));
+                waitingForVideo = false; started = EditorApplication.timeSinceStartup; deadline = 45; return;
+            }
             string path = Required("DESERTRV_INPUT_PLAN");
             var plan = JsonUtility.FromJson<JourneyInputEvidence.Plan>(File.ReadAllText(path));
             JourneyInputEvidence.ValidatePlan(plan);
@@ -84,7 +94,7 @@ namespace DesertRV.Editor
         static void OnLog(string message, string trace, LogType type)
         {
             if (running && (type == LogType.Error || type == LogType.Exception || type == LogType.Assert))
-            { recorder?.Stop("blocked: runtime error"); if (waitingForVideo) Finish(2); }
+            { recorder?.Stop("blocked: runtime error"); smokeRecorder?.Stop("blocked: runtime error"); if (waitingForVideo) Finish(2); }
         }
         static void Poll()
         {
@@ -109,20 +119,33 @@ namespace DesertRV.Editor
                 if (!File.Exists(heartbeat) || (DateTime.UtcNow - File.GetLastWriteTimeUtc(heartbeat)).TotalSeconds > 3)
                     throw new InvalidOperationException("Window identity monitoring stopped.");
                 if (Screen.width < Screen.height) throw new InvalidOperationException("GameView is not landscape.");
+                if (Smoke)
+                {
+                    if (!smokeRecorder) throw new InvalidOperationException("Smoke recorder lost.");
+                    if (EditorApplication.timeSinceStartup - started > 10 &&
+                        (smokeRecorder.CaptureCount == 0 || Time.realtimeSinceStartupAsDouble - smokeRecorder.LastCaptureWall > 5))
+                        throw new InvalidOperationException("Smoke PNG heartbeat missing.");
+                    if (smokeRecorder.Stopped) Finish(smokeRecorder.StopReason == "window-smoke-ended" ? 0 : 1);
+                    return;
+                }
                 if (!recorder) throw new InvalidOperationException("Recorder lost.");
                 if (EditorApplication.timeSinceStartup - started > 10 &&
                     (recorder.CaptureCount == 0 || Time.realtimeSinceStartupAsDouble - recorder.LastCaptureWall > 5))
                     throw new InvalidOperationException("End-of-frame PNG heartbeat missing.");
                 if (recorder.Stopped) Finish(recorder.StopReason.StartsWith("plan-ended", StringComparison.Ordinal) ? 0 : 1);
             }
-            catch (Exception) { recorder?.Stop("blocked: verified-game-window capture unavailable"); Finish(3); }
+            catch (Exception) { recorder?.Stop("blocked: verified-game-window capture unavailable"); smokeRecorder?.Stop("blocked: verified-game-window capture unavailable"); Finish(3); }
         }
         static void Finish(int code)
         {
             running = waitingForVideo = false; Application.logMessageReceived -= OnLog;
             if (!string.IsNullOrEmpty(handshake) && Directory.Exists(handshake))
-                File.WriteAllText(Path.Combine(handshake, "stop.json"), "{\"editorExitCode\":" + code + "}");
-            JourneyDiagnosticScope.Close();
+            {
+                string stop = Path.Combine(handshake, "stop.json");
+                File.WriteAllText(stop + ".tmp", "{\"editorExitCode\":" + code + "}");
+                if (!File.Exists(stop)) File.Move(stop + ".tmp", stop); else File.Delete(stop + ".tmp");
+            }
+            if (!Smoke) JourneyDiagnosticScope.Close();
             // Keep the GameView alive until ffmpeg has stopped; process exit is deferred to acknowledgment.
             if (!string.IsNullOrEmpty(handshake) && File.Exists(Path.Combine(handshake, "ready.json")))
             {
@@ -139,3 +162,4 @@ namespace DesertRV.Editor
     }
 }
 #endif
+

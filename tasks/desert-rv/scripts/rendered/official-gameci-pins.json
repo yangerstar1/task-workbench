@@ -1,0 +1,10 @@
+{
+  "repository": "game-ci/unity-test-runner",
+  "commit": "0ff419b913a3630032cbe0de48a0099b5a9f0ed9",
+  "files": {
+    "dist/platforms/ubuntu/activate.sh": "5a42f1c250b684ecdea6558bbb3bf0c5f531c32a",
+    "dist/platforms/ubuntu/return_license.sh": "3555e1deba0af4e77477f1d7a2c949baddd690c2",
+    "dist/platforms/ubuntu/entrypoint.sh": "209dd9ac8f63375d8c69b49d22b4f9ffa2017d7c",
+    "src/model/input.ts": "3c23c05b9cdc02c5634d10b7ae9551d0aee4f3f8"
+  }
+}

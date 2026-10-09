@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Capture one verified Unity GameView drawable, never the desktop. No fallback."""
-import argparse, datetime, hashlib, json, os, pathlib, re, signal, subprocess, threading, time
+import argparse, datetime, hashlib, json, os, pathlib, re, subprocess, threading, time
 
 def stamp(): return datetime.datetime.now(datetime.timezone.utc).isoformat()
 def atomic(path, obj):
@@ -20,11 +20,25 @@ def identity(window, title, pid):
     if size[0]<size[1] or not (320<=size[0]<=4096 and 200<=size[1]<=2160): raise RuntimeError('window-size')
     return size
 
+def finish_encoder(process):
+    """The only normal shutdown is owned stdin q plus confirmed zero exit."""
+    if process is None:return None,'none','encoder-not-started'
+    if process.poll() is not None:return process.returncode,'none','encoder-exited-before-stop'
+    method='none'
+    try:
+        process.stdin.write('q\n');process.stdin.flush();method='stdin-q';process.stdin.close()
+    except (BrokenPipeError,OSError,ValueError,AttributeError):
+        process.kill();process.wait();return process.returncode,method,'encoder-stop-pipe'
+    try:code=process.wait(timeout=10)
+    except subprocess.TimeoutExpired:
+        process.kill();process.wait();return process.returncode,method,'encoder-stop-timeout'
+    return code,method,None if type(code) is int and code==0 else 'encoder-exit-nonzero'
+
 def main():
     ap=argparse.ArgumentParser(); ap.add_argument('handshake'); ap.add_argument('video'); ap.add_argument('receipt'); ap.add_argument('launcher_pid',type=int); a=ap.parse_args()
     h=pathlib.Path(a.handshake); video=pathlib.Path(a.video); receipt=pathlib.Path(a.receipt)
     start=time.monotonic(); ff=None; frames=[0]; checks=0; valid=False; began=None; ended=None; failure='capture-not-started'
-    request=None; window=None; size=None
+    request=None; window=None; size=None; editor_exit=None; stop_acknowledged=False; progress_thread=None; encoder_log=None
     try:
         while not (h/'request.json').exists():
             if not alive(a.launcher_pid) or time.monotonic()-start>600: raise RuntimeError('editor-startup')
@@ -44,13 +58,14 @@ def main():
             time.sleep(.1)
         if window is None: raise RuntimeError('game-window-unavailable')
         began=stamp()
-        ff=subprocess.Popen(['ffmpeg','-nostdin','-y','-f','x11grab','-window_id',window,'-framerate','30',
+        encoder_log=open(h/'ffmpeg-private.log','w')
+        ff=subprocess.Popen(['ffmpeg','-y','-f','x11grab','-window_id',window,'-framerate','30',
             '-i',os.environ['DISPLAY'],'-c:v','libx264','-preset','ultrafast','-crf','23','-pix_fmt','yuv420p',
-            '-progress','pipe:1',str(video)],stdout=subprocess.PIPE,stderr=open(h/'ffmpeg-private.log','w'),text=True)
+            '-progress','pipe:1',str(video)],stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=encoder_log,text=True)
         def progress():
             for line in ff.stdout:
                 if line.startswith('frame='): frames[0]=int(line.split('=',1)[1])
-        threading.Thread(target=progress,daemon=True).start()
+        progress_thread=threading.Thread(target=progress,daemon=True);progress_thread.start()
         ready=False; frame_start=time.monotonic(); last_frame=0; last_progress=time.monotonic()
         while True:
             if identity(window,title,pid)!=size: raise RuntimeError('window-resized')
@@ -61,7 +76,11 @@ def main():
             if not ready and frames[0]>0:
                 atomic(h/'ready.json',{'valid':True,'title':title,'pid':pid,'windowId':window}); ready=True
             if (h/'stop.json').exists():
-                valid=ready; failure=None if valid else 'stopped-before-first-frame'; break
+                stop=json.loads((h/'stop.json').read_text())
+                editor_exit=stop.get('editorExitCode')
+                stop_acknowledged=type(editor_exit) is int and editor_exit==0
+                valid=ready and stop_acknowledged
+                failure=None if valid else 'editor-stop-not-success'; break
             if not alive(a.launcher_pid): raise RuntimeError('editor-disappeared')
             if time.monotonic()-frame_start>2400: raise RuntimeError('capture-watchdog')
             time.sleep(.1)
@@ -70,15 +89,19 @@ def main():
         failure=str(exc) if isinstance(exc,RuntimeError) and re.fullmatch('[a-z-]+',str(exc)) else 'capture-validation-failed'
         atomic(h/'invalid.json',{'valid':False,'code':failure})
     finally:
-        if ff is not None and ff.poll() is None:
-            ff.send_signal(signal.SIGINT)
-            try: ff.wait(timeout=10)
-            except subprocess.TimeoutExpired: ff.kill(); ff.wait(); valid=False; failure='encoder-shutdown'
+        encoder_exit,stop_method,encoder_failure=finish_encoder(ff)
+        if encoder_failure is not None:
+            valid=False
+            if failure is None:failure=encoder_failure
+        if progress_thread is not None:progress_thread.join(timeout=1)
+        if valid and not video.is_file():valid=False;failure='encoder-missing-video'
+        if encoder_log is not None:encoder_log.close()
         ended=stamp()
         report={'mode':'VERIFIED_GAME_WINDOW_CAPTURE','sourceVerified':valid,'visualReviewed':False,'audioCaptured':False,
             'captureStartUtc':began,'captureEndUtc':ended,'nominalCaptureFps':30,'identityChecks':checks,'encodedProgressFrames':frames[0],
             'windowId':window,'title':request.get('title') if request else None,'pid':request.get('pid') if request else None,
-            'width':size[0] if size else None,'height':size[1] if size else None,'failureCode':failure}
+            'width':size[0] if size else None,'height':size[1] if size else None,'failureCode':failure,'editorExitCode':editor_exit,'editorStopAcknowledged':stop_acknowledged,
+            'encoderExitCode':encoder_exit,'encoderStopMethod':stop_method,'encoderFailureCode':encoder_failure}
         if valid and video.is_file():
             digest=hashlib.sha256()
             with video.open('rb') as stream:
@@ -87,3 +110,4 @@ def main():
         atomic(receipt,report); atomic(h/'stopped.json',{'stopped':True})
     return 0 if valid else 1
 if __name__=='__main__':raise SystemExit(main())
+

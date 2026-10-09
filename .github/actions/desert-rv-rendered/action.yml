@@ -1,0 +1,103 @@
+name: Desert RV rendered Editor diagnostic shell
+description: Same-job prepared input or bounded 30-second saved-scene window smoke, never gameplay approval
+inputs:
+  mode:
+    description: window-smoke or journey; no automatic fallback
+    required: true
+  preparation_receipt:
+    description: Same-job JourneyEvidence/journey-candidate-integration.json path relative to repository
+    required: false
+  preparation_sha256:
+    description: Exact receipt bytes
+    required: false
+  diagnostic_scope:
+    description: Same-job prepared diagnostic scope path relative to repository
+    required: false
+  scope_sha256:
+    description: Exact scope bytes
+    required: false
+  input_plan:
+    description: Observed and reviewed at-most-120-second plan path relative to repository
+    required: false
+  plan_sha256:
+    description: Exact observed plan bytes
+    required: false
+outputs:
+  export_ready:
+    description: True only after the guard atomically created a fresh safe public export
+    value: ${{ steps.public.outputs.export_ready }}
+runs:
+  using: composite
+  steps:
+    - name: Verify public host and explicit prepared inputs before credentials
+      shell: bash
+      env:
+        GITHUB_REPOSITORY_VISIBILITY: ${{ github.event.repository.visibility }}
+        GITHUB_TRIGGERING_ACTOR: ${{ github.triggering_actor }}
+        PREPARATION_RECEIPT: ${{ inputs.preparation_receipt }}
+        PREPARATION_SHA256: ${{ inputs.preparation_sha256 }}
+        DIAGNOSTIC_SCOPE: ${{ inputs.diagnostic_scope }}
+        SCOPE_SHA256: ${{ inputs.scope_sha256 }}
+        INPUT_PLAN: ${{ inputs.input_plan }}
+        PLAN_SHA256: ${{ inputs.plan_sha256 }}
+        RENDER_MODE: ${{ inputs.mode }}
+      run: |
+        python3 tasks/desert-rv/scripts/verify_evidence.py guard
+        python3 tasks/desert-rv/scripts/rendered/verify_inputs.py --mode "$RENDER_MODE"
+    - name: Read the exact already-used official licensing implementation
+      uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      with:
+        repository: game-ci/unity-test-runner
+        ref: 0ff419b913a3630032cbe0de48a0099b5a9f0ed9
+        path: _ci/gameci-rendered
+        persist-credentials: false
+        lfs: false
+    - name: Verify official bytes and prepare existing disposable runner
+      shell: bash
+      env:
+        GITHUB_REPOSITORY_VISIBILITY: ${{ github.event.repository.visibility }}
+        GITHUB_TRIGGERING_ACTOR: ${{ github.triggering_actor }}
+        PREPARATION_RECEIPT: ${{ inputs.preparation_receipt }}
+        PREPARATION_SHA256: ${{ inputs.preparation_sha256 }}
+        DIAGNOSTIC_SCOPE: ${{ inputs.diagnostic_scope }}
+        SCOPE_SHA256: ${{ inputs.scope_sha256 }}
+        INPUT_PLAN: ${{ inputs.input_plan }}
+        PLAN_SHA256: ${{ inputs.plan_sha256 }}
+        RENDER_MODE: ${{ inputs.mode }}
+      run: |
+        python3 tasks/desert-rv/scripts/rendered/verify_inputs.py --mode "$RENDER_MODE" --gameci _ci/gameci-rendered
+        bash tasks/desert-rv/scripts/prepare_runner.sh
+        python3 tasks/desert-rv/scripts/backup/restore_unity_font.py
+        docker build --build-arg BASE_IMAGE=unityci/editor@sha256:17406791cf1e438bea2dac20671668e05d83db5ed38c916744815db4584a8264 --file tasks/desert-rv/scripts/Environment.Dockerfile --tag desert-rv-environment:local tasks/desert-rv/scripts
+        docker build --build-arg BASE_IMAGE=desert-rv-environment:local --file tasks/desert-rv/scripts/rendered/Rendered.Dockerfile --tag desert-rv-rendered:local tasks/desert-rv/scripts/rendered
+    - name: Official activation then raw non-batch Editor then official return
+      id: native
+      shell: bash
+      env:
+        GITHUB_REPOSITORY_VISIBILITY: ${{ github.event.repository.visibility }}
+        RENDER_MODE: ${{ inputs.mode }}
+        DIAGNOSTIC_SCOPE: ${{ inputs.diagnostic_scope }}
+        INPUT_PLAN: ${{ inputs.input_plan }}
+      run: |
+        set +x
+        docker run --rm --init --cpus=2 --memory=12g --stop-timeout=210 \
+          --workdir /github/workspace \
+          --volume "$GITHUB_WORKSPACE:/github/workspace" \
+          --volume "$GITHUB_WORKSPACE/_ci/gameci-rendered/dist:/gameci:ro" \
+          --env UNITY_LICENSE --env UNITY_EMAIL --env UNITY_PASSWORD \
+          --env GITHUB_ACTIONS --env GITHUB_SHA --env GITHUB_REPOSITORY_VISIBILITY \
+          --env DESERTRV_RENDER_MODE="$RENDER_MODE" \
+          --env DESERTRV_UNITY_PROJECT=/github/workspace/tasks/desert-rv/unity \
+          --env DESERTRV_DIAGNOSTIC_SCOPE="/github/workspace/$DIAGNOSTIC_SCOPE" \
+          --env DESERTRV_INPUT_PLAN="/github/workspace/$INPUT_PLAN" \
+          --env DESERTRV_EVIDENCE_DIR=/github/workspace/tasks/desert-rv/rendered-private-evidence \
+          --env DESERTRV_SAFE_EXPORT_DIR=/github/workspace/tasks/desert-rv/rendered-export \
+          --entrypoint /bin/bash desert-rv-rendered:local \
+          /github/workspace/tasks/desert-rv/scripts/rendered/container_entry.sh
+    - name: Enforce protected source and exact public export allowlist
+      id: public
+      if: always()
+      shell: bash
+      env:
+        NATIVE_OUTCOME: ${{ steps.native.outcome }}
+      run: python3 tasks/desert-rv/scripts/rendered/guard_export.py
