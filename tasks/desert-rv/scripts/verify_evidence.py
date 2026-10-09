@@ -122,7 +122,9 @@ def verify_source_state():
 def guard():
     require(os.environ.get('GITHUB_ACTIONS') == 'true', 'GitHub Actions required')
     require(os.environ.get('RUNNER_ENVIRONMENT') == 'github-hosted' and os.environ.get('RUNNER_OS') == 'Linux', 'Standard hosted Linux required')
-    require(os.environ.get('GITHUB_EVENT_NAME') == 'workflow_dispatch', 'Manual dispatch required')
+    if os.environ.get('GITHUB_EVENT_NAME') != 'workflow_dispatch':
+        import journey_rebuild_dispatch
+        journey_rebuild_dispatch.verify(ROOT, os.environ)  # Only the fixed single-parent rebuild request can admit push.
     require(os.environ.get('GITHUB_REPOSITORY') == REPOSITORY and os.environ.get('GITHUB_REF') == 'refs/heads/main', 'Trusted repository/main required')
     require(os.environ.get('GITHUB_ACTOR') == OWNER and os.environ.get('GITHUB_TRIGGERING_ACTOR') == OWNER, 'Owner dispatch and owner rerun required')
     repo = read_json(os.environ['GITHUB_EVENT_PATH'])['repository']

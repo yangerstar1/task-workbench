@@ -1,5 +1,8 @@
 name: Desert RV restore verified Journey and rebuild candidate Linux
 on:
+  push:
+    branches: [main]
+    paths: [.github/dispatch/desert-rv-rebuild-performance-20261009.json]
   workflow_dispatch:
     inputs:
       transition_sha256:
@@ -26,6 +29,14 @@ jobs:
         with:
           persist-credentials: false
           lfs: false
+          fetch-depth: 2
+      - name: Verify explicit manual input or the single reviewed performance push
+        id: dispatch_identity
+        env:
+          MANUAL_TRANSITION_SHA: ${{ inputs.transition_sha256 }}
+        run: |
+          /usr/bin/python3 tasks/desert-rv/scripts/test_journey_rebuild_dispatch.py
+          /usr/bin/python3 tasks/desert-rv/scripts/journey_rebuild_dispatch.py
       - name: Verify fresh source and restore exact original font
         run: |
           python3 tasks/desert-rv/scripts/verify_evidence.py guard
@@ -35,7 +46,7 @@ jobs:
         id: restore_assets
         env:
           GH_TOKEN: ${{ github.token }}
-          TRANSITION_SHA: ${{ inputs.transition_sha256 }}
+          TRANSITION_SHA: ${{ steps.dispatch_identity.outputs.transition_sha256 }}
         run: |
           /usr/bin/python3 tasks/desert-rv/art/journey-preparation/test_restore_preparation.py
           /usr/bin/python3 tasks/desert-rv/art/journey-preparation/test_linux_build_input.py

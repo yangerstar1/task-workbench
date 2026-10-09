@@ -4,7 +4,9 @@ set -euo pipefail
 test "${RUNNER_ENVIRONMENT:-}" = github-hosted
 test "${RUNNER_OS:-}" = Linux
 test "${GITHUB_ACTIONS:-}" = true
-test "${GITHUB_EVENT_NAME:-}" = workflow_dispatch
+if [[ "${GITHUB_EVENT_NAME:-}" != workflow_dispatch ]]; then
+  /usr/bin/python3 "$(dirname "${BASH_SOURCE[0]}")/journey_rebuild_dispatch.py" --verify-only
+fi
 test -n "${UNITY_LICENSE:-}" || { echo '::error::UNITY_LICENSE is missing; native proof cannot run.'; exit 1; }
 test -n "${UNITY_EMAIL:-}" || { echo '::error::UNITY_EMAIL is missing; native proof cannot run.'; exit 1; }
 test -n "${UNITY_PASSWORD:-}" || { echo '::error::UNITY_PASSWORD is missing; native proof cannot run.'; exit 1; }

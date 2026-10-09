@@ -18,8 +18,8 @@
       "path": ".github/workflows/desert-rv-journey-rebuild.yml",
       "beforeSha256": "",
       "beforeBytes": 0,
-      "afterSha256": "1ae71667165302079c655ec3e7cba77a87565b471cbd989350a8ef8321aeb681",
-      "afterBytes": 8631
+      "afterSha256": "d4f244a9bba6921179fcd76261232bbc7ed7b760090805a29c08ab1ec03f43a3",
+      "afterBytes": 9153
     },
     {
       "path": "tasks/desert-rv/art/journey-preparation/linux_build_input.py",
@@ -32,8 +32,8 @@
       "path": "tasks/desert-rv/art/journey-preparation/restore_preparation.py",
       "beforeSha256": "",
       "beforeBytes": 0,
-      "afterSha256": "b118bd74f07ea9b91b8df2fac84adfc4aef71068bb87d41808e3b2f99dc26701",
-      "afterBytes": 38454
+      "afterSha256": "d867bea18b3a6af1cb72ea9af2375791dc88c9ca396367b718badeec2e61c88d",
+      "afterBytes": 38615
     },
     {
       "path": "tasks/desert-rv/art/journey-preparation/test_linux_build_input.py",
@@ -48,6 +48,13 @@
       "beforeBytes": 0,
       "afterSha256": "349af844cfd7d4c503179a9871477867740a4f55a649d1a4894021076281f629",
       "afterBytes": 22624
+    },
+    {
+      "path": "tasks/desert-rv/scripts/journey_rebuild_dispatch.py",
+      "beforeSha256": "",
+      "beforeBytes": 0,
+      "afterSha256": "8f73ea5a3a1156a43cb1fcf4df2fef7e63a42d4a4ee50cc1527e596dd2dd3c67",
+      "afterBytes": 5216
     },
     {
       "path": "tasks/desert-rv/scripts/player/journey_linux_container.sh",
@@ -85,11 +92,25 @@
       "afterBytes": 14865
     },
     {
+      "path": "tasks/desert-rv/scripts/prepare_runner.sh",
+      "beforeSha256": "157c081f227d7783fda9fd4186422804dfad225ff94d451e58dcfc6e42370a40",
+      "beforeBytes": 1130,
+      "afterSha256": "c2a50ce3a3ccf2973995b8da656b33c3d3aa7c835ad13a27d53309676970a933",
+      "afterBytes": 1238
+    },
+    {
+      "path": "tasks/desert-rv/scripts/test_journey_rebuild_dispatch.py",
+      "beforeSha256": "",
+      "beforeBytes": 0,
+      "afterSha256": "e89936f1ab27eb94107dc7b63489592b74d7e4a334c99c6083528bd4853703fc",
+      "afterBytes": 7283
+    },
+    {
       "path": "tasks/desert-rv/scripts/verify_evidence.py",
       "beforeSha256": "bbb0f601cb00ec9699a5aa2204ccf5d84652f259a88580800d3a674077d09ec8",
       "beforeBytes": 16289,
-      "afterSha256": "b77ac23d700659214adf25fb12d6263e3a724fa2d57c3835232cd45a0a0e7030",
-      "afterBytes": 16340
+      "afterSha256": "e4e5716267765063d05c3d45850daea3781213fd1f7ab0314a6e2d4082ee798d",
+      "afterBytes": 16469
     },
     {
       "path": "tasks/desert-rv/unity/Assets/DesertRV/Editor/JourneyCandidateAssetIntegration.cs",
