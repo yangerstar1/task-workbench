@@ -325,8 +325,8 @@
     },
     {
       "path": "tasks/desert-rv/art/import-candidate/test_weapon_output.py",
-      "sha256": "35382d42794acf3796111fa385d72f5ef9c62c8857beb3ca3c70d34760a28c3b",
-      "size": 34329
+      "sha256": "04abe3998681831b5b7265e9395448c3c11db4651fa2706a779cf88a09b8b154",
+      "size": 34343
     },
     {
       "path": "tasks/desert-rv/art/import-candidate/urp_material_metadata.py",

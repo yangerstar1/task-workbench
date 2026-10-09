@@ -110,7 +110,7 @@ class WeaponExportTests(unittest.TestCase):
     def meta(self,path,texture=False):
         self.guid+=1;p=Path(str(path)+'.meta');p.parent.mkdir(parents=True,exist_ok=True)
         p.write_text('fileFormatVersion: 2\nguid: '+f'{self.guid:032x}'+'\n'+
-            ('TextureImporter:\n  sRGBTexture: 0\n  isReadable: 1\n  textureType: 0\n' if texture else 'DefaultImporter: {}\n'))
+            ('TextureImporter:\n  mipmaps:\n    sRGBTexture: 0\n  isReadable: 1\n  textureType: 0\n' if texture else 'DefaultImporter: {}\n'))
 
     def save_contract(self):
         data=json.dumps(self.c);self.write('CandidateImportInput/contract.json',data);self.write(self.prefix+'/contract.json',data)
