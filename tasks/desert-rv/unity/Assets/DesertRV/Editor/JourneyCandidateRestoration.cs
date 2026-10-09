@@ -59,8 +59,8 @@ namespace DesertRV.Editor
         [Serializable] public sealed class Diagnostic
         {
             public int schema = 1;
-            public string label = "RESTORATION_NATIVE_DIAGNOSTIC_ONLY", sourceCommit, producerRunUrl, stage = "INPUT", errorClass = "NONE";
-            public bool completed;
+            public string label = "RESTORATION_NATIVE_DIAGNOSTIC_ONLY", sourceCommit, producerRunUrl, stage = "INPUT", errorClass = "NONE", runIdentity = "UNVALIDATED";
+            public bool completed, consumerIdentityMatched;
             public int dependencyExpectedCount, dependencyActualCount, dependencyAddedCount, dependencyMissingCount;
             public ImporterIdentity[] importerIdentities = Array.Empty<ImporterIdentity>();
             public DependencyDifference[] dependencyDifferences = Array.Empty<DependencyDifference>();
@@ -291,14 +291,39 @@ namespace DesertRV.Editor
             using (var stream = new FileStream(path, FileMode.CreateNew, FileAccess.Write))
             using (var writer = new StreamWriter(stream)) writer.Write(JsonUtility.ToJson(value, true));
         }
+        // The pinned GameCI runner forwards GITHUB_SHA but not GITHUB_RUN_ID.
+        // The trusted workflow passes this one explicit argument; never infer it from old producer data.
+        public static string ParseConsumerRunId(string[] arguments, string expectedRunUrl)
+        {
+            const string flag = "-journeyRestorationRunId";
+            var positions = arguments == null ? Array.Empty<int>() : Enumerable.Range(0, arguments.Length).Where(i => arguments[i] == flag).ToArray();
+            Check(positions.Length != 0, "JOURNEY_RESTORATION_RUN_ID_MISSING");
+            Check(positions.Length == 1, "JOURNEY_RESTORATION_RUN_ID_DUPLICATE");
+            int index = positions[0];
+            Check(index + 1 < arguments.Length && Regex.IsMatch(arguments[index + 1] ?? "", "^[1-9][0-9]*$"), "JOURNEY_RESTORATION_RUN_ID_MALFORMED");
+            string run = arguments[index + 1];
+            Check(expectedRunUrl == "https://github.com/yangerstar1/task-workbench/actions/runs/" + run, "JOURNEY_RESTORATION_RUN_ID_MISMATCH");
+            return run;
+        }
+        static string RunIdentityFailure(Exception error)
+        {
+            foreach (string code in new[] { "MISSING", "DUPLICATE", "MALFORMED", "MISMATCH" })
+                if (error.Message == "JOURNEY_RESTORATION_RUN_ID_" + code) return code;
+            return "UNVALIDATED";
+        }
         public static void RevalidatePinnedRestoredJourney()
         {
-            string commit = Environment.GetEnvironmentVariable("GITHUB_SHA"), run = Environment.GetEnvironmentVariable("GITHUB_RUN_ID");
-            var diagnostic = new Diagnostic { sourceCommit = Digest(commit, 40) ? commit : "",
-                producerRunUrl = Regex.IsMatch(run ?? "", "^[1-9][0-9]*$") ? "https://github.com/yangerstar1/task-workbench/actions/runs/" + run : "" };
+            string commit = Environment.GetEnvironmentVariable("GITHUB_SHA");
+            var diagnostic = new Diagnostic { sourceCommit = Digest(commit, 40) ? commit : "", producerRunUrl = "" };
             Exception primary = null;
             try { Revalidate(diagnostic); diagnostic.completed = true; diagnostic.stage = "COMPLETED"; }
-            catch (Exception error) { primary = error; diagnostic.errorClass = ErrorClass(error); throw; }
+            catch (Exception error)
+            {
+                primary = error; string identity = RunIdentityFailure(error);
+                if (identity != "UNVALIDATED") { diagnostic.runIdentity = identity; diagnostic.errorClass = "RUN_ID_ARGUMENT"; }
+                else diagnostic.errorClass = ErrorClass(error);
+                throw;
+            }
             finally
             {
                 try { PersistDiagnostic(diagnostic); }
@@ -314,12 +339,15 @@ namespace DesertRV.Editor
             string envHash = Environment.GetEnvironmentVariable("JOURNEY_RESTORATION_INPUT_SHA256");
             Check(string.IsNullOrEmpty(envHash) || envHash == requestHash, "Restoration environment and sidecar disagree.");
             var request = JsonUtility.FromJson<Request>(File.ReadAllText(InputPath));
+            string run = ParseConsumerRunId(Environment.GetCommandLineArgs(), request?.producerRunUrl);
+            diagnostic.runIdentity = "MATCHED";
             Check(request != null && request.schema == 1 && request.label == "RESTORE_PINNED_JOURNEY_FOR_NATIVE_REVALIDATION" &&
                 Digest(request.sourceCommit, 40) && request.sourceCommit == Environment.GetEnvironmentVariable("GITHUB_SHA") &&
-                request.producerRunUrl == "https://github.com/yangerstar1/task-workbench/actions/runs/" + Environment.GetEnvironmentVariable("GITHUB_RUN_ID") &&
+                request.producerRunUrl == "https://github.com/yangerstar1/task-workbench/actions/runs/" + run &&
                 request.assetProducerSourceCommit == ProducerCommit && request.assetProducerRunUrl == ProducerRun && request.generatedReceiptSha256 == ProducerReceiptSha &&
                 request.files != null && request.files.Length > 100 && request.files.All(p => p != null) && request.files.Select(p => p.path).Distinct().Count() == request.files.Length &&
                 request.directories != null && request.directories.Distinct().Count() == request.directories.Length, "Current consumer and immutable producer identities required.");
+            diagnostic.producerRunUrl = request.producerRunUrl; diagnostic.consumerIdentityMatched = true;
             Check(!File.Exists(ProofPath) && !File.Exists(JourneyCandidatePreparation.Scope), "Restoration proof must be fresh; old live scope is forbidden.");
             var setup = EditorSceneManager.GetSceneManagerSetup();
             Check(!setup.Any(s => s.isLoaded && SceneManager.GetSceneByPath(s.path).isDirty), "Restoration cannot discard existing scene edits.");

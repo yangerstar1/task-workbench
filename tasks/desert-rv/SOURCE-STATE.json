@@ -59,8 +59,8 @@
     },
     {
       "path": ".github/workflows/desert-rv-journey-rebuild.yml",
-      "sha256": "ad0b6f119e7b0176c266ec7cd4234eb9541db053775b1338a8b661a47942c701",
-      "size": 8585
+      "sha256": "1ae71667165302079c655ec3e7cba77a87565b471cbd989350a8ef8321aeb681",
+      "size": 8631
     },
     {
       "path": ".github/workflows/desert-rv-player-observe.yml",
@@ -384,13 +384,13 @@
     },
     {
       "path": "tasks/desert-rv/art/journey-preparation/restoration-transition.json",
-      "sha256": "2e785d1a5a6e5986dff21e67bf025cd275cc5d57ba545014a267eabe2d4a0094",
-      "size": 6394
+      "sha256": "4503d931ed112967e840ce80a9d04006f19d7df6b6b1dbf4d29d2847e2ba2573",
+      "size": 7040
     },
     {
       "path": "tasks/desert-rv/art/journey-preparation/restore_preparation.py",
-      "sha256": "c941c588149e03c5afdc12fcaef21e6ed8fa418a74cf3daa70b479cf9b22061e",
-      "size": 37082
+      "sha256": "de6508a6b382ea8c8808ca564463c6134f1d53b808fa9520b56c5eccf0e3b183",
+      "size": 38392
     },
     {
       "path": "tasks/desert-rv/art/journey-preparation/test_generated_export.py",
@@ -409,8 +409,8 @@
     },
     {
       "path": "tasks/desert-rv/art/journey-preparation/test_restore_preparation.py",
-      "sha256": "33869cf3e3f2f19abe349c23c2a75f8d2a76937d25cea6a183c6b9a2e002c0f6",
-      "size": 19469
+      "sha256": "f1bdbaee8061d82647cd885a627172aa283312b04909fd62190a4f7f1142e659",
+      "size": 21877
     },
     {
       "path": "tasks/desert-rv/art/journey-preparation/three-strict-candidates.json",
@@ -479,8 +479,8 @@
     },
     {
       "path": "tasks/desert-rv/scripts/player/observe_journey_player.py",
-      "sha256": "c7b7079363067601b1455b870874a9aee8a514df9cc506a4ae99e82c68cd3b94",
-      "size": 22343
+      "sha256": "443482f3c1534b7a3dd489aae0c2075215e5d6959f0b2a31fd0d5e1d21bd5280",
+      "size": 24530
     },
     {
       "path": "tasks/desert-rv/scripts/player/player_window_smoke.py",
@@ -494,8 +494,8 @@
     },
     {
       "path": "tasks/desert-rv/scripts/player/test_observe_journey_player.py",
-      "sha256": "c10d3585dd4b1f74c1a3e9b8950ffdec62349392988f9c2473c9bfe207a16be3",
-      "size": 13273
+      "sha256": "42f5c0e07fe6d4e62d20aa0c0752dea048ec2f1f268a989bbd26de42da4b4b03",
+      "size": 14865
     },
     {
       "path": "tasks/desert-rv/scripts/player/test_player_window_smoke.py",
@@ -4139,8 +4139,8 @@
     },
     {
       "path": "tasks/desert-rv/unity/Assets/DesertRV/Editor/JourneyCandidateRestoration.cs",
-      "sha256": "b8c3b879a0f45e8cc666886fbff745a0a872fc689d7e52cd36f63a77a99d6da9",
-      "size": 37937
+      "sha256": "5eae3718ac2d06678c37b8ddea3fb9efc126b35b040e52733126af796f9c6f96",
+      "size": 39633
     },
     {
       "path": "tasks/desert-rv/unity/Assets/DesertRV/Editor/JourneyCandidateRestoration.cs.meta",
@@ -5369,8 +5369,8 @@
     },
     {
       "path": "tasks/desert-rv/unity/Assets/DesertRV/Tests/JourneyRestoration/JourneyRestorationTests.cs",
-      "sha256": "7f4fd8f1543ca97797a882b3f4bdd1ba5a0518feb6c20d9ca1b86c33d50d3156",
-      "size": 939
+      "sha256": "11587b3b478122fc7ddc42f16890a570d29a93e5f61934e1b2f6bd89cd14aa82",
+      "size": 2033
     },
     {
       "path": "tasks/desert-rv/unity/Assets/DesertRV/Tests/JourneyRestoration/JourneyRestorationTests.cs.meta",

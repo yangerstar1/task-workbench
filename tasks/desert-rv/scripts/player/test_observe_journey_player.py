@@ -15,6 +15,21 @@ class ObserveTests(unittest.TestCase):
    with patch.object(o,'SOURCE',self.task):
     shutil.copytree(self.package,self.task/'package');v=o.metadata(self.p,m)
    self.assertEqual(v['producerSourceCommit'],'a'*40);self.assertEqual(v['observerSourceCommit'],'e'*40)
+ def restored_manifest(self):
+  m=o.validate_package(self.package,self.p);n=m['nativeReceipt'];n.update(restorationProof=dict(path='tasks/desert-rv/unity/JourneyEvidence/JourneyPreparation/restoration-revalidated.json',sha256='d'*64),assetProducerSourceCommit='f'*40,assetProducerRunUrl='https://github.com/yangerstar1/task-workbench/actions/runs/456',restorationNativeXmlSha256='e'*64);return m
+ def test_exact_rebuild_workflow_requires_restoration_receipt(self):
+  m=self.restored_manifest();o.validate_producer_workflow(o.REBUILD_WORKFLOW,m)
+  with self.assertRaises(ValueError):o.validate_producer_workflow(o.PREPARE_WORKFLOW,m)
+  original=o.validate_package(self.package,self.p)
+  with self.assertRaises(ValueError):o.validate_producer_workflow(o.REBUILD_WORKFLOW,original)
+ def test_unknown_workflow_and_missing_restore_xml_rejected(self):
+  m=self.restored_manifest()
+  with self.assertRaises(ValueError):o.validate_producer_workflow('.github/workflows/other-rebuild.yml',m)
+  m['nativeReceipt']['restorationNativeXmlSha256']=''
+  with self.assertRaises(ValueError):o.validate_producer_workflow(o.REBUILD_WORKFLOW,m)
+ def test_original_asset_run_cannot_be_current_build_run(self):
+  m=self.restored_manifest();m['nativeReceipt']['assetProducerRunUrl']=m['producerRunUrl']
+  with self.assertRaises(ValueError):o.validate_producer_workflow(o.REBUILD_WORKFLOW,m)
  def test_receipt_original_bytes_must_match_manifest(self):
   (self.package/'native-build-receipt.json').write_bytes(self.raw+b' ')
   with self.assertRaises(ValueError):o.validate_package(self.package,self.p)
@@ -71,7 +86,7 @@ class ObserveTests(unittest.TestCase):
   stack=ExitStack();self.addCleanup(stack.close)
   for key,value in dict(SOURCE=source,WORK=work,RESULT=result,PUBLIC=work/'public').items():stack.enter_context(patch.object(o,key,value))
   stack.enter_context(patch.dict(os.environ,dict(self.p,GITHUB_SHA='e'*40,GITHUB_RUN_ID='789',NATIVE_OUTCOME=native,GITHUB_OUTPUT=str(work/'output'))))
-  m=o.validate_package(source/'package',self.p);s=o.metadata(self.p,m);s.update(stage='MEDIA_VERIFIED',failureCode='NONE',success=True,playerExitCode=-15,playerTerminationRequest='OBSERVER_TERM',encoderExitCode=0,producerBundlePreserved=True,rawLogsExported=False,captureStartUtc='2026-10-09T00:00:00+00:00',captureEndUtc='2026-10-09T00:00:16+00:00',durationSeconds=16,captureFps=30,encodedFrameRate='30/1',averageFrameRate='30/1',encodedFrames=480,identityChecks=160,windowId='123',playerPid=42)
+  m=o.validate_package(source/'package',self.p);(source/'verified.json').write_text(json.dumps(dict(schema=1,pins=self.p,producerWorkflowPath=o.PREPARE_WORKFLOW,manifestSha256=o.sha(source/'package/manifest.json'),executableSha256=m['nativeReceipt']['executableSha256'])));s=o.metadata(self.p,m);s.update(stage='MEDIA_VERIFIED',failureCode='NONE',success=True,playerExitCode=-15,playerTerminationRequest='OBSERVER_TERM',encoderExitCode=0,producerBundlePreserved=True,rawLogsExported=False,captureStartUtc='2026-10-09T00:00:00+00:00',captureEndUtc='2026-10-09T00:00:16+00:00',durationSeconds=16,captureFps=30,encodedFrameRate='30/1',averageFrameRate='30/1',encodedFrames=480,identityChecks=160,windowId='123',playerPid=42)
   (result/'status.json').write_text(json.dumps(s));(result/'sha256.json').write_text('{}')
   for name in ('real-time.mp4','frame-0.png','frame-1.png','frame-2.png'):(result/name).write_bytes(b'SYNTHETIC_TEST_MEDIA')
   (result/'sha256.json').write_text(json.dumps({p.name:o.sha(p) for p in result.iterdir() if p.name!='sha256.json'}))

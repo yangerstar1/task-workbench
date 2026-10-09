@@ -24,6 +24,7 @@ _ALLOWED=(
  'tasks/desert-rv/art/journey-preparation/restore_preparation.py','tasks/desert-rv/art/journey-preparation/test_restore_preparation.py',
  'tasks/desert-rv/art/journey-preparation/linux_build_input.py','tasks/desert-rv/art/journey-preparation/test_linux_build_input.py',
  'tasks/desert-rv/scripts/player/journey_linux_export.py','tasks/desert-rv/scripts/player/test_journey_linux_export.py',
+ 'tasks/desert-rv/scripts/player/observe_journey_player.py','tasks/desert-rv/scripts/player/test_observe_journey_player.py',
  'tasks/desert-rv/unity/Assets/DesertRV/Editor/JourneyCandidateLinuxBuild.cs',
  'tasks/desert-rv/unity/Assets/DesertRV/Tests/CandidateLinux/CandidateLinuxBoundaryTests.cs',
  'tasks/desert-rv/unity/Assets/DesertRV/Editor/JourneyCandidateAssetIntegration.cs',
@@ -297,10 +298,19 @@ def finish(native):
 DIAGNOSTIC=PRIVATE/'restoration-diagnostic.json'
 HOST_STATUS=TASK/'journey-restoration-status.json'
 DIAGNOSTIC_STAGES={'INPUT','INVENTORY','SOURCE_PROOF','STRICT_BUNDLES','DEPENDENCIES','GENERATED_BYTES','SELECTION','POSES','GROUNDING','IMPORTER_IDENTITIES','SAVED_BINDINGS','FINAL_PROTECTION','PROOF','COMPLETED'}
-DIAGNOSTIC_ERRORS={'NONE','IMPORTER_IDENTITY','DEPENDENCY_BYTES','VALIDATION','IO','UNAUTHORIZED','OTHER'}
+DIAGNOSTIC_ERRORS={'RUN_ID_ARGUMENT','NONE','IMPORTER_IDENTITY','DEPENDENCY_BYTES','VALIDATION','IO','UNAUTHORIZED','OTHER'}
 def bounded_native_diagnostic(value):
- keys={'schema','label','sourceCommit','producerRunUrl','stage','completed','importerIdentities','dependencyDifferences','errorClass','dependencyExpectedCount','dependencyActualCount','dependencyAddedCount','dependencyMissingCount'}
- require(set(value)==keys and type(value['schema']) is int and value['schema']==1 and value['label']=='RESTORATION_NATIVE_DIAGNOSTIC_ONLY' and value['sourceCommit']==os.environ['GITHUB_SHA'] and value['producerRunUrl']==current_run() and value['stage'] in DIAGNOSTIC_STAGES and type(value['completed']) is bool and value['errorClass'] in DIAGNOSTIC_ERRORS,'RESTORE_DIAGNOSTIC_SCHEMA')
+ keys={'schema','label','sourceCommit','producerRunUrl','stage','completed','importerIdentities','dependencyDifferences','errorClass','dependencyExpectedCount','dependencyActualCount','dependencyAddedCount','dependencyMissingCount','runIdentity','consumerIdentityMatched'}
+ require(set(value)==keys and type(value['schema']) is int and value['schema']==1 and value['label']=='RESTORATION_NATIVE_DIAGNOSTIC_ONLY' and value['stage'] in DIAGNOSTIC_STAGES and type(value['completed']) is bool and value['errorClass'] in DIAGNOSTIC_ERRORS,'RESTORE_DIAGNOSTIC_SCHEMA')
+ require(type(value['consumerIdentityMatched']) is bool and value['runIdentity'] in {'UNVALIDATED','MISSING','DUPLICATE','MALFORMED','MISMATCH','MATCHED'},'RESTORE_DIAGNOSTIC_IDENTITY_STATE')
+ if value['consumerIdentityMatched']:
+  require(value['sourceCommit']==os.environ['GITHUB_SHA'] and value['producerRunUrl']==current_run() and value['runIdentity']=='MATCHED','RESTORE_DIAGNOSTIC_CONSUMER')
+ else:
+  # An identity failure remains visibly unauthenticated native evidence, inside the separately host-bound failure receipt.
+  # It cannot supply a successful proof, URL fallback, assets or a build capability.
+  require(value['sourceCommit'] in ('',os.environ['GITHUB_SHA']) and value['producerRunUrl']=='' and value['completed'] is False and value['stage']=='INPUT' and
+          value['importerIdentities']==[] and value['dependencyDifferences']==[] and all(value[k]==0 for k in ('dependencyExpectedCount','dependencyActualCount','dependencyAddedCount','dependencyMissingCount')),'RESTORE_DIAGNOSTIC_UNBOUND_IDENTITY')
+  require(value['errorClass']!='NONE' and (value['runIdentity'] not in {'MISSING','DUPLICATE','MALFORMED','MISMATCH'} or value['errorClass']=='RUN_ID_ARGUMENT'),'RESTORE_DIAGNOSTIC_IDENTITY_ERROR')
  require(all(type(value[k]) is int and 0<=value[k]<=8192 for k in ('dependencyExpectedCount','dependencyActualCount','dependencyAddedCount','dependencyMissingCount')) and value['dependencyActualCount']-value['dependencyExpectedCount']==value['dependencyAddedCount']-value['dependencyMissingCount'],'RESTORE_DIAGNOSTIC_COUNTS')
  require(isinstance(value['importerIdentities'],list) and len(value['importerIdentities'])<=3 and len({x['kind'] for x in value['importerIdentities']})==len(value['importerIdentities']),'RESTORE_DIAGNOSTIC_IMPORTERS')
  selected=read(ROOT/SELECTION)['sources'];paths={x['kind']:'Assets/DesertRV/CandidateArtImports/'+read(ROOT/x['contract'])['id']+'/Candidate.prefab' for x in selected}

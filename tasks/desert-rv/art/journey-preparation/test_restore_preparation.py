@@ -132,7 +132,7 @@ class DiagnosticExportTests(unittest.TestCase):
   for key,val in [('EXPORT',self.root/'safe'),('HOST_STATUS',self.root/'status.json'),('DIAGNOSTIC',self.root/'native.json')]:
    patch=mock.patch.object(r,key,val);patch.start();self.addCleanup(patch.stop)
   patch=mock.patch.dict(os.environ,GITHUB_SHA='c'*40,GITHUB_RUN_ID='77');patch.start();self.addCleanup(patch.stop)
-  self.value=dict(schema=1,label='RESTORATION_NATIVE_DIAGNOSTIC_ONLY',sourceCommit='c'*40,producerRunUrl=r.current_run(),stage='IMPORTER_IDENTITIES',completed=False,importerIdentities=[],dependencyDifferences=[],errorClass='IMPORTER_IDENTITY',dependencyExpectedCount=792,dependencyActualCount=792,dependencyAddedCount=0,dependencyMissingCount=0)
+  self.value=dict(schema=1,label='RESTORATION_NATIVE_DIAGNOSTIC_ONLY',sourceCommit='c'*40,producerRunUrl=r.current_run(),stage='IMPORTER_IDENTITIES',completed=False,importerIdentities=[],dependencyDifferences=[],errorClass='IMPORTER_IDENTITY',dependencyExpectedCount=792,dependencyActualCount=792,dependencyAddedCount=0,dependencyMissingCount=0,runIdentity='MATCHED',consumerIdentityMatched=True)
  def test_preflight_failure_has_only_fixed_nonbuildable_receipt(self):
   r.HOST_STATUS.write_text(json.dumps(dict(command='stage',errorCode='RESTORE_EXACT_SOURCE_DIFF')))
   receipt=r.diagnose();self.assertEqual('RESTORATION_NOT_READY',receipt['status']);self.assertFalse(receipt['buildReady']);self.assertFalse(receipt['scopeReusable']);self.assertEqual([],receipt['files'])
@@ -152,6 +152,24 @@ class DiagnosticExportTests(unittest.TestCase):
  def test_inconsistent_dependency_counts_rejected(self):
   self.value['dependencyAddedCount']=1
   with self.assertRaisesRegex(Exception,'DIAGNOSTIC_COUNTS'):r.bounded_native_diagnostic(self.value)
+ def test_missing_run_identity_survives_as_nonbuildable_fixed_diagnostic(self):
+  self.value.update(stage='INPUT',producerRunUrl='',consumerIdentityMatched=False,runIdentity='MISSING',errorClass='RUN_ID_ARGUMENT',dependencyExpectedCount=0,dependencyActualCount=0)
+  r.DIAGNOSTIC.write_text(json.dumps(self.value));receipt=r.diagnose();self.assertEqual(1,len(receipt['files']));self.assertFalse(receipt['buildReady']);self.assertEqual('',json.loads((r.EXPORT/'native-diagnostic.json').read_text())['producerRunUrl'])
+ def test_missing_identity_cannot_claim_completed_or_later_stage(self):
+  self.value.update(stage='INPUT',producerRunUrl='',consumerIdentityMatched=False,runIdentity='MISSING',errorClass='RUN_ID_ARGUMENT',dependencyExpectedCount=0,dependencyActualCount=0)
+  for key,val in [('completed',True),('stage','SAVED_BINDINGS')]:
+   with self.assertRaisesRegex(Exception,'UNBOUND_IDENTITY'):r.bounded_native_diagnostic(dict(self.value,**{key:val}))
+ def test_unmatched_identity_cannot_fall_back_to_old_producer_url(self):
+  self.value.update(stage='INPUT',producerRunUrl=r.RUN_URL,consumerIdentityMatched=False,runIdentity='MISMATCH',errorClass='RUN_ID_ARGUMENT',dependencyExpectedCount=0,dependencyActualCount=0)
+  with self.assertRaisesRegex(Exception,'UNBOUND_IDENTITY'):r.bounded_native_diagnostic(self.value)
+ def test_all_four_cli_identity_failure_kinds_are_bounded(self):
+  self.value.update(stage='INPUT',producerRunUrl='',consumerIdentityMatched=False,errorClass='RUN_ID_ARGUMENT',dependencyExpectedCount=0,dependencyActualCount=0)
+  for state in ('MISSING','DUPLICATE','MALFORMED','MISMATCH'):r.bounded_native_diagnostic(dict(self.value,runIdentity=state))
+ def test_native_cli_is_explicit_actions_run_id_and_build_env_is_preserved(self):
+  import yaml
+  root=Path(__file__).resolve().parents[4];workflow=yaml.safe_load((root/'.github/workflows/desert-rv-journey-rebuild.yml').read_text());steps=workflow['jobs']['rebuild']['steps'];native=next(s for s in steps if s.get('id')=='restore_native')
+  self.assertEqual(1,native['with']['customParameters'].count('-journeyRestorationRunId'));self.assertIn('-journeyRestorationRunId ${{ github.run_id }}',native['with']['customParameters'])
+  linux=next(s for s in steps if s.get('id')=='linux_native')['run'];self.assertIn('--env GITHUB_SHA --env GITHUB_RUN_ID --env GITHUB_RUN_ATTEMPT',linux)
  def test_same_prefix_unknown_error_and_stage_rejected(self):
   for key,val in [('stage','PRIVATE'),('errorClass','STACKTRACE')]:
    changed=dict(self.value,**{key:val})

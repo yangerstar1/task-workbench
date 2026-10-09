@@ -6,6 +6,7 @@ from capture_game_window import atomic,identity,finish_encoder,stamp
 from prepare_safe_diagnostic_export import safe,sha,require,inspect_png,probe_video
 ROOT=pathlib.Path(__file__).resolve().parents[4];TASK=ROOT/'tasks/desert-rv'
 SOURCE=TASK/'player-observer-source';WORK=TASK/'player-observer-work';RESULT=WORK/'result';PUBLIC=WORK/'public'
+PREPARE_WORKFLOW='.github/workflows/desert-rv-journey-prepare.yml';REBUILD_WORKFLOW='.github/workflows/desert-rv-journey-rebuild.yml'
 TITLE='DESERTRV_JOURNEY_CANDIDATE';REPO='yangerstar1/task-workbench'
 PACKAGE_FILES={'manifest.json','native-build-receipt.json','player.tar.gz','control.json'}
 STAGES={'START','ARTIFACT_VERIFIED','BUNDLE_VERIFIED','EXTRACTED','PLAYER_SPAWNED','WINDOW_VERIFIED','FIRST_ENCODED_FRAME','DURATION_COMPLETE','ENCODER_STOPPED','MEDIA_VERIFIED'}
@@ -56,6 +57,23 @@ def validate_package(folder,p):
     bundle.validate_records(m['files']);require(next(r['sha256'] for r in m['files'] if r['path']=='DesertRV.x86_64')==native['executableSha256']);bundle.verify_tar(folder/'player.tar.gz',m['files'])
     return m
 
+def package_workflow(m):
+    pin=m['nativeReceipt']['restorationProof']
+    return REBUILD_WORKFLOW if isinstance(pin,dict) and pin.get('path') else PREPARE_WORKFLOW
+
+def validate_producer_workflow(path,m):
+    require(path in {PREPARE_WORKFLOW,REBUILD_WORKFLOW} and path==package_workflow(m));native=m['nativeReceipt']
+    if path==REBUILD_WORKFLOW:
+        pin=native['restorationProof'];require(isinstance(pin,dict) and set(pin)=={'path','sha256'} and pin['path']=='tasks/desert-rv/unity/JourneyEvidence/JourneyPreparation/restoration-revalidated.json' and re.fullmatch('[a-f0-9]{64}',pin['sha256']))
+        require(re.fullmatch('[a-f0-9]{40}',native['assetProducerSourceCommit']) and re.fullmatch(r'https://github\.com/yangerstar1/task-workbench/actions/runs/[1-9][0-9]*',native['assetProducerRunUrl']) and native['assetProducerRunUrl']!=m['producerRunUrl'])
+        require(re.fullmatch('[a-f0-9]{64}',native['restorationNativeXmlSha256']))
+    else:
+        require(native['restorationProof'] is None or native['restorationProof']=={'path':'','sha256':''})
+        require(all(native[k] in ('',None) for k in ('assetProducerSourceCommit','assetProducerRunUrl','restorationNativeXmlSha256')))
+
+def verify_stage_receipt(p,m):
+    v=read(SOURCE/'verified.json');require(set(v)=={'schema','pins','manifestSha256','executableSha256','producerWorkflowPath'} and v['schema']==1 and v['pins']==p and v['manifestSha256']==sha(SOURCE/'package/manifest.json') and v['executableSha256']==m['nativeReceipt']['executableSha256']);validate_producer_workflow(v['producerWorkflowPath'],m)
+
 def unpack_zip(archive,destination):
     require(not destination.exists());destination.mkdir()
     with zipfile.ZipFile(safe(archive)) as z:
@@ -82,16 +100,16 @@ def stage():
     p=pins();require(not SOURCE.exists());temp=pathlib.Path(tempfile.mkdtemp(prefix='observer-source-',dir=TASK));ok=False
     try:
         mark('START','ARTIFACT_API');run=api('/actions/runs/'+p['PRODUCER_RUN_ID']);artifact=api('/actions/artifacts/'+p['PRODUCER_ARTIFACT_ID'])
-        require(run['status']=='completed' and run['conclusion']=='success' and run['head_sha']==p['PRODUCER_COMMIT'] and run['path']=='.github/workflows/desert-rv-journey-prepare.yml')
+        require(run['status']=='completed' and run['conclusion']=='success' and run['head_sha']==p['PRODUCER_COMMIT'] and run['path'] in {PREPARE_WORKFLOW,REBUILD_WORKFLOW})
         require(artifact['workflow_run']['id']==int(p['PRODUCER_RUN_ID']) and artifact['workflow_run']['head_sha']==p['PRODUCER_COMMIT'] and artifact['expired'] is False and artifact['digest']=='sha256:'+p['PRODUCER_ZIP_SHA256'] and 0<artifact['size_in_bytes']<=8*1024**3)
         require(artifact['name']=='journey-linux-CANDIDATE-NOT-PLAYTESTED-'+p['PRODUCER_RUN_ID']+'-'+str(run['run_attempt']))
         mark('START','ARTIFACT_HASH')
         with (temp/'producer.zip').open('wb') as out:subprocess.run(['gh','api','repos/'+REPO+'/actions/artifacts/'+p['PRODUCER_ARTIFACT_ID']+'/zip'],stdout=out,stderr=subprocess.DEVNULL,check=True,timeout=300)
         require((temp/'producer.zip').stat().st_size==artifact['size_in_bytes'] and sha(temp/'producer.zip')==p['PRODUCER_ZIP_SHA256'])
         mark('ARTIFACT_VERIFIED','PACKAGE_SCHEMA');unpack_zip(temp/'producer.zip',temp/'package')
-        mark('ARTIFACT_VERIFIED','BUNDLE_CLOSURE');m=validate_package(temp/'package',p)
+        mark('ARTIFACT_VERIFIED','BUNDLE_CLOSURE');m=validate_package(temp/'package',p);validate_producer_workflow(run['path'],m)
         mark('BUNDLE_VERIFIED','EXTRACTION');extract_runtime(temp/'package',temp/'runtime',m)
-        atomic(temp/'verified.json',dict(schema=1,pins=p,manifestSha256=sha(temp/'package/manifest.json'),executableSha256=m['nativeReceipt']['executableSha256']));os.replace(temp,SOURCE);ok=True
+        atomic(temp/'verified.json',dict(schema=1,pins=p,producerWorkflowPath=run['path'],manifestSha256=sha(temp/'package/manifest.json'),executableSha256=m['nativeReceipt']['executableSha256']));os.replace(temp,SOURCE);ok=True
     finally:
         if not ok:shutil.rmtree(temp)
 
@@ -99,10 +117,10 @@ def process_identity(player,exe,argv):
     require(player.poll() is None and pathlib.Path('/proc/'+str(player.pid)+'/exe').resolve()==exe.resolve())
     require(pathlib.Path('/proc/'+str(player.pid)+'/cmdline').read_bytes()==b'\0'.join(a.encode() for a in argv)+b'\0')
 def metadata(p,m):
-    return dict(schema=1,label='CANDIDATE_PLAYER_WINDOW_OBSERVATION_UNREVIEWED',producerSourceCommit=p['PRODUCER_COMMIT'],producerRunUrl='https://github.com/'+REPO+'/actions/runs/'+p['PRODUCER_RUN_ID'],observerSourceCommit=os.environ['GITHUB_SHA'],observerRunUrl='https://github.com/'+REPO+'/actions/runs/'+os.environ['GITHUB_RUN_ID'],producerArtifactId=int(p['PRODUCER_ARTIFACT_ID']),producerZipSha256=p['PRODUCER_ZIP_SHA256'],manifestSha256=sha(SOURCE/'package/manifest.json'),bundleSha256=m['bundleSha256'],executableSha256=m['nativeReceipt']['executableSha256'],inputsApplied=False,gameStateTelemetry='NOT_AVAILABLE',engineFrameHeartbeat='NOT_AVAILABLE',visualReviewed=False,gameplayAccepted=False,androidVerified=False)
+    return dict(schema=1,label='CANDIDATE_PLAYER_WINDOW_OBSERVATION_UNREVIEWED',producerSourceCommit=p['PRODUCER_COMMIT'],producerRunUrl='https://github.com/'+REPO+'/actions/runs/'+p['PRODUCER_RUN_ID'],producerWorkflowPath=package_workflow(m),assetProducerSourceCommit=m['nativeReceipt']['assetProducerSourceCommit'] or '',assetProducerRunUrl=m['nativeReceipt']['assetProducerRunUrl'] or '',restorationProofSha256=(m['nativeReceipt']['restorationProof'] or {}).get('sha256',''),restorationNativeXmlSha256=m['nativeReceipt']['restorationNativeXmlSha256'] or '',observerSourceCommit=os.environ['GITHUB_SHA'],observerRunUrl='https://github.com/'+REPO+'/actions/runs/'+os.environ['GITHUB_RUN_ID'],producerArtifactId=int(p['PRODUCER_ARTIFACT_ID']),producerZipSha256=p['PRODUCER_ZIP_SHA256'],manifestSha256=sha(SOURCE/'package/manifest.json'),bundleSha256=m['bundleSha256'],executableSha256=m['nativeReceipt']['executableSha256'],inputsApplied=False,gameStateTelemetry='NOT_AVAILABLE',engineFrameHeartbeat='NOT_AVAILABLE',visualReviewed=False,gameplayAccepted=False,androidVerified=False)
 
 def capture():
-    WORK.mkdir(exist_ok=True);mark('START','BUNDLE_HASH');p=pins();require(sha(SOURCE/'producer.zip')==p['PRODUCER_ZIP_SHA256']);m=validate_package(SOURCE/'package',p);require(bundle.inventory(SOURCE/'runtime')==m['files']);require(not RESULT.exists())
+    WORK.mkdir(exist_ok=True);mark('START','BUNDLE_HASH');p=pins();require(sha(SOURCE/'producer.zip')==p['PRODUCER_ZIP_SHA256']);m=validate_package(SOURCE/'package',p);verify_stage_receipt(p,m);require(bundle.inventory(SOURCE/'runtime')==m['files']);require(not RESULT.exists())
     private=pathlib.Path(tempfile.mkdtemp(prefix='observer-private-',dir=WORK));media=private/'media';media.mkdir();logs=private/'logs';logs.mkdir()
     stage='EXTRACTED';failure='DISPLAY_UNAVAILABLE';player=ff=xvfb=wm=None;thread=None;frames=[0];window=None;started=None;ended=None;checks=0;code=None;encoder_code=None;termination='NONE';success=False
     result=metadata(p,m)
@@ -199,7 +217,7 @@ def export():
             status_bytes=safe(RESULT/'status.json').read_bytes();require(hashlib.sha256(status_bytes).hexdigest()==original_pins['status.json']);s=strict_json(status_bytes);require(s['schema']==1 and type(s['success']) is bool and s['stage'] in STAGES and s['failureCode'] in FAILURES and s['rawLogsExported'] is False)
             if s['label']=='CANDIDATE_PLAYER_OBSERVER_FAILED':require(set(s)==set(minimal) and s['success'] is False)
             else:
-                p=pins();m=validate_package(SOURCE/'package',p);expected=metadata(p,m)
+                p=pins();m=validate_package(SOURCE/'package',p);verify_stage_receipt(p,m);expected=metadata(p,m)
                 fixed={'stage','failureCode','success','playerExitCode','playerTerminationRequest','encoderExitCode','producerBundlePreserved','rawLogsExported'}
                 measured={'captureStartUtc','captureEndUtc','durationSeconds','captureFps','encodedFrameRate','averageFrameRate','encodedFrames','identityChecks','windowId','playerPid'}
                 require(set(s)==set(expected)|fixed|(measured if 'durationSeconds' in s else set()) and all(s[k]==v for k,v in expected.items()))

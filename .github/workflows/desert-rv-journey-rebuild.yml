@@ -80,7 +80,7 @@ jobs:
           projectPath: tasks/desert-rv/unity
           testMode: editmode
           artifactsPath: tasks/desert-rv/artifacts/journey-restoration
-          customParameters: -assemblyNames DesertRV.JourneyRestorationTests -force-glcore -job-worker-count 2
+          customParameters: -assemblyNames DesertRV.JourneyRestorationTests -journeyRestorationRunId ${{ github.run_id }} -force-glcore -job-worker-count 2
           dockerCpuLimit: 2
           dockerMemoryLimit: 12g
       - name: Verify this consumer's exact restoration pass and immutable bytes
