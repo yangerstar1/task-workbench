@@ -84,6 +84,75 @@ namespace DesertRV.Editor
             material.SetOverrideTag("RenderType", "Transparent");
             AssetDatabase.CreateAsset(material, folder + "/" + name + ".mat"); return material;
         }
+        [Serializable] sealed class FxMaterialSaveEvidence
+        {
+            public string path, beforeSha256, afterSha256, metaSha256;
+            public string[] removedSerializedLines, addedSerializedLines, nativeAssetTypes;
+            public bool secondSaveStable, allNativeObjectsClean;
+        }
+        static Material CheckFxMaterial(string path, string texturePath, string textureGuid)
+        {
+            var material = AssetDatabase.LoadAssetAtPath<Material>(path);
+            Require(material && EditorUtility.IsPersistent(material) && AssetDatabase.IsMainAsset(material) &&
+                AssetDatabase.GetAssetPath(material) == path && material.shader && material.shader.name == "Universal Render Pipeline/Particles/Unlit" && material.shader.isSupported,
+                "Generated FX material lost its persistent URP particle shader identity.");
+            var texture = AssetDatabase.LoadAssetAtPath<Texture2D>(texturePath);
+            Require(texture && AssetDatabase.AssetPathToGUID(texturePath) == textureGuid && material.GetTexture("_BaseMap") == texture &&
+                material.GetColor("_BaseColor").Equals(Color.white) && material.GetTextureScale("_BaseMap").Equals(Vector2.one) &&
+                material.GetTextureOffset("_BaseMap").Equals(Vector2.zero), "Generated FX texture/GUID/color/UV meaning changed during save.");
+            Require(material.renderQueue == (int)RenderQueue.Transparent && material.GetTag("RenderType", false) == "Transparent" &&
+                material.IsKeywordEnabled("_SURFACE_TYPE_TRANSPARENT") && material.GetFloat("_Surface") == 1 && material.GetFloat("_Blend") == 2 &&
+                material.GetFloat("_ZWrite") == 0 && material.GetFloat("_SrcBlend") == (float)BlendMode.SrcAlpha &&
+                material.GetFloat("_DstBlend") == (float)BlendMode.One && material.GetFloat("_Cull") == (float)CullMode.Off,
+                "Generated FX transparency/additive blend/depth/cull meaning changed during save.");
+            return material;
+        }
+        static string[] FxMaterialLines(string path)
+        {
+            var lines = File.ReadAllLines(path);
+            Require(new FileInfo(path).Length <= 65536 && lines.Length <= 1024 && lines.All(line => line.Length <= 512), "Generated FX material serialization exceeds diagnostic bounds.");
+            return lines;
+        }
+        static void SaveAndReimportFxMaterial(string path, string texturePath, string textureGuid)
+        {
+            CheckFxMaterial(path, texturePath, textureGuid);
+            // Save only this generated file, including URP's native AssetVersion subasset. No global SaveAssets.
+            AssetDatabase.SaveAssetIfDirty(AssetDatabase.GUIDFromAssetPath(path));
+            AssetDatabase.ImportAsset(path, ImportAssetOptions.ForceSynchronousImport | ImportAssetOptions.ForceUpdate);
+            AssetDatabase.SaveAssetIfDirty(AssetDatabase.GUIDFromAssetPath(path));
+            CheckFxMaterial(path, texturePath, textureGuid);
+            var objects = AssetDatabase.LoadAllAssetsAtPath(path);
+            Require(objects.Length > 0 && objects.All(value => value && EditorUtility.IsPersistent(value) && !EditorUtility.IsDirty(value)),
+                "Generated FX material or native subasset remains dirty after its explicit save.");
+        }
+        static void FinalizeFxMaterials(string folder)
+        {
+            // Complete the real installed URP import/save lifecycle before freezing ANY FX dependency hash.
+            var stableFiles = new Dictionary<string, string>();
+            foreach (string name in new[] { "Flash", "Arc" })
+            {
+                string path = folder + "/" + name + ".mat", texturePath = folder + "/" + name + ".png";
+                string textureGuid = AssetDatabase.AssetPathToGUID(texturePath), originalMeta = JourneyDiagnosticScope.HashFile(path + ".meta");
+                Require(Hash(textureGuid, 32), "Generated FX texture GUID missing.");
+                string before = JourneyDiagnosticScope.HashFile(path); var beforeLines = FxMaterialLines(path);
+                SaveAndReimportFxMaterial(path, texturePath, textureGuid);
+                string stable = JourneyDiagnosticScope.HashFile(path); var stableLines = FxMaterialLines(path);
+                var removed = beforeLines.Except(stableLines).ToArray(); var added = stableLines.Except(beforeLines).ToArray();
+                Require(removed.Length <= 128 && added.Length <= 128, "Generated FX serialization difference exceeds bounded field diagnostics.");
+                SaveAndReimportFxMaterial(path, texturePath, textureGuid);
+                Require(JourneyDiagnosticScope.HashFile(path) == stable && JourneyDiagnosticScope.HashFile(path + ".meta") == originalMeta,
+                    "Generated FX material/metadata did not stabilize across two actual save/import cycles.");
+                stableFiles.Add(path, stable); stableFiles.Add(path + ".meta", originalMeta);
+                Debug.Log("JOURNEY_FX_MATERIAL_SAVE_STABLE " + JsonUtility.ToJson(new FxMaterialSaveEvidence {
+                    path = path, beforeSha256 = before, afterSha256 = stable, metaSha256 = originalMeta,
+                    removedSerializedLines = removed, addedSerializedLines = added,
+                    nativeAssetTypes = AssetDatabase.LoadAllAssetsAtPath(path).Select(value => value.GetType().FullName).OrderBy(value => value).ToArray(),
+                    secondSaveStable = true, allNativeObjectsClean = true }));
+            }
+            Require(stableFiles.All(file => JourneyDiagnosticScope.HashFile(file.Key) == file.Value) &&
+                new[] { "Flash", "Arc" }.All(name => AssetDatabase.LoadAllAssetsAtPath(folder + "/" + name + ".mat").All(value => value && !EditorUtility.IsDirty(value))),
+                "Finalizing one FX material changed the other material or left native state dirty.");
+        }
         static ParticleSystem Particles(GameObject owner, Material material, float lifetime, float diameter, float speed, Color color, short count)
         {
             var particles = owner.AddComponent<ParticleSystem>(); particles.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
@@ -181,6 +250,7 @@ namespace DesertRV.Editor
                 }
                 Require(PrefabUtility.SaveAsPrefabAsset(arc, folder + "/ArcPresentation.prefab"), "Arc prefab save failed.");
                 AssetDatabase.Refresh(ImportAssetOptions.ForceSynchronousImport);
+                FinalizeFxMaterials(folder);
                 result.muzzleFlashPrefab = PinAsset(folder + "/MuzzleFlash.prefab"); result.arcPresentationPrefab = PinAsset(folder + "/ArcPresentation.prefab");
                 FileCheck(pin, "JourneyEvidence/"); result.protectedSourcesUnchanged = false; VerifyProtected(protectedFiles, allowed); result.protectedSourcesUnchanged = true;
                 result.outputs = outputs.Select(p => new OutputFile { path = p, sha256 = JourneyDiagnosticScope.HashFile(p), dependencyHash = AssetDatabase.GetAssetDependencyHash(p).ToString(), dependencySha256 = JourneyContentChecks.DependencySha256(p) }).ToArray();

@@ -263,6 +263,15 @@ namespace DesertRV.Tests
             CollectionAssert.AreEquivalent(new[]{1,1,1,2,2,2,3,3,3},rows.Cast<object>().Select(r=>(int)r.GetType().GetField("region").GetValue(r)));
             Assert.AreEqual(readyType.GetField("selectionSha256").GetValue(ready),report.GetType().GetField("selectionSha256").GetValue(report));
             Assert.IsFalse((bool)report.GetType().GetField("approved").GetValue(report));
+            // The real saved manifest must survive a native unload, not merely a managed reference check.
+            var request = JsonUtility.FromJson(File.ReadAllText("JourneyEvidence/JourneyPreparation/integration-input.json"), integration.GetNestedType("Request"));
+            var verifyManifest = integration.GetMethod("VerifySavedManifest", BindingFlags.Static | BindingFlags.NonPublic);
+            verifyManifest.Invoke(null, new[] { request });
+            var manifest = UnityEditor.AssetDatabase.LoadAssetAtPath<ScriptableObject>("Assets/DesertRV/Scenes/Journey/JourneyContent.asset");
+            Assert.IsTrue(manifest && UnityEditor.EditorUtility.IsPersistent(manifest));
+            Resources.UnloadAsset(manifest); Assert.IsFalse(manifest);
+            verifyManifest.Invoke(null, new[] { request });
+            Debug.Log("JOURNEY_MANIFEST_NATIVE_UNLOAD_RELOAD_REGRESSION: passed; real saved strict identities and approval=false verified.");
         }
     }
 }

@@ -460,9 +460,49 @@ namespace DesertRV.Editor
             Require(transform && Vector3.Distance(transform.localPosition, pose.localPosition) < .0001f && Quaternion.Angle(transform.localRotation, pose.localRotation) < .001f &&
                 Vector3.Distance(transform.localScale, pose.localScale) < .00001f, "Saved selected pose changed: " + role);
         }
+        static void RefreshResolvedPrefabs(Dictionary<string, Resolved> assets)
+        {
+            // Native asset objects can be unloaded by OpenScene(Single). The immutable path/hash pins survive.
+            foreach (var asset in assets.Values) asset.prefab = Load<GameObject>(asset.input.prefab);
+        }
+        static JourneyContentManifest LoadCandidateManifest()
+        {
+            var manifest = AssetDatabase.LoadAssetAtPath<JourneyContentManifest>(JourneySceneAuthoring.ManifestPath);
+            Require(manifest && EditorUtility.IsPersistent(manifest) && AssetDatabase.Contains(manifest) && AssetDatabase.IsMainAsset(manifest) &&
+                AssetDatabase.GetAssetPath(manifest) == JourneySceneAuthoring.ManifestPath, "Actual persistent main JourneyContent asset required.");
+            return manifest;
+        }
+        static void VerifySavedManifest(Request request)
+        {
+            var manifest = LoadCandidateManifest();
+            var reviews = new[] { manifest.pouncer, manifest.armored, manifest.weapon };
+            for (int i = 0; i < Kinds.Length; i++)
+            {
+                var candidate = request.candidates.Single(value => value.kind == Kinds[i]);
+                var expected = Resolve(candidate); var review = reviews[i];
+                Require(review != null && review.prefab == expected.prefab && review.sourceModel &&
+                    AssetDatabase.GetAssetPath(review.sourceModel) == candidate.sourceModelPath &&
+                    review.sourceModel == AssetDatabase.LoadAssetAtPath<GameObject>(candidate.sourceModelPath) && !review.accepted &&
+                    review.dependencyHash == candidate.prefab.dependencyHash && review.reviewedDependencySha256 == candidate.prefab.dependencySha256 &&
+                    review.generationRunUrl == expected.contract.runUrl && Empty(review.visualEvidence) && Empty(review.motionEvidence),
+                    "Saved manifest candidate provenance/binding changed: " + Kinds[i]);
+            }
+            var weapon = Load<GameObject>(request.candidates.Single(value => value.kind == "weapon").prefab);
+            var armored = Load<GameObject>(request.candidates.Single(value => value.kind == "armored").prefab);
+            var arc = Load<GameObject>(request.arcPresentationPrefab);
+            Require(manifest.weaponPresentation == weapon.GetComponent<WeaponPresentation>() &&
+                manifest.armoredWeakpointPresentation == armored.GetComponent<BeastWeakPointPresentation>() && manifest.arcPresentation == arc.GetComponent<ArcPresentation>() &&
+                !Approved(manifest) && Empty(manifest.bootstrapEvidence) && Empty(manifest.combatIntegrationEvidence) &&
+                Empty(manifest.bootstrapDependencyHash) && manifest.environmentDependencyHashes != null &&
+                manifest.environmentDependencyHashes.Length == 3 && manifest.environmentDependencyHashes.All(Empty) &&
+                manifest.environmentEvidence != null && manifest.environmentEvidence.Length == 3 && manifest.environmentEvidence.All(Empty),
+                "Saved manifest presenter ownership or absent approval fields changed.");
+            Debug.Log("JOURNEY_PERSISTENT_MANIFEST_RELOADED: actual three strict reviews/presenters/provenance preserved; approved=false.");
+        }
         static void VerifySavedBindings(Request request, Dictionary<string, Resolved> assets)
         {
             var boot = EditorSceneManager.OpenScene(JourneySceneAuthoring.BootstrapPath, OpenSceneMode.Single);
+            RefreshResolvedPrefabs(assets);
             var weapon = One<WeaponPresentation>(boot); var arc = One<ArcPresentation>(boot);
             Require(weapon.enabled && SourceAxisAligned(weapon.muzzle), "Saved weapon presenter/axis override was lost.");
             Require(weapon.ValidateBindings(out string weaponReason), "Saved weapon: " + weaponReason);
@@ -486,6 +526,7 @@ namespace DesertRV.Editor
             foreach (var plan in request.regions)
             {
                 var scene = EditorSceneManager.OpenScene(JourneySceneAuthoring.RegionPaths[plan.region - 1], OpenSceneMode.Single);
+                RefreshResolvedPrefabs(assets);
                 var binding = One<RegionBinding>(scene);
                 Require(!binding.combatAssetsVerified && !binding.environmentVerified && binding.ValidateStructure(out string reason), "Saved region structure/approval changed.");
                 var rows = plan.guards.Concat(plan.roadBeasts).Concat(plan.waves.SelectMany(w => w.enemies)).ToDictionary(row => row.id);
@@ -726,6 +767,9 @@ namespace DesertRV.Editor
                 foreach (var pin in request.savedInputs) AssetCheck(pin);
                 foreach (string target in TargetPaths()) foreach (string file in new[] { target, target + ".meta" })
                 { Require(File.Exists(file), "Generated candidate or meta missing: " + file); original.Add(file, File.ReadAllBytes(file)); }
+                Require(ManifestIsUnbound(LoadCandidateManifest()), "Manifest contains existing review/provenance/bindings; use a genuinely empty authored candidate manifest.");
+                var boot = EditorSceneManager.OpenScene(JourneySceneAuthoring.BootstrapPath, OpenSceneMode.Single);
+                // Resolve native objects only after opening the scene that consumes them.
                 var assets = request.candidates.Select(Resolve).ToDictionary(c => c.input.kind);
                 var flash = Load<GameObject>(request.muzzleFlashPrefab); var arc = Load<GameObject>(request.arcPresentationPrefab);
                 Require(PrefabUtility.IsPartOfPrefabAsset(flash) && flash.GetComponent<ParticleSystem>() &&
@@ -740,34 +784,41 @@ namespace DesertRV.Editor
                 CheckMaterials(flash); CheckMaterials(arc);
                 var audio = request.sounds.ToDictionary(s => s.role, s => Load<AudioClip>(s.clip));
                 Require(audio.All(s => s.Value.length > 0 && s.Value.samples > 0), "Missing/nonplayable audio input.");
-                var manifest = AssetDatabase.LoadAssetAtPath<JourneyContentManifest>(JourneySceneAuthoring.ManifestPath);
-                Require(ManifestIsUnbound(manifest), "Manifest contains existing review/provenance/bindings; use a genuinely empty authored candidate manifest.");
-                var boot = EditorSceneManager.OpenScene(JourneySceneAuthoring.BootstrapPath, OpenSceneMode.Single);
                 LogProtectedStage("before-bootstrap-wire", protectedFiles);
                 WireBootstrap(boot, request, assets, flash, arc, audio);
                 LogProtectedStage("after-bootstrap-wire", protectedFiles);
                 Require(EditorSceneManager.SaveScene(boot, JourneySceneAuthoring.BootstrapPath), "Bootstrap save failed.");
                 LogProtectedStage("after-bootstrap-save", protectedFiles);
+                VerifyProtected(protectedFiles); // In particular, first real scene save must preserve the already-frozen FX material bytes.
                 foreach (var plan in request.regions.OrderBy(p => p.region))
                 {
                     boot = EditorSceneManager.OpenScene(JourneySceneAuthoring.BootstrapPath, OpenSceneMode.Single);
                     var scene = EditorSceneManager.OpenScene(JourneySceneAuthoring.RegionPaths[plan.region - 1], OpenSceneMode.Additive);
+                    RefreshResolvedPrefabs(assets);
                     LogProtectedStage("before-region-" + plan.region, protectedFiles);
                     WireRegion(scene, boot, plan, assets);
                     LogProtectedStage("after-region-" + plan.region, protectedFiles);
                     Require(EditorSceneManager.SaveScene(scene, JourneySceneAuthoring.RegionPaths[plan.region - 1]), "Regional scene save failed.");
                 }
+                // The earlier manifest and prefab component wrappers must not cross Single scene reloads.
+                AssetCheck(request.savedInputs.Single(pin => pin.path == JourneySceneAuthoring.ManifestPath));
+                var manifest = LoadCandidateManifest(); Require(ManifestIsUnbound(manifest), "Unbound manifest changed before candidate assignment.");
+                RefreshResolvedPrefabs(assets);
+                var currentArc = Load<GameObject>(request.arcPresentationPrefab).GetComponent<ArcPresentation>();
+                Require(currentArc, "Persistent authored arc presenter disappeared.");
                 manifest.pouncer = Review(assets["pouncer"]); manifest.armored = Review(assets["armored"]); manifest.weapon = Review(assets["weapon"]);
-                manifest.weaponPresentation = assets["weapon"].prefab.GetComponent<WeaponPresentation>(); manifest.arcPresentation = ap;
+                manifest.weaponPresentation = assets["weapon"].prefab.GetComponent<WeaponPresentation>(); manifest.arcPresentation = currentArc;
                 manifest.armoredWeakpointPresentation = assets["armored"].prefab.GetComponent<BeastWeakPointPresentation>();
                 EditorUtility.SetDirty(manifest); AssetDatabase.SaveAssetIfDirty(manifest);
+                Require(!EditorUtility.IsDirty(manifest), "Persistent manifest save did not finish.");
+                Resources.UnloadAsset(manifest); // Force the following check to read the actual saved asset, including all assigned fields.
                 // Discard temporary RV placement before independent saved-scene checks.
                 EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
-                VerifySavedBindings(request, assets);
+                VerifySavedManifest(request); VerifySavedBindings(request, assets);
                 var errors = JourneyContentChecks.Inspect(false); Require(errors.Count == 0, string.Join("\n", errors));
                 var productionFailures = JourneyContentChecks.Inspect(true); result.productionGateFailures = productionFailures.ToArray();
                 RequireOnlyMissingApprovals(result.productionGateFailures);
-                Require(!Approved(manifest), "Production approval must remain absent.");
+                VerifySavedManifest(request); // Content inspection also reloads all scenes; never read a stale native manifest wrapper.
                 FileCheck(inputPin, "JourneyEvidence/"); ConfirmProtectedSources(result, () => VerifyProtected(protectedFiles));
                 result.outputs = TargetPaths().Select(p => new OutputFile { path = p, sha256 = JourneyDiagnosticScope.HashFile(p),
                     dependencyHash = AssetDatabase.GetAssetDependencyHash(p).ToString(), dependencySha256 = JourneyContentChecks.DependencySha256(p) }).ToArray();

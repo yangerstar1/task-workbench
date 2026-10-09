@@ -47,6 +47,7 @@ namespace DesertRV.Editor
                 else
                 {
                     var scene = EditorSceneManager.OpenScene(JourneySceneAuthoring.BootstrapPath,OpenSceneMode.Single);
+                    manifest = AssetDatabase.LoadAssetAtPath<JourneyContentManifest>(JourneySceneAuthoring.ManifestPath);
                     var directors = All<JourneyDirector>(scene); var sessions = All<JourneySession>(scene); var motors = All<JourneyMotor>(scene);
                     Require(directors.Length == 1 && sessions.Length == 1 && motors.Length == 1, "Bootstrap requires exactly one Director/Session/Motor.",errors);
                     Require(All<FirstStationJourney>(scene).Length == 0 && All<BodyViewer>(scene).Length == 0, "Bootstrap contains legacy simulation/viewer ownership.",errors);
@@ -61,6 +62,7 @@ namespace DesertRV.Editor
                     string path = JourneySceneAuthoring.RegionPaths[i];
                     if (!File.Exists(path)) { errors.Add("Missing saved regional scene: " + path); continue; }
                     var scene = EditorSceneManager.OpenScene(path,OpenSceneMode.Single);
+                    manifest = AssetDatabase.LoadAssetAtPath<JourneyContentManifest>(JourneySceneAuthoring.ManifestPath);
                     var bindings = All<RegionBinding>(scene);
                     Require(bindings.Length == 1, path + ": exactly one RegionBinding required.",errors);
                     Require(All<JourneySession>(scene).Length == 0 && All<JourneyMotor>(scene).Length == 0 && All<JourneyDirector>(scene).Length == 0 && All<JourneyHud>(scene).Length == 0,
