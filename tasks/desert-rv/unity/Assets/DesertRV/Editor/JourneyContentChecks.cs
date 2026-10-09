@@ -196,6 +196,7 @@ namespace DesertRV.Editor
             Require(a.cabinWorkbench && a.workbenchSurface && motor.vehicle && a.cabinWorkbench.IsChildOf(motor.vehicle) && a.workbenchSurface.transform.IsChildOf(motor.vehicle),"Exact cabin workbench surface must travel with RV.",errors);
             Require(d.loader.regionScenes != null && d.loader.regionScenes.SequenceEqual(JourneySceneAuthoring.RegionPaths.Select(Path.GetFileNameWithoutExtension)),"Loader scene names/order mismatch.",errors);
             Require(d.hud.font,"Missing licensed Chinese HUD font.",errors);
+            Require(JourneySceneAuthoring.ValidateArcMeshGeometry(a, out string arcGeometryReason), "Retained arc geometry snapshot invalid: " + arcGeometryReason, errors);
             if (!production) return;
             foreach (var clip in new[] { a.shotSound,a.hitSound,a.reloadSound,a.pickupSound,a.upgradeSound,a.windSound }) Require(clip && clip.length > 0,"Missing/nonplayable shot, hit, reload, pickup, upgrade or wind audio.",errors);
             if (!m) return;

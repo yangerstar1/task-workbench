@@ -2,6 +2,7 @@ using System;
 using System.IO;
 using System.Linq;
 using UnityEditor;
+using Unity.Collections;
 using UnityEditor.SceneManagement;
 using UnityEngine;
 using UnityEngine.SceneManagement;
@@ -64,6 +65,7 @@ namespace DesertRV.Editor
                 foreach (var root in sourceScene.GetRootGameObjects().Where(r => r.name == "Exposure response")) MoveUnder(root.transform, host.transform, boot);
                 motor.ram.SetActive(false); motor.arc.SetActive(false);
                 var actions = host.AddComponent<JourneyActions>(); actions.journey = session; actions.motor = motor;
+                AuthorArcMeshGeometry(actions);
                 var repair = nodes.Single(t => t.name == "GEO-rear_repair_bench");
                 actions.workbenchSurface = ExactSurface(repair);
                 actions.cabinWorkbench = Point("Cabin installation point", body, actions.workbenchSurface.bounds.center + Vector3.up * .18f);
@@ -577,13 +579,67 @@ namespace DesertRV.Editor
         }
         static Bounds GeometryBounds(Transform root)
         {var renderers=root.GetComponentsInChildren<Renderer>(true);if(renderers.Length==0)throw new InvalidOperationException("No geometry: "+root.name);var b=renderers[0].bounds;foreach(var r in renderers.Skip(1))b.Encapsulate(r.bounds);return b;}
+        static JourneyActions.ArcMeshSnapshot ReadArcMeshGeometry(Mesh mesh)
+        {
+            if (!mesh) throw new InvalidOperationException("Missing retained collider mesh.");
+            using (var data = MeshUtility.AcquireReadOnlyMeshData(mesh))
+            using (var vertices = new NativeArray<Vector3>(data[0].vertexCount, Allocator.Temp))
+            {
+                data[0].GetVertices(vertices); var triangles = new List<int>();
+                for (int sub = 0; sub < data[0].subMeshCount; sub++)
+                {
+                    var descriptor = data[0].GetSubMesh(sub);
+                    if (descriptor.topology != MeshTopology.Triangles || descriptor.indexCount % 3 != 0) throw new InvalidOperationException("Retained collider has nontriangle topology.");
+                    using (var indices = new NativeArray<int>(descriptor.indexCount, Allocator.Temp))
+                    { data[0].GetIndices(indices, sub, true); triangles.AddRange(indices.ToArray()); }
+                }
+                return JourneyActions.ArcMeshSnapshot.FromImportedMesh(mesh, vertices.ToArray(), triangles.ToArray());
+            }
+        }
+        static Mesh[] ArcColliderMeshes(JourneyActions actions)
+        {
+            if (!actions || !actions.motor || !actions.motor.vehicle) throw new InvalidOperationException("Missing retained arc collider owner.");
+            return actions.motor.vehicle.GetComponentsInChildren<MeshCollider>(true).Where(c => !c.convex && !c.isTrigger).Select(c => c.sharedMesh).Distinct().ToArray();
+        }
+        public static void AuthorArcMeshGeometry(JourneyActions actions)
+        {
+            actions.arcMeshGeometry = ArcColliderMeshes(actions).Select(ReadArcMeshGeometry).ToArray();
+            EditorUtility.SetDirty(actions);
+        }
+        public static bool ValidateArcMeshGeometry(JourneyActions actions, out string reason)
+        {
+            reason = null;
+            try
+            {
+                var expected = ArcColliderMeshes(actions); var actual = actions.arcMeshGeometry;
+                if (actual == null || actual.Length != expected.Length || actual.Any(s => s == null || !s.SourceMesh) || actual.Select(s => s.SourceMesh).Distinct().Count() != actual.Length)
+                    throw new InvalidOperationException("Missing/duplicate retained arc geometry inventory.");
+                foreach (var mesh in expected)
+                {
+                    var found = actual.SingleOrDefault(s => s.SourceMesh == mesh); var source = ReadArcMeshGeometry(mesh);
+                    if (found == null || found.Sha256 != source.Sha256 || JourneyActions.ArcGeometryDigest(found) != source.Sha256)
+                        throw new InvalidOperationException("Retained arc mesh identity/hash/topology differs from actual imported data.");
+                }
+                return true;
+            }
+            catch (Exception error) { reason = error.Message; return false; }
+        }
+        static float InteractionSurfaceDistanceSquared(Collider collider, Vector3 point)
+        {
+            if (!collider || !collider.enabled || !collider.gameObject.activeInHierarchy || collider.isTrigger) throw new InvalidOperationException("Missing/inactive interaction surface.");
+            if (collider is MeshCollider mesh && !mesh.convex)
+                return JourneyActions.ArcMeshDistanceSquared(ReadArcMeshGeometry(mesh.sharedMesh), collider.transform.localToWorldMatrix, point, out _);
+            if (collider is BoxCollider || collider is SphereCollider || collider is CapsuleCollider || collider is MeshCollider convex && convex.convex)
+                return (collider.ClosestPoint(point) - point).sqrMagnitude;
+            throw new InvalidOperationException("Unsupported interaction surface collider.");
+        }
         [Serializable] sealed class ClearanceReport {public int region;public bool passed;public string[] checkedZones;public int distantMeshes;}
         static void CheckNewLayoutClearance(RegionBinding b,JourneyMotor motor,JourneyActions actions)
         {
             Physics.SyncTransforms();var zones=new Dictionary<string,Bounds>();
-            if(b.powerPoint && (!b.powerSurface || Vector3.Distance(b.powerSurface.ClosestPoint(b.powerPoint.position),b.powerPoint.position)>.65f))
+            if(b.powerPoint && (!b.powerSurface || InteractionSurfaceDistanceSquared(b.powerSurface,b.powerPoint.position)>.65f*.65f))
                 throw new InvalidOperationException("Power interaction point is detached from its real surface after transform synchronization.");
-            if(b.salvage && (!b.salvageSurface || Vector3.Distance(b.salvageSurface.ClosestPoint(b.salvage.position),b.salvage.position)>1f))
+            if(b.salvage && (!b.salvageSurface || InteractionSurfaceDistanceSquared(b.salvageSurface,b.salvage.position)>1f))
                 throw new InvalidOperationException("Salvage interaction point is detached from its real surface after transform synchronization.");
             zones["driving-corridor"]=new Bounds(new Vector3(0,2.1f,30),new Vector3(8.6f,3.8f,78));
             zones["vehicle-spawn"]=new Bounds(b.spawn.position+Vector3.up*1.65f,new Vector3(4.5f,3.1f,8));

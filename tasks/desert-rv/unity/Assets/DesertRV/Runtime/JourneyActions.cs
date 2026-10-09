@@ -4,7 +4,7 @@ using UnityEngine;
 namespace DesertRV
 {
     // Shared actions retain exact self-collider filtering for shots and interactions.
-    public sealed class JourneyActions : MonoBehaviour
+    public sealed partial class JourneyActions : MonoBehaviour
     {
         public event Action<ShotPresentationEvent> ShotPresented;
         public event Action<ArcPresentationEvent> ArcPresented;
@@ -16,17 +16,7 @@ namespace DesertRV
         public bool PresentationCurrent => journey && journey.State != null && Region && PresentationGeneration == journey.Generation && Region.region == journey.State.SceneId;
         public int ReloadLoadedBefore { get; private set; }
         public int ReloadPlannedAdded { get; private set; }
-        public bool ArcSourceReady
-        {
-            get
-            {
-                if (!arcOrigin || !motor || !motor.arc || !motor.vehicle || !arcOrigin.IsChildOf(motor.arc.transform)) return false;
-                foreach (var collider in motor.vehicle.GetComponentsInChildren<Collider>(true))
-                    if (collider.enabled && !collider.isTrigger && collider.gameObject.activeInHierarchy &&
-                        (collider.ClosestPoint(arcOrigin.position) - arcOrigin.position).sqrMagnitude < .000001f) return false;
-                return true;
-            }
-        }
+        public bool ArcSourceReady => CheckArcSource(out _, out _, out _);
         public float FireRemaining => fireClock;
         public float ReloadRemaining => Mathf.Max(0, reloadRemaining);
         public bool PresentationPlaying => PresentationCurrent && journey.State.Status == SessionStatus.Playing;

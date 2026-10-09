@@ -307,10 +307,11 @@ namespace DesertRV.Editor
             var arcPresenter = arc.GetComponent<ArcPresentation>(); arcPresenter.enabled = false;
             arcPresenter.actions = actions; arcPresenter.arcModule = motor.arc.transform; arcPresenter.arcSound = audio["arc"]; actions.arcOrigin = arcPresenter.source;
             Physics.SyncTransforms();
+            LogArcBinding(arcPresenter, "wired-module-inactive");
             Require(arcPresenter.ValidateBindings(out string arcReason), "Arc scene binding rejected: " + arcReason); arcPresenter.enabled = true; Record(arcPresenter);
             // Arc starts inactive with the retained upgrade. Test its physical source with the module enabled, then restore exactly.
             bool wasActive = motor.arc.activeSelf;
-            try { motor.arc.SetActive(true); Physics.SyncTransforms(); Require(actions.ArcSourceReady, "Explicit arc source lies inside retained RV/module collider."); }
+            try { motor.arc.SetActive(true); Physics.SyncTransforms(); LogArcBinding(arcPresenter, "wired-module-active"); Require(actions.ArcSourceReady, "Explicit arc source lies inside retained RV/module collider."); }
             finally { motor.arc.SetActive(wasActive); }
             Require(All<BeastActor>(boot).Length == 0, "Persistent bootstrap cannot contain regional enemies.");
         }
@@ -355,15 +356,51 @@ namespace DesertRV.Editor
             foreach (var actor in binding.roadBeasts) { actor.gameObject.SetActive(false); Record(actor.gameObject); }
             foreach (var wave in binding.waves) foreach (var actor in wave.enemies) { actor.gameObject.SetActive(false); Record(actor.gameObject); }
         }
+        static void LogArcBinding(ArcPresentation arc, string stage)
+        {
+            var a = arc.actions; var m = a ? a.motor : null;
+            bool ready = a && a.CheckArcSource(out _, out _, out _);
+            Collider blocker = null; float distance = float.NaN; string query = "missing-actions";
+            if (a) a.CheckArcSource(out blocker, out distance, out query);
+            string path = blocker && m && m.vehicle ? AnimationUtility.CalculateTransformPath(blocker.transform, m.vehicle) : "none";
+            var flags = new[] { (bool)a, (bool)arc.arcModule, (bool)arc.source, a && a.arcOrigin == arc.source,
+                arc.source && arc.arcModule && arc.source.IsChildOf(arc.arcModule), (bool)m, m && m.arc,
+                m && m.arc && m.arc.transform == arc.arcModule, (bool)arc.audioSource,
+                arc.audioSource && arc.arcModule && arc.audioSource.transform.IsChildOf(arc.arcModule), (bool)arc.arcSound, ready };
+            Debug.Log("JOURNEY_ARC_BINDING stage=" + stage + "; predicates=" + string.Join(",", flags.Select(value => value ? "1" : "0")) +
+                "; source=" + (arc.source ? arc.source.position.ToString("R") : "missing") + "; moduleActive=" + (arc.arcModule && arc.arcModule.gameObject.activeInHierarchy) +
+                "; blocker=" + path + "; type=" + (blocker ? blocker.GetType().Name : "none") + "; convex=" + (blocker is MeshCollider mc && mc.convex) +
+                "; query=" + query + "; squaredDistance=" + distance.ToString("R", System.Globalization.CultureInfo.InvariantCulture));
+            if (a && m && m.vehicle && arc.source)
+            {
+                var solids = m.vehicle.GetComponentsInChildren<Collider>(true).Where(c => c.enabled && !c.isTrigger && c.gameObject.activeInHierarchy).ToArray();
+                var nearest = solids.OrderBy(c => c.bounds.SqrDistance(arc.source.position)).FirstOrDefault();
+                if (nearest) Debug.Log("JOURNEY_ARC_BOUNDS stage=" + stage + "; count=" + solids.Length + "; collider=" + AnimationUtility.CalculateTransformPath(nearest.transform, m.vehicle) +
+                    "; min=" + nearest.bounds.min.ToString("R") + "; max=" + nearest.bounds.max.ToString("R") + "; lowerBoundSquared=" + nearest.bounds.SqrDistance(arc.source.position).ToString("R", System.Globalization.CultureInfo.InvariantCulture));
+            }
+        }
+        static void VerifySavedPose(Transform transform, Pose pose, string role)
+        {
+            NamedPoseShape(pose, role);
+            Require(transform && Vector3.Distance(transform.localPosition, pose.localPosition) < .0001f && Quaternion.Angle(transform.localRotation, pose.localRotation) < .001f &&
+                Vector3.Distance(transform.localScale, pose.localScale) < .00001f, "Saved selected pose changed: " + role);
+        }
         static void VerifySavedBindings(Request request, Dictionary<string, Resolved> assets)
         {
             var boot = EditorSceneManager.OpenScene(JourneySceneAuthoring.BootstrapPath, OpenSceneMode.Single);
             var weapon = One<WeaponPresentation>(boot); var arc = One<ArcPresentation>(boot);
             Require(weapon.enabled && SourceAxisAligned(weapon.muzzle), "Saved weapon presenter/axis override was lost.");
             Require(weapon.ValidateBindings(out string weaponReason), "Saved weapon: " + weaponReason);
+            LogArcBinding(arc, "saved-bootstrap");
             Require(arc.enabled && arc.ValidateBindings(out string arcReason), "Saved arc binding invalid.");
             Require(PrefabUtility.GetCorrespondingObjectFromSource(weapon.gameObject) == assets["weapon"].prefab, "Saved weapon lost strict prefab identity.");
+            Require(PrefabUtility.GetCorrespondingObjectFromSource(arc.gameObject) == AssetDatabase.LoadAssetAtPath<GameObject>(request.arcPresentationPrefab.path) &&
+                weapon.muzzleFlash && PrefabUtility.GetCorrespondingObjectFromSource(weapon.muzzleFlash.gameObject) == AssetDatabase.LoadAssetAtPath<GameObject>(request.muzzleFlashPrefab.path), "Saved authored FX prefab identity changed.");
+            VerifySavedPose(weapon.transform, request.weaponCameraPose, "weaponCameraPose");
+            VerifySavedPose(weapon.muzzleFlash.transform, request.flashMuzzlePose, "flashMuzzlePose");
+            VerifySavedPose(arc.transform, request.arcModulePose, "arcModulePose");
             var actions = One<JourneyActions>(boot);
+            Require(JourneySceneAuthoring.ValidateArcMeshGeometry(actions, out string geometryReason), geometryReason);
             var actualAudio = new[] { actions.shotSound, actions.hitSound, actions.reloadSound, actions.pickupSound, actions.upgradeSound, actions.windSound, arc.arcSound };
             for (int i = 0; i < SoundRoles.Length; i++)
             {
