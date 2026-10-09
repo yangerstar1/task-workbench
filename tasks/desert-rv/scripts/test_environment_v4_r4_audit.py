@@ -333,6 +333,11 @@ class NativeAuditSourceTests(unittest.TestCase):
         start=text.index('        [Serializable] sealed class CorrectedTerrainAuditFile');end=text.index('        static void WriteCorrectedTerrainReport(',start)
         extra=text[start:end]
         original=text[:start]+text[end:]
+        begin=original.index('        // CORRECTED_BEACON_EMISSION_BEGIN\n')
+        finish=original.index('        // CORRECTED_BEACON_EMISSION_END\n\n',begin)+len('        // CORRECTED_BEACON_EMISSION_END\n\n')
+        original=original[:begin]+original[finish:]
+        original=original.replace('                FinalizeCorrectedBeaconEmission();\n','')
+        original=original.replace('                if(region==3)RecordCorrectedBeaconEmissionBinding(binding);\n','')
         for phase in ('freeze','postcapture'):original=original.replace('            WriteCorrectedTerrainAuditPhase("'+phase+'",report);\n','')
         self.assertEqual(hashlib.sha256(original.encode()).hexdigest(),'38d3974a478feee192beb38810b8ec6035d43e57a0c037d5ff061322a53cc5b7')
         self.assertIn('Resources.FindObjectsOfTypeAll<Object>()',extra);self.assertIn('EditorUtility.IsDirty(item)',extra)

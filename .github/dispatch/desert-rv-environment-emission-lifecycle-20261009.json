@@ -1,0 +1,8 @@
+{
+  "schema": 1,
+  "requestId": "desert-rv-environment-emission-lifecycle-20261009-once-be2ec827",
+  "baseCommit": "ac20a2758e3c9017aba00b5e64922ec51fe197e9",
+  "candidateManifestSha256": "1824ec9a49bd1a1e32a8202c5ea61f1206286c6016b4e15a639897308b0dcf38",
+  "filesManifestSha256": "8172d65f3a91afbb64db4580b3d12eb89538c85701447a281a26929823790593",
+  "sourceStateSha256": "48af73135429cbefde467bf2e5c665b06e17898cfd0c9e87c936577e3e193c3c"
+}
