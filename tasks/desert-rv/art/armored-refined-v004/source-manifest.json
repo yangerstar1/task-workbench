@@ -1,0 +1,43 @@
+{
+  "candidate": "scrapyard-bulwark-v004-refined",
+  "status": "source_only_unrendered_unapproved",
+  "source_origin": "original geometry/rig/motion and licensed CC0 surface treatment",
+  "third_party_assets": [
+    {
+      "title": "rusty_metal_02",
+      "author": "Rob Tuytel",
+      "publisher": "Poly Haven",
+      "asset_url": "https://polyhaven.com/a/rusty_metal_02",
+      "license": "CC0-1.0",
+      "license_url": "https://polyhaven.com/license",
+      "file": "rusty_metal_02_diff_1k.jpg",
+      "sha256": "adaf094391518b6afe787a123942110aa88ef521c844f970b124420f5ed5d3d9",
+      "usage": "Low-contrast modulation of original warm painted-metal palette. No original image/reference concept bundled."
+    }
+  ],
+  "sha256": {
+    "README.md": "eb97037aa74804addbbd6f926faf014147c1e4c6ee89c33e577c8b6fb98d88a8",
+    "animate.py": "159564c94eb0780bba0d0638d415aaa6e4e6a0a9b5f0ee3a98e6d3066563e339",
+    "artifact_io.py": "3a088520d8162c1beaa2c4fcf32275f8041e05db323344b1d82a1b263787a144",
+    "binding_contract.py": "c9eea0fa52490b47c3d36fc8df2b9662da67326755c5a932ca1704a16e360ff9",
+    "cavity_geometry.py": "c58030b6b9f77b9cacf5c944c816a5918484c4da49c1d9d877dfb36bba7a18d3",
+    "check_refined_math.py": "449fba01cf000b2bb17f145edd9bb477e1c2ab7a2eebbd11e05d9a1e21188e7a",
+    "evidence_layout.py": "6f4e1d32cc0f7c872697b8ccf5b789a2b16846bd11f2c51d243dd2c912e9214c",
+    "floor-regression-observed.json": "9dce23b86a4fb6dd4048ab4abf47073dab17125d7d1cd31dc07f074d12d82e11",
+    "floor_probe.py": "5835d6aa583f35140837ad9364ac7d93c0966d377ada49f05acc05936302d1e5",
+    "fps_evidence.py": "f336fd58a9726e14d03810e3e784aed518be1d0d3b2be56fa424eead66ccac14",
+    "generate.py": "e4ab4ad9abfac6e14b553390839477a09bcb0a89f0494e981f30d898ec7117e2",
+    "historical-clip-equivalence.json": "a52e7371e0ddb9bef1a501a913b8acd6a0bb00c7eba72742feca3bbadccef03c",
+    "materials/ASSET-LICENSE.json": "30e37dceca601ae0142ef53f3fcf13956350a2d1e785ccc559d375a0c7a06181",
+    "materials/rusty_metal_02_diff_1k.jpg": "adaf094391518b6afe787a123942110aa88ef521c844f970b124420f5ed5d3d9",
+    "motion.py": "4edc78bd7ff6ec22d8ad378a71871f983f76262857c8bf9cec03a06f8ed7e010",
+    "package_evidence.py": "0d3225b8fce7342d89b6acc7ea2efe735b785d0ec899f871d9b6fbf8c6bed042",
+    "parameters.json": "1db5b3fecd7822ffe2daf0819ec0225a215815d04cabcefe0713024d5f079d12",
+    "refined_geometry.py": "444a3321d92b25c5adf60a23fcad698a4c5cf7d1977fe5252acd225a428407df",
+    "surface_atlas.py": "9a6fd0013b486a3e46b8b05f16565b163ac6fc4486e999a927baf7472f175ec9",
+    "test_refinement.py": "c50e7aa5f7271eaae346169e4faa049907f3c33de4f6c84d74f3e96634f23ed5",
+    "test_static.py": "19d8595cbf43730c6c43180ae084a7f06470cbbbb9243da57922d6080567e8fe",
+    "validate_runtime_contract.py": "a2d91b8bc8f947168778cfc4f9ffc4fbc3e92cb6e8a68b7e7131bad3c8d106da",
+    "write_provenance.py": "86db4e077558e1ee8cf2253c8895c82f9c6707b50b30c005ffac1a9c41a21d95"
+  }
+}

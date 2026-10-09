@@ -1,0 +1,120 @@
+{
+  "candidate": "scrapyard-bulwark-v004-refined",
+  "status": "source_only_unrendered_unapproved",
+  "blender": "4.2.3",
+  "unity": "6000.3.19f1",
+  "fps": 60,
+  "clips": {
+    "Idle": 2.0,
+    "Walk": 0.6,
+    "Windup": 1.1,
+    "Attack": 1.2,
+    "Recover": 2.0,
+    "Hit": 0.28,
+    "Death": 1.8
+  },
+  "triangle_budget": 18000,
+  "bone_budget": 32,
+  "walk_speed_mps": 2.1,
+  "charge_speed_mps": 10.0,
+  "charge_stride_seconds": 0.15,
+  "charge_stop_seconds": 1.2,
+  "root_motion": false,
+  "forward_blender": "-Y",
+  "up_blender": "+Z",
+  "floor_penetration_limit_m": 0.004,
+  "contact_gap_limit_m": 0.012,
+  "texture": "Original 1024px basecolor/ORM; mineral paint, exposed steel borders, cavity soot, dust",
+  "provenance": "Original geometry/rig/motion; bundled Poly Haven rusty_metal_02 diffuse CC0 modulation; private approved reference observed only",
+  "walk_stride_seconds": 0.6,
+  "weakpoint_seconds": 2.0,
+  "death_settle_z": -0.26,
+  "runtime_contract": {
+    "source": "BeastActor.cs / BeastCombatState.cs",
+    "walk_speed_mps": 2.1,
+    "charge_speed_mps": 10.0,
+    "windup_seconds": 1.1,
+    "charge_timeout_seconds": 1.2,
+    "weakpoint_seconds": 2.0,
+    "hit_seconds": 0.28,
+    "root_motion": false,
+    "weakpoint_damage_owner": "BeastCombatState",
+    "attack_gate_open": false,
+    "recover_gate_open_entire_clip": true,
+    "gate_transition": "Existing Animator.CrossFade .12, visual parity requires Unity verification",
+    "walk_exceptions": "Returning home 2m/s or blocked tangent .6x requires speed synchronization; current runtime lacks parameterized playback",
+    "timeout_note": "runtime uses attackClock > 1.2; clip must loop or motor/state transition requires tested bounded overrun handling"
+  },
+  "gate_open_radians": 2.443460952792061,
+  "fps_evidence": {
+    "eye_height_m": 1.65,
+    "vertical_fov_degrees": 60,
+    "distances_m": [
+      2,
+      4,
+      6
+    ],
+    "rear_angles_degrees": [
+      120,
+      180,
+      240
+    ],
+    "side_boundary_angles_degrees": [
+      90,
+      270
+    ],
+    "side_boundary_distance_m": 4,
+    "recover_seconds": [
+      0,
+      1,
+      1.95
+    ],
+    "gameplay_rule": "whole_body_vulnerable_during_recover_no_directional_hit_cone",
+    "minimum_open_visible_samples": 8,
+    "maximum_closed_visible_samples": 2,
+    "minimum_open_visible_area_px": 64,
+    "minimum_open_visible_height_px": 8,
+    "closed_front_angles_degrees": [
+      0,
+      45,
+      315
+    ]
+  },
+  "presentation_contract": {
+    "body_renderer": "Bulwark_Body",
+    "weak_point_root": "WeakPointAssembly",
+    "core_renderer": "Core_Renderer",
+    "material_slot": 0,
+    "plate_pivots": [
+      "ArmorPlate_L_Pivot",
+      "ArmorPlate_R_Pivot"
+    ],
+    "plate_renderers": [
+      "ArmorPlate_L_Renderer",
+      "ArmorPlate_R_Renderer"
+    ],
+    "unity_open_euler_intent": [
+      [
+        0,
+        0,
+        -140
+      ],
+      [
+        0,
+        0,
+        140
+      ]
+    ],
+    "animation_owner": "runtime_only_unkeyed_branch",
+    "renderer_budget": 4,
+    "material_budget": 2,
+    "fbx_model_animations": false
+  },
+  "capsule_contract": {
+    "version": "capsule-r2",
+    "center_y": 0.775,
+    "height": 1.55,
+    "radius": 0.5,
+    "root_scale": 1
+  }
+}

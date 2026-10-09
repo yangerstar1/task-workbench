@@ -1,0 +1,223 @@
+"""SOURCE-ONLY candidate. Run Blender 4.2.3 exclusively in an approved public Actions job.
+Usage: blender -b --python generate.py -- --output OUTPUT --phase static|motion
+No downloads, publishing, Unity mutations or runtime damage. Bundled verified CC0 surface only.
+"""
+import argparse, json, math, sys
+from pathlib import Path
+import bpy, bmesh
+from mathutils import Vector, Matrix
+HERE=Path(__file__).resolve().parent
+sys.path.insert(0,str(HERE))
+import motion
+import cavity_geometry
+import refined_geometry
+import surface_atlas
+from artifact_io import fresh_output
+P=json.loads((HERE/'parameters.json').read_text())
+p=argparse.ArgumentParser(); p.add_argument('--output',required=True); p.add_argument('--phase',choices=['static','motion'],required=True)
+args=p.parse_args(sys.argv[sys.argv.index('--')+1:]); OUT=fresh_output(args.output)
+if bpy.app.version[:3]!=(4,2,3): raise RuntimeError('Pinned Blender 4.2.3 required')
+bpy.ops.object.select_all(action='SELECT'); bpy.ops.object.delete(use_global=False)
+scene=bpy.context.scene; scene.render.fps=P['fps']; scene.unit_settings.system='METRIC'
+assets=[]; source_parts=[]
+def active(o):
+    bpy.ops.object.select_all(action='DESELECT'); o.select_set(True); bpy.context.view_layer.objects.active=o
+# Original warm palette with verified bundled CC0 micro-surface, packed to one atlas.
+reference=bpy.data.images.load(str(HERE/'materials/rusty_metal_02_diff_1k.jpg'),check_existing=False)
+reference_pixels=list(reference.pixels); rw,rh=reference.size
+tex=bpy.data.images.new('Bulwark_Original_BaseColor',width=1024,height=1024,alpha=False)
+orm=bpy.data.images.new('Bulwark_Original_ORM',width=1024,height=1024,alpha=False);orm.colorspace_settings.name='Non-Color'
+pixels=[];orm_pixels=[]
+for y in range(1024):
+    for x in range(1024):
+        tile=(y//512)*4+x//256;u=(x%256)/255;v=(y%512)/511
+        ix=min(rw-1,int(u*(rw-1)));iy=min(rh-1,int(v*(rh-1)));index=(iy*rw+ix)*4
+        rgb,packed=surface_atlas.texel(tile,u,v,reference_pixels[index:index+3])
+        pixels.extend((*rgb,1));orm_pixels.extend((*packed,1))
+for image,data,name in ((tex,pixels,'bulwark-basecolor.png'),(orm,orm_pixels,'bulwark-orm.png')):
+    image.pixels=data;image.filepath_raw=str(OUT/name);image.file_format='PNG';image.save();image.pack()
+bpy.data.images.remove(reference)
+mat=bpy.data.materials.new('Bulwark_StandardPBR_Atlas');mat.use_nodes=True
+nodes=mat.node_tree.nodes;bs=nodes.get('Principled BSDF')
+image_node=nodes.new('ShaderNodeTexImage');image_node.image=tex;mat.node_tree.links.new(image_node.outputs['Color'],bs.inputs['Base Color'])
+orm_node=nodes.new('ShaderNodeTexImage');orm_node.image=orm;channels=nodes.new('ShaderNodeSeparateColor')
+mat.node_tree.links.new(orm_node.outputs['Color'],channels.inputs['Color']);mat.node_tree.links.new(channels.outputs['Green'],bs.inputs['Roughness']);mat.node_tree.links.new(channels.outputs['Blue'],bs.inputs['Metallic'])
+
+def mesh(name,verts,faces,bone,tile):
+    me=bpy.data.meshes.new(name); me.from_pydata(verts,[],faces); me.update()
+    source_parts.append(name)
+    me.attributes.new(name='source_part_id',type='INT',domain='POINT'); me.attributes.new(name='source_vertex_id',type='INT',domain='POINT')
+    part_tag=me.attributes['source_part_id']; vertex_tag=me.attributes['source_vertex_id']
+    for i in range(len(me.vertices)):part_tag.data[i].value=len(source_parts)-1; vertex_tag.data[i].value=i
+    o=bpy.data.objects.new(name,me); scene.collection.objects.link(o); assets.append(o); o['bone']=bone; o.data.materials.append(mat)
+    tag=me.attributes.new(name='weakpoint_face',type='INT',domain='FACE')
+    for value in tag.data:value.value=int(name.startswith('WeakpointTissue'))
+    bm=bmesh.new(); bm.from_mesh(me); bmesh.ops.recalc_face_normals(bm,faces=list(bm.faces)); bm.to_mesh(me); bm.free()
+    active(o); bpy.ops.object.mode_set(mode='EDIT'); bpy.ops.mesh.select_all(action='SELECT')
+    bpy.ops.uv.smart_project(angle_limit=1.15,island_margin=.025); bpy.ops.object.mode_set(mode='OBJECT')
+    for uv in o.data.uv_layers.active.data:
+        uv.uv.x=(tile%4+(uv.uv.x*.88+.06))/4; uv.uv.y=(tile//4+(uv.uv.y*.88+.06))/2
+    if name.startswith('ArmorPlate_'):
+        for poly in o.data.polygons:
+            role=2 if poly.normal.z<-.25 else 6 if abs(poly.normal.z)<.35 else tile
+            for li in poly.loop_indices:
+                uv=o.data.uv_layers.active.data[li].uv
+                local_u=uv.x*4-(tile%4);local_v=uv.y*2-(tile//4)
+                uv.x=(role%4+local_u)/4;uv.y=(role//4+local_v)/2
+    if name.startswith(('KneeBearing','KneeHub','ShinCylinder','UpperLink','CoolingLouvre')):
+        for poly in o.data.polygons:poly.use_smooth=len(poly.vertices)==4
+    return o
+
+def loft(name,sections,bone,tile,sides=12):
+    # Ring axis Y. Intentional chamfered section planes, closed manifold caps.
+    verts=[]; faces=[]
+    for x,y,z,w,h in sections:
+        for j in range(sides):
+            a=math.tau*j/sides; verts.append((x+w*math.cos(a),y,z+h*math.sin(a)))
+    for i in range(len(sections)-1):
+        for j in range(sides):
+            a=i*sides+j; b=i*sides+(j+1)%sides; faces.append((a,b,b+sides,a+sides))
+    faces+=[tuple(reversed(range(sides))),tuple((len(sections)-1)*sides+j for j in range(sides))]
+    return mesh(name,verts,faces,bone,tile)
+
+def strut(name,a,b,r1,r2,bone,tile,sides=10):
+    a,b=Vector(a),Vector(b); axis=(b-a).normalized(); helper=Vector((0,0,1)) if abs(axis.z)<.95 else Vector((1,0,0)); u=axis.cross(helper).normalized(); v=axis.cross(u)
+    verts=[]
+    for t,r in ((0,r1),(.12,r1*1.05),(.8,r2),(1,r2*.85)):
+        verts += [a.lerp(b,t)+r*(math.cos(j*math.tau/sides)*u+math.sin(j*math.tau/sides)*v) for j in range(sides)]
+    faces=[(i*sides+j,i*sides+(j+1)%sides,(i+1)*sides+(j+1)%sides,(i+1)*sides+j) for i in range(3) for j in range(sides)]
+    faces += [tuple(reversed(range(sides))),tuple(3*sides+j for j in range(sides))]
+    return mesh(name,verts,faces,bone,tile)
+# New independently versioned geometry; skeleton/motion coefficients are byte-identical.
+for part in refined_geometry.build(motion):
+    mesh(part['name'],part['verts'],part['faces'],part['bone'],part['tile'])
+# Fitted posterior cavity: an oval closed rim with a real front wall and bottom.
+# No tall rectangular freight box, open front, exposed rods, or fake hit marker.
+verts,faces=cavity_geometry.bowl_wall(); mesh('ClosedCavityRim',verts,faces,'body',2)
+verts,faces=cavity_geometry.bowl_floor(); mesh('CavityBottom',verts,faces,'body',7)
+for sign in (-1,1):
+    verts,faces=refined_geometry.tube((sign*.48,.63,.86),(sign*.48,.93,.86),.035,.035,12)
+    mesh('DoorHingeShaft_'+str(sign),verts,faces,'body',6)
+
+verts,faces=refined_geometry.core_geometry()
+core=mesh('Core_Renderer',verts,faces,'body',4); core['presentation_part']='core'
+core_closed=bpy.data.materials.new('Core_Closed'); core_closed.use_nodes=True
+core_closed.node_tree.nodes['Principled BSDF'].inputs['Base Color'].default_value=(.27,.095,.027,1)
+core_closed.node_tree.nodes['Principled BSDF'].inputs['Roughness'].default_value=.63
+core_open=core_closed.copy(); core_open.name='Core_Open'
+core_open.node_tree.nodes['Principled BSDF'].inputs['Base Color'].default_value=(.85,.255,.025,1)
+core_open.node_tree.nodes['Principled BSDF'].inputs['Emission Color'].default_value=(.12,.025,.002,1)
+core_open.node_tree.nodes['Principled BSDF'].inputs['Emission Strength'].default_value=1
+core.data.materials.clear(); core.data.materials.append(core_closed)
+plate_objects={}
+for side,sign in motion.SIDES:
+    # Two shallow curved half-shells continue the old overlapping dorsal silhouette.
+    verts,faces=refined_geometry.cover_geometry(sign,cavity_geometry)
+    plate=mesh('ArmorPlate_'+side+'_Renderer',verts,faces,'body',0); plate['presentation_part']='plate'; plate_objects[side]=plate
+rest={k:(motion.HIP[k],motion.knee(motion.HIP[k],motion.FOOT[k],k),motion.FOOT[k]) for k in motion.LEGS}
+# Rigidly weighted armor parts are intentional. No automatic weights or cross-limb leakage.
+bpy.ops.object.armature_add(enter_editmode=True); rig=bpy.context.object; rig.name='Bulwark_Rig'; rig.data.edit_bones.remove(rig.data.edit_bones[0])
+def bone(n,h,t,parent=None):
+    b=rig.data.edit_bones.new(n); b.head=h; b.tail=t
+    if parent:b.parent=rig.data.edit_bones[parent]
+bone('root',(0,0,0),(0,0,.2)); bone('body',(0,0,.69),(0,0,1.0),'root')
+bone('ram',(0,-.79,.66),(0,-1.15,.66),'body')
+for k,(h,n,f) in rest.items():
+    bone('upper.'+k,h,n,'body'); bone('lower.'+k,n,f,'upper.'+k); bone('foot.'+k,f,motion.add(f,(0,-.2,0)),'lower.'+k)
+bpy.ops.object.mode_set(mode='OBJECT')
+body_assets=[o for o in assets if not o.get('presentation_part')]
+for o in body_assets:
+    o.parent=rig; g=o.vertex_groups.new(name=o['bone']); g.add(list(range(len(o.data.vertices))),1,'REPLACE'); mod=o.modifiers.new('Deform','ARMATURE'); mod.object=rig
+# One skinned renderer and one atlas material, not one draw call per armor fragment.
+bpy.ops.object.select_all(action='DESELECT')
+for o in body_assets:o.select_set(True)
+bpy.context.view_layer.objects.active=body_assets[0]; bpy.ops.object.join()
+combined=bpy.context.object; combined.name='Bulwark_Body'; assets=[combined,core]+list(plate_objects.values())
+# Joining same-material objects can retain duplicate material slots; remap deterministically.
+for poly in combined.data.polygons:poly.material_index=0
+while len(combined.data.materials)>1:combined.data.materials.pop(index=len(combined.data.materials)-1)
+sole_indices={k:[] for k in motion.LEGS}
+for k in motion.LEGS:
+    gi=combined.vertex_groups['foot.'+k].index
+    sole_indices[k]=[v.index for v in combined.data.vertices if any(g.group==gi and g.weight>.99 for g in v.groups)]
+# Dedicated unkeyed presentation branch, carrier body bone may move the whole assembly.
+assembly=bpy.data.objects.new('WeakPointAssembly',None); scene.collection.objects.link(assembly)
+assembly.parent=rig; assembly.parent_type='BONE'; assembly.parent_bone='body'; bpy.context.view_layer.update(); assembly.matrix_world=Matrix.Identity(4)
+core.parent=assembly; core.matrix_world=Matrix.Identity(4)
+pivots={}
+for side,sign in motion.SIDES:
+    pivot=bpy.data.objects.new('ArmorPlate_'+side+'_Pivot',None); scene.collection.objects.link(pivot); pivot.parent=assembly; pivot.location=(sign*.48,.78,.86)
+    pivot.rotation_mode='XYZ'; plate=plate_objects[side]; plate.parent=pivot
+    plate.matrix_parent_inverse=Matrix.Identity(4); plate.location=-pivot.location
+    pivots[side]=pivot
+presentation_nodes=[assembly]+list(pivots.values())
+def set_presentation(exposed):
+    # Review-only emulation of WeakPointExposed. Never insert animation keys here.
+    core.data.materials[0]=core_open if exposed else core_closed
+    for side,sign in motion.SIDES:pivots[side].rotation_euler=(0,sign*P['gate_open_radians'] if exposed else 0,0)
+    bpy.context.view_layer.update()
+set_presentation(False)
+for pb in rig.pose.bones: pb.rotation_mode='QUATERNION'
+rest_matrices={b.name:b.matrix_local.copy() for b in rig.data.bones}
+def translate(z): return Matrix.Translation((0,0,z))
+def apply_pose(pose):
+    rig.pose.bones['root'].matrix=rest_matrices['root']; z=pose['z']
+    rig.pose.bones['body'].matrix=translate(z)@rest_matrices['body']; bpy.context.view_layer.update()
+    for name,angle,axis in [('ram',pose['ram'],'X')]:
+        pivot=rest_matrices[name].translation
+        rig.pose.bones[name].matrix=translate(z)@Matrix.Translation(pivot)@Matrix.Rotation(angle,4,axis)@Matrix.Translation(-pivot)@rest_matrices[name]
+    for k in motion.LEGS:
+        h=Vector(motion.add(motion.HIP[k],(0,0,z))); f=Vector(pose['feet'][k]); n=Vector(motion.knee(h,f,k,minimum_z=pose.get('knee_clearance')))
+        for name,a,b in [('upper.'+k,h,n),('lower.'+k,n,f)]:
+            # Preserve rest roll: shortest rotation from original limb axis.
+            rest_axis=rig.data.bones[name].tail_local-rig.data.bones[name].head_local
+            rot=rest_axis.rotation_difference(b-a).to_matrix().to_4x4()
+            rig.pose.bones[name].matrix=Matrix.Translation(a)@rot@rest_matrices[name].to_3x3().to_4x4()
+            bpy.context.view_layer.update()
+        m=rest_matrices['foot.'+k].copy(); m.translation=f; rig.pose.bones['foot.'+k].matrix=m
+    bpy.context.view_layer.update()
+exec(compile((HERE/'binding_contract.py').read_text(),str(HERE/'binding_contract.py'),'exec'))
+# Neutral studio only. No private source image enters any generated output.
+scene.render.engine='CYCLES'; scene.cycles.samples=24; scene.cycles.use_denoising=True; scene.view_settings.view_transform='AgX'; scene.world.color=(.18,.18,.18)
+scene.render.resolution_x=960; scene.render.resolution_y=540; scene.render.resolution_percentage=100
+bpy.ops.mesh.primitive_plane_add(size=200); floor=bpy.context.object; floor.name='REVIEW_ONLY_floor'
+fmat=bpy.data.materials.new('REVIEW_ONLY_neutral'); fmat.diffuse_color=(.17,.16,.14,1); floor.data.materials.append(fmat)
+for loc,power,size in [((-3,-4,5),750,4),((4,-1,3),350,4),((0,4,5),650,3)]:
+    bpy.ops.object.light_add(type='AREA',location=loc); l=bpy.context.object; l.data.energy=power; l.data.shape='DISK'; l.data.size=size; l.rotation_euler=(Vector((0,0,.5))-l.location).to_track_quat('-Z','Y').to_euler()
+bpy.ops.object.camera_add(); cam=bpy.context.object; cam.data.type='ORTHO'; cam.data.ortho_scale=4.8; scene.camera=cam
+from bpy_extras.object_utils import world_to_camera_view
+review=OUT/'review'; review.mkdir(exist_ok=True)
+def camera(angle,center=(0,-.1,.55)):
+    target=Vector(center); cam.location=target+Vector((4*math.sin(angle),-4*math.cos(angle),2.6)); cam.rotation_euler=(target-cam.location).to_track_quat('-Z','Y').to_euler(); bpy.context.view_layer.update()
+def bounds():
+    deps=bpy.context.evaluated_depsgraph_get(); verts=[]; lowest=None
+    for obj in assets:
+        ob=obj.evaluated_get(deps); me=ob.to_mesh()
+        for v in me.vertices:
+            co=ob.matrix_world@v.co; verts.append(co)
+            if lowest is None or co.z<lowest['world_z']:
+                original=obj.data.vertices[v.index]; groups=sorted(original.groups,key=lambda g:g.weight,reverse=True)
+                part=me.attributes.get('source_part_id'); local=me.attributes.get('source_vertex_id')
+                lowest={'mesh':obj.name,'source_part':source_parts[part.data[v.index].value] if part else obj.name,'source_vertex':local.data[v.index].value if local else v.index,'mesh_vertex':v.index,'bone':obj.vertex_groups[groups[0].group].name if groups else None,'world_z':co.z,'world_position':list(co)}
+        ob.to_mesh_clear()
+    return verts,lowest
+def validate_frame(label,require_full_body=True):
+    vs,lowest=bounds(); min_z=min(v.z for v in vs); clip=[world_to_camera_view(scene,cam,v) for v in vs]
+    errors=[]
+    if min_z< -P['floor_penetration_limit_m']: errors.append('floor penetration')
+    body_clipped=any(v.z<=0 or min(v.x,v.y)<.035 or max(v.x,v.y)>.965 for v in clip)
+    if require_full_body and body_clipped: errors.append('camera clipping')
+    return {'lowest_vertex':lowest,'errors':errors,'whole_body_clipped_diagnostic':body_clipped,'whole_body_required':require_full_body,'label':label,'min_z':min_z,'screen_min':[min(v.x for v in clip),min(v.y for v in clip)],'screen_max':[max(v.x for v in clip),max(v.y for v in clip)]}
+def still(path):
+    scene.render.image_settings.file_format='PNG'; scene.render.filepath=str(path); bpy.ops.render.render(write_still=True)
+apply_pose(motion.sample('Idle',0)); camera(0)
+if args.phase=='static':
+    # Early views complete without creating/rendering animation.
+    checks=[]
+    for i in range(8):
+        camera(math.tau*i/8); checks.append(validate_frame('static-'+str(i))); still(review/f'static-{i:02}.png')
+    apply_pose(motion.sample('Recover',0)); set_presentation(True); camera(math.pi*.68); checks.append(validate_frame('open-weakpoint')); still(review/'static-weakpoint-open.png')
+    bpy.ops.wm.save_as_mainfile(filepath=str(OUT/'bulwark-static-review.blend'))
+    exec(compile((HERE/'fps_evidence.py').read_text(),str(HERE/'fps_evidence.py'),'exec'))
+    (OUT/'static-checks.json').write_text(json.dumps(checks,indent=2)); sys.exit(1 if any(c['errors'] for c in checks) else 0)
+exec(compile((HERE/'animate.py').read_text(),str(HERE/'animate.py'),'exec'))
