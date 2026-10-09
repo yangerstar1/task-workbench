@@ -14,7 +14,6 @@ namespace DesertRV.Tests
 {
     // Native EditMode fixture source, not a claim of native execution or imported-asset acceptance.
     // Runtime types deliberately use reflection: the candidate-art/EditMode asmdefs have no Assembly-CSharp reference.
-    [NonParallelizable]
     public sealed class ArmoredFootContactConstraintTests
     {
         const float MeasuredMinimum = -.0415903f;
