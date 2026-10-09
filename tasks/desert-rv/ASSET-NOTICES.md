@@ -31,3 +31,5 @@ New scenery resources in `unity/Assets/DesertRV/Art/EnvironmentV4` are CC0 1.0. 
 - Kenney Factory Kit 3.0: https://kenney.nl/assets/factory-kit ; CC0 1.0. Seven original FBX files and the original atlas. The archive's original license is preserved at `EnvironmentV4/Factory/LICENSE.txt`.
 
 `EnvironmentV4/asset-provenance.json` records every copied asset hash and the exact roughness-to-URP mask derivation. `art/environment-v4/upstream-download-evidence.json` retains verified original download identities, and `license-evidence.json` the license-page verification. No web preview image, Quaternius QAL resource, paywalled model, or unverified candidate is included.
+
+Environment V4 R2 adds self-authored metric ground/vertex-opacity shader and procedural pump/yard geometry. No new third-party assets are introduced; the 29 CC0 binary asset files and their recorded source hashes are unchanged. See art/environment-v4/REVISION-R2.md.

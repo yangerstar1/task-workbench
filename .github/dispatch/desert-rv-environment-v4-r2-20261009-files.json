@@ -1,0 +1,128 @@
+{
+  "schema": 1,
+  "requestId": "desert-rv-environment-v4-r2-20261009-once-b871ce26",
+  "baseCommit": "10d52332b0808017a3f7d39e6920d008b113ba6f",
+  "candidateManifestSha256": "74e0f061bb5e3b716245e984f37c0ac6800768736bd2f180a999cf9f49dd3c6c",
+  "files": [
+    {
+      "path": ".github/workflows/desert-rv-environment-v4-r2.yml",
+      "sha256": "886ef6b433bdaf8e8aba3b426641ac8182c84c57655a6b42b25ac4e5e0d4c1bd",
+      "size": 6780,
+      "mode": "100644"
+    },
+    {
+      "path": "tasks/desert-rv/ASSET-NOTICES.md",
+      "sha256": "ebb7c0e61fa256e855b88afb1ac9b3900b38cffb1461da07c63043f16cb4fba6",
+      "size": 3231,
+      "mode": "100644"
+    },
+    {
+      "path": "tasks/desert-rv/art/environment-v4/REVISION-R2.md",
+      "sha256": "354aaf50a7a9b79dc6e065329c909ed5d2a20b3e2219a6061296c846a98f2c32",
+      "size": 4746,
+      "mode": "100644"
+    },
+    {
+      "path": "tasks/desert-rv/art/environment-v4/candidate-r2-file-manifest.json",
+      "sha256": "74e0f061bb5e3b716245e984f37c0ac6800768736bd2f180a999cf9f49dd3c6c",
+      "size": 4173,
+      "mode": "100644"
+    },
+    {
+      "path": "tasks/desert-rv/art/environment-v4/generated-contract.json",
+      "sha256": "9dfb996cd20ef0b4e3b956e991286d245a1bb836dab151e21f2d8fc925c2bf9f",
+      "size": 23399,
+      "mode": "100644"
+    },
+    {
+      "path": "tasks/desert-rv/art/environment-v4/make_contract.py",
+      "sha256": "8fd2716777951819112d2c23fe50036040e0b49cd6faa9516f4cc1dce550e2b2",
+      "size": 3987,
+      "mode": "100644"
+    },
+    {
+      "path": "tasks/desert-rv/art/environment-v4/test_candidate.py",
+      "sha256": "195234d835d4c6efeda5240878b8bbba519e6c807df07a080d7f7459744d2431",
+      "size": 9239,
+      "mode": "100644"
+    },
+    {
+      "path": "tasks/desert-rv/scripts/environment_v4_evidence.py",
+      "sha256": "7f8bd56d466260bbf57653a76f3845deea81d9f96d03a093366376dcfeba6548",
+      "size": 11777,
+      "mode": "100644"
+    },
+    {
+      "path": "tasks/desert-rv/scripts/environment_v4_r2_dispatch.py",
+      "sha256": "8a8b926e249941a80f3aa846ecffea065ec5af18f42601c94f8443568391c4ec",
+      "size": 7921,
+      "mode": "100644"
+    },
+    {
+      "path": "tasks/desert-rv/scripts/prepare_runner.sh",
+      "sha256": "1fa8eba3b76329608c3de8c4cabbcc3d235b92ac04961b8531a305570a9fbf26",
+      "size": 1728,
+      "mode": "100644"
+    },
+    {
+      "path": "tasks/desert-rv/scripts/test_environment_v4_r2_dispatch.py",
+      "sha256": "c69e1600eab9de8a45a151a8186884acac0d1c4615e4164ef1c9a10f1044a3a7",
+      "size": 15466,
+      "mode": "100644"
+    },
+    {
+      "path": "tasks/desert-rv/scripts/test_environment_v4_r2_runner_prefix.py",
+      "sha256": "66146475e86ad2d82ea5cf12d1be53ac62bb7501290845e61e31b6757fc6d86c",
+      "size": 3064,
+      "mode": "100644"
+    },
+    {
+      "path": "tasks/desert-rv/scripts/verify_evidence.py",
+      "sha256": "460d9ac89d24dc7e110cfb809e8b84837f90223268c70297e43b4d204765cb22",
+      "size": 17373,
+      "mode": "100644"
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/EnvironmentV4/EnvironmentSurface.shader",
+      "sha256": "b72d11cd28dfac29a1dd19481c5d22bf2aaa81a943819ca35c44bf0d17e905a9",
+      "size": 3507,
+      "mode": "100644"
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/EnvironmentV4/EnvironmentSurface.shader.meta",
+      "sha256": "8f8a438c8eda359aa28a07ea6a42683cdb177c93f30529ce4a86c7b872c45f5c",
+      "size": 230,
+      "mode": "100644"
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/EnvironmentV4/aerial_sand_diff_1k.jpg.meta",
+      "sha256": "504c5e4693c3d3a3fd4dbc547c431ffb6853ea28e01cf08a1e7f8034913d9e41",
+      "size": 3009,
+      "mode": "100644"
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/EnvironmentV4/sand_03_diff_1k.jpg.meta",
+      "sha256": "b431c73161ddea5ed3c29621496680f6ccd1e4e599599d89be703815c6cd3a14",
+      "size": 3009,
+      "mode": "100644"
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Editor/JourneySceneAuthoring.EnvironmentPolish.cs",
+      "sha256": "9bf7f3f4bc939baa5298e207c9f9297c18d72208048e3a7c1ae6b01ee7274272",
+      "size": 57007,
+      "mode": "100644"
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Editor/JourneySceneAuthoring.cs",
+      "sha256": "ced4da08b8447265c14a26b5b63503bb4a08861e5bc5536d1921a4c7e880ee49",
+      "size": 66434,
+      "mode": "100644"
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Tests/EditorRender/JourneyEnvironmentRenderTests.cs",
+      "sha256": "70eae4ea3cecd22bbe81308492b274dd6b423381b3d1152d0b24176be11689d7",
+      "size": 2407,
+      "mode": "100644"
+    }
+  ]
+}

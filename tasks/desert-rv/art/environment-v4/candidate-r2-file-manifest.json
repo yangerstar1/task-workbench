@@ -1,0 +1,99 @@
+{
+  "schema": 1,
+  "base_commit": "a9bb99ff9dec15d2b44ee914239f8b70393e287a",
+  "status": "SOURCE_REVISION_PENDING_NATIVE_AND_VISUAL_REVIEW",
+  "binary_payloads_unchanged": 29,
+  "files": [
+    {
+      "path": "tasks/desert-rv/ASSET-NOTICES.md",
+      "change": "modified",
+      "bytes": 3231,
+      "sha256": "ebb7c0e61fa256e855b88afb1ac9b3900b38cffb1461da07c63043f16cb4fba6",
+      "before_sha256": "8fa1abb8dd8ee042128cdf58dd4aba6a3eefa47acf00312aa497f359bb67fdf3"
+    },
+    {
+      "path": "tasks/desert-rv/art/environment-v4/REVISION-R2.md",
+      "change": "added",
+      "bytes": 4746,
+      "sha256": "354aaf50a7a9b79dc6e065329c909ed5d2a20b3e2219a6061296c846a98f2c32",
+      "before_sha256": null
+    },
+    {
+      "path": "tasks/desert-rv/art/environment-v4/generated-contract.json",
+      "change": "modified",
+      "bytes": 23399,
+      "sha256": "9dfb996cd20ef0b4e3b956e991286d245a1bb836dab151e21f2d8fc925c2bf9f",
+      "before_sha256": "bf3f7cb99e77c37b5a2788342d6aed756b6d420d25bc833b494958d74c7205f6"
+    },
+    {
+      "path": "tasks/desert-rv/art/environment-v4/make_contract.py",
+      "change": "modified",
+      "bytes": 3987,
+      "sha256": "8fd2716777951819112d2c23fe50036040e0b49cd6faa9516f4cc1dce550e2b2",
+      "before_sha256": "6695191b25e211eae291b9d9fd53d4fec68fba70cc1144691ef1ee1222199afe"
+    },
+    {
+      "path": "tasks/desert-rv/art/environment-v4/test_candidate.py",
+      "change": "modified",
+      "bytes": 9239,
+      "sha256": "195234d835d4c6efeda5240878b8bbba519e6c807df07a080d7f7459744d2431",
+      "before_sha256": "f1d29b0558cf862817802dd12812cb0075ba68dfd16d61af2b8f341efc0e6fc8"
+    },
+    {
+      "path": "tasks/desert-rv/scripts/environment_v4_evidence.py",
+      "change": "modified",
+      "bytes": 11777,
+      "sha256": "7f8bd56d466260bbf57653a76f3845deea81d9f96d03a093366376dcfeba6548",
+      "before_sha256": "1f87ef6e761d3216f32d5cc26ecfe78dd1444b901119364f5a4cddf932621dd9"
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/EnvironmentV4/EnvironmentSurface.shader",
+      "change": "added",
+      "bytes": 3507,
+      "sha256": "b72d11cd28dfac29a1dd19481c5d22bf2aaa81a943819ca35c44bf0d17e905a9",
+      "before_sha256": null
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/EnvironmentV4/EnvironmentSurface.shader.meta",
+      "change": "added",
+      "bytes": 230,
+      "sha256": "8f8a438c8eda359aa28a07ea6a42683cdb177c93f30529ce4a86c7b872c45f5c",
+      "before_sha256": null
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/EnvironmentV4/aerial_sand_diff_1k.jpg.meta",
+      "change": "modified",
+      "bytes": 3009,
+      "sha256": "504c5e4693c3d3a3fd4dbc547c431ffb6853ea28e01cf08a1e7f8034913d9e41",
+      "before_sha256": "137dbba7755ea547df8576fa1d49d7de161f28e90dec6c042776533d9c525f99"
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/EnvironmentV4/sand_03_diff_1k.jpg.meta",
+      "change": "modified",
+      "bytes": 3009,
+      "sha256": "b431c73161ddea5ed3c29621496680f6ccd1e4e599599d89be703815c6cd3a14",
+      "before_sha256": "4f002c7945cbd5ce1bbcc67ef9cc6aaacbb20560169fbb92f08fc92edf041bcf"
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Editor/JourneySceneAuthoring.EnvironmentPolish.cs",
+      "change": "modified",
+      "bytes": 57007,
+      "sha256": "9bf7f3f4bc939baa5298e207c9f9297c18d72208048e3a7c1ae6b01ee7274272",
+      "before_sha256": "85be3ae4f073b9bb36c86cd1c8bed021e2a9c163aab7ebe300cd42d0599e63ff"
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Editor/JourneySceneAuthoring.cs",
+      "change": "modified",
+      "bytes": 66434,
+      "sha256": "ced4da08b8447265c14a26b5b63503bb4a08861e5bc5536d1921a4c7e880ee49",
+      "before_sha256": "ea031595cb47287eeac3b727579609769247178c48728a2ac9b0a94c2350242a"
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Tests/EditorRender/JourneyEnvironmentRenderTests.cs",
+      "change": "modified",
+      "bytes": 2407,
+      "sha256": "70eae4ea3cecd22bbe81308492b274dd6b423381b3d1152d0b24176be11689d7",
+      "before_sha256": "a6e415fc5d08d3499bc1d528e3a2c830b9c32aa54bb83db7391dae72142ea28e"
+    }
+  ]
+}

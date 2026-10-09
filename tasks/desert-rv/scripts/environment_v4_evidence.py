@@ -26,15 +26,15 @@ def load_contract():
     contract = source.read_json(CONTRACT)
     require(contract.get('schema') == 1 and contract.get('generated_folder') == POLISH, 'Wrong V4 generated contract')
     files, metas = contract.get('files'), contract.get('metadata_files')
-    require(isinstance(files,list) and isinstance(metas,list) and len(files)==97 and len(metas)==98, 'Wrong exact V4 file counts')
+    require(isinstance(files,list) and isinstance(metas,list) and len(files)==121 and len(metas)==122, 'Wrong exact V4 file counts')
     require(len(set(files))==len(files) and len(set(metas))==len(metas), 'Duplicate V4 contract path')
     require(set(metas)=={p+'.meta' for p in files}|{POLISH+'.meta'}, 'V4 metadata contract differs')
     for name in files+metas:
         require(isinstance(name,str) and '*' not in name and '..' not in Path(name).parts and '\\' not in name and
                 (name==POLISH+'.meta' or name.startswith(POLISH+'/') and len(Path(name).parts)==len(Path(POLISH).parts)+1), 'Unsafe V4 contract path')
     keys=contract.get('region_mesh_keys');materials=contract.get('material_names')
-    require(isinstance(keys,dict) and set(keys)=={'1','2','3'} and isinstance(materials,list) and len(materials)==14 and len(set(materials))==14, 'Wrong V4 region/material contract')
-    require({r:len(keys[r]) for r in keys}=={'1':35,'2':25,'3':23}, 'Wrong V4 mesh count')
+    require(isinstance(keys,dict) and set(keys)=={'1','2','3'} and isinstance(materials,list) and len(materials)==16 and len(set(materials))==16, 'Wrong V4 region/material contract')
+    require({r:len(keys[r]) for r in keys}=={'1':37,'2':45,'3':23}, 'Wrong V4 mesh count')
     exact={POLISH+'/Surface-'+mat+'.mat' for mat in materials}
     exact|={POLISH+'/R'+r+'-'+key+'.asset' for r in keys for key in keys[r]}
     require(set(files)==exact, 'V4 files differ from finite mesh/material membership')
@@ -45,7 +45,7 @@ def collect_generated(project, contract):
     folder=project/legacy.GENERATED
     source.safe(Path(str(folder)+'.meta'))
     files=[p for p in folder.rglob('*') if p.is_file()]+[Path(str(folder)+'.meta')]
-    require(195<len(files)<400,'Invalid bounded V4 generated count')
+    require(243<len(files)<400,'Invalid bounded V4 generated count')
     names={p.relative_to(project).as_posix() for p in files}
     expected=set(contract['files'])|set(contract['metadata_files'])
     actual={n for n in names if n==POLISH+'.meta' or n.startswith(POLISH+'/')}

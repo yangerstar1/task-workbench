@@ -17,16 +17,16 @@ namespace DesertRV.Editor
         internal const string PolishSource = "Assets/DesertRV/Art/EnvironmentV4";
         internal const string PolishGenerated = Folder + "/EnvironmentV4";
         static readonly Dictionary<string, Material> polishMaterials = new Dictionary<string, Material>();
-        static readonly string[] polishMaterialNames = { "Sand", "TrackSand", "Sheet", "Asphalt", "Concrete", "Plaster", "Oxide", "Steel", "Ivory", "Ochre", "Rubber", "Oil", "Lamp", "Factory" };
+        static readonly string[] polishMaterialNames = { "Sand", "Dune", "Dust", "TrackSand", "Sheet", "Asphalt", "Concrete", "Plaster", "Oxide", "Steel", "Ivory", "Ochre", "Rubber", "Oil", "Lamp", "Factory" };
 
         // ENVIRONMENT_V4_CONTRACT_BEGIN
         static string[] PolishExpectedMeshNames(int region)
         {
             switch(region)
             {
-                case 1: return new[]{"CanopyBase-Concrete","CanopyUpper-Ivory","CanopyUpper-Lamp","CanopyUpper-Oxide","CanopyUpper-Steel","Forecourt-Concrete","ForecourtDrain-Steel","ForecourtDust-Sand","ForecourtWear-Oil","Ground-Sand","GroundWear-Oil","PullOff-TrackSand","PumpDetails-Ochre","PumpDetails-Steel","ReliefEast-Sand","ReliefWest-Sand","Road-Asphalt","Shoulder-Sand","StationBack-Concrete","StationBack-Ivory","StationBack-Oxide","StationBack-Steel","StationFascia-Oxide","StationFuel-Concrete","StationFuel-Ivory","StationFuel-Oxide","StationFuel-Steel","StationRoof-Ivory","StationRoof-Rubber","StationRoof-Steel","StationRoofBase-Concrete","StationServiceBase-Concrete","StationWallLeft-Plaster","StationWallRear-Plaster","StationWallRight-Plaster"};
-                case 2: return new[]{"Container0-Sheet","Container1-Sheet","Container2-Sheet","Ground-Sand","GroundWear-Oil","PullOff-TrackSand","ReliefEast-Sand","ReliefWest-Sand","Road-Asphalt","ScrapStacks-Oxide","ScrapStacks-Steel","Shoulder-Sand","YardGroundEast-Concrete","YardGroundWest-Concrete","YardPipeStore-Oxide","YardPipeStore-Steel","YardRearEast-Concrete","YardRearEast-Ivory","YardRearEast-Steel","YardRearWest-Concrete","YardRearWest-Oxide","YardRearWest-Steel","YardWorkshop-Lamp","YardWorkshop-Sheet","YardWorkshop-Steel"};
-                case 3: return new[]{"BeaconGroundEast-Concrete","BeaconGroundWest-Concrete","Ground-Sand","GroundWear-Oil","PullOff-TrackSand","RelayBatteries-Ivory","RelayBatteries-Steel","RelayCanopy-Lamp","RelayCanopy-Sheet","RelayCanopy-Steel","RelayHouse-Concrete","RelayHouse-Ivory","RelayHouse-Steel","ReliefEast-Sand","ReliefWest-Sand","Road-Asphalt","Shoulder-Sand","TowerFixtures-Lamp","TowerFixtures-Steel","TowerLadder-Ivory","TowerLadder-Steel","TowerUpper-Ivory","TowerUpper-Steel"};
+                case 1: return new[]{"CanopyBase-Concrete","CanopyUpper-Ivory","CanopyUpper-Lamp","CanopyUpper-Oxide","CanopyUpper-Steel","Forecourt-Concrete","ForecourtDrain-Steel","ForecourtDust-Dust","ForecourtWear-Oil","Ground-Sand","GroundWear-Oil","PullOff-TrackSand","PumpDetails-Ivory","PumpDetails-Ochre","PumpDetails-Rubber","PumpDetails-Steel","ReliefEast-Dune","ReliefWest-Dune","Road-Asphalt","Shoulder-Dust","StationBack-Concrete","StationBack-Ivory","StationBack-Oxide","StationBack-Steel","StationFascia-Oxide","StationFuel-Concrete","StationFuel-Ivory","StationFuel-Oxide","StationFuel-Steel","StationRoof-Ivory","StationRoof-Rubber","StationRoof-Steel","StationRoofBase-Concrete","StationServiceBase-Concrete","StationWallLeft-Plaster","StationWallRear-Plaster","StationWallRight-Plaster"};
+                case 2: return new[]{"Container0-Sheet","Container0Trim-Ivory","Container0Trim-Oxide","Container0Trim-Steel","Container1-Sheet","Container1Trim-Ivory","Container1Trim-Oxide","Container1Trim-Steel","Container2-Sheet","Container2Trim-Ivory","Container2Trim-Oxide","Container2Trim-Steel","Ground-Sand","GroundWear-Oil","PullOff-TrackSand","ReliefEast-Dune","ReliefWest-Dune","Road-Asphalt","ScrapStacks-Oxide","ScrapStacks-Steel","Shoulder-Dust","YardBays-Concrete","YardBays-Steel","YardConveyor-Oxide","YardConveyor-Rubber","YardConveyor-Steel","YardEdge-Dust","YardGroundEast-Concrete","YardGroundWest-Concrete","YardHeaps-Oxide","YardHeaps-Steel","YardPipeStore-Oxide","YardPipeStore-Steel","YardPress-Ivory","YardPress-Oxide","YardPress-Steel","YardRearEast-Concrete","YardRearEast-Ivory","YardRearEast-Steel","YardRearWest-Concrete","YardRearWest-Oxide","YardRearWest-Steel","YardWorkshop-Lamp","YardWorkshop-Sheet","YardWorkshop-Steel"};
+                case 3: return new[]{"BeaconGroundEast-Concrete","BeaconGroundWest-Concrete","Ground-Sand","GroundWear-Oil","PullOff-TrackSand","RelayBatteries-Ivory","RelayBatteries-Steel","RelayCanopy-Lamp","RelayCanopy-Sheet","RelayCanopy-Steel","RelayHouse-Concrete","RelayHouse-Ivory","RelayHouse-Steel","ReliefEast-Dune","ReliefWest-Dune","Road-Asphalt","Shoulder-Dust","TowerFixtures-Lamp","TowerFixtures-Steel","TowerLadder-Ivory","TowerLadder-Steel","TowerUpper-Ivory","TowerUpper-Steel"};
                 default: throw new ArgumentOutOfRangeException(nameof(region));
             }
         }
@@ -53,14 +53,15 @@ namespace DesertRV.Editor
             var m = AssetDatabase.LoadAssetAtPath<Material>(path);
             if (!m)
             {
-                var shader = Shader.Find("Universal Render Pipeline/Lit");
-                if (!shader || !shader.isSupported) throw new InvalidOperationException("EnvironmentV4 requires supported URP Lit.");
+                bool groundSurface = kind == "Sand" || kind == "Dune" || kind == "Dust" || kind == "Oil" || kind == "TrackSand";
+                var shader = Shader.Find(groundSurface ? "DesertRV/EnvironmentSurface" : "Universal Render Pipeline/Lit");
+                if (!shader || !shader.isSupported || ShaderUtil.ShaderHasError(shader)) throw new InvalidOperationException("EnvironmentV4 requires supported URP Lit.");
                 m = new Material(shader) { name = "EnvironmentV4 " + kind, enableInstancing = true };
                 string tile = null; Color tint = Color.white; float smooth = .19f, metal = 0, normal = .35f;
                 switch (kind)
                 {
-                    case "Sand": tile = "sand_03"; tint = new Color(1.75f, 1.52f, 1.16f); normal = .19f; break;
-                    case "TrackSand": tile = "aerial_sand"; tint = new Color(1.18f, 1.08f, .91f); normal = .27f; break;
+                    case "Sand": case "Dune": case "Dust": tile = "sand_03"; tint = new Color(1.75f, 1.52f, 1.16f); normal = 0; break;
+                    case "TrackSand": tile = "aerial_sand"; tint = new Color(.96f, .82f, .64f, .26f); normal = 0; break;
                     case "Sheet": tile = "corrugated_iron_03"; tint = new Color(.90f, .88f, .80f); normal = .22f; break;
                     case "Asphalt": tile = "asphalt_02"; tint = new Color(.76f, .77f, .76f); normal = .3f; break;
                     case "Concrete": tile = "concrete_floor_worn_001"; tint = new Color(1.42f, 1.36f, 1.20f); normal = .3f; break;
@@ -70,18 +71,31 @@ namespace DesertRV.Editor
                     case "Ivory": tile = "rusty_metal_02"; tint = new Color(.78f, .75f, .65f); normal = .19f; break;
                     case "Ochre": tile = "rusty_metal_02"; tint = new Color(.91f, .57f, .16f); normal = .19f; break;
                     case "Rubber": tint = new Color(.07f, .082f, .08f); smooth = .12f; break;
-                    case "Oil": tint = new Color(.20f, .17f, .115f); smooth = .12f; break;
+                    case "Oil": tint = new Color(.19f, .17f, .13f, .23f); smooth = .025f; break;
                     case "Lamp": tint = new Color(1, .72f, .37f); smooth = .36f; break;
                     case "Factory": tint = new Color(.75f, .70f, .60f); smooth = .21f; metal = .25f; break;
                 }
-                m.SetColor("_BaseColor", tint); m.SetFloat("_Smoothness", smooth); m.SetFloat("_Metallic", metal);
+                if (kind == "Dust") tint.a = .7f;
+                m.SetColor("_BaseColor", tint);
+                if (!groundSurface) { m.SetFloat("_Smoothness", smooth); m.SetFloat("_Metallic", metal); }
                 if (tile != null)
                 {
                     m.SetTexture("_BaseMap", RequiredPolishTexture(tile + "_diff_1k.jpg"));
+                    if (!groundSurface) {
                     m.SetTexture("_BumpMap", RequiredPolishTexture(tile + "_nor_gl_1k.jpg"));
                     m.SetTexture("_MetallicGlossMap", RequiredPolishTexture(tile + "_metallic_smoothness_1k.png"));
                     m.SetFloat("_BumpScale", normal); m.SetFloat("_Smoothness", .70f);
-                    m.EnableKeyword("_NORMALMAP"); m.EnableKeyword("_METALLICSPECGLOSSMAP");
+                    m.EnableKeyword("_NORMALMAP"); m.EnableKeyword("_METALLICSPECGLOSSMAP"); }
+                }
+                if (groundSurface)
+                {
+                    m.SetFloat("_DetailContrast", kind == "Dune" ? .08f : kind == "TrackSand" ? .5f : .65f);
+                    m.SetFloat("_DetailStart", kind == "Dune" ? 12 : 24); m.SetFloat("_DetailEnd", kind == "Dune" ? 40 : 80);
+                    bool overlay = kind == "Oil" || kind == "Dust" || kind == "TrackSand";
+                    m.SetFloat("_SrcBlend", (float)(overlay ? BlendMode.SrcAlpha : BlendMode.One));
+                    m.SetFloat("_DstBlend", (float)(overlay ? BlendMode.OneMinusSrcAlpha : BlendMode.Zero));
+                    m.SetFloat("_ZWrite", overlay ? 0 : 1); m.renderQueue = overlay ? 2501 : 2000;
+                    m.SetOverrideTag("RenderType", overlay ? "Transparent" : "Opaque");
                 }
                 if (kind == "Factory") m.SetTexture("_BaseMap", RequiredPolishTexture("Factory/colormap.png"));
                 if (kind == "Lamp") { m.EnableKeyword("_EMISSION"); m.SetColor("_EmissionColor", new Color(2.8f, 1.6f, .55f)); }
@@ -95,7 +109,7 @@ namespace DesertRV.Editor
             if (!t) throw new InvalidOperationException("Verified EnvironmentV4 texture missing: " + name);
             return t;
         }
-        static float TextureMetres(string material) => material == "TrackSand" ? 15 : material == "Sand" || material == "Plaster" || material == "Sheet" ? 2 : material == "Asphalt" || material == "Concrete" ? 3 : 1;
+        static float TextureMetres(string material) => material == "TrackSand" ? 15 : material == "Sand" || material == "Dune" || material == "Dust" || material == "Plaster" || material == "Sheet" ? 2 : material == "Asphalt" || material == "Concrete" ? 3 : 1;
 
         static void RefineGround(PolishAuthor p, RegionBinding b)
         {
@@ -104,6 +118,7 @@ namespace DesertRV.Editor
             foreach (var r in b.GetComponentsInChildren<Renderer>(true))
             {
                 string n = r.name;
+                if (n.StartsWith("GEO-floor_oil_stain", StringComparison.Ordinal)) r.enabled = false;
                 if (n == "Road surface" || n == "Far road continuation" || n == "Road behind arrival" || n.StartsWith("Road shoulder patch ") || n.StartsWith("Roadside sand lobe ")) r.enabled = false;
             }
             // Geometric edges vary; the playable road core stays completely clear and flat.
@@ -115,27 +130,18 @@ namespace DesertRV.Editor
                 float r0 = 4.03f + .10f * Mathf.Cos(n * 1.37f), r1 = 4.03f + .10f * Mathf.Cos((n + 1) * 1.37f);
                 p.Quad("Road", "Asphalt", new Vector3(l0,.038f,z0),new Vector3(l1,.038f,z1),new Vector3(r1,.038f,z1),new Vector3(r0,.038f,z0));
             }
-            // Shallow sand ingress in broken ribbons, not repeated oval blobs. No raised driving obstacles.
-            foreach (float side in new[] { -1f, 1f })
-                for (int i = 0; i < 26; i++)
-                {
-                    float z = -14 + i * 3.6f;
-                    float x = side * (4.05f + .05f * Mathf.Sin(i * 2.1f));
-                    float ingress = .09f + (i % 5) * .035f;
-                    var a = new Vector3(x, .043f, z); var c = new Vector3(x + side * (.48f + i % 3 * .10f), .008f, z + 3.5f);
-                    var inner = new Vector3(x - side * ingress, .045f, z + 1.5f); var outer = new Vector3(c.x, .008f, z);
-                    if (side > 0) p.Quad("Shoulder", "Sand", a, inner, c, outer);
-                    else p.Quad("Shoulder", "Sand", outer, c, inner, a);
-                }
+            // Continuous smoothly varying shoulder band, with zero opacity at both outer edges.
+            // The opaque original driving surface and every collider remain unchanged.
+            foreach (float side in new[] { -1f, 1f }) p.RoadsideBlend(side,-18,84);
             // Low ground relief provides a layered horizon; every berm starts outside x +/- 25 m.
             // Collision is the authored triangle surface, not a cube approximation or decoration blocker.
             foreach (float side in new[] { -1f, 1f })
             {
                 string group = side < 0 ? "ReliefWest" : "ReliefEast";
                 for (int i = 0; i < 4; i++)
-                    p.Berm(group, "Sand", new Vector3(side * (39 + i % 2 * 7), -.047f, 10 + i * 32), new Vector2(13 + i * 2, 25), 1.15f + i % 3 * .48f, i + b.region * 7, true);
+                    p.Berm(group, "Dune", new Vector3(side * (39 + i % 2 * 7), -.047f, 10 + i * 32), new Vector2(13 + i * 2, 25), 1.15f + i % 3 * .48f, i + b.region * 7, true);
                 for (int i = 0; i < 3; i++)
-                    p.Berm(group, "Sand", new Vector3(side * (83 + i * 6), -.05f, 54 + i * 65), new Vector2(28, 47), 5.5f + i * 2.1f, i + 33, true);
+                    p.Berm(group, "Dune", new Vector3(side * (83 + i * 6), -.05f, 54 + i * 65), new Vector2(28, 47), 5.5f + i * 2.1f, i + 33, true);
             }
             // Aerial capture contains tire marks; confine it to realistic pull-off strips, never the empty desert.
             foreach(float side in new[]{-1f,1f})
@@ -178,12 +184,13 @@ namespace DesertRV.Editor
             for (int i = 0; i < 9; i++)
             {
                 float z = apron.min.z + .9f + i * (apron.size.z - 1.8f) / 8;
-                p.FlatPatch("ForecourtDust", "Sand", new Vector3(apron.max.x - .32f, .056f, z), new Vector2(.5f, .45f + i % 3 * .25f), i+41);
+                p.FlatPatch("ForecourtDust", "Dust", new Vector3(apron.max.x - .32f, .056f, z), new Vector2(.55f+.16f*Mathf.Sin(i*1.8f), .8f+.35f*Mathf.Cos(i*1.1f)), i+41);
             }
             for (int i = 0; i < 2; i++)
             {
                 var pump = geom.Single(t => t.name == (i == 0 ? "GEO-pump_island" : "GEO-pump_island.001")).GetComponent<Renderer>().bounds;
                 p.FlatPatch("ForecourtWear", "Oil", new Vector3(pump.center.x + 1.2f,.058f,pump.center.z), new Vector2(.58f,1.1f), 73+i);
+                RefinePump(p, geom, i);
                 // Discrete pump island guards are grouped beside the existing island, never the road.
                 for (int k = -1; k <= 1; k += 2)
                 {
@@ -256,6 +263,46 @@ namespace DesertRV.Editor
             }
         }
 
+        static void RefinePump(PolishAuthor p, Transform[] geom, int index)
+        {
+            string suffix=index==0?"":".001";
+            Bounds head=geom.Single(t=>t.name=="GEO-pump_rounded_head"+suffix).GetComponent<Renderer>().bounds;
+            Bounds meter=geom.Single(t=>t.name=="GEO-pump_meter_recess"+suffix).GetComponent<Renderer>().bounds;
+            Vector3 front=meter.center-head.center;front.y=0;front=front.normalized;
+            if(front.sqrMagnitude<.9f)throw new InvalidOperationException("Pump face direction not supported by actual source bounds.");
+            Vector3 right=Vector3.Cross(Vector3.up,front).normalized;
+            float depth=Vector3.Dot(new Vector3(Mathf.Abs(front.x),0,Mathf.Abs(front.z)),head.extents);
+            Vector3 face=head.center+front*(depth+.038f);float width=.55f;
+            // Two-sided meter face frame, recessed dark bezel, physical needles and display bars.
+            p.Beam("PumpDetails","Rubber",face-right*width*.5f,face+right*width*.5f,.07f,.34f);
+            foreach(float sign in new[]{-1f,1f})
+            {
+                p.Beam("PumpDetails","Steel",face+right*sign*.30f-Vector3.up*.21f,face+right*sign*.30f+Vector3.up*.21f,.035f,.045f);
+                p.Beam("PumpDetails","Ivory",face+Vector3.up*sign*.21f-right*.31f,face+Vector3.up*sign*.21f+right*.31f,.035f,.035f);
+                Vector3 dial=face+right*sign*.145f+front*.05f-Vector3.up*.005f;
+                p.Cylinder("PumpDetails","Steel",dial,dial+front*.022f,.105f,24);
+                p.Cylinder("PumpDetails","Ivory",dial+front*.025f,dial+front*.032f,.086f,24);
+                p.Beam("PumpDetails","Steel",dial+front*.035f,dial+front*.035f+right*.043f+Vector3.up*.052f,.012f,.01f);
+                for(int j=0;j<5;j++)
+                { float a=(-60+j*30)*Mathf.Deg2Rad;Vector3 q=dial+front*.037f+(right*Mathf.Sin(a)+Vector3.up*Mathf.Cos(a))*.071f;p.Beam("PumpDetails","Steel",q,q-(right*Mathf.Sin(a)+Vector3.up*Mathf.Cos(a))*.012f,.007f,.005f); }
+            }
+            for(int j=0;j<5;j++)p.Beam("PumpDetails","Ivory",face+front*.052f+right*(-.18f+j*.09f)+Vector3.up*.139f,face+front*.052f+right*(-.18f+j*.09f)+Vector3.up*.19f,.035f,.012f);
+            // Place the large flexible loop on the road-facing side, rather than hidden behind the pump.
+            Vector3 hoseRight=right.z<0?-right:right; // positive-Z side faces the unchanged forecourt eye-height camera.
+            Vector3 side=head.center+hoseRight*(Vector3.Dot(new Vector3(Mathf.Abs(hoseRight.x),0,Mathf.Abs(hoseRight.z)),head.extents)+.095f)+front*.10f;
+            Vector3 start=side+Vector3.up*.10f, dock=side+front*.09f-Vector3.up*.17f;
+            Vector3 c1=start+hoseRight*.47f-Vector3.up*1.27f,c2=dock+hoseRight*.37f-Vector3.up*1.15f;
+            Vector3 previous=start;
+            for(int j=1;j<=18;j++)
+            {float t=j/18f,u=1-t;Vector3 next=u*u*u*start+3*u*u*t*c1+3*u*t*t*c2+t*t*t*dock;p.Cylinder("PumpDetails","Rubber",previous,next,.035f,10);previous=next;}
+            p.Beam("PumpDetails","Steel",dock,dock+Vector3.up*.21f+front*.055f,.068f,.075f);
+            p.Beam("PumpDetails","Rubber",dock+front*.045f,dock-Vector3.up*.15f+front*.035f,.050f,.065f);
+            p.Cylinder("PumpDetails","Steel",dock+Vector3.up*.20f+front*.05f,dock+Vector3.up*.33f+front*.17f,.025f,10);
+            // Hide only the replaced scene-instance hoses/nozzles. Keep original pump/body collisions.
+            foreach(var t in geom.Where(t=>t.name=="GEO-pump_hose"+suffix||t.name=="GEO-pump_nozzle"+suffix))
+                if(t.TryGetComponent<Renderer>(out var r))r.enabled=false;
+        }
+
         static void RefineScrapyard(PolishAuthor p, RegionBinding b)
         {
             // Suppress overly bright repeated ribs in the old candidate, retain physical container walls.
@@ -263,13 +310,24 @@ namespace DesertRV.Editor
             foreach(var r in b.GetComponentsInChildren<Renderer>(true))
             {
                 if(r.name=="Container corrugation")r.enabled=false;
-                if(r.name=="Salvage container body")p.SourceMesh("Container"+(containerIndex++),"Sheet",r);
+                if(r.name=="Salvage container body")
+                {
+                    int index=containerIndex++;p.SourceMesh("Container"+index,"Sheet",r);Bounds box=r.bounds;
+                    // Real silhouette ribs, end doors, locking rods. Texture alone did not read at driving distance.
+                    for(int k=0;k<16;k++)foreach(float x in new[]{box.min.x-.02f,box.max.x+.02f})
+                    {float z=Mathf.Lerp(box.min.z+.12f,box.max.z-.12f,k/15f);p.Box("Container"+index+"Trim","Steel",new Vector3(x,box.center.y,z),new Vector3(.045f,box.size.y-.16f,.045f));}
+                    foreach(float x in new[]{box.min.x+.08f,box.max.x-.08f})p.Box("Container"+index+"Trim","Oxide",new Vector3(x,box.center.y,box.min.z-.025f),new Vector3(.13f,box.size.y,.065f));
+                    for(int k=0;k<2;k++)
+                    {float x=box.center.x+(k==0?-.28f:.28f)*box.size.x;p.Cylinder("Container"+index+"Trim","Ivory",new Vector3(x,box.min.y+.14f,box.min.z-.08f),new Vector3(x,box.max.y-.14f,box.min.z-.08f),.028f,8);p.Box("Container"+index+"Trim","Steel",new Vector3(x+.085f,box.min.y+.9f,box.min.z-.11f),new Vector3(.19f,.055f,.08f));}
+                    p.Box("Container"+index+"Trim","Steel",new Vector3(box.center.x,box.center.y,box.min.z-.03f),new Vector3(.05f,box.size.y,.04f));
+                }
                 if(r.name=="Service corrugated roof")r.enabled=false;
                 if(r.name=="Workshop dismantling table")r.enabled=false;
             }
             // Distinct left sorting court and right powered workshop: a broad worn hardstand establishes context.
-            p.Box("YardGroundWest","Concrete",new Vector3(-12,.015f,32),new Vector3(14,.09f,42));
-            p.Box("YardGroundEast","Concrete",new Vector3(13,.015f,30),new Vector3(15,.09f,39));
+            p.YardSlabs("YardGroundWest",new Vector3(-12,0,32),new Vector2(14,42));
+            p.YardSlabs("YardGroundEast",new Vector3(13,0,30),new Vector2(15,39));
+            RefineYardProcess(p,b);
             for(int row=0;row<3;row++)
                 for(int i=0;i<6;i++)
                 {
@@ -301,8 +359,60 @@ namespace DesertRV.Editor
             PolishSpot(b.transform,"Yard overhead task luminaire",new Vector3(11,3.08f,26),2.1f,11,100);
         }
 
+        static void RefineYardProcess(PolishAuthor p,RegionBinding b)
+        {
+            // Two retaining bays frame a clear central stripping / hoist lane, not scattered evenly spaced props.
+            foreach(float z in new[]{27.5f,41.0f})
+            {
+                Vector3 at=new Vector3(-16.0f,0,z);
+                p.Box("YardBays","Concrete",at+new Vector3(-2.05f,.72f,0),new Vector3(.22f,1.44f,5.3f));
+                p.Box("YardBays","Concrete",at+new Vector3(0,.62f,2.55f),new Vector3(4.2f,1.24f,.20f));
+                p.Box("YardBays","Steel",at+new Vector3(-2.03f,1.49f,0),new Vector3(.26f,.10f,5.4f));
+                // Folded sheet faces generate broad jagged but purposeful mound silhouettes.
+                for(int k=0;k<27;k++)
+                {
+                    float a=k*2.39996f, radius=.25f+1.35f*((k%9)/8f);
+                    float h=.23f+1.6f*(1-radius/2.0f)+(k%4)*.12f;
+                    Vector3 q=at+new Vector3(Mathf.Cos(a)*radius,h,Mathf.Sin(a)*radius*1.25f);
+                    Vector3 along=new Vector3(Mathf.Cos(a)*(.65f+k%3*.18f),.05f,Mathf.Sin(a)*(.65f+k%3*.18f));
+                    Vector3 across=new Vector3(-Mathf.Sin(a)*.48f,.12f+k%2*.15f,Mathf.Cos(a)*.48f);
+                    string mat=k%3==0?"Steel":"Oxide";
+                    p.Quad("YardHeaps",mat,q-along-across,q-along+across,q+along+across+Vector3.up*.16f,q+along-across);
+                    p.Quad("YardHeaps",mat,q+along-across,q+along+across+Vector3.up*.16f,q-along+across,q-along-across);
+                }
+                p.EnableCollision("YardBays","Concrete");p.EnableCollision("YardHeaps","Oxide","Steel");
+            }
+            // A low feed conveyor connects the stripped-chassis zone to the receiving hopper.
+            Vector3 from=new Vector3(-12.7f,.58f,33.6f),to=new Vector3(-14.7f,2.0f,37.0f);
+            Vector3 side=Vector3.Cross((to-from).normalized,Vector3.up).normalized*.62f;
+            p.Beam("YardConveyor","Rubber",from,to,1.08f,.10f);
+            foreach(float sign in new[]{-1f,1f})
+            {
+                p.Beam("YardConveyor","Steel",from+side*sign,to+side*sign,.12f,.19f);
+                p.Beam("YardConveyor","Steel",to+side*sign,new Vector3(to.x+side.x*sign,.08f,to.z+side.z*sign),.12f,.12f);
+            }
+            for(int k=0;k<10;k++)
+            {Vector3 at=Vector3.Lerp(from,to,k/9f)+Vector3.up*.065f;p.Cylinder("YardConveyor","Oxide",at-side*.85f,at+side*.85f,.07f,10);}
+            p.EnableCollision("YardConveyor","Steel","Rubber");
+            // Distinct engine stripping cradle in the powered side work bay, with open front aisle.
+            p.BevelBox("YardPress","Oxide",new Vector3(17.1f,.48f,34.8f),new Vector3(2.4f,.95f,2.3f),.12f);
+            foreach(float x in new[]{16.0f,18.2f})p.Beam("YardPress","Steel",new Vector3(x,.6f,35.5f),new Vector3(x,3.5f,35.5f),.20f,.25f);
+            p.Beam("YardPress","Steel",new Vector3(15.8f,3.5f,35.5f),new Vector3(18.4f,3.5f,35.5f),.34f,.31f);
+            p.Cylinder("YardPress","Ivory",new Vector3(17.1f,3.30f,35.5f),new Vector3(17.1f,1.50f,35.5f),.14f,16);
+            p.Box("YardPress","Steel",new Vector3(17.1f,1.42f,35.5f),new Vector3(1.4f,.16f,.9f));
+            p.EnableCollision("YardPress","Oxide","Steel");
+        }
+
         static void RefineBeacon(PolishAuthor p, RegionBinding b)
         {
+            // Only seven local pixel lights remain: below the retained URP per-object limit of eight.
+            // Remove duplicate hidden point fills; keep three alternating visible route lamps.
+            foreach(var light in b.GetComponentsInChildren<Light>(true))
+            {
+                if(light.name=="Beacon equipment worklight"||light.name=="Beacon base service light"||light.name=="Safe-route lamp 1"||light.name=="Safe-route lamp 3"||light.name=="Safe-route lamp 5")light.enabled=false;
+                if(light.name=="Beacon blue lantern"){light.intensity=12;light.range=15;light.renderMode=LightRenderMode.ForcePixel;}
+                if(light.name=="Safe-zone arrival light"){light.intensity=4;light.range=11;}
+            }
             // Cream concrete, blue steel and warm task pools provide a distinct night compound identity.
             foreach(var r in b.GetComponentsInChildren<Renderer>(true))
             {
@@ -346,17 +456,28 @@ namespace DesertRV.Editor
             foreach(Vector3 at in new[]{new Vector3(11,3.2f,29),new Vector3(-11,3.6f,31.8f)})
             {
                 string group=at.x<0?"TowerFixtures":"RelayCanopy";
-                p.BevelBox(group,"Steel",at,new Vector3(.6f,.17f,.34f),.025f);
-                p.Box(group,"Lamp",at+Vector3.down*.10f,new Vector3(.45f,.035f,.25f));
-                PolishSpot(b.transform,"Beacon shielded service flood",at+Vector3.down*.13f,3.0f,12,103);
+                Vector3 target=at.x<0?new Vector3(-7.0f,.10f,26.0f):new Vector3(7.2f,.10f,23.0f);
+                Vector3 direction=(target-at).normalized;
+                Vector3 right=Vector3.Cross(Vector3.up,direction).normalized*.27f,up=Vector3.Cross(direction,right).normalized*.145f;
+                p.Beam(group,"Steel",at-direction*.07f,at+direction*.07f,.64f,.36f);
+                Vector3 lens=at+direction*.09f;
+                p.Quad(group,"Lamp",lens-right-up,lens+right-up,lens+right+up,lens-right+up);
+                var flood=PolishSpot(b.transform,"Beacon shielded service flood",at+direction*.13f,22.0f,15,90);
+                flood.transform.rotation=Quaternion.LookRotation(target-flood.transform.position);
             }
+            int activeLocal=b.GetComponentsInChildren<Light>(true).Count(l=>l.enabled&&l.gameObject.activeInHierarchy&&l.type!=LightType.Directional);
+            if(activeLocal!=7)throw new InvalidOperationException("Night compound must retain exactly seven visible-fixture local lights.");
+            var pipeline=new SerializedObject(GraphicsSettings.currentRenderPipeline);
+            if(pipeline.FindProperty("m_AdditionalLightsRenderingMode").intValue!=1||pipeline.FindProperty("m_AdditionalLightsPerObjectLimit").intValue<8)
+                throw new InvalidOperationException("Expected retained per-pixel URP additional lights and eight-light per-object limit.");
+            Debug.Log("ENVIRONMENT_V4_R2_LIGHTING seven-local-fixtures per-pixel-limit=8");
         }
 
-        static void PolishSpot(Transform parent,string name,Vector3 at,float intensity,float range,float angle)
+        static Light PolishSpot(Transform parent,string name,Vector3 at,float intensity,float range,float angle)
         {
             var light=new GameObject(name).AddComponent<Light>();light.transform.SetParent(parent,false);light.transform.position=at;
             light.transform.rotation=Quaternion.Euler(90,0,0);light.type=LightType.Spot;light.color=new Color(1,.78f,.48f);
-            light.intensity=intensity;light.range=range;light.spotAngle=angle;light.innerSpotAngle=angle*.55f;light.shadows=LightShadows.None;
+            light.intensity=intensity;light.range=range;light.spotAngle=angle;light.innerSpotAngle=angle*.62f;light.shadows=LightShadows.None;light.renderMode=LightRenderMode.ForcePixel;return light;
         }
         static void PlaceFactory(RegionBinding b,string asset,Vector3 at,Vector3 maximum,Quaternion rotation)
         {
@@ -488,14 +609,49 @@ namespace DesertRV.Editor
                 Box(group,roofMat,at+new Vector3(0,1.32f,size.z*.5f),new Vector3(size.x,2.5f,.09f));
                 Get(group,"Steel").collide=true;Get(group,"Concrete").collide=true;Get(group,roofMat).collide=true;
             }
+            public void YardSlabs(string group,Vector3 at,Vector2 size)
+            {
+                const float step=3.0f;int nx=Mathf.CeilToInt(size.x/step),nz=Mathf.CeilToInt(size.y/step);
+                float dx=size.x/nx,dz=size.y/nz;
+                for(int x=0;x<nx;x++)for(int z=0;z<nz;z++)
+                {
+                    if((x==0||x==nx-1)&&(z==0||z==nz-1))continue;
+                    Vector3 q=at+new Vector3(-size.x*.5f+(x+.5f)*dx,.012f,-size.y*.5f+(z+.5f)*dz);
+                    Box(group,"Concrete",q,new Vector3(dx-.018f,.08f,dz-.018f));
+                    if((x==0||x==nx-1)&&z%3!=1)FlatPatch("YardEdge","Dust",q+new Vector3((x==0?-1:1)*dx*.44f,.044f,0),new Vector2(.9f,1.15f+.25f*Mathf.Sin(z)),x*17+z);
+                }
+            }
+            public void RoadsideBlend(float side,float start,float end)
+            {
+                var m=Get("Shoulder","Dust");const float step=1.5f;
+                Func<float,int,Vector3> point=(z,lane)=>
+                {
+                    float inner=3.89f+.08f*Mathf.Sin(z*.21f)+.055f*Mathf.Sin(z*.57f);
+                    float outer=4.72f+.15f*Mathf.Sin(z*.12f+side);
+                    float f=lane/3f;return new Vector3(side*Mathf.Lerp(inner,outer,f),Mathf.Lerp(.047f,.003f,f),z);
+                };
+                Func<int,float> alpha=lane=>lane==0||lane==3?0:.72f;
+                for(float z=start;z<end;z+=step)for(int lane=0;lane<3;lane++)
+                {
+                    Vector3 a=point(z,lane),b=point(Mathf.Min(z+step,end),lane),c=point(Mathf.Min(z+step,end),lane+1),d=point(z,lane+1);
+                    if(side>0){m.Tri(a,b,c,alpha(lane),alpha(lane),alpha(lane+1));m.Tri(a,c,d,alpha(lane),alpha(lane+1),alpha(lane+1));}
+                    else {m.Tri(a,c,b,alpha(lane),alpha(lane+1),alpha(lane));m.Tri(a,d,c,alpha(lane),alpha(lane+1),alpha(lane+1));}
+                }
+            }
             public void FlatPatch(string group,string mat,Vector3 at,Vector2 radius,int seed)
             {
-                var m=Get(group,mat);int sides=11;
-                for(int i=0;i<sides;i++)
+                var m=Get(group,mat);const int sides=32,rings=4;
+                Func<int,int,Vector3> point=(r,i)=>
                 {
-                    float a=i*Mathf.PI*2/sides,c=(i+1)*Mathf.PI*2/sides;
-                    float ra=.77f+.23f*Mathf.Sin(i*2.714f+seed),rc=.77f+.23f*Mathf.Sin((i+1)*2.714f+seed);
-                    m.Tri(at,at+new Vector3(Mathf.Cos(c)*radius.x*rc,0,Mathf.Sin(c)*radius.y*rc),at+new Vector3(Mathf.Cos(a)*radius.x*ra,0,Mathf.Sin(a)*radius.y*ra));
+                    float a=i*Mathf.PI*2/sides+seed*.37f, f=(float)r/rings;
+                    float shape=1+.095f*Mathf.Sin(a*2+seed)+.075f*Mathf.Cos(a*3+seed*.7f);
+                    return at+new Vector3(Mathf.Cos(a)*radius.x*shape*f,0,Mathf.Sin(a)*radius.y*shape*f);
+                };
+                Func<int,float> alpha=r=>r==rings?0:r==rings-1?.28f:r==rings-2?.72f:.86f;
+                for(int r=0;r<rings;r++)for(int i=0;i<sides;i++)
+                {
+                    Vector3 a=point(r,i+1),b=point(r+1,i+1),c=point(r+1,i),d=point(r,i);
+                    m.Tri(a,b,c,alpha(r),alpha(r+1),alpha(r+1));m.Tri(a,c,d,alpha(r),alpha(r+1),alpha(r));
                 }
             }
             public void Berm(string group,string mat,Vector3 at,Vector2 radius,float height,int seed,bool collide)
@@ -531,12 +687,13 @@ namespace DesertRV.Editor
         sealed class PolishMesh
         {
             public readonly string material;public bool collide,smoothNormals;
-            readonly List<Vector3> vertices=new List<Vector3>();readonly List<Vector2> uv=new List<Vector2>();readonly List<int> indices=new List<int>();
+            readonly List<Vector3> vertices=new List<Vector3>();readonly List<Vector2> uv=new List<Vector2>();readonly List<int> indices=new List<int>();readonly List<Color> colors=new List<Color>();
             public PolishMesh(string mat){material=mat;}
-            public void Tri(Vector3 a,Vector3 b,Vector3 c)
+            public void Tri(Vector3 a,Vector3 b,Vector3 c,float alphaA=1,float alphaB=1,float alphaC=1)
             {
                 Vector3 normal=Vector3.Cross(b-a,c-a);if(normal.sqrMagnitude<.00000001f)return;
                 int first=vertices.Count;vertices.Add(a);vertices.Add(b);vertices.Add(c);
+                colors.Add(new Color(1,1,1,alphaA));colors.Add(new Color(1,1,1,alphaB));colors.Add(new Color(1,1,1,alphaC));
                 foreach(var p in new[]{a,b,c})uv.Add(Project(p,normal.normalized)/TextureMetres(material));
                 indices.Add(first);indices.Add(first+1);indices.Add(first+2);
             }
@@ -546,7 +703,7 @@ namespace DesertRV.Editor
             public Mesh Build(string name)
             {
                 var mesh=new Mesh{name=name,indexFormat=vertices.Count>65535?IndexFormat.UInt32:IndexFormat.UInt16};
-                mesh.SetVertices(vertices);mesh.SetUVs(0,uv);mesh.SetTriangles(indices,0);mesh.RecalculateNormals();
+                mesh.SetVertices(vertices);mesh.SetUVs(0,uv);mesh.SetColors(colors);mesh.SetTriangles(indices,0);mesh.RecalculateNormals();
                 if(smoothNormals)
                 {
                     var normals=mesh.normals;var sums=new Dictionary<Vector3Int,Vector3>();

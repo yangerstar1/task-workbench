@@ -35,8 +35,8 @@ class CandidateTests(unittest.TestCase):
   for tile in set(re.findall(r'tile = "([a-z_0-9]+)"',CODE)):
    for suffix in ('diff_1k.jpg','nor_gl_1k.jpg','metallic_smoothness_1k.png'):self.assertTrue((ART/f'{tile}_{suffix}').is_file())
  def test_finite_generated_contract(self):
-  self.assertEqual(len(CONTRACT['files']),97);self.assertEqual(len(CONTRACT['metadata_files']),98)
-  self.assertEqual(len(set(CONTRACT['files'])),97)
+  self.assertEqual(len(CONTRACT['files']),121);self.assertEqual(len(CONTRACT['metadata_files']),122)
+  self.assertEqual(len(set(CONTRACT['files'])),121)
   self.assertTrue(all(p.endswith(('.mat','.asset')) and '*' not in p and '..' not in p for p in CONTRACT['files']))
   for region,keys in CONTRACT['region_mesh_keys'].items():
    block=re.search(r'case '+region+r': return new\[\]\{([^}]+)\};',CODE).group(1)
@@ -44,14 +44,14 @@ class CandidateTests(unittest.TestCase):
   self.assertIn('meshes.Keys.SequenceEqual(PolishExpectedMeshNames(region.region))',CODE)
  def test_physical_texture_scale(self):
   self.assertIn('material == "TrackSand" ? 15',CODE)
-  self.assertIn('material == "Sand" || material == "Plaster" || material == "Sheet" ? 2',CODE)
+  self.assertIn('material == "Sand" || material == "Dune" || material == "Dust" || material == "Plaster" || material == "Sheet" ? 2',CODE)
   self.assertIn('material == "Asphalt" || material == "Concrete" ? 3 : 1',CODE)
   self.assertIn('Project(p,normal.normalized)/TextureMetres(material)',CODE)
   self.assertIn('p.SourceMesh("StationWallLeft", "Plaster", r)',CODE)
   # Photographed tire tracks must not texture the open desert itself.
-  self.assertIn('case "Sand": tile = "sand_03"',CODE);self.assertIn('case "TrackSand": tile = "aerial_sand"',CODE)
+  self.assertIn('case "Sand": case "Dune": case "Dust": tile = "sand_03"',CODE);self.assertIn('case "TrackSand": tile = "aerial_sand"',CODE)
  def test_shared_material_budget_and_importer_safety(self):
-  self.assertEqual(len(CONTRACT['material_names']),14)
+  self.assertEqual(len(CONTRACT['material_names']),16)
   self.assertNotIn('SaveAndReimport',CODE);self.assertNotIn('AssetImporter.GetAtPath',CODE)
   self.assertIn('enableInstancing = true',CODE)
   self.assertIn('if(own.Length>80||triangles>90000||lights>3)',CODE)
@@ -89,4 +89,42 @@ class CandidateTests(unittest.TestCase):
    meta=p.with_name(p.name+'.meta');self.assertTrue(meta.is_file(),str(p))
    guid=re.search(r'^guid: ([a-f0-9]{32})$',meta.read_text(),re.M).group(1);guids.append(guid)
   self.assertEqual(len(guids),len(set(guids)))
+ def test_far_sand_has_separate_macro_material_and_no_periodic_normal(self):
+  shader=(ART/'EnvironmentSurface.shader').read_text()
+  self.assertIn('p.Berm(group, "Dune"',CODE)
+  self.assertIn('SAMPLE_TEXTURE2D_LOD(_BaseMap,sampler_BaseMap,float2(.5,.5),10)',shader)
+  self.assertIn('distance(input.world,_WorldSpaceCameraPos)',shader)
+  self.assertNotIn('Noise(',shader);self.assertNotIn('_BumpMap',shader)
+  self.assertIn('filterMode: 2',(ART/'sand_03_diff_1k.jpg.meta').read_text())
+ def test_overlay_has_explicit_vertex_fade_and_zero_outer_alpha(self):
+  shader=(ART/'EnvironmentSurface.shader').read_text()
+  self.assertIn('Blend [_SrcBlend] [_DstBlend]',shader);self.assertIn('_BaseColor.a*input.color.a',shader)
+  self.assertIn('mesh.SetColors(colors)',CODE);self.assertIn('r==rings?0',CODE)
+  self.assertIn('const int sides=32,rings=4',CODE);self.assertNotIn('int sides=11',CODE)
+ def test_actual_pump_face_anchors_and_loop(self):
+  self.assertIn('Bounds meter=geom.Single',CODE);self.assertIn('head.extents',CODE)
+  self.assertIn('j<=18',CODE);self.assertIn('p.Cylinder("PumpDetails","Rubber"',CODE)
+  self.assertIn('PumpDetails-Ivory',CODE);self.assertIn('PumpDetails-Rubber',CODE)
+ def test_night_pixel_lights_are_bounded_and_aimed_to_approach(self):
+  self.assertIn('activeLocal!=7',CODE);self.assertIn('m_AdditionalLightsRenderingMode',CODE)
+  self.assertIn('Quaternion.LookRotation(target-flood.transform.position)',CODE)
+  main=(ROOT/'unity/Assets/DesertRV/Editor/JourneySceneAuthoring.cs').read_text()
+  self.assertIn('light.intensity=region==3?.48f',main)
+ def test_added_yard_midforms_leave_road_clear(self):
+  for nearest in [16-2.2,12.7-.7,15.8,19-.13]:self.assertGreater(nearest,4.3)
+  self.assertIn('RefineYardProcess(p,b)',CODE);self.assertIn('YardConveyor-Rubber',CODE)
+  self.assertIn('p.YardSlabs(',CODE);self.assertIn('if((x==0||x==nx-1)&&(z==0||z==nz-1))continue',CODE)
+ def test_twenty_camera_implementation_stays_byte_exact_to_v4(self):
+  self.assertEqual(hashlib.sha256(CAPTURE.encode()).hexdigest(),'fa6cbe1f1252801ec1b0f62b864104d715f781dc01567b50ec82c9a0b30f097e')
+  text=(ROOT/'unity/Assets/DesertRV/Editor/JourneySceneAuthoring.cs').read_text()
+  camera=text[text.index('        public static void CaptureEnvironmentCandidates()'):text.index('        static void SetAtmosphere(')]
+  self.assertEqual(hashlib.sha256(camera.encode()).hexdigest(),'40862ffdef1f474be2a54af79135ed1d979ca4c5e2ace1bdd452b65252043728')
+ def test_container_trims_keep_left_and_right_bounds_separate(self):
+  self.assertIn('"Container"+index+"Trim"',CODE)
+  self.assertNotIn('"ContainerTrim",',CODE)
+  keys=CONTRACT['region_mesh_keys']['2']
+  for index in range(3):
+   self.assertEqual(sum(k.startswith('Container'+str(index)+'Trim-') for k in keys),3)
+  # Actual source centres/sizes: left [-14.6,-9.4], right [11.4,16.6].
+  for lo,hi in [(-14.7,-9.3),(11.3,16.7)]:self.assertTrue(hi<-4.3 or lo>4.3)
 if __name__=='__main__':unittest.main()

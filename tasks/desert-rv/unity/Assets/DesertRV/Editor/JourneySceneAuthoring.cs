@@ -256,7 +256,7 @@ namespace DesertRV.Editor
             RenderSettings.fog=true;RenderSettings.fogMode=FogMode.Linear;RenderSettings.fogColor=horizon;
             RenderSettings.fogStartDistance=region==2?90:140;RenderSettings.fogEndDistance=region==2?330:400;
             foreach(var light in Components<Light>(scene).Where(x=>x.type==LightType.Directional))
-            {light.transform.rotation=Quaternion.Euler(region==3?35:region==2?21:25,-38,0);light.color=region==3?new Color(.55f,.68f,1):new Color(1,.84f,.65f);light.intensity=region==3?.62f:region==2?1.05f:1.4f;light.shadows=LightShadows.Soft;RenderSettings.sun=light;}
+            {light.transform.rotation=Quaternion.Euler(region==3?35:region==2?21:25,-38,0);light.color=region==3?new Color(.55f,.68f,1):new Color(1,.84f,.65f);light.intensity=region==3?.48f:region==2?1.05f:1.4f;light.shadows=LightShadows.Soft;RenderSettings.sun=light;}
         }
         static readonly Color Sand = new Color(.89f,.70f,.45f), Asphalt = new Color(.31f,.31f,.29f),
             Rust = new Color(.48f,.27f,.16f), Steel = new Color(.25f,.32f,.32f), Cream = new Color(.77f,.72f,.59f),

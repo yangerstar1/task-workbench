@@ -27,6 +27,10 @@ namespace DesertRV.Tests
             UnityEngine.Debug.Log("ENVIRONMENT_V4_STAGE author-and-18-views-ms=" + stageClock.ElapsedMilliseconds);
             // V4 renderer-only delta: add two real eye-height views, without importing combat art.
             type.GetMethod("CaptureEnvironmentPolishCloseups", BindingFlags.Static | BindingFlags.Public).Invoke(null, null);
+            var surface = Shader.Find("DesertRV/EnvironmentSurface");
+            Assert.That(surface, Is.Not.Null); Assert.That(surface.isSupported, Is.True);
+            Assert.That(UnityEditor.ShaderUtil.ShaderHasError(surface), Is.False, "New ground/overlay shader compiled without error after all actual captures");
+            UnityEngine.Debug.Log("ENVIRONMENT_V4_R2_SURFACE shader-supported-no-errors-after-20-views");
             UnityEngine.Debug.Log("ENVIRONMENT_V4_STAGE complete-20-views-ms=" + stageClock.ElapsedMilliseconds);
         }
     }
