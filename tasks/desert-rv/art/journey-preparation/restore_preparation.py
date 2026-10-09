@@ -24,6 +24,7 @@ _ALLOWED=(
  'tasks/desert-rv/art/journey-preparation/restore_preparation.py','tasks/desert-rv/art/journey-preparation/test_restore_preparation.py',
  'tasks/desert-rv/art/journey-preparation/linux_build_input.py','tasks/desert-rv/art/journey-preparation/test_linux_build_input.py',
  'tasks/desert-rv/scripts/player/journey_linux_export.py','tasks/desert-rv/scripts/player/test_journey_linux_export.py',
+ 'tasks/desert-rv/scripts/player/journey_linux_container.sh',
  'tasks/desert-rv/scripts/player/observe_journey_player.py','tasks/desert-rv/scripts/player/test_observe_journey_player.py',
  'tasks/desert-rv/unity/Assets/DesertRV/Editor/JourneyCandidateLinuxBuild.cs',
  'tasks/desert-rv/unity/Assets/DesertRV/Tests/CandidateLinux/CandidateLinuxBoundaryTests.cs',

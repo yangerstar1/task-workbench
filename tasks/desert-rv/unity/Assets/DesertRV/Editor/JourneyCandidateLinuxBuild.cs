@@ -16,6 +16,161 @@ namespace DesertRV.Editor
     [InitializeOnLoad]
     public static class JourneyCandidateLinuxBuild
     {
+        const BuildOptions CandidateOptions = BuildOptions.Development | BuildOptions.DetailedBuildReport;
+        const string PerformancePackage = "com.unity.test-framework.performance";
+        const string PerformancePreferenceKey = "PT_ResourcesCleanup";
+        static readonly string[] PerformanceJson = { "Assets/Resources/PerformanceTestRunInfo.json", "Assets/Resources/PerformanceTestRunSettings.json" };
+        static readonly string[] PerformanceFiles = { "Assets/Resources.meta", "Assets/Resources/PerformanceTestRunInfo.json", "Assets/Resources/PerformanceTestRunInfo.json.meta", "Assets/Resources/PerformanceTestRunSettings.json", "Assets/Resources/PerformanceTestRunSettings.json.meta" };
+        static readonly Dictionary<string,string> PerformanceSourcePins = new Dictionary<string,string> {
+            { "Editor/TestRunBuilder.cs", "baa8f8478290b233c7a54ffbd3d1f83d9be24e3be564cc2136a7f8ab8a8c7ae8" },
+            { "Runtime/Utils.cs", "7362b6b0897557200509c194bce33b55dbda639fb9bb2fd83ea20249f5e54d15" },
+            { "Runtime/Data/Run.cs", "06049b74dbf11e9161142d7f625b3982633e4c2ff668831654e3c36adf1e3aec" },
+            { "Runtime/Data/RunSettings.cs", "702022eaff2a23ab20024582c6569b9f0bba0c854610dc7c32f2b018d5567e41" },
+            { "Runtime/Data/Player.cs", "9ec9e9e80f7d5db2a1ce6dc545970265652c0bd0ee74613cf7dffa33f7b8f933" },
+            { "Runtime/Data/Editor.cs", "e4133a3c3084b78f619af00b706b5c5d72c60cab32361e01c635ed2ae28e37b5" },
+            { "Runtime/Data/Hardware.cs", "31dddfd3b99df4d89dc7cfe5f9639c3e364187db74d491218efda3d6dac5e09c" }
+        };
+        [Serializable] sealed class PerformanceObservation
+        {
+            public string status="NOT_ARMED";
+            public bool packageVerified, baselineAbsent, preferenceRestored, synchronousImportCompleted, exactInventoryRestored, packedReportAvailable;
+            public int packedContainers, packedObjects, packedSourceObjects, packedJsonHits;
+            public string[] packedScenePaths=Array.Empty<string>(), callbackScenePaths=Array.Empty<string>(), jsonGuids=Array.Empty<string>();
+            public InventoryObservation generated=new InventoryObservation();
+        }
+        sealed class PerformancePreference
+        {
+            readonly bool existed=EditorPrefs.HasKey(PerformancePreferenceKey), value=EditorPrefs.GetBool(PerformancePreferenceKey);
+            public static void Suppress() { EditorPrefs.SetBool(PerformancePreferenceKey,false);Check(!EditorPrefs.GetBool(PerformancePreferenceKey),"PERFORMANCE_PREFERENCE"); }
+            public void Restore()
+            {
+                if(existed) EditorPrefs.SetBool(PerformancePreferenceKey,value); else EditorPrefs.DeleteKey(PerformancePreferenceKey);
+                Check(EditorPrefs.HasKey(PerformancePreferenceKey)==existed && (!existed || EditorPrefs.GetBool(PerformancePreferenceKey)==value),"PERFORMANCE_PREFERENCE");
+            }
+        }
+        static void NoLinks(string path)
+        {
+            for(var current=new FileInfo(Path.GetFullPath(path)) as FileSystemInfo;current!=null;current=current is FileInfo file ? file.Directory : ((DirectoryInfo)current).Parent)
+                Check((current.Attributes & FileAttributes.ReparsePoint)==0,"PERFORMANCE_LINK");
+        }
+        static void VerifyPerformancePackage()
+        {
+            var info=UnityEditor.PackageManager.PackageInfo.FindForAssetPath("Packages/"+PerformancePackage+"/Editor/TestRunBuilder.cs");
+            Check(info!=null && info.name==PerformancePackage && info.version=="3.0.3","PERFORMANCE_PACKAGE");
+            foreach(var pin in PerformanceSourcePins)
+            {
+                string path=Path.Combine(info.resolvedPath,pin.Key);NoLinks(path);
+                Check(File.Exists(path) && Hash(path)==pin.Value,"PERFORMANCE_PACKAGE");
+            }
+        }
+        static void RequirePerformanceBaselineAbsent(string root=".")
+        {
+            Check(!Directory.Exists(Path.Combine(root,"Assets/Resources")) && !File.Exists(Path.Combine(root,"Assets/Resources")) &&
+                PerformanceFiles.All(p=>!File.Exists(Path.Combine(root,p)) && !Directory.Exists(Path.Combine(root,p))),"PERFORMANCE_BASELINE");
+        }
+        static InventoryObservation RequirePerformanceInventory(Request request,bool complete,string root=".")
+        {
+            var found=InspectInventory(request,root);
+            var required=new[]{"Assets/Resources","Assets/Resources.meta"}.Concat(PerformanceJson).ToArray();
+            var allowed=new HashSet<string>(PerformanceFiles.Concat(new[]{"Assets/Resources"}),StringComparer.Ordinal);
+            bool valid=found.observed && !found.truncated && found.unsafePathsOmitted==0 && found.removedFiles==0 && found.removedDirectories==0 && found.addedDirectories==1 &&
+                found.entries.All(e=>e.change=="ADDED" && allowed.Contains(e.path) && (e.path=="Assets/Resources" ? e.kind=="DIRECTORY" : e.kind=="FILE" && e.measurement=="ACTUAL_BYTES" && e.bytes<=65536)) &&
+                required.All(p=>found.entries.Any(e=>e.path==p)) && (!complete || found.totalChanges==6 && found.addedFiles==5);
+            if(!valid && currentDiagnostic!=null && !currentDiagnostic.primaryInventory.observed)currentDiagnostic.primaryInventory=found;
+            Check(valid,"PERFORMANCE_INVENTORY");
+            return found;
+        }
+        static InventoryObservation BeginPerformanceIsolation(Request request,string root=".")
+        {
+            PerformancePreference.Suppress();
+            return RequirePerformanceInventory(request,false,root);
+        }
+        static string[] ExpectedPerformancePayloads()
+        {
+            // The pinned official implementation exposes no non-test-build switch. Recreate only its in-memory values,
+            // never its Setup/Cleanup methods, and require exact official serialization before touching generated bytes.
+            var builder=Type.GetType("Unity.PerformanceTesting.Editor.TestRunBuilder, Unity.PerformanceTesting.Editor",true);
+            var settings=Type.GetType("Unity.PerformanceTesting.Data.RunSettings, Unity.PerformanceTesting",true);
+            var run=builder.GetMethod("CreateBuildInfo").Invoke(Activator.CreateInstance(builder,true),null);
+            var configuration=Activator.CreateInstance(settings,System.Reflection.BindingFlags.Instance|System.Reflection.BindingFlags.Public|System.Reflection.BindingFlags.NonPublic,null,new object[]{Environment.GetCommandLineArgs()},null);
+            return new[]{JsonUtility.ToJson(run),JsonUtility.ToJson(configuration)};
+        }
+        static void ValidatePerformancePayloads(string root=".")
+        {
+            var expected=ExpectedPerformancePayloads();
+            Check(PerformanceJson.Select((path,index)=>File.ReadAllText(Path.Combine(root,path))==expected[index]).All(v=>v),"PERFORMANCE_PAYLOAD");
+        }
+        static string MetaGuid(string path,bool folder)
+        {
+            string text=File.ReadAllText(path).Replace("\r\n","\n");
+            string importer=folder ? "folderAsset: yes\nDefaultImporter" : "TextScriptImporter";
+            var match=Regex.Match(text,"\\AfileFormatVersion: 2\\nguid: ([a-f0-9]{32})\\n"+importer+":\\n  externalObjects: \\{\\}\\n  userData:[ ]*\\n  assetBundleName:[ ]*\\n  assetBundleVariant:[ ]*\\n?\\z");
+            Check(match.Success,"PERFORMANCE_META");return match.Groups[1].Value;
+        }
+        static void MovePerformanceFiles(Request request,InventoryObservation expected,string root,string quarantine)
+        {
+            var current=RequirePerformanceInventory(request,true,root);
+            Check(JsonUtility.ToJson(current)==JsonUtility.ToJson(expected) && !Directory.Exists(quarantine) && !File.Exists(quarantine),"PERFORMANCE_MOVE");
+            NoLinks(Path.GetDirectoryName(Path.GetFullPath(quarantine)));Directory.CreateDirectory(quarantine);
+            // Preserve the exact original bytes only inside this container's already-cleaned private directory.
+            foreach(var row in current.entries.Where(e=>e.kind=="FILE"))
+            {
+                string source=Path.Combine(root,row.path),target=Path.Combine(quarantine,Path.GetFileName(row.path));
+                Check(new FileInfo(source).Length==row.bytes && Hash(source)==row.sha256,"PERFORMANCE_MOVE");
+                File.Copy(source,target,false);Check(new FileInfo(target).Length==row.bytes && Hash(target)==row.sha256,"PERFORMANCE_MOVE");
+            }
+            // Source workspace and private /tmp can be different volumes: verify all copies before deleting any source.
+            Check(JsonUtility.ToJson(RequirePerformanceInventory(request,true,root))==JsonUtility.ToJson(expected),"PERFORMANCE_MOVE");
+            foreach(var row in current.entries.Where(e=>e.kind=="FILE"))
+            {
+                string source=Path.Combine(root,row.path);Check(Hash(source)==row.sha256,"PERFORMANCE_MOVE");File.Delete(source);
+            }
+            string directory=Path.Combine(root,"Assets/Resources");Check(!Directory.EnumerateFileSystemEntries(directory).Any(),"PERFORMANCE_INVENTORY");Directory.Delete(directory,false);
+            VerifyInventory(request,root);
+        }
+        internal static void IsolatePerformanceResources(BuildReport report)
+        {
+            if(active==null) return;
+            Check(report!=null && report.summary.platform==BuildTarget.StandaloneLinux64 && report.summary.options==CandidateOptions && Path.GetFullPath(report.summary.outputPath)==Output,"LEASE_PROFILE");
+            var observation=currentDiagnostic.performanceResources;
+            Check(observation.status=="ARMED" && observation.baselineAbsent && observation.packageVerified,"PERFORMANCE_BASELINE");
+            // Suppress before source revalidation or unknown-inventory rejection can leave additions behind.
+            BeginPerformanceIsolation(active.request);VerifyPerformancePackage();ValidatePerformancePayloads();
+            AssetDatabase.Refresh(ImportAssetOptions.ForceSynchronousImport);
+            observation.synchronousImportCompleted=true;
+            observation.generated=RequirePerformanceInventory(active.request,true);ValidatePerformancePayloads();
+            MetaGuid("Assets/Resources.meta",true);var jsonGuids=PerformanceJson.Select(p=>MetaGuid(p+".meta",false)).ToArray();
+            Check(jsonGuids.Distinct().Count()==2 && PerformanceJson.Select((p,i)=>AssetDatabase.AssetPathToGUID(p)==jsonGuids[i]).All(v=>v),"PERFORMANCE_META");observation.jsonGuids=jsonGuids;
+            observation.status="IMPORTED";Persist(currentDiagnostic);
+            // The official postprocess still deletes these two exact paths; every subsequent scene verifies the original inventory.
+            MovePerformanceFiles(active.request,observation.generated,".",active.performanceQuarantine);
+            AssetDatabase.Refresh(ImportAssetOptions.ForceSynchronousImport);
+            RequirePerformanceBaselineAbsent();Verify(active,true);
+            observation.exactInventoryRestored=true;observation.status="QUARANTINED";Persist(currentDiagnostic);
+        }
+        static bool IsPerformancePacked(string path,string guid,string[] jsonGuids) => PerformanceJson.Contains(path) || jsonGuids.Contains(guid);
+        static void VerifyPackedPerformanceExclusion(BuildReport report,PerformanceObservation observation,string[] callbackScenes)
+        {
+            Check(observation.status=="QUARANTINED" && report!=null && report.summary.result==BuildResult.Succeeded && report.summary.options==CandidateOptions,"PERFORMANCE_PACKED_REPORT");
+            var containers=report.packedAssets;Check(containers!=null && containers.Length>0,"PERFORMANCE_PACKED_REPORT");
+            var scenes=new HashSet<string>(StringComparer.Ordinal);int count=0,sourceCount=0,hits=0;
+            foreach(var container in containers)
+            {
+                var contents=container.contents;Check(contents!=null,"PERFORMANCE_PACKED_REPORT");
+                foreach(var item in contents)
+                {
+                    count++;string path=item.sourceAssetPath??"";string guid=item.sourceAssetGUID.ToString();
+                    if(IsPerformancePacked(path,guid,observation.jsonGuids))hits++;
+                    if(path.StartsWith("Assets/",StringComparison.Ordinal) || path.StartsWith("Packages/",StringComparison.Ordinal))sourceCount++;
+                    if(Paths.Contains(path))scenes.Add(path);
+                }
+            }
+            observation.packedReportAvailable=true;observation.packedContainers=containers.Length;observation.packedObjects=count;observation.packedSourceObjects=sourceCount;observation.packedJsonHits=hits;observation.packedScenePaths=scenes.OrderBy(p=>p,StringComparer.Ordinal).ToArray();observation.callbackScenePaths=callbackScenes.OrderBy(p=>p,StringComparer.Ordinal).ToArray();
+            Persist(currentDiagnostic);
+            Check(count>0 && sourceCount>0 && new HashSet<string>(callbackScenes,StringComparer.Ordinal).SetEquals(Paths) && callbackScenes.Length==Paths.Length && hits==0,"PERFORMANCE_PACKED_CONTENT");
+            observation.status="PACKED_VERIFIED";Persist(currentDiagnostic);
+        }
+
         const string Input = "JourneyEvidence/JourneyPreparation/linux-build-input.json";
         const string Receipt = "../journey-preparation-export/generated/receipt.json";
         const string Settings = "ProjectSettings/ProjectSettings.asset";
@@ -46,7 +201,7 @@ namespace DesertRV.Editor
             public string[] temporarySettingsFiles = { "ProjectSettings/ProjectSettings.asset" };
             // Records the APIs invoked; complete temporary bytes are separately pinned, not an asserted YAML diff.
             public string[] temporarySettingsApiFields = { "scriptingBackend.Standalone", "fullScreenMode", "defaultScreenWidth", "defaultScreenHeight", "productName", "resizableWindow" };
-            public bool candidateOnly = true, development = true, approved = false, settingsRestored, sourceBytesUnchanged;
+            public bool candidateOnly = true, development = true, detailedBuildReport = true, performanceTestResourcesExcluded = true, approved = false, settingsRestored, sourceBytesUnchanged;
             public bool visualReviewed = false, gameplayReviewed = false, audioAuditioned = false;
         }
         [Serializable] sealed class RootObservation
@@ -81,6 +236,7 @@ namespace DesertRV.Editor
             public string primaryFailureCode = "NONE", primaryExceptionKind = "NONE", restorationFailureCode = "NONE", restorationExceptionKind = "NONE", verificationFailureCode = "NONE", verificationExceptionKind = "NONE", leaseClosedReason = "NONE";
             public string[] buildErrorKinds = Array.Empty<string>();
             public string primaryCallbackGate="NONE", primarySceneRole="NONE", verificationCallbackGate="NONE", verificationSceneRole="NONE";
+            public PerformanceObservation performanceResources=new PerformanceObservation();
             public RootObservation primaryRootMismatch=new RootObservation(), verificationRootMismatch=new RootObservation();
             public InventoryObservation primaryInventory=new InventoryObservation(), verificationInventory=new InventoryObservation();
             public SafeBuildMessage[] buildMessages=Array.Empty<SafeBuildMessage>();
@@ -93,6 +249,7 @@ namespace DesertRV.Editor
         static string CallbackGate()
         {
             string trace=Environment.StackTrace;
+            if(trace.Contains("IsolatePerformanceResources")) return "CANDIDATE_PERFORMANCE";
             if(trace.Contains("JourneyProductionBuildGate.OnPreprocessBuild")) return "PRODUCTION_PREPROCESS";
             if(trace.Contains("JourneyProductionBuildGate.OnProcessScene")) return "PRODUCTION_SCENE";
             if(trace.Contains("JourneyCandidateLinuxBuild.ProcessCandidateScene")) return "CANDIDATE_SCENE";
@@ -168,12 +325,12 @@ namespace DesertRV.Editor
         static void Persist(Diagnostic diagnostic) => PersistJson("JourneyEvidence/JourneyPreparation/linux-build-diagnostic.json",JsonUtility.ToJson(diagnostic,true));
         sealed class Lease
         {
-            public Request request; public string requestHash, fingerprint;
+            public Request request; public string requestHash, fingerprint, performanceQuarantine;
             public readonly Dictionary<string,string> temporarySettings = new Dictionary<string,string>();
             public readonly HashSet<string> processed = new HashSet<string>(StringComparer.Ordinal);
         }
         static readonly HashSet<string> CompilerCodes = new HashSet<string>(new[] { "CS0006","CS0012","CS0016","CS0029","CS0030","CS0101","CS0103","CS0104","CS0106","CS0111","CS0117","CS0118","CS0120","CS0121","CS0122","CS0136","CS0161","CS0200","CS0234","CS0246","CS0266","CS0535","CS0619","CS1001","CS1002","CS1003","CS1022","CS1026","CS1061","CS1068","CS1069","CS1501","CS1502","CS1503","CS1513","CS1519","CS1525","CS1617","CS1705","UNKNOWN_CSHARP_ERROR" },StringComparer.Ordinal);
-        static readonly HashSet<string> FailureCodes = new HashSet<string>(new[] { "BOOTSTRAP_BINDING","BOOTSTRAP_OWNER","BUILD_OR_SCENE_FAILED","BUILD_PROFILE","BUILTIN_DEPENDENCY","DEPENDENCY_BYTES","DEPENDENCY_KIND","DEPENDENCY_PATH","DIRTY_SCENE","ENTRY_PROFILE","IMPORT_FINGERPRINT","INVENTORY_DIRECTORY","INVENTORY_LINK","INVENTORY_NONREGULAR","INVENTORY_SET","LEASE_PROFILE","PACKAGE_IDENTITY","PIN_BYTES","PIN_LINK","PIN_MISSING","PIN_PATH","REGION_BINDING","REGION_IDENTITY","REGION_OWNER","REQUEST_HASH","REQUEST_IDENTITY","REQUEST_RECEIPT_HASH","RESTORATION_PROOF","RESTORATION_XML","ROOT_BYTES","ROOT_DEPENDENCY","ROOT_DEPENDENCY_BYTES","ROOT_IMPORT_HASH","SAVED_RUNTIME_IDENTITY","SCENE_COMPONENT","SCENE_SEQUENCE","TARGET_OUTPUT","UNCLASSIFIED_EXCEPTION" },StringComparer.Ordinal);
+        static readonly HashSet<string> FailureCodes = new HashSet<string>(new[] { "PERFORMANCE_PREFERENCE","PERFORMANCE_LINK","PERFORMANCE_PACKAGE","PERFORMANCE_BASELINE","PERFORMANCE_INVENTORY","PERFORMANCE_PAYLOAD","PERFORMANCE_META","PERFORMANCE_MOVE","PERFORMANCE_PACKED_REPORT","PERFORMANCE_PACKED_CONTENT","PERFORMANCE_PRIVATE","BOOTSTRAP_BINDING","BOOTSTRAP_OWNER","BUILD_OR_SCENE_FAILED","BUILD_PROFILE","BUILTIN_DEPENDENCY","DEPENDENCY_BYTES","DEPENDENCY_KIND","DEPENDENCY_PATH","DIRTY_SCENE","ENTRY_PROFILE","IMPORT_FINGERPRINT","INVENTORY_DIRECTORY","INVENTORY_LINK","INVENTORY_NONREGULAR","INVENTORY_SET","LEASE_PROFILE","PACKAGE_IDENTITY","PIN_BYTES","PIN_LINK","PIN_MISSING","PIN_PATH","REGION_BINDING","REGION_IDENTITY","REGION_OWNER","REQUEST_HASH","REQUEST_IDENTITY","REQUEST_RECEIPT_HASH","RESTORATION_PROOF","RESTORATION_XML","ROOT_BYTES","ROOT_DEPENDENCY","ROOT_DEPENDENCY_BYTES","ROOT_IMPORT_HASH","SAVED_RUNTIME_IDENTITY","SCENE_COMPONENT","SCENE_SEQUENCE","TARGET_OUTPUT","UNCLASSIFIED_EXCEPTION" },StringComparer.Ordinal);
         static Lease active;
         static JourneyCandidateLinuxBuild() { AssemblyReloadEvents.beforeAssemblyReload += () => Close("ASSEMBLY_RELOAD"); EditorApplication.quitting += () => Close("EDITOR_QUIT"); }
         static void Close(string reason = "EXPLICIT")
@@ -197,7 +354,7 @@ namespace DesertRV.Editor
         static string Hash(string path) => JourneyDiagnosticScope.HashFile(path);
         static string HashBytes(byte[] bytes) { using(var sha=System.Security.Cryptography.SHA256.Create()) return BitConverter.ToString(sha.ComputeHash(bytes)).Replace("-","").ToLowerInvariant(); }
         public static bool ValidBuildProfile(BuildTarget target, BuildOptions options, string[] defines) =>
-            target == BuildTarget.StandaloneLinux64 && options == BuildOptions.Development && defines != null && defines.SequenceEqual(new[] { JourneyCandidateLinuxIdentity.Define });
+            target == BuildTarget.StandaloneLinux64 && options == CandidateOptions && defines != null && defines.SequenceEqual(new[] { JourneyCandidateLinuxIdentity.Define });
         static string RepoFile(string name)
         {
             Check(!string.IsNullOrEmpty(name) && !Path.IsPathRooted(name) && !name.Contains("..") && !name.Contains("\\") &&
@@ -365,7 +522,7 @@ namespace DesertRV.Editor
         public static bool AllowsCandidateBuild(BuildReport report)
         {
             if (active == null) return false;
-            Check(report != null && report.summary.platform == BuildTarget.StandaloneLinux64 && report.summary.options == BuildOptions.Development &&
+            Check(report != null && report.summary.platform == BuildTarget.StandaloneLinux64 && report.summary.options == CandidateOptions &&
                 Path.GetFullPath(report.summary.outputPath) == Output, "LEASE_PROFILE");
             Verify(active,true); return true;
         }
@@ -443,6 +600,13 @@ namespace DesertRV.Editor
             try { foreach (var path in Paths) CheckSceneObjects(EditorSceneManager.OpenScene(path,OpenSceneMode.Single),AssetDatabase.LoadAssetAtPath<JourneyContentManifest>(JourneySceneAuthoring.ManifestPath)); }
             finally { JourneySceneAuthoring.RestoreSceneSetup(setup); }
             diagnostic.stage="CONTENT_VERIFIED";Persist(diagnostic);
+            VerifyPerformancePackage();RequirePerformanceBaselineAbsent();
+            string privateRoot=Environment.GetEnvironmentVariable("DESERTRV_PERFORMANCE_PRIVATE");
+            Check(!string.IsNullOrEmpty(privateRoot) && Path.IsPathRooted(privateRoot) && Path.GetFullPath(privateRoot).StartsWith(Path.GetFullPath(Path.GetTempPath()),StringComparison.Ordinal) && Directory.Exists(privateRoot),"PERFORMANCE_PRIVATE");
+            NoLinks(privateRoot);lease.performanceQuarantine=Path.Combine(privateRoot,"performance-resources");
+            Check(!Directory.Exists(lease.performanceQuarantine) && !File.Exists(lease.performanceQuarantine),"PERFORMANCE_PRIVATE");
+            diagnostic.performanceResources.packageVerified=true;diagnostic.performanceResources.baselineAbsent=true;diagnostic.performanceResources.status="ARMED";
+            var performancePreference=new PerformancePreference();
             byte[] settings = File.ReadAllBytes(Settings);
             var oldBackend = PlayerSettings.GetScriptingBackend(NamedBuildTarget.Standalone);
             var oldWindow = PlayerSettings.fullScreenMode; int oldWidth=PlayerSettings.defaultScreenWidth,oldHeight=PlayerSettings.defaultScreenHeight;
@@ -454,11 +618,12 @@ namespace DesertRV.Editor
                 PlayerSettings.productName="DESERTRV_JOURNEY_CANDIDATE";PlayerSettings.resizableWindow=false;
                 AssetDatabase.SaveAssets();
                 lease.temporarySettings[Settings]=Hash(Settings);active=lease;
-                string[] defines={JourneyCandidateLinuxIdentity.Define};Check(ValidBuildProfile(BuildTarget.StandaloneLinux64,BuildOptions.Development,defines),"BUILD_PROFILE");
+                string[] defines={JourneyCandidateLinuxIdentity.Define};Check(ValidBuildProfile(BuildTarget.StandaloneLinux64,CandidateOptions,defines),"BUILD_PROFILE");
                 currentSceneRole="NONE";diagnostic.activeTargetBeforeBuild=TargetKind(EditorUserBuildSettings.activeBuildTarget);diagnostic.stage="BUILD_PLAYER_ENTERED";Persist(diagnostic);
-                result=BuildPipeline.BuildPlayer(new BuildPlayerOptions { scenes=Paths,target=BuildTarget.StandaloneLinux64,locationPathName=Output,options=BuildOptions.Development,extraScriptingDefines=defines });
+                result=BuildPipeline.BuildPlayer(new BuildPlayerOptions { scenes=Paths,target=BuildTarget.StandaloneLinux64,locationPathName=Output,options=CandidateOptions,extraScriptingDefines=defines });
                 diagnostic.stage="BUILD_PLAYER_RETURNED";diagnostic.activeTargetAfterBuild=TargetKind(EditorUserBuildSettings.activeBuildTarget);diagnostic.leaseActiveAtBuildReturn=active!=null;Report(result,diagnostic);Persist(diagnostic);
                 Check(result != null && result.summary.result==BuildResult.Succeeded && lease.processed.SetEquals(Paths),"BUILD_OR_SCENE_FAILED");
+                VerifyPackedPerformanceExclusion(result,diagnostic.performanceResources,lease.processed.ToArray());
             }
             catch (Exception error)
             {
@@ -470,6 +635,7 @@ namespace DesertRV.Editor
                 Close();diagnosticContext="RESTORATION";currentSceneRole="NONE";
                 try
                 {
+                    performancePreference.Restore();diagnostic.performanceResources.preferenceRestored=true;
                     PlayerSettings.SetScriptingBackend(NamedBuildTarget.Standalone,oldBackend);PlayerSettings.fullScreenMode=oldWindow;
                     PlayerSettings.defaultScreenWidth=oldWidth;PlayerSettings.defaultScreenHeight=oldHeight;PlayerSettings.productName=oldProduct;PlayerSettings.resizableWindow=oldResize;
                     AssetDatabase.SaveAssets();
@@ -493,6 +659,11 @@ namespace DesertRV.Editor
                 restorationProof=request.restorationProof ?? new JourneyCandidateAssetIntegration.FilePin { path="",sha256="" },assetProducerSourceCommit=request.assetProducerSourceCommit ?? "",assetProducerRunUrl=request.assetProducerRunUrl ?? "",restorationNativeXmlSha256=request.restorationNativeXmlSha256 ?? "",generatedReceiptSha256=request.generatedReceiptSha256,boundaryNativeXmlSha256=request.boundaryNativeXmlSha256,boundaryNativeCases=request.boundaryNativeCases,requestSha256=requestHash,executableSha256=Hash(Output),settingsRestored=true,sourceBytesUnchanged=true,scenes=Paths },true));
             diagnostic.stage="RECEIPT_WRITTEN";diagnostic.receiptWritten=true;Persist(diagnostic);
         }
+    }
+    public sealed class JourneyCandidatePerformanceIsolation : IPreprocessBuildWithReport
+    {
+        public int callbackOrder => 1;
+        public void OnPreprocessBuild(BuildReport report) { JourneyCandidateLinuxBuild.IsolatePerformanceResources(report); }
     }
     public sealed class JourneyCandidateLinuxSceneGate : IProcessSceneWithReport
     {

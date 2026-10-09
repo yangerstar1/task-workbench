@@ -16,6 +16,14 @@ class SourceTransitionTests(unittest.TestCase):
  def rejects(self,code):
   with self.assertRaisesRegex(Exception,code):self.check()
  def test_exact_reviewed_added_and_changed_source_accepted(self):self.assertEqual(self.policy['changes'],self.check())
+ def test_exact_reviewed_container_change_requires_its_own_hash_pin(self):
+  name='tasks/desert-rv/scripts/player/journey_linux_container.sh'
+  self.before['files'].append(dict(path=name,sha256='e'*64,size=20))
+  self.after['files'].append(dict(path=name,sha256='f'*64,size=21))
+  self.policy['changes'].append(dict(path=name,beforeSha256='e'*64,beforeBytes=20,afterSha256='f'*64,afterBytes=21));self.policy['changes'].sort(key=lambda x:x['path'])
+  self.assertEqual(self.policy['changes'],self.check())
+  self.after['files'][-1]['sha256']='a'*64;self.rejects('EXACT_SOURCE_DIFF')
+  self.after['files'][-1]['sha256']='f'*64;self.after['files'][-1]['path']='tasks/desert-rv/scripts/player/unreviewed_container.sh';self.rejects('UNREVIEWED_SOURCE')
  def test_unlisted_runtime_change_rejected(self):self.after['files'].append(dict(path='tasks/desert-rv/unity/Assets/DesertRV/Runtime/JourneyActions.cs',sha256='e'*64,size=9));self.rejects('UNREVIEWED_SOURCE')
  def test_unlisted_asset_change_rejected(self):self.after['files'].append(dict(path='tasks/desert-rv/unity/Assets/Original.asset',sha256='e'*64,size=9));self.rejects('UNREVIEWED_SOURCE')
  def test_contract_change_rejected(self):self.after['files'].append(dict(path='tasks/desert-rv/art/import-candidate/contracts/weapon.json',sha256='e'*64,size=9));self.rejects('UNREVIEWED_SOURCE')

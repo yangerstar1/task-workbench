@@ -37,6 +37,7 @@ attempted=1
 if timeout --signal=TERM --kill-after=15s 12m bash -c 'source /gameci/platforms/ubuntu/activate.sh' >"$private/activation.log" 2>&1; then activation=SUCCEEDED; else activation=FAILED; exit 1; fi
 cd /github/workspace/tasks/desert-rv/unity
 python3 "$scripts/player/journey_linux_export.py" snapshot "$private" >/dev/null 2>&1
+export DESERTRV_PERFORMANCE_PRIVATE="$private"
 if timeout --signal=TERM --kill-after=30s 65m unity-editor -projectPath "$PWD" -executeMethod DesertRV.Editor.JourneyCandidateLinuxBuild.BuildPreparedLinuxDiagnostic -quit -force-glcore -job-worker-count 2 -logFile "$private/editor.log" >"$private/rendered.log" 2>&1; then
   build_exit=0
 else

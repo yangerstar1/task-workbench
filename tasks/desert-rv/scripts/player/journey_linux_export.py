@@ -11,11 +11,11 @@ RECOVERY=TASK/'journey-linux-control-private';recovery.EVIDENCE=RECOVERY
 sys.path.insert(0,str(TASK/'art/journey-preparation'));import linux_build_input
 MODE='CANDIDATE_LINUX_DEVELOPMENT_BUILT_UNREVIEWED'
 SCENES=['Assets/DesertRV/Scenes/Journey/'+n+'.unity' for n in ('JourneyBootstrap','FirstStation','Scrapyard','NightBeacon')]
-RECEIPT_KEYS={'schema','label','sourceCommit','producerRunUrl','generatedReceiptSha256','requestSha256','executableSha256','unityVersion','target','backend','define','executable','scenes','candidateOnly','development','settingsRestored','sourceBytesUnchanged','approved','visualReviewed','gameplayReviewed','audioAuditioned','temporarySettingsFiles','temporarySettingsApiFields','boundaryNativeXmlSha256','boundaryNativeCases','restorationProof','assetProducerSourceCommit','assetProducerRunUrl','restorationNativeXmlSha256'}
-DIAG_KEYS={'primaryInventory','verificationInventory','activeTargetAtEntry','activeTargetBeforeBuild','activeTargetAfterBuild','reportTarget','sourceBytesUnchanged', 'primaryCallbackGate', 'settingsRestored', 'buildReportAvailable', 'restorationExceptionKind', 'verificationSceneRole', 'totalErrors', 'leaseClosedReason', 'exceptionKind', 'buildResult', 'primarySceneRole', 'buildMessages', 'verificationFailureCode', 'receiptWritten', 'primaryRootMismatch', 'restorationFailureCode', 'assemblyReloadObserved', 'primaryFailureCode', 'verificationCallbackGate', 'label', 'verificationRootMismatch', 'buildMessagesTruncated', 'stage', 'leaseActiveAtBuildReturn', 'primaryExceptionKind', 'verificationExceptionKind', 'schema', 'buildErrorKinds', 'totalWarnings'}
-FAILURE_CODES={'PIN_LINK', 'RESTORATION_XML', 'INVENTORY_NONREGULAR', 'ROOT_BYTES', 'BUILD_OR_SCENE_FAILED', 'INVENTORY_LINK', 'ROOT_IMPORT_HASH', 'PACKAGE_IDENTITY', 'PIN_BYTES', 'DEPENDENCY_PATH', 'INVENTORY_DIRECTORY', 'SAVED_RUNTIME_IDENTITY', 'BOOTSTRAP_OWNER', 'ROOT_DEPENDENCY', 'REQUEST_RECEIPT_HASH', 'BOOTSTRAP_BINDING', 'REGION_BINDING', 'REGION_OWNER', 'SCENE_COMPONENT', 'DEPENDENCY_KIND', 'INVENTORY_SET', 'ROOT_DEPENDENCY_BYTES', 'SCENE_SEQUENCE', 'PIN_MISSING', 'REGION_IDENTITY', 'BUILTIN_DEPENDENCY', 'IMPORT_FINGERPRINT', 'TARGET_OUTPUT', 'REQUEST_IDENTITY', 'PIN_PATH', 'UNCLASSIFIED_EXCEPTION', 'DIRTY_SCENE', 'ENTRY_PROFILE', 'LEASE_PROFILE', 'RESTORATION_PROOF', 'REQUEST_HASH', 'DEPENDENCY_BYTES', 'BUILD_PROFILE'}
+RECEIPT_KEYS={'detailedBuildReport','performanceTestResourcesExcluded','schema','label','sourceCommit','producerRunUrl','generatedReceiptSha256','requestSha256','executableSha256','unityVersion','target','backend','define','executable','scenes','candidateOnly','development','settingsRestored','sourceBytesUnchanged','approved','visualReviewed','gameplayReviewed','audioAuditioned','temporarySettingsFiles','temporarySettingsApiFields','boundaryNativeXmlSha256','boundaryNativeCases','restorationProof','assetProducerSourceCommit','assetProducerRunUrl','restorationNativeXmlSha256'}
+DIAG_KEYS={'performanceResources','primaryInventory','verificationInventory','activeTargetAtEntry','activeTargetBeforeBuild','activeTargetAfterBuild','reportTarget','sourceBytesUnchanged', 'primaryCallbackGate', 'settingsRestored', 'buildReportAvailable', 'restorationExceptionKind', 'verificationSceneRole', 'totalErrors', 'leaseClosedReason', 'exceptionKind', 'buildResult', 'primarySceneRole', 'buildMessages', 'verificationFailureCode', 'receiptWritten', 'primaryRootMismatch', 'restorationFailureCode', 'assemblyReloadObserved', 'primaryFailureCode', 'verificationCallbackGate', 'label', 'verificationRootMismatch', 'buildMessagesTruncated', 'stage', 'leaseActiveAtBuildReturn', 'primaryExceptionKind', 'verificationExceptionKind', 'schema', 'buildErrorKinds', 'totalWarnings'}
+FAILURE_CODES={'PERFORMANCE_PREFERENCE','PERFORMANCE_LINK','PERFORMANCE_PACKAGE','PERFORMANCE_BASELINE','PERFORMANCE_INVENTORY','PERFORMANCE_PAYLOAD','PERFORMANCE_META','PERFORMANCE_MOVE','PERFORMANCE_PACKED_REPORT','PERFORMANCE_PACKED_CONTENT','PERFORMANCE_PRIVATE','PIN_LINK', 'RESTORATION_XML', 'INVENTORY_NONREGULAR', 'ROOT_BYTES', 'BUILD_OR_SCENE_FAILED', 'INVENTORY_LINK', 'ROOT_IMPORT_HASH', 'PACKAGE_IDENTITY', 'PIN_BYTES', 'DEPENDENCY_PATH', 'INVENTORY_DIRECTORY', 'SAVED_RUNTIME_IDENTITY', 'BOOTSTRAP_OWNER', 'ROOT_DEPENDENCY', 'REQUEST_RECEIPT_HASH', 'BOOTSTRAP_BINDING', 'REGION_BINDING', 'REGION_OWNER', 'SCENE_COMPONENT', 'DEPENDENCY_KIND', 'INVENTORY_SET', 'ROOT_DEPENDENCY_BYTES', 'SCENE_SEQUENCE', 'PIN_MISSING', 'REGION_IDENTITY', 'BUILTIN_DEPENDENCY', 'IMPORT_FINGERPRINT', 'TARGET_OUTPUT', 'REQUEST_IDENTITY', 'PIN_PATH', 'UNCLASSIFIED_EXCEPTION', 'DIRTY_SCENE', 'ENTRY_PROFILE', 'LEASE_PROFILE', 'RESTORATION_PROOF', 'REQUEST_HASH', 'DEPENDENCY_BYTES', 'BUILD_PROFILE'}
 EXCEPTIONS={'NONE','BUILD_FAILED','UNAUTHORIZED_ACCESS','IO','OTHER'}
-CALLBACKS={'NONE','PRODUCTION_PREPROCESS','PRODUCTION_SCENE','CANDIDATE_SCENE'}
+CALLBACKS={'CANDIDATE_PERFORMANCE','NONE','PRODUCTION_PREPROCESS','PRODUCTION_SCENE','CANDIDATE_SCENE'}
 ROLES={'NONE','CONTENT','BOOTSTRAP','FIRST_STATION','SCRAPYARD','NIGHT_BEACON'}
 BUILD_ERROR_KINDS={'CANDIDATE_GATE','PRODUCTION_GATE','CS_COMPILATION','SHADER_ERROR','UNCLASSIFIED_BUILD_ERROR'}
 RUNTIME_ROOTS={'DesertRV.x86_64','UnityPlayer.so','DesertRV_Data','MonoBleedingEdge','UnityCrashHandler64'}
@@ -45,7 +45,7 @@ def native_receipt(value):
     require(value['unityVersion']=='6000.3.19f1' and value['target']=='StandaloneLinux64' and value['backend']=='Mono2x' and value['define']=='DESERTRV_CANDIDATE_LINUX' and value['executable']=='DesertRV.x86_64' and value['scenes']==SCENES)
     require(type(value['boundaryNativeCases']) is int and value['boundaryNativeCases']==17)
     require(value['temporarySettingsFiles']==['ProjectSettings/ProjectSettings.asset'] and value['temporarySettingsApiFields']==['scriptingBackend.Standalone','fullScreenMode','defaultScreenWidth','defaultScreenHeight','productName','resizableWindow'])
-    for key in ('candidateOnly','development','settingsRestored','sourceBytesUnchanged'):require(value[key] is True)
+    for key in ('candidateOnly','development','detailedBuildReport','performanceTestResourcesExcluded','settingsRestored','sourceBytesUnchanged'):require(value[key] is True)
     for key in ('approved','visualReviewed','gameplayReviewed','audioAuditioned'):require(value[key] is False)
     pin=value['restorationProof'];restored=isinstance(pin,dict) and bool(pin.get('path'))
     if restored:
@@ -76,6 +76,34 @@ def inventory_observation(value):
         else:require(row['measurement']=='UNREADABLE' and row['bytes']==-1 and row['sha256']=='')
     for kind,key in [(('ADDED','FILE'),'addedFiles'),(('REMOVED','FILE'),'removedFiles'),(('ADDED','DIRECTORY'),'addedDirectories'),(('REMOVED','DIRECTORY'),'removedDirectories')]:require(counts[kind]<=value[key])
     if not value['truncated']:require(all(counts[kind]==value[key] for kind,key in [(('ADDED','FILE'),'addedFiles'),(('REMOVED','FILE'),'removedFiles'),(('ADDED','DIRECTORY'),'addedDirectories'),(('REMOVED','DIRECTORY'),'removedDirectories')]))
+
+PERFORMANCE_JSON=['Assets/Resources/PerformanceTestRunInfo.json','Assets/Resources/PerformanceTestRunSettings.json']
+PERFORMANCE_FILES=['Assets/Resources.meta',PERFORMANCE_JSON[0],PERFORMANCE_JSON[0]+'.meta',PERFORMANCE_JSON[1],PERFORMANCE_JSON[1]+'.meta']
+def performance_observation(value):
+    require(isinstance(value,dict) and set(value)=={'status','packageVerified','baselineAbsent','preferenceRestored','synchronousImportCompleted','exactInventoryRestored','packedReportAvailable','packedContainers','packedObjects','packedSourceObjects','packedJsonHits','packedScenePaths','callbackScenePaths','jsonGuids','generated'})
+    require(value['status'] in {'NOT_ARMED','ARMED','IMPORTED','QUARANTINED','PACKED_VERIFIED'})
+    for k in ('packageVerified','baselineAbsent','preferenceRestored','synchronousImportCompleted','exactInventoryRestored','packedReportAvailable'):require(type(value[k]) is bool)
+    for k in ('packedContainers','packedObjects','packedSourceObjects','packedJsonHits'):require(type(value[k]) is int and 0<=value[k]<=2147483647)
+    require(value['packedJsonHits']<=value['packedObjects'] and value['packedSourceObjects']<=value['packedObjects'])
+    scenes=value['packedScenePaths'];require(isinstance(scenes,list) and scenes==sorted(set(scenes)) and set(scenes)<=set(SCENES))
+    callbacks=value['callbackScenePaths'];require(isinstance(callbacks,list) and callbacks==sorted(set(callbacks)) and set(callbacks)<=set(SCENES))
+    guids=value['jsonGuids'];require(isinstance(guids,list) and len(guids) in (0,2) and len(set(guids))==len(guids) and all(isinstance(g,str) and re.fullmatch('[a-f0-9]{32}',g) for g in guids))
+    inventory_observation(value['generated'])
+    if value['status']!='NOT_ARMED':require(value['packageVerified'] and value['baselineAbsent'])
+    if value['generated']['observed']:
+        inventory=value['generated'];require(inventory['totalChanges']==6 and inventory['addedFiles']==5 and inventory['addedDirectories']==1 and inventory['removedFiles']==inventory['removedDirectories']==inventory['unsafePathsOmitted']==0 and not inventory['truncated'])
+        require([r['path'] for r in inventory['entries']]==sorted(['Assets/Resources']+PERFORMANCE_FILES))
+        for row in inventory['entries']:require(row['change']=='ADDED' and (row['path']=='Assets/Resources' and row['kind']=='DIRECTORY' or row['path'] in PERFORMANCE_FILES and row['kind']=='FILE' and row['measurement']=='ACTUAL_BYTES' and 0<row['bytes']<=65536))
+    if value['status'] in {'IMPORTED','QUARANTINED','PACKED_VERIFIED'}:require(value['generated']['observed'] and value['synchronousImportCompleted'] and len(guids)==2)
+    if value['status'] in {'QUARANTINED','PACKED_VERIFIED'}:require(value['exactInventoryRestored'])
+    if not value['packedReportAvailable']:require(value['packedContainers']==value['packedObjects']==value['packedSourceObjects']==value['packedJsonHits']==0 and scenes==[] and callbacks==[])
+    else:require(value['packedContainers']>0 and value['packedObjects']>=len(scenes))
+    if value['status']=='PACKED_VERIFIED':require(value['packedReportAvailable'] and value['packedObjects']>0 and value['packedSourceObjects']>0 and value['packedJsonHits']==0 and callbacks==sorted(SCENES))
+    return value
+
+def performance_success(value):
+    return value['status']=='PACKED_VERIFIED' and value['preferenceRestored'] and value['exactInventoryRestored'] and value['packedReportAvailable'] and value['packedJsonHits']==0 and value['packedSourceObjects']>0 and value['callbackScenePaths']==sorted(SCENES)
+
 
 def root_observation(value):
     require(isinstance(value,dict) and set(value)=={'observed','rootBytesMatch','rootDependencyBytesMatch','slot','expectedImportHash','observedImportHash'})
@@ -115,13 +143,14 @@ def native_diagnostic(value):
     require(value['leaseClosedReason'] in {'NONE','EXPLICIT','ASSEMBLY_RELOAD','EDITOR_QUIT'})
     for prefix in ('primary','verification'):
         require(value[prefix+'CallbackGate'] in CALLBACKS and value[prefix+'SceneRole'] in ROLES);root_observation(value[prefix+'RootMismatch']);inventory_observation(value[prefix+'Inventory'])
+    performance_observation(value['performanceResources'])
     kinds=value['buildErrorKinds'];require(isinstance(kinds,list) and kinds==sorted(set(kinds)) and set(kinds)<=BUILD_ERROR_KINDS)
     messages=value['buildMessages'];require(isinstance(messages,list) and len(messages)<=32)
     for message in messages:safe_build_message(message);require(message['category'] in kinds)
     return value
 
 def diagnostic_success(d):
-    return d is not None and d['stage']=='RECEIPT_WRITTEN' and d['buildResult']=='SUCCEEDED' and d['exceptionKind']=='NONE' and d['buildReportAvailable'] is True and d['reportTarget']=='LINUX64' and d['totalErrors']==0 and all(d[p+'FailureCode']=='NONE' for p in ('primary','restoration','verification')) and all(d[p+'Inventory']['totalChanges']==0 for p in ('primary','verification')) and all(d[k] is True for k in ('settingsRestored','sourceBytesUnchanged','receiptWritten'))
+    return d is not None and performance_success(d['performanceResources']) and d['stage']=='RECEIPT_WRITTEN' and d['buildResult']=='SUCCEEDED' and d['exceptionKind']=='NONE' and d['buildReportAvailable'] is True and d['reportTarget']=='LINUX64' and d['totalErrors']==0 and all(d[p+'FailureCode']=='NONE' for p in ('primary','restoration','verification')) and all(d[p+'Inventory']['totalChanges']==0 for p in ('primary','verification')) and all(d[k] is True for k in ('settingsRestored','sourceBytesUnchanged','receiptWritten'))
 
 def validate_records(records):
     require(isinstance(records,list) and 0<len(records)<=20000);previous='';total=0;roots=set()

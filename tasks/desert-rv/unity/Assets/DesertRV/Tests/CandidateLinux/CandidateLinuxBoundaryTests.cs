@@ -14,13 +14,14 @@ namespace DesertRV.Tests
         static Type Builder => Type.GetType("DesertRV.Editor.JourneyCandidateLinuxBuild, Assembly-CSharp-Editor",true);
         static Type Identity => Type.GetType("DesertRV.JourneyCandidateLinuxIdentity, Assembly-CSharp",true);
         static object Call(string name, params object[] args) => Builder.GetMethod(name,BindingFlags.Public|BindingFlags.NonPublic|BindingFlags.Static).Invoke(null,args);
+        const BuildOptions CandidateOptions=BuildOptions.Development|BuildOptions.DetailedBuildReport;
         static bool Profile(BuildTarget target, BuildOptions options, string[] defines) => (bool)Call("ValidBuildProfile",target,options,defines);
-        [Test] public void ExactLinuxDevelopmentProfileAccepted() => Assert.IsTrue(Profile(BuildTarget.StandaloneLinux64,BuildOptions.Development,new[]{"DESERTRV_CANDIDATE_LINUX"}));
-        [Test] public void MissingDefineRejected() => Assert.IsFalse(Profile(BuildTarget.StandaloneLinux64,BuildOptions.Development,new string[0]));
-        [Test] public void ExtraDefineRejected() => Assert.IsFalse(Profile(BuildTarget.StandaloneLinux64,BuildOptions.Development,new[]{"DESERTRV_CANDIDATE_LINUX","OTHER"}));
-        [Test] public void NonLinuxRejected() => Assert.IsFalse(Profile(BuildTarget.Android,BuildOptions.Development,new[]{"DESERTRV_CANDIDATE_LINUX"}));
-        [Test] public void NonDevelopmentRejected() => Assert.IsFalse(Profile(BuildTarget.StandaloneLinux64,BuildOptions.None,new[]{"DESERTRV_CANDIDATE_LINUX"}));
-        [Test] public void ExtraBuildOptionsRejected() => Assert.IsFalse(Profile(BuildTarget.StandaloneLinux64,BuildOptions.Development|BuildOptions.AutoRunPlayer,new[]{"DESERTRV_CANDIDATE_LINUX"}));
+        [Test] public void ExactLinuxDevelopmentProfileAccepted() => Assert.IsTrue(Profile(BuildTarget.StandaloneLinux64,CandidateOptions,new[]{"DESERTRV_CANDIDATE_LINUX"}));
+        [Test] public void MissingDefineRejected() => Assert.IsFalse(Profile(BuildTarget.StandaloneLinux64,CandidateOptions,new string[0]));
+        [Test] public void ExtraDefineRejected() => Assert.IsFalse(Profile(BuildTarget.StandaloneLinux64,CandidateOptions,new[]{"DESERTRV_CANDIDATE_LINUX","OTHER"}));
+        [Test] public void NonLinuxRejected() => Assert.IsFalse(Profile(BuildTarget.Android,CandidateOptions,new[]{"DESERTRV_CANDIDATE_LINUX"}));
+        [Test] public void NonDevelopmentRejected() { Assert.IsFalse(Profile(BuildTarget.StandaloneLinux64,BuildOptions.None,new[]{"DESERTRV_CANDIDATE_LINUX"}));Assert.IsFalse(Profile(BuildTarget.StandaloneLinux64,BuildOptions.Development,new[]{"DESERTRV_CANDIDATE_LINUX"}));Assert.IsFalse(Profile(BuildTarget.StandaloneLinux64,BuildOptions.DetailedBuildReport,new[]{"DESERTRV_CANDIDATE_LINUX"})); }
+        [Test] public void ExtraBuildOptionsRejected() => Assert.IsFalse(Profile(BuildTarget.StandaloneLinux64,CandidateOptions|BuildOptions.AutoRunPlayer,new[]{"DESERTRV_CANDIDATE_LINUX"}));
         [Test] public void OrdinaryEntrypointHasNoCandidateLease() => Assert.IsFalse((bool)Call("AllowsCandidateBuild",new object[]{null}));
         [Test] public void RuntimeCapabilityInactiveInEditor() => Assert.IsFalse((bool)Identity.GetProperty("Active").GetValue(null));
         [Test] public void EmptySerializedIdentityRejected()
@@ -75,6 +76,68 @@ namespace DesertRV.Tests
             string root=Path.Combine(Path.GetTempPath(),"journey-linux-json-"+Guid.NewGuid().ToString("N"));Directory.CreateDirectory(root);
             try { string path=Path.Combine(root,"receipt.json");Call("PersistJson",path,"{\"phase\":1}");Call("PersistJson",path,"{\"phase\":2}");Assert.AreEqual("{\"phase\":2}",File.ReadAllText(path));Assert.IsFalse(File.Exists(path+".tmp")); }
             finally { Directory.Delete(root,true); }
+            // Exercise the exact official package identity without building a player or changing the package.
+            Call("VerifyPerformancePackage");
+            const string preference="PT_ResourcesCleanup";bool originallyPresent=EditorPrefs.HasKey(preference),originalValue=EditorPrefs.GetBool(preference);
+            try
+            {
+                foreach(int mode in new[]{0,1,2}) foreach(bool throws in new[]{false,true})
+                {
+                    if(mode==0)EditorPrefs.DeleteKey(preference);else EditorPrefs.SetBool(preference,mode==2);
+                    var scopeType=Builder.GetNestedType("PerformancePreference",BindingFlags.NonPublic);var scope=Activator.CreateInstance(scopeType,true);
+                    try
+                    {
+                        try { EditorPrefs.SetBool(preference,true);scopeType.GetMethod("Suppress").Invoke(null,null);if(throws)throw new IOException("synthetic callback rejection"); }
+                        finally { scopeType.GetMethod("Restore").Invoke(scope,null); }
+                    }
+                    catch(IOException) { Assert.IsTrue(throws); }
+                    Assert.AreEqual(mode!=0,EditorPrefs.HasKey(preference));if(mode!=0)Assert.AreEqual(mode==2,EditorPrefs.GetBool(preference));
+                }
+            }
+            finally { if(originallyPresent)EditorPrefs.SetBool(preference,originalValue);else EditorPrefs.DeleteKey(preference); }
+            InventoryFixture((folder,request)=>
+            {
+                Call("RequirePerformanceBaselineAbsent",folder);
+                Directory.CreateDirectory(Path.Combine(folder,"Assets/Resources"));
+                var files=new[]{"Assets/Resources.meta","Assets/Resources/PerformanceTestRunInfo.json","Assets/Resources/PerformanceTestRunSettings.json"};
+                foreach(var f in files)File.WriteAllText(Path.Combine(folder,f),"synthetic injection");
+                var officialPayloads=(string[])Call("ExpectedPerformancePayloads");Assert.AreEqual(2,officialPayloads.Length);
+                Assert.IsTrue(officialPayloads[0].Contains("\"Dependencies\""));Assert.IsTrue(officialPayloads[1].Contains("\"MeasurementCount\""));
+                for(int i=0;i<2;i++)File.WriteAllText(Path.Combine(folder,files[i+1]),officialPayloads[i]);
+                Call("ValidatePerformancePayloads",folder);
+                File.WriteAllText(Path.Combine(folder,files[2]),"{\"MeasurementCount\":999}");
+                Assert.Throws<TargetInvocationException>(()=>Call("ValidatePerformancePayloads",folder));File.WriteAllText(Path.Combine(folder,files[2]),officialPayloads[1]);
+                string guid=new string('a',32),meta="fileFormatVersion: 2\nguid: "+guid+"\nTextScriptImporter:\n  externalObjects: {}\n  userData: \n  assetBundleName: \n  assetBundleVariant: \n";
+                string metaPath=Path.Combine(folder,"temporary-meta");File.WriteAllText(metaPath,meta);Assert.AreEqual(guid,Call("MetaGuid",metaPath,false));
+                File.WriteAllText(metaPath,meta.Replace("TextScriptImporter:","folderAsset: yes\nDefaultImporter:"));Assert.AreEqual(guid,Call("MetaGuid",metaPath,true));
+                File.WriteAllText(metaPath,meta+"unknown: must reject\n");Assert.Throws<TargetInvocationException>(()=>Call("MetaGuid",metaPath,false));File.Delete(metaPath);
+                Assert.IsTrue((bool)Call("IsPerformancePacked",files[1],new string('0',32),new[]{guid,new string('b',32)}));
+                Assert.IsTrue((bool)Call("IsPerformancePacked","",guid,new[]{guid,new string('b',32)}));
+                Assert.IsFalse((bool)Call("IsPerformancePacked","Assets/Real.asset",new string('c',32),new[]{guid,new string('b',32)}));
+                Call("RequirePerformanceInventory",request,false,folder);
+                Assert.Throws<TargetInvocationException>(()=>Call("RequirePerformanceInventory",request,true,folder));
+                foreach(var f in files.Skip(1))File.WriteAllText(Path.Combine(folder,f+".meta"),"synthetic meta");
+                var expected=Call("RequirePerformanceInventory",request,true,folder);
+                string quarantine=Path.Combine(folder,"private");
+                File.WriteAllText(Path.Combine(folder,"Assets/Resources/Unknown.txt"),"preserve me");
+                var prefType=Builder.GetNestedType("PerformancePreference",BindingFlags.NonPublic);var pref=Activator.CreateInstance(prefType,true);
+                try
+                {
+                    EditorPrefs.SetBool(preference,true);
+                    Assert.Throws<TargetInvocationException>(()=>Call("BeginPerformanceIsolation",request,folder));
+                    Assert.IsFalse(EditorPrefs.GetBool(preference));Assert.IsTrue(File.Exists(Path.Combine(folder,"Assets/Resources/Unknown.txt")));
+                }
+                finally { prefType.GetMethod("Restore").Invoke(pref,null); }
+                Assert.Throws<TargetInvocationException>(()=>Call("MovePerformanceFiles",request,expected,folder,quarantine));
+                Assert.AreEqual("preserve me",File.ReadAllText(Path.Combine(folder,"Assets/Resources/Unknown.txt")));Assert.IsFalse(Directory.Exists(quarantine));
+                Assert.IsTrue(files.All(f=>File.Exists(Path.Combine(folder,f))));File.Delete(Path.Combine(folder,"Assets/Resources/Unknown.txt"));
+                File.WriteAllText(Path.Combine(folder,files[1]),"changed after pin");
+                Assert.Throws<TargetInvocationException>(()=>Call("MovePerformanceFiles",request,expected,folder,quarantine));Assert.IsFalse(Directory.Exists(quarantine));
+                expected=Call("RequirePerformanceInventory",request,true,folder);Call("MovePerformanceFiles",request,expected,folder,quarantine);
+                Assert.AreEqual(5,Directory.GetFiles(quarantine).Length);Assert.IsFalse(Directory.Exists(Path.Combine(folder,"Assets/Resources")));Call("VerifyInventory",request,folder);
+                Directory.CreateDirectory(Path.Combine(folder,"Assets/Resources"));
+                Assert.Throws<TargetInvocationException>(()=>Call("RequirePerformanceBaselineAbsent",folder));
+            });
             // Preserve the exact existing 17-test inventory while testing the new bounded diagnostics.
             var diagnosticType=Builder.GetNestedType("Diagnostic",BindingFlags.NonPublic);var diagnostic=Activator.CreateInstance(diagnosticType,true);
             Call("RememberFailure",diagnostic,"PRIMARY","ROOT_IMPORT_HASH","BUILD_FAILED");
