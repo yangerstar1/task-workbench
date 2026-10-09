@@ -317,7 +317,9 @@ namespace DesertRV.Tests
                 // plus repeatedly evaluating the same time can retain a post-animation edit.
                 float targetTime = (++rawPoseEvaluation % 2 == 1) ? .25f : .75f;
                 const float frameDelta = 1f / 60f;
-                Animator.Play("Idle", 0, targetTime - frameDelta); Animator.Update(frameDelta);
+                Animator.Play("Idle", 0, targetTime - frameDelta);
+                Animator.Update(0); // Establish the Play request before advancing the next evaluation.
+                Animator.Update(frameDelta);
                 Assert.That(Animator.GetCurrentAnimatorStateInfo(0).normalizedTime,
                     Is.EqualTo(targetTime).Within(.00001f), "Animator must advance to the keyed raw pose.");
                 Assert.That(Animator.GetCurrentAnimatorStateInfo(0).shortNameHash, Is.EqualTo(UnityEngine.Animator.StringToHash("Idle")),

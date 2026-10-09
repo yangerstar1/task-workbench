@@ -4825,8 +4825,8 @@
     },
     {
       "path": "tasks/desert-rv/unity/Assets/DesertRV/Tests/CandidateArt/ArmoredFootContactConstraintTests.cs",
-      "sha256": "d93bb2616824068a57aeacd9b81ad6d8e37e47bb3d12c5732689a41797ebeb43",
-      "size": 40977
+      "sha256": "5b76f9cf7609b727edc570a0b696d82753ebfc270f0d662c81604385db1310a8",
+      "size": 41097
     },
     {
       "path": "tasks/desert-rv/unity/Assets/DesertRV/Tests/CandidateArt/ArmoredFootContactConstraintTests.cs.meta",
@@ -4885,8 +4885,8 @@
     },
     {
       "path": "tasks/desert-rv/unity/Assets/DesertRV/Tests/CandidateArt/PouncerPawContactConstraintTests.cs",
-      "sha256": "e9dc1b1513cfe048cf150dbaa2b04f703331e1360e0023457f96926fd9ce5826",
-      "size": 43542
+      "sha256": "073a789205bcfc20b54de1a413d12d5ebc94d2918a38855cba0c7a7efa387ea4",
+      "size": 43562
     },
     {
       "path": "tasks/desert-rv/unity/Assets/DesertRV/Tests/CandidateArt/PouncerPawContactConstraintTests.cs.meta",
