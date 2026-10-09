@@ -5,8 +5,8 @@ set -euo pipefail
 : "${UNITY_EDITOR:?Existing licensed Unity 6000.3.19f1 executable required}"
 mode="${DESERTRV_RENDER_MODE:-journey}"
 case "$mode" in
-  journey) : "${DESERTRV_DIAGNOSTIC_SCOPE:?Pinned request required}"; : "${DESERTRV_INPUT_PLAN:?Observed short-segment plan required}"; entry=DesertRV.Editor.JourneyRenderedDiagnosticRunner.Run ;;
-  window-smoke) entry=DesertRV.Editor.JourneyRenderedDiagnosticRunner.RunWindowSmoke ;;
+  journey) : "${DESERTRV_DIAGNOSTIC_SCOPE:?Pinned request required}"; : "${DESERTRV_INPUT_PLAN:?Observed short-segment plan required}"; entry=DesertRV.Editor.JourneyRenderedCommandLine.Run ;;
+  window-smoke) entry=DesertRV.Editor.JourneyRenderedCommandLine.RunWindowSmoke ;;
   *) exit 2 ;;
 esac
 : "${DESERTRV_EVIDENCE_DIR:?Fresh evidence directory required}"
@@ -21,13 +21,19 @@ script_dir="$(cd -- "$(dirname -- "$0")" && pwd)"
 Xvfb "$DISPLAY" -screen 0 1600x1000x24 -nolisten tcp >"$private_logs/xvfb.log" 2>&1 & xvfb_pid=$!
 unity_pid=''
 wm_pid=''
+editor_status=unknown
+capture_status=unknown
+termination_request=NONE
 cleanup() {
   original=$?
   trap - EXIT
-  [[ -z "$unity_pid" ]] || kill "$unity_pid" 2>/dev/null || true
+  if [[ -n "$unity_pid" ]]; then
+    if kill -TERM "$unity_pid" 2>/dev/null; then termination_request=SIGTERM_ON_SHELL_CLEANUP; fi
+  fi
   [[ -z "$wm_pid" ]] || kill "$wm_pid" 2>/dev/null || true
   kill "$xvfb_pid" 2>/dev/null || true
   if ! python3 "$script_dir/rendered/write_control_status.py" --record-progress "$DESERTRV_PROGRESS_DIR" "$DESERTRV_EVIDENCE_DIR" >/dev/null 2>&1; then original=1; fi
+  if ! python3 "$script_dir/rendered/startup_diagnostic.py" --logs "$private_logs" --project "$DESERTRV_UNITY_PROJECT" --output "$DESERTRV_EVIDENCE_DIR/startup-diagnostic.json" --editor-exit "$editor_status" --capture-exit "$capture_status" --termination "$termination_request" >/dev/null 2>&1; then original=1; fi
   exit "$original"
 }
 trap cleanup EXIT
@@ -45,7 +51,9 @@ set +e
 python3 "$(dirname "$0")/capture_game_window.py" "$DESERTRV_CAPTURE_HANDSHAKE_DIR" "$private_capture/real-time.mp4" "$private_capture/capture-receipt.json" "$unity_pid"
 capture_status=$?
 # Recording failure is terminal. Do not wait five more minutes for the unrelated outer watchdog.
-if [[ "$capture_status" != 0 ]]; then kill -TERM "$unity_pid" 2>/dev/null || true; fi
+if [[ "$capture_status" != 0 ]]; then
+  if kill -TERM "$unity_pid" 2>/dev/null; then termination_request=SIGTERM_ON_CAPTURE_FAILURE; fi
+fi
 wait "$unity_pid"; editor_status=$?
 set -e
 unity_pid=''

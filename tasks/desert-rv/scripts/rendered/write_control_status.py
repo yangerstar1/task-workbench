@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # Fixed enums only; never copy process logs, credentials, paths, or exception strings.
 import json,os,pathlib,re,sys
+import startup_diagnostic as startup
 from guard_export import CODES,PHASES,STATES,safe,unique_object
 BASE=pathlib.Path('/github/workspace/tasks/desert-rv')
 CAPTURE_FIELDS={'mode','sourceVerified','visualReviewed','audioCaptured','captureStartUtc','captureEndUtc','nominalCaptureFps','identityChecks','encodedProgressFrames','windowId','title','pid','width','height','failureCode','editorExitCode','editorStopAcknowledged','encoderExitCode','encoderStopMethod','encoderFailureCode','videoSha256'}
@@ -45,7 +46,8 @@ def summarize_progress(directory,evidence):
 def write_status(values,base=BASE):
     if len(values)!=4 or not all(type(v) is str and v in STATES for v in values):raise ValueError()
     report=dict(schema=1,mode='RENDERED_CONTROL_ONLY_NOT_ACCEPTANCE',activation=values[0],licenseReturn=values[1],renderProcess=values[2],privateCleanup=values[3],
-        captureFailureCode=capture_detail(base/'rendered-private-evidence/capture-receipt.json'),renderPhases=read_phases(base/'rendered-private-evidence/render-progress.json'))
+        captureFailureCode=capture_detail(base/'rendered-private-evidence/capture-receipt.json'),renderPhases=read_phases(base/'rendered-private-evidence/render-progress.json'),
+        startupDiagnostics=startup.load_report(base/'rendered-private-evidence/startup-diagnostic.json',base/'unity'))
     out=safe(base/'rendered-control-export');out.mkdir(exist_ok=True);os.chmod(out,0o755)
     p=safe(out/'status.json');p.write_text(json.dumps(report)+'\n');os.chmod(p,0o644)
     if read_small(p)!=report:raise ValueError()

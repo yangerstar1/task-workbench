@@ -12,9 +12,19 @@ namespace DesertRV.Editor
     [InitializeOnLoad]
     public static class JourneyRenderedDiagnosticRunner
     {
-        public const string Entry = "DesertRV.Editor.JourneyRenderedDiagnosticRunner.Run";
-        public const string SmokeEntry = "DesertRV.Editor.JourneyRenderedDiagnosticRunner.RunWindowSmoke";
-        static bool Smoke => Environment.GetCommandLineArgs().Contains(SmokeEntry);
+        public const string Entry = "DesertRV.Editor.JourneyRenderedCommandLine.Run";
+        public const string SmokeEntry = "DesertRV.Editor.JourneyRenderedCommandLine.RunWindowSmoke";
+        static string RequestedEntry
+        {
+            get
+            {
+                var args = Environment.GetCommandLineArgs(); int count = 0; string method = null;
+                for (int i = 0; i < args.Length; i++) if (args[i] == "-executeMethod")
+                { count++; method = i + 1 < args.Length ? args[i + 1] : null; }
+                return count == 1 && (method == Entry || method == SmokeEntry) ? method : null;
+            }
+        }
+        static bool Smoke => RequestedEntry == SmokeEntry;
         static JourneyWindowSmokeEvidence smokeRecorder;
         [Serializable] sealed class CaptureRequest { public string title; public int pid; }
         [Serializable] sealed class CaptureReady { public string title, windowId; public int pid; public bool valid; }
@@ -29,7 +39,7 @@ namespace DesertRV.Editor
             EditorApplication.playModeStateChanged += OnPlayMode;
             EditorApplication.update += Poll;
         }
-        static bool ExplicitInvocation => Environment.GetCommandLineArgs().Contains(Entry) || Smoke;
+        static bool ExplicitInvocation => RequestedEntry != null;
         static string Required(string name)
         {
             string value = Environment.GetEnvironmentVariable(name);

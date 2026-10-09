@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Last host-side boundary; publish only verified allowlist or one fixed failure status."""
 import hashlib,json,os,pathlib,re,shutil,subprocess,tempfile
+import startup_diagnostic as startup
 ROOT=pathlib.Path(__file__).resolve().parents[4]
 TASK=ROOT/'tasks/desert-rv'
 CODES={'editor-startup','request-identity','process-identity','duplicate-window','game-window-unavailable','window-identity','window-not-viewable','window-size','window-resized','ffmpeg-exited','video-frame-heartbeat','editor-stop-not-success','editor-disappeared','capture-watchdog','capture-validation-failed','encoder-shutdown','encoder-not-started','encoder-exited-before-stop','encoder-stop-pipe','encoder-stop-timeout','encoder-exit-nonzero','encoder-missing-video','capture-not-started','NONE','UNAVAILABLE'}
@@ -17,16 +18,19 @@ def read_control(p):
     p=safe(p)
     if not p.is_file() or p.stat().st_size>4096:raise ValueError()
     value=json.loads(p.read_text(),object_pairs_hook=unique_object)
-    if not isinstance(value,dict) or set(value)!=CONTROL_FIELDS:raise ValueError()
+    if not isinstance(value,dict) or set(value) not in (CONTROL_FIELDS,CONTROL_FIELDS|{'startupDiagnostics'}):raise ValueError()
     if type(value['schema']) is not int or value['schema']!=1 or value['mode']!='RENDERED_CONTROL_ONLY_NOT_ACCEPTANCE':raise ValueError()
     if any(type(value[k]) is not str or value[k] not in STATES for k in ('activation','licenseReturn','renderProcess','privateCleanup')):raise ValueError()
     if type(value['captureFailureCode']) is not str or value['captureFailureCode'] not in CODES:raise ValueError()
     phases=value['renderPhases']
     if not isinstance(phases,list) or phases!=[p for p in PHASES if p in phases]:raise ValueError()
+    if 'startupDiagnostics' in value:startup.validate(value['startupDiagnostics'],set(startup.source_map(TASK/'unity').values()))
     return value
 def failure_details(control):
     # Reconstruct from finite enums only. Never copy arbitrary receipt fields, logs, or traces.
-    return {key:control[key] for key in ('activation','licenseReturn','renderProcess','privateCleanup','captureFailureCode','renderPhases')}
+    result={key:control[key] for key in ('activation','licenseReturn','renderProcess','privateCleanup','captureFailureCode','renderPhases')}
+    if 'startupDiagnostics' in control:result['startupDiagnostics']=control['startupDiagnostics']
+    return result
 def safe(p):
     if p.is_symlink() or any(x.is_symlink() for x in p.parents):raise ValueError()
     return p

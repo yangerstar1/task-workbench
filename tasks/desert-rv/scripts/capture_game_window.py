@@ -34,6 +34,36 @@ def finish_encoder(process):
         process.kill();process.wait();return process.returncode,method,'encoder-stop-timeout'
     return code,method,None if type(code) is int and code==0 else 'encoder-exit-nonzero'
 
+ENTRIES={'journey':'DesertRV.Editor.JourneyRenderedCommandLine.Run','window-smoke':'DesertRV.Editor.JourneyRenderedCommandLine.RunWindowSmoke'}
+def parse_unity_argv(raw,project,mode):
+    if not isinstance(raw,bytes) or len(raw)>32768 or not raw.endswith(b'\0'):return False
+    try:args=raw[:-1].decode('utf-8','strict').split('\0')
+    except UnicodeDecodeError:return False
+    if not args or mode not in ENTRIES:return False
+    if any(flag in args for flag in ('-batchmode','-nographics')):return False
+    for flag,expected in (('-executeMethod',ENTRIES[mode]),('-projectPath',project)):
+        positions=[i for i,value in enumerate(args) if value==flag]
+        if len(positions)!=1 or positions[0]+1>=len(args) or args[positions[0]+1]!=expected:return False
+    return True
+
+def owned_descendant(pid,launcher,proc=pathlib.Path('/proc')):
+    if pid==launcher:return False # timeout parent is not the Unity window-owning child.
+    seen=set()
+    for _ in range(8):
+        if pid<=1 or pid in seen:return False
+        seen.add(pid)
+        try:parent=int((proc/str(pid)/'stat').read_text().rsplit(')',1)[1].split()[1])
+        except (OSError,ValueError,IndexError):return False
+        if parent==launcher:return True
+        pid=parent
+    return False
+
+def verify_owned_process(pid,launcher):
+    expected=pathlib.Path(os.environ['UNITY_EDITOR']).resolve()
+    if pathlib.Path(f'/proc/{pid}/exe').resolve()!=expected or not owned_descendant(pid,launcher):raise RuntimeError('process-identity')
+    project=os.environ.get('DESERTRV_UNITY_PROJECT','');mode=os.environ.get('DESERTRV_RENDER_MODE','journey')
+    if not project or not parse_unity_argv(pathlib.Path(f'/proc/{pid}/cmdline').read_bytes(),project,mode):raise RuntimeError('process-identity')
+
 def mark_phase(phase):
     # Optional diagnostic facts, never a success override or a source of arbitrary public text.
     directory=os.environ.get('DESERTRV_PROGRESS_DIR')
@@ -55,8 +85,7 @@ def main():
         title=request['title']; pid=request['pid']
         if not re.fullmatch(r'DESERTRV_GAME_[a-f0-9]{32}',title) or type(pid)!=int or pid<=0: raise RuntimeError('request-identity')
         # Window is discovered by exact title, then bound to the actual Unity executable PID.
-        expected=pathlib.Path(os.environ['UNITY_EDITOR']).resolve()
-        if pathlib.Path(f'/proc/{pid}/exe').resolve()!=expected: raise RuntimeError('process-identity')
+        verify_owned_process(pid,a.launcher_pid)
         until=time.monotonic()+15
         while time.monotonic()<until:
             found=subprocess.run(['xdotool','search','--onlyvisible','--name','^'+title+'$'],capture_output=True,text=True)

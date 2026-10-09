@@ -30,7 +30,7 @@ class CaptureShutdownTests(unittest.TestCase):
             root=pathlib.Path(directory);h=root/'handshake';h.mkdir();video=root/'synthetic.mp4';receipt=root/'receipt.json'
             (h/'request.json').write_text(json.dumps({'title':'DESERTRV_GAME_'+'a'*32,'pid':os.getpid()}));(h/'stop.json').write_text(json.dumps({'editorExitCode':editor_exit}))
             if video_exists:video.write_bytes(b'SYNTHETIC PROTOCOL FIXTURE NOT GAMEVIEW')
-            with patch.object(sys,'argv',['capture',str(h),str(video),str(receipt),str(os.getpid())]),patch.dict(os.environ,UNITY_EDITOR=sys.executable,DISPLAY='synthetic'),patch.object(capture,'identity',return_value=(320,200)),patch.object(capture.subprocess,'run',return_value=types.SimpleNamespace(stdout='123\n')),patch.object(capture.subprocess,'Popen',return_value=proc),patch.object(capture.threading,'Thread',Thread):
+            with patch.object(sys,'argv',['capture',str(h),str(video),str(receipt),str(os.getpid())]),patch.dict(os.environ,UNITY_EDITOR=sys.executable,DISPLAY='synthetic'),patch.object(capture,'verify_owned_process',return_value=None),patch.object(capture,'identity',return_value=(320,200)),patch.object(capture.subprocess,'run',return_value=types.SimpleNamespace(stdout='123\n')),patch.object(capture.subprocess,'Popen',return_value=proc),patch.object(capture.threading,'Thread',Thread):
                 code=capture.main()
             return code,json.loads(receipt.read_text())
     def test_q_zero_exit_and_successful_editor_stop_is_the_only_success(self):
