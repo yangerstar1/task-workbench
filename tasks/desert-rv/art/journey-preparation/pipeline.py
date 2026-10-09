@@ -65,6 +65,7 @@ def validate_selection(value):
         module=__import__('strict_output' if item['kind']=='armored' else item['kind']+'_output');module.contract_shape(c);ids.append(c['id'])
     require(len(set(ids))==3,'PREP_DUPLICATE_CANDIDATE_ID')
     require(isinstance(value['fx'],dict) and isinstance(value['integration'],dict),'PREP_AUTHORING_SELECTION')
+    arc_pose_source(value['integration'])
 
 def validation_sources():
     files=[ROOT/'art/import-candidate'/name for name in ('strict_output.py','pouncer_output.py','weapon_output.py','verify_output.py','candidate_native_cases.py','foot_contact_output.py','paw_contact_output.py')]
@@ -225,6 +226,13 @@ def collect(kind,native):
         s['assetFiles']=merged;phase='STATE_SAVE';save(s)
     except Exception as error:raise ArchiveStageFailure(phase,kind,error) from None
 
+def arc_pose_source(integration):
+    # Preserve raw JSON null intent before Unity inline serialization can materialize a DTO.
+    require(isinstance(integration,dict) and 'arcModulePose' in integration,'PREP_EXPLICIT_ARC_POSE_INTENT')
+    pose=integration['arcModulePose']
+    require(pose is None or isinstance(pose,dict),'PREP_EXPLICIT_ARC_POSE_INTENT')
+    return 'scene-geometry' if pose is None else 'selection'
+
 def ready():
     s=state();check_state(s);require([x['kind'] for x in s['completed']]==list(KINDS),'PREP_THREE_STRICT_SUCCESSES_REQUIRED');assert_union(s['assetFiles'])
     require(not (PROJECT/'JourneyEvidence/CandidateArt').exists(),'PREP_RAW_REPORT_DESTINATION_EXISTS')
@@ -242,7 +250,7 @@ def ready():
         require(sha(PROJECT/contract)==imp['contractSha256'],'PREP_COPIED_CONTRACT_CHANGED')
         requests.append(dict(kind=kind,sourceModelPath=str(Path(contract).parent/'Source'/c['modelFile']),prefab=dict(path=prefab,sha256=sha(PROJECT/prefab),dependencyHash=imp['dependencyHash'],dependencySha256=imp['dependencySha256']),contract=dict(path=contract,sha256=sha(PROJECT/contract)),importReport=dict(path=str(dest.relative_to(PROJECT)/'import-report.json'),sha256=sha(dest/'import-report.json'))))
         proof.append(dict(path=str((PUBLIC/kind/'receipt.json').relative_to(REPO)),sha256=item['exportReceiptSha256']))
-    payload=dict(schema=1,status='THREE_NATIVE_STRICT_EXPORTS_VERIFIED_NOT_APPROVED',sourceCommit=s['sourceCommit'],fx=s['plan']['fx'],integration=s['plan']['integration'],validatedExportReceipts=proof,validationSourcePins=s['validationSourcePins'],nativeProofs=[dict(kind=x['kind'],xml=x['nativeXml'],cases=x['nativeCases']) for x in s['completed']])
+    payload=dict(schema=1,status='THREE_NATIVE_STRICT_EXPORTS_VERIFIED_NOT_APPROVED',sourceCommit=s['sourceCommit'],fx=s['plan']['fx'],integration=s['plan']['integration'],arcModulePoseSource=arc_pose_source(s['plan']['integration']),validatedExportReceipts=proof,validationSourcePins=s['validationSourcePins'],nativeProofs=[dict(kind=x['kind'],xml=x['nativeXml'],cases=x['nativeCases']) for x in s['completed']])
     payload['integration']['candidates']=requests
     target=PRIVATE/'ready-input.json';require(not target.exists(),'PREP_READY_INPUT_EXISTS');target.write_text(json.dumps(payload,indent=2)+'\n')
     (PRIVATE/'ready-input.sha256').write_text(sha(target)+'\n');s['phase']='ready-input-frozen';s['readyInputSha256']=sha(target);save(s)

@@ -19,7 +19,7 @@ namespace DesertRV.Editor
         [Serializable] public sealed class ReadyInput
         {
             public int schema;
-            public string status, sourceCommit;
+            public string status, sourceCommit, arcModulePoseSource;
             public JourneyCandidateAssetIntegration.FxRequest fx;
             public JourneyCandidateAssetIntegration.Request integration;
             public JourneyCandidateAssetIntegration.FilePin[] validatedExportReceipts, validationSourcePins;
@@ -93,6 +93,7 @@ namespace DesertRV.Editor
                 input.sourceCommit == Environment.GetEnvironmentVariable("GITHUB_SHA") && Regex.IsMatch(input.sourceCommit ?? "", "^[a-f0-9]{40}$"), "Same-job strict readiness is absent.");
             Check(input.integration != null && input.fx != null && input.integration.candidates != null && input.integration.candidates.Length == 3 &&
                 input.validatedExportReceipts != null && input.validatedExportReceipts.Length == 3, "All three actual strict exports required.");
+            Check(input.arcModulePoseSource == "scene-geometry" || input.arcModulePoseSource == "selection", "Explicit pinned arc pose source required.");
             var kinds = new[] { "armored", "pouncer", "weapon" };
             Check(new HashSet<string>(input.integration.candidates.Select(c => c.kind)).SetEquals(kinds), "Three independent strict kinds required.");
             string repo = Path.GetFullPath("../../.."), run = null;
@@ -152,8 +153,8 @@ namespace DesertRV.Editor
                 Check(fx.status == "ORIGINAL_NATIVE_FX_AUTHORED_UNCALIBRATED" && fx.protectedSourcesUnchanged && fx.failures.Length == 0 && !fx.visualCalibrated && !fx.audioAuditioned && !fx.gameplayReviewed, "Actual original FX authoring did not finish.");
                 input.integration.sourceCommit = input.sourceCommit;
                 input.integration.muzzleFlashPrefab = fx.muzzleFlashPrefab; input.integration.arcPresentationPrefab = fx.arcPresentationPrefab;
-                // Explicit source-supported weapon pose is retained. Only missing arc pose is proposed from actual RV geometry.
-                if (input.integration.arcModulePose == null) input.integration.arcModulePose = poses.arcModulePose;
+                // The host pinned the raw JSON null/object intent before Unity inline DTO deserialization.
+                input.integration.arcModulePose = JourneyCandidateAssetIntegration.ResolveArcModulePose(input.arcModulePoseSource, input.integration.arcModulePose, poses.arcModulePose);
                 string selection = Folder + "/integration-selection.json", frozen = Folder + "/integration-input.json";
                 WriteFresh(selection, input.integration);
                 Set("DESERTRV_JOURNEY_ASSET_SELECTION", selection); Set("DESERTRV_JOURNEY_ASSET_SELECTION_SHA256", Hash(selection)); Set("DESERTRV_JOURNEY_ASSET_INPUT", frozen);

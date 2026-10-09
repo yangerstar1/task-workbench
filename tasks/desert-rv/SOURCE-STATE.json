@@ -368,8 +368,8 @@
     },
     {
       "path": "tasks/desert-rv/art/journey-preparation/pipeline.py",
-      "sha256": "1e8a2fbfee48bddbd899a09fae0c859398039128cea80e5e7f61452e556bd8b2",
-      "size": 23181
+      "sha256": "77a8777f9a05b0d987ab3034ccb232625c466912d871053ceecb6a5e09b95614",
+      "size": 23704
     },
     {
       "path": "tasks/desert-rv/art/journey-preparation/test_generated_export.py",
@@ -383,8 +383,8 @@
     },
     {
       "path": "tasks/desert-rv/art/journey-preparation/test_pipeline.py",
-      "sha256": "3790fcab81d9b6a7b6dd60319a7402c397f69cc3acfa0e3f3a47601f35c5afc9",
-      "size": 25570
+      "sha256": "25d19c789bb4d1f3c1e1ccb755272c641f0c4ea6aba5f184788f0bcf5db39dd6",
+      "size": 26548
     },
     {
       "path": "tasks/desert-rv/art/journey-preparation/three-strict-candidates.json",
@@ -4073,8 +4073,8 @@
     },
     {
       "path": "tasks/desert-rv/unity/Assets/DesertRV/Editor/JourneyCandidateAssetIntegration.cs",
-      "sha256": "195fd639a08574ca1811aa341664b4576e36b34e9136ffb8cbe3b9f3fc376e96",
-      "size": 50590
+      "sha256": "3695d636fc9a5a6c34f947e447ed0d620b35d558e5f68d5a4342ee82f4ffc816",
+      "size": 52659
     },
     {
       "path": "tasks/desert-rv/unity/Assets/DesertRV/Editor/JourneyCandidateAssetIntegration.cs.meta",
@@ -4103,8 +4103,8 @@
     },
     {
       "path": "tasks/desert-rv/unity/Assets/DesertRV/Editor/JourneyCandidatePreparation.cs",
-      "sha256": "29afac54b724a0d5d12170e6d4e13ff2a9f0c27d128b0bdfc621ba9e57401bfd",
-      "size": 15548
+      "sha256": "4b8b9353a978fd21f560cda4a22965663f07cc0a3437b130ab551e096aced33d",
+      "size": 15773
     },
     {
       "path": "tasks/desert-rv/unity/Assets/DesertRV/Editor/JourneyCandidatePreparation.cs.meta",
@@ -5298,8 +5298,8 @@
     },
     {
       "path": "tasks/desert-rv/unity/Assets/DesertRV/Tests/JourneyPreparation/JourneyPreparationTests.cs",
-      "sha256": "ac7833c3f577fea54b4ec5a6702599059abb6a1dcffa7d5b50eb849b69e4da0e",
-      "size": 3087
+      "sha256": "183887647ec44b061c0301c4fa224738cdcf89c7a78886f817195554c50638e4",
+      "size": 6481
     },
     {
       "path": "tasks/desert-rv/unity/Assets/DesertRV/Tests/JourneyPreparation/JourneyPreparationTests.cs.meta",

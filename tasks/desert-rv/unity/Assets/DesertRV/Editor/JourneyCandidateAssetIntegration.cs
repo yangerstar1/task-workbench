@@ -89,6 +89,30 @@ namespace DesertRV.Editor
                 Finite(p.localRotation.x) && Finite(p.localRotation.y) && Finite(p.localRotation.z) && Finite(p.localRotation.w) &&
                 Mathf.Abs(Quaternion.Dot(p.localRotation, p.localRotation) - 1) <= .0001f && p.localScale == Vector3.one, "Explicit finite pose with unit outer scale required; do not renormalize imported rig scale.");
         }
+        static void NamedPoseShape(Pose pose, string role)
+        {
+            try { PoseShape(pose); }
+            catch (InvalidOperationException error)
+            {
+                string values = pose == null ? "null" : JsonUtility.ToJson(pose) +
+                    "; positionFinite=" + Finite(pose.localPosition) + "; scaleFinite=" + Finite(pose.localScale) +
+                    "; rotationFinite=" + (Finite(pose.localRotation.x) && Finite(pose.localRotation.y) && Finite(pose.localRotation.z) && Finite(pose.localRotation.w)) +
+                    "; rotationNormSquared=" + Quaternion.Dot(pose.localRotation, pose.localRotation).ToString("R", System.Globalization.CultureInfo.InvariantCulture) +
+                    "; unitOuterScale=" + (pose.localScale == Vector3.one);
+                throw new InvalidOperationException(role + " rejected: " + values + "; " + error.Message, error);
+            }
+        }
+        internal static Pose ResolveArcModulePose(string source, Pose selected, Pose derived)
+        {
+            Require(source == "selection" || source == "scene-geometry", "Explicit pinned arc pose source required.");
+            if (source == "selection") { NamedPoseShape(selected, "arcModulePose(selection)"); return selected; }
+            // Observe this Unity version's representation of the exact null field, rather than accepting an arbitrary invalid pose.
+            var nullPose = JsonUtility.FromJson<Request>("{\"arcModulePose\":null}").arcModulePose;
+            Require(selected == null && nullPose == null || selected != null && nullPose != null &&
+                selected.localPosition.Equals(nullPose.localPosition) && selected.localScale.Equals(nullPose.localScale) && selected.localRotation.Equals(nullPose.localRotation),
+                "Scene-derived arc pose requires the explicitly selected JSON null; supplied pose cannot be replaced.");
+            NamedPoseShape(derived, "arcModulePose(actual scene geometry)"); return derived;
+        }
         // Public pure input-shape check: useful to fail before asset/scene writes and in isolated NUnit tests.
         public static void ValidateRequestShape(Request r, string expectedCommit)
         {
@@ -102,7 +126,7 @@ namespace DesertRV.Editor
             Require(r.savedInputs != null && r.savedInputs.Length == 5 && r.savedInputs.All(p => p != null) &&
                 new HashSet<string>(r.savedInputs.Select(p => p.path)).SetEquals(TargetPaths()), "Pin exactly four already-generated Journey scenes and the JourneyContent asset.");
             Require(r.muzzleFlashPrefab != null && r.arcPresentationPrefab != null, "Explicit authored muzzle flash and arc presentation prefab pins required.");
-            PoseShape(r.weaponCameraPose); PoseShape(r.flashMuzzlePose); PoseShape(r.arcModulePose);
+            NamedPoseShape(r.weaponCameraPose, "weaponCameraPose"); NamedPoseShape(r.flashMuzzlePose, "flashMuzzlePose"); NamedPoseShape(r.arcModulePose, "arcModulePose");
             Require(r.sounds != null && r.sounds.Length == 7 && r.sounds.All(s => s != null && s.clip != null) &&
                 new HashSet<string>(r.sounds.Select(s => s.role)).SetEquals(SoundRoles), "Seven exact playable audio roles required, including reload and arc.");
             Require(r.regions != null && r.regions.Length == 3 && r.regions.All(p => p != null) &&

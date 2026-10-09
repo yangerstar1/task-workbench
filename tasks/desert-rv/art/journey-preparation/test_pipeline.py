@@ -19,6 +19,15 @@ class PipelineTests(unittest.TestCase):
         self.file(prefix+'/Source/model.fbx',b'fixture bytes, not a native FBX');self.file(prefix+'/Source/model.fbx.meta',b'guid: '+b'a'*32+b'\n')
         self.file(prefix+'.meta',b'guid: '+name.encode()+b'\n');self.file(str(p.IMPORTS)+'.meta',b'fixed shared root meta')
         return p.import_inventory()
+    def test_arc_json_null_has_explicit_geometry_source(self):self.assertEqual(p.arc_pose_source({'arcModulePose':None}),'scene-geometry')
+    def test_explicit_arc_object_keeps_selection_source(self):self.assertEqual(p.arc_pose_source({'arcModulePose':{'localScale':{'x':1,'y':1,'z':1}}}),'selection')
+    def test_zero_arc_object_cannot_become_geometry_fallback(self):self.assertEqual(p.arc_pose_source({'arcModulePose':{'localScale':{'x':0,'y':0,'z':0}}}),'selection')
+    def test_empty_arc_object_cannot_become_geometry_fallback(self):self.assertEqual(p.arc_pose_source({'arcModulePose':{}}),'selection')
+    def test_missing_arc_key_is_not_explicit_null(self):
+        with self.assertRaisesRegex(Exception,'EXPLICIT_ARC_POSE_INTENT'):p.arc_pose_source({})
+    def test_wrong_arc_json_type_is_rejected(self):
+        for value in (False,0,'null',[]):
+            with self.assertRaisesRegex(Exception,'EXPLICIT_ARC_POSE_INTENT'):p.arc_pose_source({'arcModulePose':value})
     def test_checked_selection_real_contract_hashes_and_all_existing_shape_gates(self):
         plan=json.loads(SELECTION.read_text())
         for source in plan['sources']:

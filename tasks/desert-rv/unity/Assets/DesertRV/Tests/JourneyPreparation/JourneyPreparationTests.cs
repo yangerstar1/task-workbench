@@ -1,5 +1,6 @@
 using System;
 using System.Linq;
+using System.IO;
 using System.Reflection;
 using NUnit.Framework;
 using UnityEngine;
@@ -38,10 +39,47 @@ namespace DesertRV.Tests
             CollectionAssert.AreEqual(roots, after.SelectMany(scene => scene.GetRootGameObjects()).Select(go => go.GetInstanceID()).OrderBy(id => id));
             Assert.AreEqual(active, SceneManager.GetActiveScene()); Assert.IsTrue(after.All(scene => !scene.isDirty));
         }
+        static void VerifyPoseJsonRoundtrip()
+        {
+            var editor = Type.GetType("DesertRV.Editor.JourneyCandidateAssetIntegration, Assembly-CSharp-Editor", true);
+            var requestType = editor.GetNestedType("Request"); var poseType = editor.GetNestedType("Pose");
+            var readyType = Type.GetType("DesertRV.Editor.JourneyCandidatePreparation+ReadyInput, Assembly-CSharp-Editor", true);
+            var resolve = editor.GetMethod("ResolveArcModulePose", BindingFlags.Static | BindingFlags.NonPublic);
+            var shape = editor.GetMethod("NamedPoseShape", BindingFlags.Static | BindingFlags.NonPublic);
+            object PoseOf(object request, string name) => requestType.GetField(name).GetValue(request);
+            object ParsePose(string json) => JsonUtility.FromJson(json, poseType);
+            const string unit = "{\"localPosition\":{\"x\":0.125,\"y\":0.25,\"z\":0.5},\"localRotation\":{\"x\":0,\"y\":0,\"z\":0,\"w\":1},\"localScale\":{\"x\":1,\"y\":1,\"z\":1}}";
+            var derived = ParsePose(unit); // Isolated method fixture only; never written to a production input/asset.
+            var actual = JsonUtility.FromJson(File.ReadAllText("JourneyEvidence/JourneyPreparation/ready-input.json"), readyType);
+            var roundtrip = JsonUtility.FromJson(JsonUtility.ToJson(actual), readyType);
+            foreach (var ready in new[] { actual, roundtrip })
+            {
+                var request = readyType.GetField("integration").GetValue(ready);
+                string intent = (string)readyType.GetField("arcModulePoseSource").GetValue(ready);
+                var selected = PoseOf(request, "arcModulePose");
+                Debug.Log("JOURNEY_POSE_JSON_ROUNDTRIP source=" + intent + "; arcNull=" + (selected == null) + "; arc=" + (selected == null ? "null" : JsonUtility.ToJson(selected)));
+                var resolved = resolve.Invoke(null, new[] { (object)intent, selected, derived });
+                Assert.AreSame(intent == "scene-geometry" ? derived : selected, resolved);
+                foreach (string role in new[] { "weaponCameraPose", "flashMuzzlePose" }) shape.Invoke(null, new[] { PoseOf(request, role), role });
+            }
+            var observedNull = PoseOf(JsonUtility.FromJson("{\"arcModulePose\":null}", requestType), "arcModulePose");
+            Assert.AreSame(derived, resolve.Invoke(null, new[] { (object)"scene-geometry", observedNull, derived }));
+            var explicitPose = ParsePose(unit);
+            Assert.AreSame(explicitPose, resolve.Invoke(null, new[] { (object)"selection", explicitPose, derived }));
+            var invalid = ParsePose(unit); poseType.GetField("localScale").SetValue(invalid, Vector3.zero);
+            foreach (var args in new[] {
+                new[] { (object)"selection", invalid, derived }, new[] { (object)"selection", observedNull, derived },
+                new[] { (object)"scene-geometry", explicitPose, derived }, new[] { (object)"scene-geometry", observedNull, invalid },
+                new[] { (object)null, observedNull, derived }, new[] { (object)"unknown", observedNull, derived } })
+            {
+                var error = Assert.Throws<TargetInvocationException>(() => resolve.Invoke(null, args));
+                Assert.IsInstanceOf<InvalidOperationException>(error.InnerException);
+            }
+        }
         [Test] public void PrepareVerifiedSameWorkspaceJourney()
         {
             // Actual native success and injected-failure cleanup, inside the existing single-case gate.
-            VerifyFxPreviewLifecycle(false); VerifyFxPreviewLifecycle(true);
+            VerifyFxPreviewLifecycle(false); VerifyFxPreviewLifecycle(true); VerifyPoseJsonRoundtrip();
             Type.GetType("DesertRV.Editor.JourneyCandidatePreparation, Assembly-CSharp-Editor", true)
                 .GetMethod("PrepareVerifiedSameWorkspace").Invoke(null, null);
         }
