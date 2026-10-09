@@ -624,7 +624,10 @@ def export_weapon(root,output,c,summary,native,protected):
             dependencyHashScope='Existing Unity dependency digest: available dependency files and meta bytes; virtual Packages contents are not asserted hashed.')
         require(weapon_native_report(root)==native_hash,'WEAPON_NATIVE_CHANGED_DURING_EXPORT')
         verify_snapshot(snapshot)
-        (staged/'receipt.json').write_text(json.dumps(result,indent=2,allow_nan=False)+'\n')
+        receipt_bytes=(json.dumps(result,indent=2,allow_nan=False)+'\n').encode()
+        (staged/'receipt.json').write_bytes(receipt_bytes)
+        import strict_output
+        strict_output.verify_staged_inventory(staged,records,hashlib.sha256(receipt_bytes).hexdigest())
         require(not output.is_symlink() and not any(output.iterdir()),'WEAPON_EXPORT_NOT_EMPTY_OR_UNSAFE')
         staged.replace(output)
         summary.update(result)

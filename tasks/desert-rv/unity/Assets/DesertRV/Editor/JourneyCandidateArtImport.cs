@@ -27,7 +27,7 @@ namespace DesertRV.Editor
         [Serializable] public sealed class Bindings
         {
             public string animatorPath, body, leftHand, rightHand, muzzle, incomingOffset, leftReloadOffset;
-            public RootNeutralBaseline neutralBaseline;
+            public RootNeutralBaseline neutralBaseline,rigCurveBaseline;
             public string[] loadedNails, incomingNails;
             public string weakPointRoot, core; public string[] plates, plateRenderers;
             public Vector3[] openEuler; public Color openEmission, openBaseColor;
@@ -207,7 +207,7 @@ namespace DesertRV.Editor
                         Check(binding.type==typeof(Transform),"Only authored transform animation supported: "+binding.propertyName);
                         At(root,binding.path); var curve=AnimationUtility.GetEditorCurve(clip,binding);
                         Check(curve!=null && curve.keys.Length>0 && curve.keys.All(k=>Finite(k.value)),"Missing/nonfinite curve.");
-                        if(binding.path=="")
+                        if(binding.path=="" || (c.kind=="pouncer" && binding.path=="Pouncer_Rig"))
                         {
                             bool constant=curve.keys.All(k=>Mathf.Abs(k.value-curve.keys[0].value)<.00001f);
                             bool tangentsSafe=curve.keys.All(k=>SafeConstantTangent(k.inTangent)&&SafeConstantTangent(k.outTangent));
@@ -217,6 +217,7 @@ namespace DesertRV.Editor
                         if(binding.propertyName.StartsWith("m_LocalScale",StringComparison.Ordinal)) Check(curve.keys.All(k=>k.value>.001f),"Animation scales geometry away.");
                     }
                     if(c.kind=="armored")RequireNeutralRootCurves(spec.state,report.rootCurves.Where(r=>r.state==spec.state).ToArray(),root);
+                    if(c.kind=="pouncer")RequireNeutralRootCurves(spec.state,report.rootCurves.Where(r=>r.state==spec.state).ToArray(),At(root,"Pouncer_Rig"));
                     // Euler and quaternion tracks on one transform would be competing rotation representations.
                     foreach(var track in floats.GroupBy(b=>b.path)) Check(!(track.Any(b=>b.propertyName.StartsWith("m_LocalRotation")) && track.Any(b=>b.propertyName.IndexOf("Euler",StringComparison.OrdinalIgnoreCase)>=0)),"Competing rotation curves: "+track.Key);
                     report.clips.Add(new ClipReadback { state=spec.state,file=spec.file,take=spec.take,poseExpectation=spec.poseExpectation,seconds=clip.length,frameRate=clip.frameRate,floatBindings=floats.Length,objectBindings=objects.Length,loop=clip.isLooping });

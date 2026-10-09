@@ -23,10 +23,14 @@ def export(root,output,native='success',protected='success'):
     head=os.environ.get('GITHUB_SHA','');run=os.environ.get('GITHUB_RUN_ID','')
     if re.fullmatch('[a-f0-9]{40}',head) and re.fullmatch('[0-9]+',run):
         summary.update(importCommit=head,importRunUrl='https://github.com/yangerstar1/task-workbench/actions/runs/'+run)
+    contract=None
     try:
         contract_path=root/'unity/CandidateImportInput/contract.json';safe_file(contract_path)
         contract=strict_read(contract_path)
         if contract.get('mode')=='STRICT_BINDING':
+            if contract.get('kind')=='pouncer':
+                from pouncer_output import export_pouncer
+                return export_pouncer(root,output,contract,summary,native,protected)
             if contract.get('kind')=='weapon':
                 from weapon_output import export_weapon
                 return export_weapon(root,output,contract,summary,native,protected)
@@ -89,13 +93,20 @@ def export(root,output,native='success',protected='success'):
             records.append({'path':rel.as_posix(),'sha256':sha(dest),'bytes':dest.stat().st_size})
         summary.update(status='DISCOVERED_UNREVIEWED_NOT_BOUND',errorCode=None,files=records)
     except (EvidenceError,StrictError) as e:
-        summary['errorCode']=str(e)
+        code=str(e)
+        summary['errorCode']=code if re.fullmatch(r'[A-Z][A-Z0-9_]{0,100}',code) else 'INVALID_EVIDENCE'
+        if isinstance(contract,dict) and contract.get('mode')=='STRICT_BINDING':
+            try:
+                from failed_capture_output import try_export_failed
+                try_export_failed(root,output,contract,summary,native,protected)
+            except Exception:
+                pass  # Preserve the original failure; diagnostic collection never turns it green.
         raise
     except Exception:
         summary['errorCode']='INVALID_EVIDENCE'
         raise EvidenceError('INVALID_EVIDENCE') from None
     finally:
-        if summary.get('status')!='STRICT_CANDIDATE_CAPTURED_NOT_ACCEPTED':
+        if summary.get('status') not in ('STRICT_CANDIDATE_CAPTURED_NOT_ACCEPTED','FAILED_DIAGNOSTICS'):
             (output/'receipt.json').write_text(json.dumps(summary,indent=2)+'\n')
     return summary
 if __name__=='__main__':

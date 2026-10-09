@@ -51,9 +51,27 @@ def mesh_dimensions(minimum,maximum,size):
  for v in (minimum,maximum,size):vec(v)
  require(all(size[k]>0 and abs((maximum[k]-minimum[k])-size[k])<=.00001 for k in ('x','y','z')),'STRICT_MESH_DIMENSIONS')
 
+def verify_staged_inventory(staged,records,receipt_sha):
+ require(staged.is_dir() and not staged.is_symlink() and all(not p.is_symlink() for p in staged.parents),'STRICT_STAGING_UNSAFE')
+ expected={r['path'] for r in records}|{'receipt.json'};directories=set()
+ require(len(expected)==len(records)+1,'STRICT_STAGING_DUPLICATE')
+ for name in expected:
+  require(rel(name),'STRICT_STAGING_PATH')
+  directories.update(p.as_posix() for p in Path(name).parents if p!=Path('.'))
+ for record in records:require(sha(staged/record['path'])==record['sha256'] and (staged/record['path']).stat().st_size==record['bytes'],'STRICT_STAGING_HASH')
+ require(sha(staged/'receipt.json')==receipt_sha,'STRICT_STAGING_RECEIPT')
+ files=set();actual_dirs=set()
+ for p in staged.rglob('*'):
+  require(not p.is_symlink(),'STRICT_STAGING_UNSAFE')
+  name=p.relative_to(staged).as_posix()
+  if p.is_dir():actual_dirs.add(name)
+  elif p.is_file():files.add(name)
+  else:raise StrictError('STRICT_STAGING_UNSAFE')
+ require(files==expected and actual_dirs==directories,'STRICT_STAGING_ALLOWLIST')
+
 def contract_shape(c):
  keys(c,('schema','mode','scope','id','kind','repository','runUrl','sourceCommit','artifactId','artifactName','artifactSha256','files','modelFile','clips','materials','bindings'))
- require(c['schema']==1 and c['mode']=='STRICT_BINDING' and c['scope']=='FULL_CANDIDATE' and c['kind']=='armored','STRICT_ARMORED_FULL_ONLY')
+ require(type(c['schema']) is int and c['schema']==1 and c['mode']=='STRICT_BINDING' and c['scope']=='FULL_CANDIDATE' and c['kind']=='armored','STRICT_ARMORED_FULL_ONLY')
  require(c['repository']=='yangerstar1/task-workbench' and re.fullmatch(r'https://github.com/yangerstar1/task-workbench/actions/runs/[1-9][0-9]*',c['runUrl']) and digest(c['sourceCommit'],40) and digest(c['artifactSha256']),'STRICT_SOURCE_IDENTITY')
  require(type(c['artifactId']) is int and c['artifactId']>0 and re.fullmatch('[a-z0-9][a-z0-9-]{3,79}',c['id']) and isinstance(c['artifactName'],str) and re.fullmatch('[A-Za-z0-9_.-]{1,160}',c['artifactName']),'STRICT_CONTRACT_IDENTITY')
  require(isinstance(c['files'],list) and 1<=len(c['files'])<=32,'STRICT_INPUT_COUNT');files={}
@@ -311,7 +329,9 @@ def export_strict(root,output,c,summary,native,protected):
   for name,obj in [('import-report.json',imp),('capture-report.json',capture),('weakpoint-fixture-report.json',weak)]:
    d=staged/name;d.write_text(json.dumps(obj,indent=2)+'\n');records.append({'path':name,'sha256':sha(d),'bytes':d.stat().st_size})
   result=dict(summary,status='STRICT_CANDIDATE_CAPTURED_NOT_ACCEPTED',approved=False,errorCode=None,files=records,nativeXmlSha256=native_hash,nativeCases=6,images=202,weakpointImages=9,protectedSource='UNCHANGED',rawReportSha256={n:sha(evidence/n) for n in ('import-report.json','capture-report.json','weakpoint-fixture-report.json')})
-  (staged/'receipt.json').write_text(json.dumps(result,indent=2)+'\n')
+  receipt_bytes=(json.dumps(result,indent=2)+'\n').encode()
+  (staged/'receipt.json').write_bytes(receipt_bytes)
+  verify_staged_inventory(staged,records,hashlib.sha256(receipt_bytes).hexdigest())
   require(not any(output.iterdir()),'STRICT_EXPORT_NOT_EMPTY')
   # Linux atomically replaces the empty runner-owned directory. No payload is visible before this commit.
   staged.replace(output)

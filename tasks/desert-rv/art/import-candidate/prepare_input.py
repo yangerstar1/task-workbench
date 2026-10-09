@@ -13,7 +13,9 @@ def prepare(contract_path, expected_sha, output, mode):
     contract=json.loads(contract_path.read_text())
     require(contract.get('mode')==mode,'Dispatch mode differs from reviewed contract')
     if mode=='STRICT_BINDING':
-        if contract.get('kind')=='weapon':
+        if contract.get('kind')=='pouncer':
+            from pouncer_output import contract_shape
+        elif contract.get('kind')=='weapon':
             from weapon_output import contract_shape
         else:
             from strict_output import contract_shape

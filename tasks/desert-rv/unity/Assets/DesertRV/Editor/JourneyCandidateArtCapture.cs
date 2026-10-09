@@ -60,7 +60,7 @@ namespace DesertRV.Editor
                 if(initialRenderers.Length==0)throw new InvalidOperationException("Missing neutral geometry.");
                 var initialBounds=initialRenderers[0].bounds;foreach(var r in initialRenderers)initialBounds.Encapsulate(r.bounds);
                 evidence.neutralRoot=ObserveNeutral(subject,animator,initialRenderers);
-                if(contract.kind=="armored")RequireNeutral(contract.bindings.neutralBaseline,evidence.neutralRoot);
+                if(contract.kind=="armored" || contract.kind=="pouncer")RequireNeutral(contract.bindings.neutralBaseline,evidence.neutralRoot);
                 animator.cullingMode=AnimatorCullingMode.AlwaysAnimate;animator.applyRootMotion=false;
                 var cameraObject=new GameObject("CandidateReviewCamera"); UnityEngine.SceneManagement.SceneManager.MoveGameObjectToScene(cameraObject,scene);
                 camera=cameraObject.AddComponent<Camera>(); camera.scene=scene; camera.backgroundColor=new Color(.12f,.14f,.17f); camera.clearFlags=CameraClearFlags.SolidColor;

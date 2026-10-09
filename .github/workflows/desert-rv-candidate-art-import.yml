@@ -40,7 +40,7 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y --no-install-recommends python3-pil python3-yaml
       - name: Test offline stager
         working-directory: tasks/desert-rv/art/import-candidate
-        run: /usr/bin/python3 -m unittest -v test_stage_artifact test_capture_source test_verify_output test_strict_output test_weapon_output
+        run: /usr/bin/python3 -m unittest -v test_stage_artifact test_capture_source test_verify_output test_strict_output test_weapon_output test_failed_capture_output test_failed_capture_dispatch
       - name: Fetch and verify pinned candidate input
         env:
           GH_TOKEN: ${{ github.token }}
@@ -51,6 +51,12 @@ jobs:
           python3 tasks/desert-rv/art/import-candidate/prepare_input.py
           --mode "$MODE" --contract "$CONTRACT" --sha256 "$CONTRACT_SHA"
           --output tasks/desert-rv/unity/CandidateImportInput
+      - name: Test Pouncer export against verified source bytes
+        if: inputs.mode == 'STRICT_BINDING' && inputs.contract == 'tasks/desert-rv/art/import-candidate/contracts/pouncer-full-strict-37856618820.json'
+        working-directory: tasks/desert-rv/art/import-candidate
+        env:
+          POUNCER_SOURCE_DIR: ${{ github.workspace }}/tasks/desert-rv/unity/CandidateImportInput/payload
+        run: /usr/bin/python3 -m unittest -v test_pouncer_output test_pouncer_failed_capture
       - name: Restore pinned font and prepare official Unity runner
         env:
           UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}

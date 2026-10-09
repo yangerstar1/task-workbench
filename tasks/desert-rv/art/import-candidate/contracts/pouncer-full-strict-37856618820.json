@@ -1,0 +1,628 @@
+{
+  "schema": 1,
+  "mode": "STRICT_BINDING",
+  "scope": "FULL_CANDIDATE",
+  "id": "pouncer-full-strict-37856618820",
+  "kind": "pouncer",
+  "repository": "yangerstar1/task-workbench",
+  "runUrl": "https://github.com/yangerstar1/task-workbench/actions/runs/37856618820",
+  "sourceCommit": "a1490c92e804ef54367c23bddb25dffb2dea49b1",
+  "artifactId": 11584890436,
+  "artifactName": "pouncer-combined-candidate-37856618820",
+  "artifactSha256": "bc27a00db7ae477f05f24ccf925ca7eaf8391411e5b3a5ff33550df92a4a1e89",
+  "files": [
+    {
+      "file": "pouncer-candidate.fbx",
+      "sha256": "7a00a875d8d5d8bd6f14d39aee736a9e705f95f304e754d8653d3f1150ef223f"
+    },
+    {
+      "file": "pouncer-basecolor.png",
+      "sha256": "d771c6ddefb650959e1702359745b6ecc076a3df6f4aa1f09e99346db7e4a06b"
+    }
+  ],
+  "modelFile": "pouncer-candidate.fbx",
+  "clips": [
+    {
+      "state": "Idle",
+      "file": "pouncer-candidate.fbx",
+      "take": "Pouncer_Rig|Idle",
+      "seconds": 2,
+      "loop": true,
+      "poseExpectation": "varying"
+    },
+    {
+      "state": "Walk",
+      "file": "pouncer-candidate.fbx",
+      "take": "Pouncer_Rig|Walk",
+      "seconds": 0.4,
+      "loop": true,
+      "poseExpectation": "varying"
+    },
+    {
+      "state": "Windup",
+      "file": "pouncer-candidate.fbx",
+      "take": "Pouncer_Rig|Windup",
+      "seconds": 0.78,
+      "loop": false,
+      "poseExpectation": "varying"
+    },
+    {
+      "state": "Attack",
+      "file": "pouncer-candidate.fbx",
+      "take": "Pouncer_Rig|Attack",
+      "seconds": 0.8,
+      "loop": false,
+      "poseExpectation": "varying"
+    },
+    {
+      "state": "Recover",
+      "file": "pouncer-candidate.fbx",
+      "take": "Pouncer_Rig|Recover",
+      "seconds": 1.3,
+      "loop": false,
+      "poseExpectation": "varying"
+    },
+    {
+      "state": "Hit",
+      "file": "pouncer-candidate.fbx",
+      "take": "Pouncer_Rig|Hit",
+      "seconds": 0.28,
+      "loop": false,
+      "poseExpectation": "varying"
+    },
+    {
+      "state": "Death",
+      "file": "pouncer-candidate.fbx",
+      "take": "Pouncer_Rig|Death",
+      "seconds": 1.8,
+      "loop": false,
+      "poseExpectation": "varying"
+    }
+  ],
+  "materials": [
+    {
+      "sourceName": "AmberEye",
+      "baseColorFile": "",
+      "normalFile": "",
+      "metallicSmoothnessFile": "",
+      "occlusionFile": "",
+      "ormFile": "",
+      "baseColor": {
+        "r": 0.865041971206665,
+        "g": 0.5926192998886108,
+        "b": 0.20598408579826355,
+        "a": 1.0
+      },
+      "metallic": 0.0,
+      "smoothness": 0.75
+    },
+    {
+      "sourceName": "Keratin",
+      "baseColorFile": "",
+      "normalFile": "",
+      "metallicSmoothnessFile": "",
+      "occlusionFile": "",
+      "ormFile": "",
+      "baseColor": {
+        "r": 0.2347950041294098,
+        "g": 0.17558157444000244,
+        "b": 0.12315814942121506,
+        "a": 1.0
+      },
+      "metallic": 0.0,
+      "smoothness": 0.5
+    },
+    {
+      "sourceName": "MouthAndPupil",
+      "baseColorFile": "",
+      "normalFile": "",
+      "metallicSmoothnessFile": "",
+      "occlusionFile": "",
+      "ormFile": "",
+      "baseColor": {
+        "r": 0.09320176392793655,
+        "g": 0.07846782356500626,
+        "b": 0.06100849807262421,
+        "a": 1.0
+      },
+      "metallic": 0.0,
+      "smoothness": 0.30000001192092896
+    },
+    {
+      "sourceName": "Sandstone_BaseColorTexture",
+      "baseColorFile": "pouncer-basecolor.png",
+      "normalFile": "",
+      "metallicSmoothnessFile": "",
+      "occlusionFile": "",
+      "ormFile": "",
+      "baseColor": {
+        "r": 1.0,
+        "g": 1.0,
+        "b": 1.0,
+        "a": 1.0
+      },
+      "metallic": 0.0,
+      "smoothness": 0.13999998569488525
+    },
+    {
+      "sourceName": "ToothL-1.08",
+      "baseColorFile": "",
+      "normalFile": "",
+      "metallicSmoothnessFile": "",
+      "occlusionFile": "",
+      "ormFile": "",
+      "baseColor": {
+        "r": 0.7152408361434937,
+        "g": 0.6576276421546936,
+        "b": 0.5370987057685852,
+        "a": 1.0
+      },
+      "metallic": 0.0,
+      "smoothness": 0.3999999761581421
+    },
+    {
+      "sourceName": "ToothL-1.23",
+      "baseColorFile": "",
+      "normalFile": "",
+      "metallicSmoothnessFile": "",
+      "occlusionFile": "",
+      "ormFile": "",
+      "baseColor": {
+        "r": 0.7152408361434937,
+        "g": 0.6576276421546936,
+        "b": 0.5370987057685852,
+        "a": 1.0
+      },
+      "metallic": 0.0,
+      "smoothness": 0.3999999761581421
+    },
+    {
+      "sourceName": "ToothR-1.08",
+      "baseColorFile": "",
+      "normalFile": "",
+      "metallicSmoothnessFile": "",
+      "occlusionFile": "",
+      "ormFile": "",
+      "baseColor": {
+        "r": 0.7152408361434937,
+        "g": 0.6576276421546936,
+        "b": 0.5370987057685852,
+        "a": 1.0
+      },
+      "metallic": 0.0,
+      "smoothness": 0.3999999761581421
+    },
+    {
+      "sourceName": "ToothR-1.23",
+      "baseColorFile": "",
+      "normalFile": "",
+      "metallicSmoothnessFile": "",
+      "occlusionFile": "",
+      "ormFile": "",
+      "baseColor": {
+        "r": 0.7152408361434937,
+        "g": 0.6576276421546936,
+        "b": 0.5370987057685852,
+        "a": 1.0
+      },
+      "metallic": 0.0,
+      "smoothness": 0.3999999761581421
+    },
+    {
+      "sourceName": "VentralJaw",
+      "baseColorFile": "",
+      "normalFile": "",
+      "metallicSmoothnessFile": "",
+      "occlusionFile": "",
+      "ormFile": "",
+      "baseColor": {
+        "r": 0.3491901159286499,
+        "g": 0.2527894675731659,
+        "b": 0.17184403538703918,
+        "a": 1.0
+      },
+      "metallic": 0.0,
+      "smoothness": 0.19999998807907104
+    }
+  ],
+  "bindings": {
+    "animatorPath": "",
+    "body": "Pouncer_Skin_LOD0",
+    "colliderCenter": {
+      "x": 0,
+      "y": 0.725,
+      "z": 0
+    },
+    "colliderRadius": 0.36,
+    "colliderHeight": 1.27,
+    "neutralBaseline": {
+      "position": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "rotation": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0,
+        "w": 1.0
+      },
+      "scale": {
+        "x": 1.0,
+        "y": 1.0,
+        "z": 1.0
+      },
+      "renderers": [
+        {
+          "path": "AmberEye",
+          "worldCenter": {
+            "x": -0.2709999978542328,
+            "y": 0.5855196714401245,
+            "z": 0.8807518482208252
+          },
+          "worldExtents": {
+            "x": 0.011999998241662979,
+            "y": 0.023214293643832207,
+            "z": 0.03755047172307968
+          }
+        },
+        {
+          "path": "AmberEye.001",
+          "worldCenter": {
+            "x": 0.2709999978542328,
+            "y": 0.5855196714401245,
+            "z": 0.8807518482208252
+          },
+          "worldExtents": {
+            "x": 0.011999998241662979,
+            "y": 0.023214293643832207,
+            "z": 0.03755047172307968
+          }
+        },
+        {
+          "path": "ArticulatedLowerJaw",
+          "worldCenter": {
+            "x": 2.3283064365386963e-08,
+            "y": 0.3442639112472534,
+            "z": 0.9629213213920593
+          },
+          "worldExtents": {
+            "x": 0.21199998259544373,
+            "y": 0.05025562644004822,
+            "z": 0.2586844265460968
+          }
+        },
+        {
+          "path": "Claw",
+          "worldCenter": {
+            "x": -0.27999937534332275,
+            "y": 0.05220172926783562,
+            "z": 0.7674000859260559
+          },
+          "worldExtents": {
+            "x": 0.02600005827844143,
+            "y": 0.04392872378230095,
+            "z": 0.07094594091176987
+          }
+        },
+        {
+          "path": "Claw.001",
+          "worldCenter": {
+            "x": -0.3449993133544922,
+            "y": 0.05220174044370651,
+            "z": 0.7674000859260559
+          },
+          "worldExtents": {
+            "x": 0.02600003406405449,
+            "y": 0.043928734958171844,
+            "z": 0.07094594091176987
+          }
+        },
+        {
+          "path": "Claw.002",
+          "worldCenter": {
+            "x": -0.40999922156333923,
+            "y": 0.05220172181725502,
+            "z": 0.7674000859260559
+          },
+          "worldExtents": {
+            "x": 0.026000022888183594,
+            "y": 0.04392872378230095,
+            "z": 0.07094594091176987
+          }
+        },
+        {
+          "path": "Claw.003",
+          "worldCenter": {
+            "x": -0.26598867774009705,
+            "y": 0.0469079464673996,
+            "z": -0.39053839445114136
+          },
+          "worldExtents": {
+            "x": 0.026001548394560814,
+            "y": 0.06804516166448593,
+            "z": 0.07295538485050201
+          }
+        },
+        {
+          "path": "Claw.004",
+          "worldCenter": {
+            "x": -0.3149883449077606,
+            "y": 0.046906739473342896,
+            "z": -0.3905380964279175
+          },
+          "worldExtents": {
+            "x": 0.026001572608947754,
+            "y": 0.06804516911506653,
+            "z": 0.07295539975166321
+          }
+        },
+        {
+          "path": "Claw.005",
+          "worldCenter": {
+            "x": -0.3639880120754242,
+            "y": 0.04690557345747948,
+            "z": -0.3905377984046936
+          },
+          "worldExtents": {
+            "x": 0.026001548394560814,
+            "y": 0.06804516911506653,
+            "z": 0.07295539975166321
+          }
+        },
+        {
+          "path": "Claw.006",
+          "worldCenter": {
+            "x": 0.4099992513656616,
+            "y": 0.05220168083906174,
+            "z": 0.7673994898796082
+          },
+          "worldExtents": {
+            "x": 0.02600005827844143,
+            "y": 0.043928783386945724,
+            "z": 0.07094594091176987
+          }
+        },
+        {
+          "path": "Claw.007",
+          "worldCenter": {
+            "x": 0.3449993431568146,
+            "y": 0.05220167711377144,
+            "z": 0.7673996090888977
+          },
+          "worldExtents": {
+            "x": 0.02600005827844143,
+            "y": 0.043928783386945724,
+            "z": 0.07094596326351166
+          }
+        },
+        {
+          "path": "Claw.008",
+          "worldCenter": {
+            "x": 0.27999937534332275,
+            "y": 0.05220164731144905,
+            "z": 0.7673996090888977
+          },
+          "worldExtents": {
+            "x": 0.02600005827844143,
+            "y": 0.043928783386945724,
+            "z": 0.07094596326351166
+          }
+        },
+        {
+          "path": "Claw.009",
+          "worldCenter": {
+            "x": 0.3639882504940033,
+            "y": 0.04690544679760933,
+            "z": -0.39053821563720703
+          },
+          "worldExtents": {
+            "x": 0.026001548394560814,
+            "y": 0.06804518401622772,
+            "z": 0.07295537739992142
+          }
+        },
+        {
+          "path": "Claw.010",
+          "worldCenter": {
+            "x": 0.31498855352401733,
+            "y": 0.046906646341085434,
+            "z": -0.3905384838581085
+          },
+          "worldExtents": {
+            "x": 0.026001572608947754,
+            "y": 0.06804518401622772,
+            "z": 0.07295538485050201
+          }
+        },
+        {
+          "path": "Claw.011",
+          "worldCenter": {
+            "x": 0.26598888635635376,
+            "y": 0.046907879412174225,
+            "z": -0.39053875207901
+          },
+          "worldExtents": {
+            "x": 0.026001548394560814,
+            "y": 0.06804518401622772,
+            "z": 0.07295539975166321
+          }
+        },
+        {
+          "path": "DeepEyeSocket",
+          "worldCenter": {
+            "x": -0.2590000033378601,
+            "y": 0.5855187773704529,
+            "z": 0.8607268929481506
+          },
+          "worldExtents": {
+            "x": 0.01300000585615635,
+            "y": 0.04185201972723007,
+            "z": 0.06971026211977005
+          }
+        },
+        {
+          "path": "DeepEyeSocket.001",
+          "worldCenter": {
+            "x": 0.2590000033378601,
+            "y": 0.5855188369750977,
+            "z": 0.8607268929481506
+          },
+          "worldExtents": {
+            "x": 0.01300000585615635,
+            "y": 0.04185201972723007,
+            "z": 0.06971026211977005
+          }
+        },
+        {
+          "path": "Fang",
+          "worldCenter": {
+            "x": -0.15999996662139893,
+            "y": 0.40384095907211304,
+            "z": 0.9920810461044312
+          },
+          "worldExtents": {
+            "x": 0.018000008538365364,
+            "y": 0.032810505479574203,
+            "z": 0.027864063158631325
+          }
+        },
+        {
+          "path": "Fang.001",
+          "worldCenter": {
+            "x": -0.15999996662139893,
+            "y": 0.4113384783267975,
+            "z": 1.141893744468689
+          },
+          "worldExtents": {
+            "x": 0.018000008538365364,
+            "y": 0.03281049430370331,
+            "z": 0.027864063158631325
+          }
+        },
+        {
+          "path": "Fang.002",
+          "worldCenter": {
+            "x": 0.1600000113248825,
+            "y": 0.4038410186767578,
+            "z": 0.9920810461044312
+          },
+          "worldExtents": {
+            "x": 0.018000008538365364,
+            "y": 0.032810505479574203,
+            "z": 0.027864063158631325
+          }
+        },
+        {
+          "path": "Fang.003",
+          "worldCenter": {
+            "x": 0.1600000113248825,
+            "y": 0.41133853793144226,
+            "z": 1.141893744468689
+          },
+          "worldExtents": {
+            "x": 0.018000008538365364,
+            "y": 0.03281046822667122,
+            "z": 0.027864063158631325
+          }
+        },
+        {
+          "path": "MouthCavity",
+          "worldCenter": {
+            "x": 1.1641532182693481e-08,
+            "y": 0.38552430272102356,
+            "z": 0.985879123210907
+          },
+          "worldExtents": {
+            "x": 0.18999998271465302,
+            "y": 0.06426165252923965,
+            "z": 0.20022501051425934
+          }
+        },
+        {
+          "path": "Nostril",
+          "worldCenter": {
+            "x": -0.12499997019767761,
+            "y": 0.49484899640083313,
+            "z": 1.2297202348709106
+          },
+          "worldExtents": {
+            "x": 0.029999995604157448,
+            "y": 0.014311918057501316,
+            "z": 0.019125832244753838
+          }
+        },
+        {
+          "path": "Nostril.001",
+          "worldCenter": {
+            "x": 0.1250000298023224,
+            "y": 0.49484899640083313,
+            "z": 1.2297202348709106
+          },
+          "worldExtents": {
+            "x": 0.029999995604157448,
+            "y": 0.014311918057501316,
+            "z": 0.019125832244753838
+          }
+        },
+        {
+          "path": "Pouncer_Skin_LOD0",
+          "worldCenter": {
+            "x": -0.008114799857139587,
+            "y": 0.41918104887008667,
+            "z": -0.04100167378783226
+          },
+          "worldExtents": {
+            "x": 0.5877448320388794,
+            "y": 0.5455133318901062,
+            "z": 1.3296031951904297
+          }
+        },
+        {
+          "path": "SlitPupil",
+          "worldCenter": {
+            "x": -0.2800000011920929,
+            "y": 0.585769534111023,
+            "z": 0.8857457041740417
+          },
+          "worldExtents": {
+            "x": 0.0059999991208314896,
+            "y": 0.014719790779054165,
+            "z": 0.009929484687745571
+          }
+        },
+        {
+          "path": "SlitPupil.001",
+          "worldCenter": {
+            "x": 0.2800000011920929,
+            "y": 0.5857695937156677,
+            "z": 0.8857457041740417
+          },
+          "worldExtents": {
+            "x": 0.0059999991208314896,
+            "y": 0.014719790779054165,
+            "z": 0.009929484687745571
+          }
+        }
+      ]
+    },
+    "rigCurveBaseline": {
+      "position": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "rotation": {
+        "x": -0.7071068286895752,
+        "y": 0.0,
+        "z": 0.0,
+        "w": 0.7071068286895752
+      },
+      "scale": {
+        "x": 100.0,
+        "y": 100.0,
+        "z": 100.0
+      }
+    }
+  }
+}

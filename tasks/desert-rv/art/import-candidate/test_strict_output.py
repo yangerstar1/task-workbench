@@ -86,6 +86,9 @@ class StrictExportTests(unittest.TestCase):
   p=self.root/'artifacts/candidate-art/results.xml';p.write_text('<test-run result="Passed"><test-case fullname="'+s.NATIVE+'" result="Passed"/></test-run>');self.rejected('STRICT_NATIVE_FAILED')
  def test_partial_scope_refused(self):
   p=self.project/'CandidateImportInput/contract.json';c=copy.deepcopy(self.c);c['scope']='PARTIAL_DIAGNOSTIC_NOT_FULL';p.write_text(json.dumps(c));self.rejected('STRICT_ARMORED_FULL_ONLY')
+ def test_boolean_schema_does_not_impersonate_version_one(self):
+  c=copy.deepcopy(self.c);c['schema']=True
+  with self.assertRaises(s.StrictError):s.contract_shape(c)
  def test_other_kind_refused(self):
   c=copy.deepcopy(self.c);c['kind']='weapon'
   with self.assertRaises(s.StrictError):s.contract_shape(c)
@@ -143,6 +146,28 @@ class StrictExportTests(unittest.TestCase):
    if Path(p)==self.ev/'import-report.json':raise OSError('synthetic late read failure')
    return original(p)
   with patch.object(s,'sha',fail):self.rejected('INVALID_EVIDENCE')
+ def test_staging_unlisted_file_is_not_uploaded(self):
+  original=s.shutil.copyfile
+  def inject(src,dest,*args,**kwargs):
+   result=original(src,dest,*args,**kwargs)
+   for parent in Path(dest).parents:
+    if parent.name.startswith('.strict-safe-'):(parent/'unlisted.log').write_text('SECRET');break
+   return result
+  with patch.object(s.shutil,'copyfile',inject):self.rejected('STRICT_STAGING_ALLOWLIST')
+ def test_staging_receipt_cannot_be_replaced(self):
+  original=Path.write_bytes
+  def inject(path,data):
+   result=original(path,data)
+   if path.name=='receipt.json' and path.parent.name.startswith('.strict-safe-'):original(path,b'{"approved":true}')
+   return result
+  with patch.object(Path,'write_bytes',inject):self.rejected('STRICT_STAGING_RECEIPT')
+ def test_extra_file_created_during_final_receipt_hash_is_rejected(self):
+  original=s.sha
+  def inject(path):
+   result=original(path)
+   if Path(path).name=='receipt.json' and Path(path).parent.name.startswith('.strict-safe-'):(Path(path).parent/'unlisted.log').write_text('SECRET')
+   return result
+  with patch.object(s,'sha',inject):self.rejected('STRICT_STAGING_ALLOWLIST')
  def test_duplicate_json_refused(self):
   p=self.project/'CandidateImportInput/contract.json';p.write_text('{"mode":"STRICT_BINDING","mode":"DISCOVERY_ONLY"}');self.rejected('STRICT_DUPLICATE_JSON_KEY')
  def test_path_and_private_url_rejected(self):

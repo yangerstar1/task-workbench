@@ -163,6 +163,15 @@ class WeaponExportTests(unittest.TestCase):
         self.assertFalse(list(self.out.parent.glob('.weapon-safe-*')))
         if code:self.assertEqual(receipt['errorCode'],code)
 
+    def test_staging_unlisted_file_cannot_escape(self):
+        original=w.shutil.copyfile
+        def inject(src,dest,*args,**kwargs):
+            result=original(src,dest,*args,**kwargs)
+            for parent in Path(dest).parents:
+                if parent.name.startswith('.weapon-safe-'):
+                    (parent/'unlisted.log').write_text('SECRET');break
+            return result
+        with patch.object(w.shutil,'copyfile',inject):self.rejected('STRICT_STAGING_ALLOWLIST')
     def test_full_synthetic_export_is_explicitly_unaccepted(self):
         result=self.run_export();self.assertEqual((result['images'],result['weaponSamples'],result['nativeCases']),(25,4463,6))
         for key in ('approved','calibratedForScene','visualApproved','gameplayAccepted'):self.assertIs(result[key],False)
