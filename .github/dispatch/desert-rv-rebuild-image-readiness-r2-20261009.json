@@ -1,0 +1,6 @@
+{
+  "schema": 1,
+  "requestId": "desert-rv-rebuild-image-readiness-r2-20261009-once",
+  "baseCommit": "5342c507985d5f97dfcb843e06e149f0ce269d41",
+  "policySha256": "9749102776483dab20cde6454a4602ac0d374a60b389bfcfe866ec2e4b7373a9"
+}

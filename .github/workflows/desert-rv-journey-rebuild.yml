@@ -2,7 +2,7 @@ name: Desert RV restore verified Journey and rebuild candidate Linux
 on:
   push:
     branches: [journey-linux-export-recovery-938]
-    paths: [.github/dispatch/desert-rv-rebuild-python-cache-20261009.json]
+    paths: [.github/dispatch/desert-rv-rebuild-image-readiness-r2-20261009.json]
   workflow_dispatch:
     inputs:
       transition_sha256:
@@ -39,7 +39,9 @@ jobs:
         run: |
           /usr/bin/python3 tasks/desert-rv/scripts/test_journey_rebuild_dispatch.py
           /usr/bin/python3 tasks/desert-rv/scripts/journey_rebuild_dispatch.py
-      - name: Observe fixed official image availability before any pull or license
+      - name: Verify current source before fixed-image readiness
+        run: /usr/bin/python3 tasks/desert-rv/scripts/verify_evidence.py guard
+      - name: Verify fixed-image readiness with at most one bounded fallback pull
         id: image_precheck
         run: |
           /usr/bin/python3 tasks/desert-rv/scripts/test_environment_image_precheck.py

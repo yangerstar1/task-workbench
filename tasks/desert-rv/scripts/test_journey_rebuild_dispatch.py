@@ -25,7 +25,7 @@ class PushIdentityTests(unittest.TestCase):
  def test_nonfinite_json_rejected(self):self.reject('JSON_CONSTANT',raw=b'{"schema":NaN}')
  def test_boolean_schema_rejected(self):self.request['schema']=True;self.reject('REQUEST_IDENTITY')
  def test_consumed_first_request_cannot_authorize_new_run(self):
-  for nonce,parent in [('desert-rv-rebuild-performance-20261009-once','9abf31160845852d6b1eaffcf432522f60258a0a'),('desert-rv-rebuild-performance350-20261009-once','be129aef52363202d7d3cbb51c28281075bef0b5'),('desert-rv-rebuild-export-recovery938-20261009-once','93886445d69597efa0dbf190340b61a6f9ea447c'),('desert-rv-linux-template-probe-20261009-once','dac4109a2a643f25760b9761ea71454e23981e8f'),('desert-rv-rebuild-linux-layout-20261009-once','4ac351190f97783a9b99621a1a8e6bed954f0f9e'),('desert-rv-rebuild-linux-symbol-20261009-once','4bcc86731f7a030ee31b78017ad9ad27f1997383')]:
+  for nonce,parent in [('desert-rv-rebuild-performance-20261009-once','9abf31160845852d6b1eaffcf432522f60258a0a'),('desert-rv-rebuild-performance350-20261009-once','be129aef52363202d7d3cbb51c28281075bef0b5'),('desert-rv-rebuild-export-recovery938-20261009-once','93886445d69597efa0dbf190340b61a6f9ea447c'),('desert-rv-linux-template-probe-20261009-once','dac4109a2a643f25760b9761ea71454e23981e8f'),('desert-rv-rebuild-linux-layout-20261009-once','4ac351190f97783a9b99621a1a8e6bed954f0f9e'),('desert-rv-rebuild-linux-symbol-20261009-once','4bcc86731f7a030ee31b78017ad9ad27f1997383'),('desert-rv-rebuild-python-cache-20261009-once','af1f7e2f77e22a2983995d78406921b35e52706f')]:
    self.request['requestId']=nonce;self.request['baseCommit']=parent;self.reject('REQUEST_IDENTITY')
  def test_wrong_nonce_rejected(self):self.request['requestId']='other';self.reject('REQUEST_IDENTITY')
  def test_wrong_request_base_rejected(self):self.request['baseCommit']='c'*40;self.reject('REQUEST_IDENTITY')
@@ -62,10 +62,10 @@ class PushIdentityTests(unittest.TestCase):
 class WorkflowEarlyBoundaryTests(unittest.TestCase):
  def test_fixed_image_and_root_cache_checks_precede_first_pull_or_license(self):
   workflow=(Path(__file__).resolve().parents[3]/'.github/workflows/desert-rv-journey-rebuild.yml').read_text()
-  identity=workflow.index('id: dispatch_identity');image=workflow.index('id: image_precheck')
+  identity=workflow.index('id: dispatch_identity');source=workflow.index('      - name: Verify current source before fixed-image readiness');image=workflow.index('id: image_precheck')
   root=workflow.index('JOURNEY_HOSTED_ROOT_CACHE_TEST:');license=workflow.index('UNITY_LICENSE:')
   pull=workflow.index('docker build');native=workflow.index('game-ci/unity-test-runner@')
-  self.assertTrue(identity<image<root<license<pull<native)
+  self.assertTrue(identity<source<image<root<license<pull<native)
   self.assertIn("JOURNEY_HOSTED_ROOT_CACHE_TEST: '1'",workflow)
   block=workflow.split('      - name: Verify non-root host union across real root-owned bytecode caches',1)[1].split('      - name:',1)[0]
   self.assertIn('MANUAL_TRANSITION_SHA: ${{ inputs.transition_sha256 }}',block)
@@ -81,7 +81,7 @@ class WorkflowEarlyBoundaryTests(unittest.TestCase):
   pre=workflow.split('        id: image_precheck',1)[1].split('      - name:',1)[0]
   post=workflow.split('        id: image_report',1)[1].split('      - name:',1)[0]
   fragments=[textwrap.dedent(part.split("<<'PYCODE'\n",1)[1].split('          PYCODE',1)[0]) for part in (pre,post)]
-  good=check.blank_result();good.update(status='PASS',cacheHit=True)
+  good=check.blank_result();good.update(status='PASS',reason='CACHE_HIT',cacheHit=True)
   with tempfile.TemporaryDirectory() as temp:
    root=Path(temp);scripts=root/'tasks/desert-rv/scripts';scripts.mkdir(parents=True)
    shutil.copyfile(source/'tasks/desert-rv/scripts/environment_image_precheck.py',scripts/'environment_image_precheck.py')
@@ -93,6 +93,7 @@ class WorkflowEarlyBoundaryTests(unittest.TestCase):
    env['PRECHECK_EXIT']='2';self.assertNotEqual(run(fragments[0]),0)
    unknown=check.blank_result();report.write_text(json.dumps(unknown));self.assertEqual(run(fragments[0]),0);self.assertEqual(run(fragments[1]),0)
    report.write_text(json.dumps(dict(unknown,privateLog='NEVER_PUBLIC')));self.assertNotEqual(run(fragments[1]),0)
+   report.write_text(json.dumps(dict(unknown,schemaVersion=1)));self.assertNotEqual(run(fragments[1]),0)
    report.unlink();target=root/'outside';target.write_text(json.dumps(good));report.symlink_to(target);self.assertNotEqual(run(fragments[0]),0)
    # Execute the actual first shell block with a fixture-only helper CLI. The
    # validation functions remain exact; the fixture never contacts a registry.
