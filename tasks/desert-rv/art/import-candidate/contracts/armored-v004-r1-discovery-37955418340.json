@@ -1,0 +1,31 @@
+{
+  "schema": 1,
+  "mode": "DISCOVERY_ONLY",
+  "scope": "FULL_CANDIDATE",
+  "id": "armored-v004-r1-discovery-37955418340",
+  "kind": "armored",
+  "repository": "yangerstar1/task-workbench",
+  "runUrl": "https://github.com/yangerstar1/task-workbench/actions/runs/37955418340",
+  "sourceCommit": "10d52332b0808017a3f7d39e6920d008b113ba6f",
+  "artifactId": 11627034592,
+  "artifactName": "armored-v004-r1-technical-source-37955418340-1",
+  "artifactSha256": "efe9bbe9b0c405f027281098e206de3d3b44767a8c0f8771fd254bde55239730",
+  "files": [
+    {
+      "file": "bulwark-candidate.fbx",
+      "sha256": "036b9b44a1f3f34bbbe0a5168ff9a28d622f677567cba89c43bd44c117dbd6a3"
+    },
+    {
+      "file": "bulwark-animations.fbx",
+      "sha256": "b5104348d8b893cf419cd89a084eb866c323d25aca981d567a9642c16b1a520a"
+    },
+    {
+      "file": "bulwark-basecolor.png",
+      "sha256": "a114b6f11baf0fce328b4ad70ef8a9cb683134050b52e3b48bf8ae2995c9a5ea"
+    },
+    {
+      "file": "bulwark-orm.png",
+      "sha256": "35332b21a1721917e34e9343107bf8893afbcf290e48967459ba38b84cf22cf0"
+    }
+  ]
+}

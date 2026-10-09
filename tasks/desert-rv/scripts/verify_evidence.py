@@ -69,7 +69,7 @@ def identity():
 BASELINE_EXPORT_SHA = '003d3ba2c39fc626e85053371a7b454358a35f291d5a82e30ff5be1999aec2f9'
 BASELINE_COMMIT = '6dc675517db262c72dcb8c1507239d4bf10acc5d'
 SOURCE_ROOTS = ('tasks/desert-rv/unity', 'tasks/desert-rv/backup-assets', 'tasks/desert-rv/scripts', 'tasks/desert-rv/art/import-candidate', 'tasks/desert-rv/art/journey-preparation', 'tasks/desert-rv/art/environment-v4')
-SOURCE_FILES = ('tasks/desert-rv/ASSET-NOTICES.md', '.github/workflows/desert-rv-android.yml', '.github/workflows/desert-rv-environment.yml', '.github/workflows/desert-rv-candidate-art-import.yml', '.github/workflows/desert-rv-supplies.yml', 'tasks/desert-rv/art/reload-audio/generated-candidate.json', '.github/actions/desert-rv-rendered/action.yml', '.github/workflows/desert-rv-rendered-smoke.yml', '.github/workflows/desert-rv-player-smoke.yml', '.github/workflows/desert-rv-journey-prepare.yml', '.github/workflows/desert-rv-player-observe.yml', '.github/workflows/desert-rv-journey-rebuild.yml', '.github/workflows/desert-rv-environment-v4.yml', '.github/dispatch/desert-rv-environment-v4-20261009-files.json', '.github/workflows/desert-rv-environment-v4-r2.yml', '.github/dispatch/desert-rv-environment-v4-r2-20261009-files.json')
+SOURCE_FILES = ('tasks/desert-rv/ASSET-NOTICES.md', '.github/workflows/desert-rv-android.yml', '.github/workflows/desert-rv-environment.yml', '.github/workflows/desert-rv-candidate-art-import.yml', '.github/workflows/desert-rv-supplies.yml', 'tasks/desert-rv/art/reload-audio/generated-candidate.json', '.github/actions/desert-rv-rendered/action.yml', '.github/workflows/desert-rv-rendered-smoke.yml', '.github/workflows/desert-rv-player-smoke.yml', '.github/workflows/desert-rv-journey-prepare.yml', '.github/workflows/desert-rv-player-observe.yml', '.github/workflows/desert-rv-journey-rebuild.yml', '.github/workflows/desert-rv-environment-v4.yml', '.github/dispatch/desert-rv-environment-v4-20261009-files.json', '.github/workflows/desert-rv-environment-v4-r2.yml', '.github/dispatch/desert-rv-environment-v4-r2-20261009-files.json', '.github/workflows/desert-rv-armored-v004-r1-discovery.yml')
 FONT_PATH = 'tasks/desert-rv/unity/Assets/DesertRV/UI/Fonts/NotoSansCJKsc-Regular.otf'
 FONT_SHA = 'a6a530f3e7e7a2c299470c42efff2e109fcc0a5be92686b96d5e84a05f3ecb2b'
 
@@ -129,6 +129,9 @@ def guard():
         elif os.environ.get('GITHUB_WORKFLOW_REF') == REPOSITORY + '/.github/workflows/desert-rv-environment-v4.yml@refs/heads/main':
             import environment_v4_dispatch
             environment_v4_dispatch.verify(ROOT, os.environ)  # Independent fixed V4 request, never the rebuild nonce.
+        elif os.environ.get('GITHUB_WORKFLOW_REF') == REPOSITORY + '/.github/workflows/desert-rv-armored-v004-r1-discovery.yml@refs/heads/main':
+            import armored_v004_discovery_dispatch
+            armored_v004_discovery_dispatch.verify(ROOT, os.environ)  # Exact separate Discovery-only push.
         else:
             import journey_rebuild_dispatch
             journey_rebuild_dispatch.verify(ROOT, os.environ)  # Preserve the existing rebuild-only guard unchanged.

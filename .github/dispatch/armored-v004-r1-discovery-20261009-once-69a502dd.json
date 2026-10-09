@@ -1,0 +1,8 @@
+{
+  "schema": 1,
+  "requestId": "armored-v004-r1-discovery-20261009-once-69a502dd",
+  "baseCommit": "f144b37f84a759d4dd796b897aa819a78938dfb5",
+  "contractSha256": "88ce9d59103097189ff94f85734f0715454aba3378af75125a1cc86fb209400b",
+  "filesManifestSha256": "f44f8c24ea4ae4656a60dd90f9a82f50d7a666c9e438973a211448e17173e242",
+  "sourceStateSha256": "d0451a214854ef839acbc544b847b30dbcdf8ec3adffaebe2f4d48270e9775d7"
+}

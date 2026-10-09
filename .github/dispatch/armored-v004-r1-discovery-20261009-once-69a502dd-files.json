@@ -1,0 +1,49 @@
+{
+  "schema": 1,
+  "requestId": "armored-v004-r1-discovery-20261009-once-69a502dd",
+  "baseCommit": "f144b37f84a759d4dd796b897aa819a78938dfb5",
+  "files": [
+    {
+      "path": ".github/workflows/desert-rv-armored-v004-r1-discovery.yml",
+      "sha256": "e9d002447ffda6e559df2bce20fb7eae684285f7937d0e3e16e847f7ba8031e6",
+      "priorSha256": null,
+      "size": 5812,
+      "mode": "100644"
+    },
+    {
+      "path": "tasks/desert-rv/art/import-candidate/contracts/armored-v004-r1-discovery-37955418340.json",
+      "sha256": "88ce9d59103097189ff94f85734f0715454aba3378af75125a1cc86fb209400b",
+      "priorSha256": null,
+      "size": 1076,
+      "mode": "100644"
+    },
+    {
+      "path": "tasks/desert-rv/scripts/armored_v004_discovery_dispatch.py",
+      "sha256": "23b62943578e29b948202d1a4f67444b9ab10111d50c9d3140534c9fcf256174",
+      "priorSha256": null,
+      "size": 13040,
+      "mode": "100644"
+    },
+    {
+      "path": "tasks/desert-rv/scripts/prepare_runner.sh",
+      "sha256": "5d79c12cb53746ec560ecc7417f22c1f99d07f5c25b609f44a522c5e29f2aefb",
+      "priorSha256": "1fa8eba3b76329608c3de8c4cabbcc3d235b92ac04961b8531a305570a9fbf26",
+      "size": 1983,
+      "mode": "100644"
+    },
+    {
+      "path": "tasks/desert-rv/scripts/test_armored_v004_discovery_dispatch.py",
+      "sha256": "91751a38d913641dbe2b16066b2beb8018f1cedc75c404014b11ce0029addd34",
+      "priorSha256": null,
+      "size": 18939,
+      "mode": "100644"
+    },
+    {
+      "path": "tasks/desert-rv/scripts/verify_evidence.py",
+      "sha256": "4959ff84aec962358f05170cd79c52e95ca278f717966337e5c5136728843847",
+      "priorSha256": "460d9ac89d24dc7e110cfb809e8b84837f90223268c70297e43b4d204765cb22",
+      "size": 17738,
+      "mode": "100644"
+    }
+  ]
+}
