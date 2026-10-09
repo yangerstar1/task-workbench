@@ -1,22 +1,22 @@
-"""Closed four-view diffuse comparison push fixtures, including actual Git parent/blob/mode checks. No network or dispatch."""
+"""Closed R4 twenty-view production terrain push fixtures, including actual Git parent/blob/mode checks. No network or dispatch."""
 import copy,hashlib,json,os,re,subprocess,tempfile,unittest
 from pathlib import Path
 from unittest import mock
-import environment_diffuse_comparison_r1_dispatch as d
+import environment_v4_r4_audit_dispatch as d
 
 class IdentityTests(unittest.TestCase):
  def setUp(self):
   self.head='a'*40;self.candidate=(d.ROOT/d.CANDIDATE).read_bytes();self.state=b'fixture source state'
   self.env=dict(GITHUB_ACTIONS='true',GITHUB_REPOSITORY=d.REPOSITORY,GITHUB_REPOSITORY_VISIBILITY='public',GITHUB_ACTOR=d.OWNER,GITHUB_TRIGGERING_ACTOR=d.OWNER,GITHUB_REF='refs/heads/main',GITHUB_SHA=self.head,GITHUB_RUN_ID='1',GITHUB_RUN_ATTEMPT='1',GITHUB_EVENT_NAME='push',GITHUB_WORKFLOW_REF=d.REPOSITORY+'/'+d.WORKFLOW+'@refs/heads/main')
   self.event=dict(before=d.BASE,after=self.head,ref='refs/heads/main',created=False,deleted=False,forced=False,repository=dict(full_name=d.REPOSITORY,visibility='public',private=False,fork=False,default_branch='main',owner=dict(login=d.OWNER)),sender=dict(login=d.OWNER),head_commit=dict(id=self.head))
-  self.manifest=dict(schema=1,requestId=d.REQUEST_ID,baseCommit=d.BASE,candidateManifestSha256=d.CANDIDATE_SHA,files=[dict(path=p,sha256='b'*64,size=12,mode='100644') for p in [d.WORKFLOW,'tasks/desert-rv/scripts/environment_diffuse_comparison_r1_dispatch.py']])
+  self.manifest=dict(schema=1,requestId=d.REQUEST_ID,baseCommit=d.BASE,candidateManifestSha256=d.CANDIDATE_SHA,files=[dict(path=p,sha256='b'*64,size=12,mode='100644') for p in d.PAYLOAD_PATHS])
   self.request=dict(schema=1,requestId=d.REQUEST_ID,baseCommit=d.BASE,candidateManifestSha256=d.CANDIDATE_SHA,filesManifestSha256=d.sha(json.dumps(self.manifest).encode()),sourceStateSha256=d.sha(self.state))
   self.parents=[d.BASE];self.present=False;self.changed=[i['path'] for i in self.manifest['files']]+[d.REQUEST,d.MANIFEST,d.SOURCE_STATE]
  def check(self,raw=None,tracked=None,manifest=None,candidate=None):
   raw=json.dumps(self.request).encode() if raw is None else raw;manifest=json.dumps(self.manifest).encode() if manifest is None else manifest
   return d.validate_identity(self.env,self.event,self.head,self.parents,raw,raw if tracked is None else tracked,self.present,self.changed,manifest,self.state,self.candidate if candidate is None else candidate)
  def reject(self,code,**kwargs):
-  with self.assertRaisesRegex(ValueError,'ENVIRONMENT_DIFFUSE_COMPARISON_R1_DISPATCH_'+code):self.check(**kwargs)
+  with self.assertRaisesRegex(ValueError,'ENVIRONMENT_V4_R4_AUDIT_DISPATCH_'+code):self.check(**kwargs)
  def test_exact_fixed_push_passes(self):self.assertEqual(self.manifest,self.check())
  def test_manual_event_rejected_not_impersonated(self):self.env['GITHUB_EVENT_NAME']='workflow_dispatch';self.reject('EVENT')
  def test_pull_request_rejected(self):self.env['GITHUB_EVENT_NAME']='pull_request';self.reject('EVENT')
@@ -36,6 +36,10 @@ class IdentityTests(unittest.TestCase):
  def test_previous_probe_workflow_rejected(self):self.env['GITHUB_WORKFLOW_REF']=d.REPOSITORY+'/.github/workflows/desert-rv-environment-terrain-probe.yml@refs/heads/main';self.reject('WORKFLOW')
  def test_strict_nonce_rejected(self):self.request['requestId']='armored-v004-r1-strict-20261009-once-c8521e4b';self.reject('REQUEST_IDENTITY')
  def test_strict_workflow_rejected(self):self.env['GITHUB_WORKFLOW_REF']=d.REPOSITORY+'/.github/workflows/desert-rv-armored-v004-r1-strict.yml@refs/heads/main';self.reject('WORKFLOW')
+ def test_previous_comparison_r1_nonce_rejected(self):self.request['requestId']='desert-rv-environment-diffuse-comparison-r1-20261009-once-c91b7f42';self.reject('REQUEST_IDENTITY')
+ def test_previous_comparison_r1_workflow_rejected(self):self.env['GITHUB_WORKFLOW_REF']=d.REPOSITORY+'/.github/workflows/desert-rv-environment-diffuse-comparison-r1.yml@refs/heads/main';self.reject('WORKFLOW')
+ def test_previous_r4_nonce_rejected(self):self.request['requestId']='desert-rv-environment-v4-r4-20261009-once-d28e54a9';self.reject('REQUEST_IDENTITY')
+ def test_previous_r4_workflow_rejected(self):self.env['GITHUB_WORKFLOW_REF']=d.REPOSITORY+'/.github/workflows/desert-rv-environment-v4-r4.yml@refs/heads/main';self.reject('WORKFLOW')
  def test_wrong_parent_rejected(self):self.parents=['c'*40];self.reject('PARENT')
  def test_merge_parent_rejected(self):self.parents.append('c'*40);self.reject('PARENT')
  def test_wrong_before_rejected(self):self.event['before']='c'*40;self.reject('PUSH_IDENTITY')
@@ -83,6 +87,13 @@ class IdentityTests(unittest.TestCase):
  def test_manifest_oversized_file_rejected(self):self.manifest['files'][0]['size']=40*1024*1024+1;self.reject('FILE_IDENTITY')
  def test_wrong_manifest_identity_rejected(self):self.manifest['requestId']='rebuild';self.reject('MANIFEST_IDENTITY')
 
+ def test_manifest_extra_valid_path_rejected(self):self.manifest['files'].append(dict(path='tasks/arbitrary.py',sha256='b'*64,size=1,mode='100644'));self.reject('PAYLOAD_SET')
+ def test_manifest_missing_candidate_path_rejected(self):self.manifest['files']=[r for r in self.manifest['files'] if r['path']!=d.CANDIDATE];self.reject('PAYLOAD_SET')
+ def test_manifest_substituted_valid_path_rejected(self):
+  next(r for r in self.manifest['files'] if r['path']==d.CANDIDATE)['path']='tasks/substitute.json';self.reject('PAYLOAD_SET')
+ def test_manifest_request_hash_cycle_rejected(self):self.manifest['files'][0]['path']=d.REQUEST;self.reject('FILE_PATH')
+ def test_manifest_self_hash_cycle_rejected(self):self.manifest['files'][0]['path']=d.MANIFEST;self.reject('FILE_PATH')
+
 class WorkflowEnvironmentTests(unittest.TestCase):
  """Read the real workflow job-env bridge; do not invent it inside the helper fixture."""
  def setUp(self):
@@ -123,7 +134,7 @@ class RealGitTests(unittest.TestCase):
  def setUp(self):
   self.temp=tempfile.TemporaryDirectory();self.root=Path(self.temp.name);self.git('init');self.git('config','user.name','Local Fixture');self.git('config','user.email','fixture@example.invalid')
   (self.root/'baseline').write_text('immutable base');self.git('add','.');self.git('commit','-m','fixture base');self.base=self.git('rev-parse','HEAD')
-  self.payloads={d.WORKFLOW:b'fixture workflow','tasks/desert-rv/scripts/environment_diffuse_comparison_r1_dispatch.py':b'fixture helper',d.CANDIDATE:(d.ROOT/d.CANDIDATE).read_bytes()}
+  self.payloads={p:((d.ROOT/d.CANDIDATE).read_bytes() if p==d.CANDIDATE else ('fixture '+p).encode()) for p in d.PAYLOAD_PATHS}
   for path,raw in self.payloads.items():p=self.root/path;p.parent.mkdir(parents=True,exist_ok=True);p.write_bytes(raw)
   manifest=dict(schema=1,requestId=d.REQUEST_ID,baseCommit=self.base,candidateManifestSha256=d.CANDIDATE_SHA,files=[dict(path=p,sha256=d.sha(raw),size=len(raw),mode='100644') for p,raw in sorted(self.payloads.items())])
   manifest_raw=(json.dumps(manifest,indent=2)+'\n').encode();self.manifest_sha=d.sha(manifest_raw)
@@ -176,96 +187,84 @@ class RealGitTests(unittest.TestCase):
   p=self.root/d.WORKFLOW;p.unlink();p.symlink_to(self.root/'baseline')
   with self.assertRaisesRegex(ValueError,'INPUT_FILE'):self.verify()
 
-class ComparisonWorkflowScopeTests(unittest.TestCase):
- def setUp(self):self.workflow=(d.ROOT/d.WORKFLOW).read_text()
- def test_separate_native_assembly_and_bounded_resources(self):
-  self.assertEqual(self.workflow.count('customParameters:'),1)
-  self.assertIn('customParameters: -assemblyNames DesertRV.EditorDiffuseComparisonTests -force-glcore -job-worker-count 2',self.workflow)
-  self.assertNotIn('-assemblyNames DesertRV.EditorRenderTests',self.workflow)
-  for token in ('timeout-minutes: 55','dockerCpuLimit: 2','dockerMemoryLimit: 12g','unityVersion: 6000.3.19f1'):self.assertIn(token,self.workflow)
- def test_exact_probe_wrapper_routes(self):
-  self.assertIn('scripts/environment_diffuse_comparison_evidence.py before',self.workflow);self.assertIn('scripts/environment_diffuse_comparison_evidence.py package',self.workflow)
-  self.assertNotIn('scripts/environment_v4_evidence.py before',self.workflow);self.assertNotIn('scripts/environment_v4_evidence.py package',self.workflow)
- def test_no_old_partial_or_arbitrary_failure_package(self):
-  self.assertNotIn(' partial',self.workflow);self.assertNotIn('id: partial',self.workflow);self.assertNotIn('id: package_diag',self.workflow)
-  self.assertEqual(self.workflow.count('uses: actions/upload-artifact@'),2)
-  self.assertIn('path: tasks/desert-rv/evidence/diffuse-comparison/',self.workflow)
-  self.assertIn('path: tasks/desert-rv/evidence/environment-source-diagnostic/protected-source-failure.json',self.workflow)
-  self.assertNotIn('path: tasks/desert-rv/evidence/environment-v4/',self.workflow)
-  self.assertIn('artifactsPath: tasks/desert-rv/artifacts/diffuse-comparison',self.workflow)
- def test_original_generated_contract_is_retained(self):
-  contract=json.loads((d.ROOT/'tasks/desert-rv/art/environment-v4/generated-contract.json').read_text())
-  self.assertEqual(len(contract['files']),121);self.assertEqual(len(contract['metadata_files']),122)
-  self.assertEqual({k:len(v) for k,v in contract['region_mesh_keys'].items()},{'1':37,'2':45,'3':23});self.assertEqual(len(contract['material_names']),16)
- def test_official_container_wrapper_is_byte_exact(self):
-  self.assertEqual(d.sha((d.ROOT/'tasks/desert-rv/scripts/Environment.Dockerfile').read_bytes()),'f0d83398543119a22f73cd922257c88ee00894f41d6c5f302f1f525438ad73ab')
- def test_official_pil_numpy_only_no_yaml_dependency(self):
-  self.assertIn('apt-get install -y --no-install-recommends python3-pil python3-numpy',self.workflow);self.assertNotIn('python3-yaml',self.workflow);self.assertNotIn('pip install',self.workflow)
-  import ast
-  for name in ('environment_diffuse_comparison_r1_dispatch.py','test_environment_diffuse_comparison_r1_dispatch.py','test_environment_diffuse_comparison_r1_runner_prefix.py'):
-   tree=ast.parse((Path(d.__file__).parent/name).read_text())
-   imported={a.name for n in ast.walk(tree) if isinstance(n,ast.Import) for a in n.names}|{n.module for n in ast.walk(tree) if isinstance(n,ast.ImportFrom)}
-   self.assertNotIn('yaml',imported)
-
- def test_workflow_has_only_fixed_request_push_and_read_permission(self):
-  self.assertNotIn('workflow_dispatch:',self.workflow);self.assertNotIn('repository_dispatch:',self.workflow)
-  self.assertIn('    branches: [main]',self.workflow)
-  self.assertIn('      - '+d.REQUEST,self.workflow)
-  self.assertIn("github.event.before == '"+d.BASE+"'",self.workflow)
-  self.assertIn('permissions:\n  contents: read\n',self.workflow)
-  self.assertNotIn('secrets: inherit',self.workflow)
- def test_failure_is_only_the_two_original_source_hash_diagnostics(self):
-  lines=[line.strip() for line in self.workflow.splitlines() if line.strip().startswith('if: failure()')]
-  self.assertEqual(lines,["if: failure() && steps.snapshot.outcome == 'success'","if: failure() && steps.source_diag.outputs.present == 'true'"])
-  self.assertIn('scripts/environment_evidence.py diagnose',self.workflow)
-  self.assertNotIn('continue-on-error:',self.workflow);self.assertNotIn('if: always()',self.workflow)
- def test_all_old_and_new_validation_suites_are_included(self):
-  for name in ('test_environment_diffuse_comparison_dispatch.py','test_environment_diffuse_comparison_runner_prefix.py'):self.assertIn('/usr/bin/python3 tasks/desert-rv/scripts/'+name,self.workflow)
-  for name in ('test_environment_v4_dispatch.py','test_environment_v4_r2_dispatch.py','test_environment_v4_r3_dispatch.py','test_journey_rebuild_dispatch.py','test_armored_v004_discovery_dispatch.py','test_armored_v004_strict_dispatch.py','test_environment_terrain_probe_dispatch.py','test_environment_terrain_probe_runner_prefix.py','test_environment_terrain_probe_evidence.py','test_environment_diffuse_comparison_r1_dispatch.py','test_environment_diffuse_comparison_r1_runner_prefix.py','test_environment_diffuse_comparison_evidence.py'):
-   self.assertIn('/usr/bin/python3 tasks/desert-rv/scripts/'+name,self.workflow)
-  self.assertIn('/usr/bin/python3 tasks/desert-rv/art/environment-v4/diffuse-correction/test_correction.py',self.workflow)
-
-class FrozenComparisonAuthoringTests(unittest.TestCase):
- def test_single_editor_case_and_600s_timeout(self):
-  folder=d.ROOT/'tasks/desert-rv/unity/Assets/DesertRV/Tests/EditorDiffuseComparison'
-  asm=json.loads((folder/'DesertRV.EditorDiffuseComparisonTests.asmdef').read_text())
-  self.assertEqual(asm['name'],'DesertRV.EditorDiffuseComparisonTests');self.assertEqual(asm['includePlatforms'],['Editor'])
-  code=(folder/'JourneyDiffuseComparisonTests.cs').read_text();self.assertEqual(code.count('[Test,'),1);self.assertIn('[Test, Timeout(600000)]',code)
-  self.assertIn('public void AuthorAndCaptureFourDiffuseComparisons()',code);self.assertIn('AuthorAndCaptureDiffuseComparison',code)
- def test_wrapper_locks_two_cameras_and_two_diffuse_states(self):
-  import environment_diffuse_comparison_evidence as evidence
-  self.assertEqual(evidence.RENDER_TEST,'DesertRV.Tests.JourneyDiffuseComparisonTests.AuthorAndCaptureFourDiffuseComparisons')
-  self.assertEqual(evidence.VARIANTS,('original','illumination-corrected'))
-  self.assertEqual(set(evidence.CAMERAS),{'overview','ground'});self.assertEqual(len(evidence.IMAGES),4)
-  import environment_terrain_probe_evidence as original
-  self.assertEqual(evidence.CAMERAS,original.CAMERAS)
- def test_original_production_sources_and_explicit_r4_render_entry(self):
-  # R4 explicitly changes only the EditorRender entry pin; original SHA: f5b8d102ce5debf111805742fa300bf3ded062b02f4d53856e429e057e0097f2
-  pins={'tasks/desert-rv/unity/Assets/DesertRV/Editor/JourneySceneAuthoring.cs': 'ced4da08b8447265c14a26b5b63503bb4a08861e5bc5536d1921a4c7e880ee49', 'tasks/desert-rv/unity/Assets/DesertRV/Editor/JourneySceneAuthoring.EnvironmentPolish.cs': 'b829eda4869721b7956cb279b53e0a6b7e1194ef91880c80e2d712110a8366d9', 'tasks/desert-rv/unity/Assets/DesertRV/Editor/JourneySceneAuthoring.EnvironmentPolishCapture.cs': 'fa6cbe1f1252801ec1b0f62b864104d715f781dc01567b50ec82c9a0b30f097e', 'tasks/desert-rv/unity/Assets/DesertRV/Tests/EditorRender/JourneyEnvironmentRenderTests.cs': '4a16e5d04dabc2a0ed78dd0be8eb6b4730e2edc9a2a40ac3b0acd20382246858', 'tasks/desert-rv/scripts/environment_v4_evidence.py': '7f8bd56d466260bbf57653a76f3845deea81d9f96d03a093366376dcfeba6548', 'tasks/desert-rv/art/environment-v4/generated-contract.json': '9dfb996cd20ef0b4e3b956e991286d245a1bb836dab151e21f2d8fc925c2bf9f'}
-  for name,expected in pins.items():self.assertEqual(d.sha((d.ROOT/name).read_bytes()),expected,name)
-
- def test_original_eight_view_probe_is_unchanged(self):
-  pins={'tasks/desert-rv/scripts/environment_terrain_probe_dispatch.py': '6c0e883271251f0e9a9b02e00ed241aaeb31f1a884ea53f0c3715a275bf7b83d', 'tasks/desert-rv/scripts/environment_terrain_probe_evidence.py': 'bffbd79990a82a9d2aed171892eafb5dda97b8ab186714c00dbbac126e5abf12', '.github/workflows/desert-rv-environment-terrain-probe.yml': 'bcae3cc5aa89f9f8794dc210c90009738ccc5a819aae4862019fdef27deeeaac', 'tasks/desert-rv/unity/Assets/DesertRV/Editor/JourneySceneAuthoring.TerrainProbe.cs': 'e0c8643bd5a399095aad86e49b9929d04e9737385f373e04a35e8208e81b21d1'}
-  for name,expected in pins.items():self.assertEqual(d.sha((d.ROOT/name).read_bytes()),expected,name)
-
-class NarrowR1SharedIntegrationTests(unittest.TestCase):
- def test_verify_evidence_py_only_exact_r1_insertions(self):
+class NarrowAuditIntegrationTests(unittest.TestCase):
+ def test_only_exact_guard_insertions(self):
   text=(Path(d.__file__).parent/'verify_evidence.py').read_text()
   self.assertEqual(text.count(", '.github/workflows/desert-rv-environment-v4-r4-audit.yml', '.github/dispatch/desert-rv-environment-v4-r4-audit-20261009-files.json'"),1);text=text.replace(", '.github/workflows/desert-rv-environment-v4-r4-audit.yml', '.github/dispatch/desert-rv-environment-v4-r4-audit-20261009-files.json'",'')
   self.assertEqual(text.count("        if os.environ.get('GITHUB_WORKFLOW_REF') == REPOSITORY + '/.github/workflows/desert-rv-environment-v4-r4-audit.yml@refs/heads/main':\n            import environment_v4_r4_audit_dispatch\n            environment_v4_r4_audit_dispatch.verify(ROOT, os.environ)  # Independent fixed R4 phase audit; strict package unchanged.\n        elif os.environ.get('GITHUB_WORKFLOW_REF') == REPOSITORY + '/.github/workflows/desert-rv-environment-v4-r4.yml@refs/heads/main':"),1);text=text.replace("        if os.environ.get('GITHUB_WORKFLOW_REF') == REPOSITORY + '/.github/workflows/desert-rv-environment-v4-r4-audit.yml@refs/heads/main':\n            import environment_v4_r4_audit_dispatch\n            environment_v4_r4_audit_dispatch.verify(ROOT, os.environ)  # Independent fixed R4 phase audit; strict package unchanged.\n        elif os.environ.get('GITHUB_WORKFLOW_REF') == REPOSITORY + '/.github/workflows/desert-rv-environment-v4-r4.yml@refs/heads/main':","        if os.environ.get('GITHUB_WORKFLOW_REF') == REPOSITORY + '/.github/workflows/desert-rv-environment-v4-r4.yml@refs/heads/main':")
-  self.assertEqual(text.count(", '.github/workflows/desert-rv-environment-v4-r4.yml', '.github/dispatch/desert-rv-environment-v4-r4-20261009-files.json'"),1);text=text.replace(", '.github/workflows/desert-rv-environment-v4-r4.yml', '.github/dispatch/desert-rv-environment-v4-r4-20261009-files.json'",'')
-  self.assertEqual(text.count("        if os.environ.get('GITHUB_WORKFLOW_REF') == REPOSITORY + '/.github/workflows/desert-rv-environment-v4-r4.yml@refs/heads/main':\n            import environment_v4_r4_dispatch\n            environment_v4_r4_dispatch.verify(ROOT, os.environ)  # Exact separate R4 corrected terrain twenty-view verification.\n        elif os.environ.get('GITHUB_WORKFLOW_REF') == REPOSITORY + '/.github/workflows/desert-rv-environment-diffuse-comparison-r1.yml@refs/heads/main':"),1);text=text.replace("        if os.environ.get('GITHUB_WORKFLOW_REF') == REPOSITORY + '/.github/workflows/desert-rv-environment-v4-r4.yml@refs/heads/main':\n            import environment_v4_r4_dispatch\n            environment_v4_r4_dispatch.verify(ROOT, os.environ)  # Exact separate R4 corrected terrain twenty-view verification.\n        elif os.environ.get('GITHUB_WORKFLOW_REF') == REPOSITORY + '/.github/workflows/desert-rv-environment-diffuse-comparison-r1.yml@refs/heads/main':","        if os.environ.get('GITHUB_WORKFLOW_REF') == REPOSITORY + '/.github/workflows/desert-rv-environment-diffuse-comparison-r1.yml@refs/heads/main':")
-  self.assertEqual(text.count(", '.github/workflows/desert-rv-environment-diffuse-comparison-r1.yml', '.github/dispatch/desert-rv-environment-diffuse-comparison-r1-20261009-files.json'"),1);text=text.replace(", '.github/workflows/desert-rv-environment-diffuse-comparison-r1.yml', '.github/dispatch/desert-rv-environment-diffuse-comparison-r1-20261009-files.json'",'')
-  self.assertEqual(text.count("        if os.environ.get('GITHUB_WORKFLOW_REF') == REPOSITORY + '/.github/workflows/desert-rv-environment-diffuse-comparison-r1.yml@refs/heads/main':\n            import environment_diffuse_comparison_r1_dispatch\n            environment_diffuse_comparison_r1_dispatch.verify(ROOT, os.environ)  # Exact separate R1 four-view diffuse comparison repair.\n        elif os.environ.get('GITHUB_WORKFLOW_REF') == REPOSITORY + '/.github/workflows/desert-rv-environment-diffuse-comparison.yml@refs/heads/main':"),1);text=text.replace("        if os.environ.get('GITHUB_WORKFLOW_REF') == REPOSITORY + '/.github/workflows/desert-rv-environment-diffuse-comparison-r1.yml@refs/heads/main':\n            import environment_diffuse_comparison_r1_dispatch\n            environment_diffuse_comparison_r1_dispatch.verify(ROOT, os.environ)  # Exact separate R1 four-view diffuse comparison repair.\n        elif os.environ.get('GITHUB_WORKFLOW_REF') == REPOSITORY + '/.github/workflows/desert-rv-environment-diffuse-comparison.yml@refs/heads/main':","        if os.environ.get('GITHUB_WORKFLOW_REF') == REPOSITORY + '/.github/workflows/desert-rv-environment-diffuse-comparison.yml@refs/heads/main':")
-  self.assertEqual(d.sha(text.encode()),'df10bb4920503b8167c255b28f325aee781850dc0cc3020de6bf06907eb445b0')
- def test_prepare_runner_sh_only_exact_r1_insertions(self):
+  self.assertEqual(d.sha(text.encode()),'ff6b8936a154ed215c1ab24dd719df867f806118eefcd209b112d2294615905e')
+ def test_only_exact_runner_insertions(self):
   text=(Path(d.__file__).parent/'prepare_runner.sh').read_text()
   self.assertEqual(text.count('  if [[ "${GITHUB_WORKFLOW_REF:-}" == \'yangerstar1/task-workbench/.github/workflows/desert-rv-environment-v4-r4-audit.yml@refs/heads/main\' ]]; then\n    /usr/bin/python3 "$(dirname "${BASH_SOURCE[0]}")/environment_v4_r4_audit_dispatch.py" --verify-only\n  elif [[ "${GITHUB_WORKFLOW_REF:-}" == \'yangerstar1/task-workbench/.github/workflows/desert-rv-environment-v4-r4.yml@refs/heads/main\' ]]; then'),1);text=text.replace('  if [[ "${GITHUB_WORKFLOW_REF:-}" == \'yangerstar1/task-workbench/.github/workflows/desert-rv-environment-v4-r4-audit.yml@refs/heads/main\' ]]; then\n    /usr/bin/python3 "$(dirname "${BASH_SOURCE[0]}")/environment_v4_r4_audit_dispatch.py" --verify-only\n  elif [[ "${GITHUB_WORKFLOW_REF:-}" == \'yangerstar1/task-workbench/.github/workflows/desert-rv-environment-v4-r4.yml@refs/heads/main\' ]]; then','  if [[ "${GITHUB_WORKFLOW_REF:-}" == \'yangerstar1/task-workbench/.github/workflows/desert-rv-environment-v4-r4.yml@refs/heads/main\' ]]; then')
-  self.assertEqual(text.count('  if [[ "${GITHUB_WORKFLOW_REF:-}" == \'yangerstar1/task-workbench/.github/workflows/desert-rv-environment-v4-r4.yml@refs/heads/main\' ]]; then\n    /usr/bin/python3 "$(dirname "${BASH_SOURCE[0]}")/environment_v4_r4_dispatch.py" --verify-only\n  elif [[ "${GITHUB_WORKFLOW_REF:-}" == \'yangerstar1/task-workbench/.github/workflows/desert-rv-environment-diffuse-comparison-r1.yml@refs/heads/main\' ]]; then'),1);text=text.replace('  if [[ "${GITHUB_WORKFLOW_REF:-}" == \'yangerstar1/task-workbench/.github/workflows/desert-rv-environment-v4-r4.yml@refs/heads/main\' ]]; then\n    /usr/bin/python3 "$(dirname "${BASH_SOURCE[0]}")/environment_v4_r4_dispatch.py" --verify-only\n  elif [[ "${GITHUB_WORKFLOW_REF:-}" == \'yangerstar1/task-workbench/.github/workflows/desert-rv-environment-diffuse-comparison-r1.yml@refs/heads/main\' ]]; then','  if [[ "${GITHUB_WORKFLOW_REF:-}" == \'yangerstar1/task-workbench/.github/workflows/desert-rv-environment-diffuse-comparison-r1.yml@refs/heads/main\' ]]; then')
-  self.assertEqual(text.count('  if [[ "${GITHUB_WORKFLOW_REF:-}" == \'yangerstar1/task-workbench/.github/workflows/desert-rv-environment-diffuse-comparison-r1.yml@refs/heads/main\' ]]; then\n    /usr/bin/python3 "$(dirname "${BASH_SOURCE[0]}")/environment_diffuse_comparison_r1_dispatch.py" --verify-only\n  elif [[ "${GITHUB_WORKFLOW_REF:-}" == \'yangerstar1/task-workbench/.github/workflows/desert-rv-environment-diffuse-comparison.yml@refs/heads/main\' ]]; then'),1);text=text.replace('  if [[ "${GITHUB_WORKFLOW_REF:-}" == \'yangerstar1/task-workbench/.github/workflows/desert-rv-environment-diffuse-comparison-r1.yml@refs/heads/main\' ]]; then\n    /usr/bin/python3 "$(dirname "${BASH_SOURCE[0]}")/environment_diffuse_comparison_r1_dispatch.py" --verify-only\n  elif [[ "${GITHUB_WORKFLOW_REF:-}" == \'yangerstar1/task-workbench/.github/workflows/desert-rv-environment-diffuse-comparison.yml@refs/heads/main\' ]]; then','  if [[ "${GITHUB_WORKFLOW_REF:-}" == \'yangerstar1/task-workbench/.github/workflows/desert-rv-environment-diffuse-comparison.yml@refs/heads/main\' ]]; then')
-  self.assertEqual(d.sha(text.encode()),'8c3a755951ae5332f601a7043e7fb35be058796263cab7dd150942c0b30ebf47')
- def test_previous_comparison_identity_files_unchanged(self):
-  pins={'.github/workflows/desert-rv-environment-diffuse-comparison.yml': '44019cdb559597c222d28fb6de5bae84f68d9a973de7fe7b30d23e100710ebcd', '.github/dispatch/desert-rv-environment-diffuse-comparison-20261009.json': '1386a3b6dfb746cc76542ae9172ab9afa79f5e54c8910ebfbaff18a7012bfb69', '.github/dispatch/desert-rv-environment-diffuse-comparison-20261009-files.json': 'a571d25aa79a85f50488be98b5bfb1c14815375753ed4ad224bb41ac7f437093', 'tasks/desert-rv/scripts/environment_diffuse_comparison_dispatch.py': '1c3c6cf43ae8af47a8df2d9c56f5264d99d8ec11035df4bfc9ea983c0bec9cbd'}
+  self.assertEqual(d.sha(text.encode()),'575db6430f48e29b8ff98a49bb1c2565889d6f29695b2222203bcaab4dae4f17')
+
+class AuditWorkflowTests(unittest.TestCase):
+ def setUp(self):self.workflow=(d.ROOT/d.WORKFLOW).read_text()
+ def test_prior_twenty_camera_native_entry_and_resources_are_exact(self):
+  original=(d.ROOT/'.github/workflows/desert-rv-environment-v4-r4.yml').read_text()
+  def native(text):return text.split('      - name: Execute separate native EditorRender author and capture entry',1)[1].split('      - name: Reject altered originals',1)[0]
+  self.assertEqual(native(self.workflow),native(original))
+  self.assertEqual(self.workflow.count('customParameters:'),1)
+  self.assertIn('customParameters: -assemblyNames DesertRV.EditorRenderTests -force-glcore -job-worker-count 2',self.workflow)
+  self.assertIn('timeout-minutes: 55',self.workflow)
+  self.assertIn('scripts/environment_v4_r4_evidence.py before',self.workflow)
+  for item in ('continue-on-error:','if: always()','contents: write','-nographics','EditorDiffuseComparisonTests','EditorTerrainProbeTests'):self.assertNotIn(item,self.workflow)
+ def test_diagnostics_runs_on_strict_success_or_failure_only_after_native_success(self):
+  self.assertIn("if: ${{ !cancelled() && steps.native.outcome == 'success' }}",self.workflow)
+  self.assertIn("if: ${{ !cancelled() && steps.audit_diag.outcome == 'success' }}",self.workflow)
+  self.assertIn("environment_v4_r4_audit.py diagnose --package-outcome '${{ steps.package.outcome }}'",self.workflow)
+  self.assertIn('environment_v4_r4_audit.py package',self.workflow)
+  self.assertNotIn('environment_v4_r4_evidence.py partial',self.workflow)
+  self.assertNotIn('id: partial',self.workflow)
+  self.assertNotIn('--package-outcome success',self.workflow)
+  self.assertNotIn('--package-outcome failure',self.workflow)
+ def test_fixed_request_public_owner_first_attempt_scope(self):
+  self.assertNotIn('workflow_dispatch:',self.workflow);self.assertNotIn('repository_dispatch:',self.workflow)
+  self.assertIn('    branches: [main]',self.workflow);self.assertIn('      - '+d.REQUEST,self.workflow)
+  self.assertIn("github.event.before == '"+d.BASE+"'",self.workflow)
+  self.assertIn('permissions:\n  contents: read\n',self.workflow)
+ def test_all_old_tests_and_three_audit_suites_are_retained(self):
+  original=(d.ROOT/'.github/workflows/desert-rv-environment-v4-r4.yml').read_text()
+  def commands(text):return text.split('      - name: Validate guards and safety contracts\n',1)[1].split('      - name: Restore exact checkpoint font',1)[0].splitlines()[1:]
+  additions=['          /usr/bin/python3 tasks/desert-rv/scripts/test_environment_v4_r4_audit_dispatch.py','          /usr/bin/python3 tasks/desert-rv/scripts/test_environment_v4_r4_audit_runner_prefix.py','          /usr/bin/python3 tasks/desert-rv/scripts/test_environment_v4_r4_audit.py']
+  self.assertEqual(commands(self.workflow),commands(original)+additions)
+ def test_only_exact_artifact_paths_and_upload_count(self):
+  paths=re.findall(r'^          path: (.+)$',self.workflow,re.M)
+  self.assertEqual(paths,['tasks/desert-rv/evidence/environment-v4-r4/','tasks/desert-rv/evidence/environment-v4-r4-audit/','tasks/desert-rv/evidence/environment-source-diagnostic/protected-source-failure.json','tasks/desert-rv/evidence/environment-package-diagnostic/unity-package-resolution.json'])
+  self.assertEqual(self.workflow.count('uses: actions/upload-artifact@'),4)
+  self.assertIn('name: desert-rv-environment-v4-r4-audit-LIFECYCLE-DIAGNOSTIC-',self.workflow)
+  import environment_v4_r4_audit as audit
+  self.assertEqual(audit.OUT,d.ROOT/'tasks/desert-rv/evidence/environment-v4-r4-audit')
+  for forbidden in ('Unity.log','artifacts/environment/','JourneyEvidence/','generated/'):
+   self.assertFalse(any(forbidden in path for path in paths))
+ def test_every_prior_authorization_file_is_byte_identical(self):
+  pins={'.github/dispatch/armored-v004-r1-discovery-20261009-once-69a502dd-files.json': 'f44f8c24ea4ae4656a60dd90f9a82f50d7a666c9e438973a211448e17173e242', '.github/dispatch/armored-v004-r1-discovery-20261009-once-69a502dd.json': 'f410c5744988ab33ce0d39cc9e5f438d3254250976cc3d885123f573f8b57bae', '.github/dispatch/armored-v004-r1-strict-20261009-once-c8521e4b-files.json': '7107fa05cbc12706b4545595deaeab6ced546e46cd474d1f9e2e8355ee315043', '.github/dispatch/armored-v004-r1-strict-20261009-once-c8521e4b.json': 'a8b01a16c0e06719720aa198ecdfe915ffb246e0a47d926ad08b078df2130440', '.github/dispatch/desert-rv-armored-v004-r1-static-20261009.json': 'dff22bd4d1dacc76f5c379d11614b74fca6940ff236e06de1074e63a6df353ac', '.github/dispatch/desert-rv-armored-v004-r1-technical-20261009.json': 'b2835cb6038b7d41f30c9fcd4c042cd7517f54afbd9a49185c7fd4088599a7d1', '.github/dispatch/desert-rv-armored-v004-static-20261009.json': '6ccb20b76a191feab4bc16ab3f5911dfb237d88582059c4b3744b824b76fe4b7', '.github/dispatch/desert-rv-environment-diffuse-comparison-20261009-files.json': 'a571d25aa79a85f50488be98b5bfb1c14815375753ed4ad224bb41ac7f437093', '.github/dispatch/desert-rv-environment-diffuse-comparison-20261009.json': '1386a3b6dfb746cc76542ae9172ab9afa79f5e54c8910ebfbaff18a7012bfb69', '.github/dispatch/desert-rv-environment-diffuse-comparison-r1-20261009-files.json': 'e26ec76f89d79506c248b92ddaba3fce190db8084d71c04466d3f11051627570', '.github/dispatch/desert-rv-environment-diffuse-comparison-r1-20261009.json': 'ccae6bbcaa49b2acb358f9455dfb4f476c1e75445cfad6f2c4f6ff036920fe34', '.github/dispatch/desert-rv-environment-terrain-probe-20261009-files.json': '4e7484ee6d3624acc5c964fd542d4050779b7129236353f1381bc10ef57fe9e8', '.github/dispatch/desert-rv-environment-terrain-probe-20261009.json': 'bca0375e55b6da13c94907d351f3754620b3dcfe15ccd27776200d5384c2e52e', '.github/dispatch/desert-rv-environment-v4-20261009-files.json': 'fc0a8a0670126e742c8540ebabe44352b42c132656c5887df2f71e42734c23cb', '.github/dispatch/desert-rv-environment-v4-20261009.json': '442a5bf8ce36bf69dc54c02e4a4f57c0d4b4ba2528df4090da67e8fc7088e991', '.github/dispatch/desert-rv-environment-v4-r2-20261009-files.json': '21012aab599a5282554e78eba4d4c649ffe884d683e7741296669f70c1f73ec3', '.github/dispatch/desert-rv-environment-v4-r2-20261009.json': 'd6344772a648b6228199bee74a781ef8d36925c73d9793182a76f13f02fb4db1', '.github/dispatch/desert-rv-environment-v4-r3-20261009-files.json': '375f75e87efe7c6db0b3be09a73c396ca66da94d2c434d81f8d353f9c2cd0628', '.github/dispatch/desert-rv-environment-v4-r3-20261009.json': 'fd9ed1fc78cce60e660f6bef41c67a6e0d7db7e9ffbb4e6004ee570776fec476', '.github/dispatch/desert-rv-environment-v4-r4-20261009-files.json': '12738e82388b4f3ff6fc84dfd82651f57e9937b0153ef8b05c312dbd9728c16c', '.github/dispatch/desert-rv-environment-v4-r4-20261009.json': '6fde28a7973a484947726abaf3e89bc418eb0f8d00582d9a506bc1ef7f09b5e6', '.github/dispatch/desert-rv-rebuild-performance-20261009.json': 'beea0fdb80eff9506e2dd0ddff0e6099670d155397d42f01e751ef9044e469b0', '.github/dispatch/desert-rv-rebuild-performance350-20261009.json': '9c1c9e02704e360275c87e67813d23f43dacea1faf86e6f307569a075d48fad1', '.github/workflows/desert-rv-android.yml': 'a921a22d3bafd4b736575ceb48a44e302a4c31104b77fc8d341ec83162b0d4cd', '.github/workflows/desert-rv-armored-refined-static.yml': '19680a698ef93945b19d2911bfb83a670b1ab31b24a3fc196a5ad79d95398b53', '.github/workflows/desert-rv-armored-refined-technical.yml': '23d5cea0ebd344aaaa9a7d096dd909f4d90ef9f21eb9b0a099e28be7df209676', '.github/workflows/desert-rv-armored-v004-r1-discovery.yml': 'e9d002447ffda6e559df2bce20fb7eae684285f7937d0e3e16e847f7ba8031e6', '.github/workflows/desert-rv-armored-v004-r1-strict.yml': 'cca09e27c17e0d5a84637169f8a0ee0b520d77f43513a05293a2933ccf3ac6ba', '.github/workflows/desert-rv-candidate-art-import.yml': '631d3e8d75d6a67b424d82b0a902c2261f444b86fc9a9690a7336613d430621c', '.github/workflows/desert-rv-environment-diffuse-comparison-r1.yml': 'eb439295f8b9d1bd1a720f7dd487266d2806f222f84ff5a941aae6910ac0db93', '.github/workflows/desert-rv-environment-diffuse-comparison.yml': '44019cdb559597c222d28fb6de5bae84f68d9a973de7fe7b30d23e100710ebcd', '.github/workflows/desert-rv-environment-terrain-probe.yml': 'bcae3cc5aa89f9f8794dc210c90009738ccc5a819aae4862019fdef27deeeaac', '.github/workflows/desert-rv-environment-v4-r2.yml': '886ef6b433bdaf8e8aba3b426641ac8182c84c57655a6b42b25ac4e5e0d4c1bd', '.github/workflows/desert-rv-environment-v4-r3.yml': '8929745c359c96f1a6fc7ddf90850e77f71e75d1884de8f2e33165a1c35631a7', '.github/workflows/desert-rv-environment-v4-r4.yml': '10712c9cfbbe230d801743bf320407947b6933b1d80931be2e26c7c847501535', '.github/workflows/desert-rv-environment-v4.yml': '891c1822353a9bde0966fe290a97a09e5282591fccff3962658a8c1789816e05', '.github/workflows/desert-rv-environment.yml': '172633338212febf86e7044d516b5db77b35718e461c7f51113879ef97f1a4aa', '.github/workflows/desert-rv-journey-prepare.yml': '367eec8a8c17bcaaa00dedd117e119b48bd24fa3b0df85d75f798895581c37d8', '.github/workflows/desert-rv-journey-rebuild.yml': '1cb6397c58fcbfb1d8ba8ba52b64915074594ab5b84fc68151cdd00902f0210d', '.github/workflows/desert-rv-player-observe.yml': '92dd8519f828b291ae638e88431d376d358ba7bca89abc2f4df0251b7ace944b', '.github/workflows/desert-rv-player-smoke.yml': '016374404d7410e7465137e608fde56691e0583f315ee5cb606a50b24e740072', '.github/workflows/desert-rv-rendered-smoke.yml': '78343b783fe955d751df7340388d7eb6fd21b7144fa12f5770cfca5a17d57870', '.github/workflows/desert-rv-supplies.yml': '96e34b71e0e981cde3488063333b6acdf9f8db18e181031ba6e5b60b1da59332', 'tasks/desert-rv/scripts/armored_v004_discovery_dispatch.py': '23b62943578e29b948202d1a4f67444b9ab10111d50c9d3140534c9fcf256174', 'tasks/desert-rv/scripts/armored_v004_strict_dispatch.py': '7248d35f9abb6cd03de768f673d58b97cce7efef883bc1b37447d5aa397300b8', 'tasks/desert-rv/scripts/environment_diffuse_comparison_dispatch.py': '1c3c6cf43ae8af47a8df2d9c56f5264d99d8ec11035df4bfc9ea983c0bec9cbd', 'tasks/desert-rv/scripts/environment_diffuse_comparison_r1_dispatch.py': 'b1ba84217ec8173343fa23eff321fc3522736c20c0a24dec5976172736e9a479', 'tasks/desert-rv/scripts/environment_terrain_probe_dispatch.py': '6c0e883271251f0e9a9b02e00ed241aaeb31f1a884ea53f0c3715a275bf7b83d', 'tasks/desert-rv/scripts/environment_v4_dispatch.py': '5aaf1d2c006246a9a17aeca2103be09bcadf57e08f13b3820ef5054030fbac5b', 'tasks/desert-rv/scripts/environment_v4_r2_dispatch.py': '8a8b926e249941a80f3aa846ecffea065ec5af18f42601c94f8443568391c4ec', 'tasks/desert-rv/scripts/environment_v4_r3_dispatch.py': '0427d2d8db05bbb94acd45bada987c44b4211b4dec4f2113968edf0a7ffeed62', 'tasks/desert-rv/scripts/environment_v4_r4_dispatch.py': 'd4817fd852a6abcfbd112d5ba437fbfc7d26732e3e133fa3a67361e292317d6c', 'tasks/desert-rv/scripts/journey_rebuild_dispatch.py': '9f906ef9ce1b4664ec5dc5c5b756afc78f78a90fd834b54a87cce565eba33101'}
   for name,expected in pins.items():self.assertEqual(d.sha((d.ROOT/name).read_bytes()),expected,name)
+ def test_original_strict_wrapper_is_byte_identical(self):
+  self.assertEqual(d.sha((d.ROOT/'tasks/desert-rv/scripts/environment_v4_r4_evidence.py').read_bytes()),'958739e1d1b38bc8916e0e730d43c9f1abf52ba9ba524ffb72848f102cfa8f2f')
+  self.assertEqual(d.sha((d.ROOT/'tasks/desert-rv/scripts/environment_v4_evidence.py').read_bytes()),'7f8bd56d466260bbf57653a76f3845deea81d9f96d03a093366376dcfeba6548')
+  self.assertEqual(d.sha((d.ROOT/'tasks/desert-rv/unity/Assets/DesertRV/Tests/EditorRender/JourneyEnvironmentRenderTests.cs').read_bytes()),'4a16e5d04dabc2a0ed78dd0be8eb6b4730e2edc9a2a40ac3b0acd20382246858')
+
+class AuditFinalControlTests(unittest.TestCase):
+ def test_current_request_manifest_and_payload_are_exact(self):
+  request=d.parse_request((d.ROOT/d.REQUEST).read_bytes());raw=(d.ROOT/d.MANIFEST).read_bytes();manifest=d.parse_manifest(raw)
+  self.assertEqual(d.sha(raw),request['filesManifestSha256']);self.assertEqual(d.sha((d.ROOT/d.SOURCE_STATE).read_bytes()),request['sourceStateSha256'])
+  self.assertEqual(d.sha((d.ROOT/d.CANDIDATE).read_bytes()),d.CANDIDATE_SHA)
+  for row in manifest['files']:
+   path=d.ROOT/row['path'];self.assertTrue(path.is_file());self.assertFalse(path.is_symlink())
+   self.assertEqual(d.sha(path.read_bytes()),row['sha256'],row['path']);self.assertEqual(path.stat().st_size,row['size'],row['path'])
+ def test_no_current_or_historical_control_cycle(self):
+  manifest=d.parse_manifest((d.ROOT/d.MANIFEST).read_bytes());payload={row['path'] for row in manifest['files']}
+  state=json.loads((d.ROOT/d.SOURCE_STATE).read_text());covered={row['path'] for row in state['files']}
+  self.assertFalse(payload & {d.REQUEST,d.MANIFEST,d.SOURCE_STATE})
+  self.assertTrue({d.MANIFEST,d.WORKFLOW,d.CANDIDATE}<=covered);self.assertFalse(covered & {d.REQUEST,d.SOURCE_STATE})
+  self.assertTrue(payload<=covered)
+  import test_environment_v4_r4_dispatch as historical
+  preimages=historical.published_r4_preimages()
+  self.assertEqual(d.sha(preimages[d.SOURCE_STATE]),historical.PUBLISHED_R4_SOURCE_SHA)
+  self.assertNotEqual(d.sha((d.ROOT/d.SOURCE_STATE).read_bytes()),historical.PUBLISHED_R4_SOURCE_SHA)
+ def test_current_source_closed_set_is_not_historical(self):
+  import verify_evidence as evidence
+  evidence.verify_source_state()
 
 if __name__=='__main__':unittest.main()

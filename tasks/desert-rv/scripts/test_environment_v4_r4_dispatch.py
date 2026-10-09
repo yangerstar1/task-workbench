@@ -185,14 +185,117 @@ class RealGitTests(unittest.TestCase):
   p=self.root/d.WORKFLOW;p.unlink();p.symlink_to(self.root/'baseline')
   with self.assertRaisesRegex(ValueError,'INPUT_FILE'):self.verify()
 
+# Historical R4 publication bytes are distinct from this independent audit's current source.
+PUBLISHED_R4_COMMIT='d1a5749787d81845433899455c47925a3ca40f0e'
+PUBLISHED_R4_REQUEST_SHA='6fde28a7973a484947726abaf3e89bc418eb0f8d00582d9a506bc1ef7f09b5e6'
+PUBLISHED_R4_SOURCE_SHA='bb56c1c5a845651154203a2bde36a337776825df9665896cc0ed17ca79e1a620'
+PUBLISHED_R4_FIXTURE='tasks/desert-rv/scripts/fixtures/environment-v4-r4-published-d1a57497.json'
+PUBLISHED_R4_PREIMAGE_PATHS={'tasks/desert-rv/scripts/test_environment_diffuse_comparison_dispatch.py', 'tasks/desert-rv/SOURCE-STATE.json', 'tasks/desert-rv/scripts/test_environment_v4_r4_dispatch.py', 'tasks/desert-rv/scripts/prepare_runner.sh', 'tasks/desert-rv/unity/Assets/DesertRV/Editor/JourneySceneAuthoring.CorrectedTerrain.cs', 'tasks/desert-rv/scripts/test_environment_diffuse_comparison_r1_dispatch.py', 'tasks/desert-rv/scripts/verify_evidence.py'}
+
+def published_r4_preimages(raw=None):
+ import base64,zlib
+ request_raw=d.safe_bytes(d.ROOT/d.REQUEST,4096)
+ d.require(d.sha(request_raw)==PUBLISHED_R4_REQUEST_SHA,'HISTORICAL_REQUEST')
+ request=d.parse_request(request_raw)
+ manifest_raw=d.safe_bytes(d.ROOT/d.MANIFEST,2*1024*1024)
+ d.require(d.sha(manifest_raw)==request['filesManifestSha256'],'HISTORICAL_MANIFEST')
+ d.parse_manifest(manifest_raw)
+ d.require(d.sha(d.safe_bytes(d.ROOT/d.CANDIDATE,2*1024*1024))==request['candidateManifestSha256']==d.CANDIDATE_SHA,'HISTORICAL_CANDIDATE')
+ d.require(request['sourceStateSha256']==PUBLISHED_R4_SOURCE_SHA,'HISTORICAL_SOURCE_PIN')
+ raw=d.safe_bytes(d.ROOT/PUBLISHED_R4_FIXTURE,1024*1024) if raw is None else raw
+ packet=d.decode(raw,1024*1024)
+ d.require(isinstance(packet,dict) and set(packet)=={'schema','label','sourceCommit','files'} and type(packet['schema']) is int and packet['schema']==1,'HISTORICAL_SCHEMA')
+ d.require(packet['label']=='HISTORICAL_PUBLIC_R4_PREIMAGE_NOT_PRODUCER_EVIDENCE' and packet['sourceCommit']==PUBLISHED_R4_COMMIT,'HISTORICAL_IDENTITY')
+ rows=packet['files'];d.require(isinstance(rows,list) and len(rows)==len(PUBLISHED_R4_PREIMAGE_PATHS),'HISTORICAL_COUNT')
+ result={}
+ for row in rows:
+  d.require(isinstance(row,dict) and set(row)=={'path','bytes','sha256','encoding','data'},'HISTORICAL_FILE_KEYS')
+  name=row['path'];d.require(name in PUBLISHED_R4_PREIMAGE_PATHS and name not in result,'HISTORICAL_PATH')
+  d.require(type(row['bytes']) is int and 0<row['bytes']<=512*1024 and d.digest(row['sha256']) and row['encoding']=='zlib-base64' and isinstance(row['data'],str),'HISTORICAL_FILE_IDENTITY')
+  packed=base64.b64decode(row['data'],validate=True);decoder=zlib.decompressobj()
+  original=decoder.decompress(packed,row['bytes']+1)
+  d.require(decoder.eof and not decoder.unused_data and not decoder.unconsumed_tail and len(original)==row['bytes'] and d.sha(original)==row['sha256'],'HISTORICAL_FILE_BYTES')
+  result[name]=original
+ d.require(set(result)==PUBLISHED_R4_PREIMAGE_PATHS,'HISTORICAL_SET')
+ d.require(d.sha(result[d.SOURCE_STATE])==PUBLISHED_R4_SOURCE_SHA,'HISTORICAL_SOURCE_BYTES')
+ source=d.decode(result[d.SOURCE_STATE],512*1024);d.require(isinstance(source,dict) and isinstance(source.get('files'),list),'HISTORICAL_SOURCE_SCHEMA')
+ declared={row['path']:row for row in source['files']}
+ d.require(len(declared)==len(source['files']),'HISTORICAL_SOURCE_DUPLICATE')
+ for name,original in result.items():
+  if name==d.SOURCE_STATE:continue
+  d.require(name in declared and d.sha(original)==declared[name]['sha256'] and len(original)==declared[name]['size'],'HISTORICAL_SOURCE_CLOSURE')
+ return result
+
+def published_r4_bytes(name,preimages):
+ # Only the explicitly listed changed historical paths use pinned public preimages.
+ return preimages[name] if name in PUBLISHED_R4_PREIMAGE_PATHS else d.safe_bytes(d.ROOT/name,4*1024*1024)
+
+class PublishedR4PreimageTests(unittest.TestCase):
+ def packet(self):return json.loads((d.ROOT/PUBLISHED_R4_FIXTURE).read_text())
+ def check(self,packet):return published_r4_preimages(json.dumps(packet).encode())
+ def test_exact_published_preimages_anchor_old_source(self):
+  values=self.check(self.packet());self.assertEqual(set(values),PUBLISHED_R4_PREIMAGE_PATHS);self.assertEqual(d.sha(values[d.SOURCE_STATE]),PUBLISHED_R4_SOURCE_SHA)
+ def test_missing_duplicate_and_unknown_preimage_rejected(self):
+  original=self.packet()
+  for mode in ('missing','duplicate','unknown','extra'):
+   value=copy.deepcopy(original)
+   if mode=='missing':value['files'].pop()
+   if mode=='duplicate':value['files'][-1]=value['files'][0]
+   if mode=='extra':value['files'].append(copy.deepcopy(value['files'][0]))
+   if mode=='unknown':value['files'][0]['path']='tasks/desert-rv/private.log'
+   with self.subTest(mode=mode),self.assertRaises(ValueError):self.check(value)
+ def test_rehashed_preimage_tamper_is_rejected_by_original_source(self):
+  import base64,zlib
+  for name in sorted(PUBLISHED_R4_PREIMAGE_PATHS-{d.SOURCE_STATE}):
+   value=self.packet();row=next(r for r in value['files'] if r['path']==name)
+   raw=zlib.decompress(base64.b64decode(row['data']))+b'\n# UNREVIEWED\n';row.update(bytes=len(raw),sha256=d.sha(raw),data=base64.b64encode(zlib.compress(raw)).decode())
+   with self.subTest(path=name),self.assertRaisesRegex(ValueError,'HISTORICAL_SOURCE_CLOSURE'):self.check(value)
+ def test_rehashed_old_source_tamper_is_rejected_by_original_request(self):
+  import base64,zlib
+  value=self.packet();row=next(r for r in value['files'] if r['path']==d.SOURCE_STATE)
+  raw=zlib.decompress(base64.b64decode(row['data']))+b' ';row.update(bytes=len(raw),sha256=d.sha(raw),data=base64.b64encode(zlib.compress(raw)).decode())
+  with self.assertRaisesRegex(ValueError,'HISTORICAL_SOURCE_BYTES'):self.check(value)
+ def test_old_request_tamper_cannot_rebind_snapshot(self):
+  original=d.safe_bytes
+  def changed(path,limit):
+   raw=original(path,limit)
+   return raw+b' ' if path==d.ROOT/d.REQUEST else raw
+  with mock.patch.object(d,'safe_bytes',side_effect=changed),self.assertRaisesRegex(ValueError,'HISTORICAL_REQUEST'):published_r4_preimages()
+ def test_old_manifest_and_candidate_byte_anchors_reject_changes(self):
+  original=d.safe_bytes
+  for name,code in ((d.MANIFEST,'HISTORICAL_MANIFEST'),(d.CANDIDATE,'HISTORICAL_CANDIDATE')):
+   def changed(path,limit):
+    raw=original(path,limit)
+    return raw+b' ' if path==d.ROOT/name else raw
+   with self.subTest(path=name),mock.patch.object(d,'safe_bytes',side_effect=changed),self.assertRaisesRegex(ValueError,code):published_r4_preimages()
+ def test_current_source_gate_does_not_use_historical_preimages(self):
+  import verify_evidence as evidence
+  original=evidence.sha;target=d.ROOT/'tasks/desert-rv/scripts/verify_evidence.py'
+  def changed(path):return '0'*64 if Path(path)==target else original(path)
+  with mock.patch.object(evidence,'sha',side_effect=changed),self.assertRaisesRegex(ValueError,'Current source bytes differ'):evidence.verify_source_state()
+  self.assertEqual(d.sha(published_r4_preimages()[d.SOURCE_STATE]),PUBLISHED_R4_SOURCE_SHA)
+ def test_unknown_fields_bad_declared_size_and_trailing_stream_rejected(self):
+  import base64
+  original=self.packet()
+  for mode in ('unknown','size','trailing'):
+   value=copy.deepcopy(original);row=value['files'][0]
+   if mode=='unknown':row['extra']='UNREVIEWED'
+   if mode=='size':row['bytes']=1
+   if mode=='trailing':row['data']=base64.b64encode(base64.b64decode(row['data'])+b'JUNK').decode()
+   with self.subTest(mode=mode),self.assertRaises(ValueError):self.check(value)
+
+
 class NarrowR4IntegrationTests(unittest.TestCase):
  def test_only_exact_guard_insertions(self):
   text=(Path(d.__file__).parent/'verify_evidence.py').read_text()
+  self.assertEqual(text.count(", '.github/workflows/desert-rv-environment-v4-r4-audit.yml', '.github/dispatch/desert-rv-environment-v4-r4-audit-20261009-files.json'"),1);text=text.replace(", '.github/workflows/desert-rv-environment-v4-r4-audit.yml', '.github/dispatch/desert-rv-environment-v4-r4-audit-20261009-files.json'",'')
+  self.assertEqual(text.count("        if os.environ.get('GITHUB_WORKFLOW_REF') == REPOSITORY + '/.github/workflows/desert-rv-environment-v4-r4-audit.yml@refs/heads/main':\n            import environment_v4_r4_audit_dispatch\n            environment_v4_r4_audit_dispatch.verify(ROOT, os.environ)  # Independent fixed R4 phase audit; strict package unchanged.\n        elif os.environ.get('GITHUB_WORKFLOW_REF') == REPOSITORY + '/.github/workflows/desert-rv-environment-v4-r4.yml@refs/heads/main':"),1);text=text.replace("        if os.environ.get('GITHUB_WORKFLOW_REF') == REPOSITORY + '/.github/workflows/desert-rv-environment-v4-r4-audit.yml@refs/heads/main':\n            import environment_v4_r4_audit_dispatch\n            environment_v4_r4_audit_dispatch.verify(ROOT, os.environ)  # Independent fixed R4 phase audit; strict package unchanged.\n        elif os.environ.get('GITHUB_WORKFLOW_REF') == REPOSITORY + '/.github/workflows/desert-rv-environment-v4-r4.yml@refs/heads/main':","        if os.environ.get('GITHUB_WORKFLOW_REF') == REPOSITORY + '/.github/workflows/desert-rv-environment-v4-r4.yml@refs/heads/main':")
   self.assertEqual(text.count(", '.github/workflows/desert-rv-environment-v4-r4.yml', '.github/dispatch/desert-rv-environment-v4-r4-20261009-files.json'"),1);text=text.replace(", '.github/workflows/desert-rv-environment-v4-r4.yml', '.github/dispatch/desert-rv-environment-v4-r4-20261009-files.json'",'')
   self.assertEqual(text.count("        if os.environ.get('GITHUB_WORKFLOW_REF') == REPOSITORY + '/.github/workflows/desert-rv-environment-v4-r4.yml@refs/heads/main':\n            import environment_v4_r4_dispatch\n            environment_v4_r4_dispatch.verify(ROOT, os.environ)  # Exact separate R4 corrected terrain twenty-view verification.\n        elif os.environ.get('GITHUB_WORKFLOW_REF') == REPOSITORY + '/.github/workflows/desert-rv-environment-diffuse-comparison-r1.yml@refs/heads/main':"),1);text=text.replace("        if os.environ.get('GITHUB_WORKFLOW_REF') == REPOSITORY + '/.github/workflows/desert-rv-environment-v4-r4.yml@refs/heads/main':\n            import environment_v4_r4_dispatch\n            environment_v4_r4_dispatch.verify(ROOT, os.environ)  # Exact separate R4 corrected terrain twenty-view verification.\n        elif os.environ.get('GITHUB_WORKFLOW_REF') == REPOSITORY + '/.github/workflows/desert-rv-environment-diffuse-comparison-r1.yml@refs/heads/main':","        if os.environ.get('GITHUB_WORKFLOW_REF') == REPOSITORY + '/.github/workflows/desert-rv-environment-diffuse-comparison-r1.yml@refs/heads/main':")
   self.assertEqual(d.sha(text.encode()),'0d0e9cade546caa24ec5c433c0403186c5792ff44f2f8dfea2276cbb7d230d9e')
  def test_only_exact_runner_insertions(self):
   text=(Path(d.__file__).parent/'prepare_runner.sh').read_text()
+  self.assertEqual(text.count('  if [[ "${GITHUB_WORKFLOW_REF:-}" == \'yangerstar1/task-workbench/.github/workflows/desert-rv-environment-v4-r4-audit.yml@refs/heads/main\' ]]; then\n    /usr/bin/python3 "$(dirname "${BASH_SOURCE[0]}")/environment_v4_r4_audit_dispatch.py" --verify-only\n  elif [[ "${GITHUB_WORKFLOW_REF:-}" == \'yangerstar1/task-workbench/.github/workflows/desert-rv-environment-v4-r4.yml@refs/heads/main\' ]]; then'),1);text=text.replace('  if [[ "${GITHUB_WORKFLOW_REF:-}" == \'yangerstar1/task-workbench/.github/workflows/desert-rv-environment-v4-r4-audit.yml@refs/heads/main\' ]]; then\n    /usr/bin/python3 "$(dirname "${BASH_SOURCE[0]}")/environment_v4_r4_audit_dispatch.py" --verify-only\n  elif [[ "${GITHUB_WORKFLOW_REF:-}" == \'yangerstar1/task-workbench/.github/workflows/desert-rv-environment-v4-r4.yml@refs/heads/main\' ]]; then','  if [[ "${GITHUB_WORKFLOW_REF:-}" == \'yangerstar1/task-workbench/.github/workflows/desert-rv-environment-v4-r4.yml@refs/heads/main\' ]]; then')
   self.assertEqual(text.count('  if [[ "${GITHUB_WORKFLOW_REF:-}" == \'yangerstar1/task-workbench/.github/workflows/desert-rv-environment-v4-r4.yml@refs/heads/main\' ]]; then\n    /usr/bin/python3 "$(dirname "${BASH_SOURCE[0]}")/environment_v4_r4_dispatch.py" --verify-only\n  elif [[ "${GITHUB_WORKFLOW_REF:-}" == \'yangerstar1/task-workbench/.github/workflows/desert-rv-environment-diffuse-comparison-r1.yml@refs/heads/main\' ]]; then'),1);text=text.replace('  if [[ "${GITHUB_WORKFLOW_REF:-}" == \'yangerstar1/task-workbench/.github/workflows/desert-rv-environment-v4-r4.yml@refs/heads/main\' ]]; then\n    /usr/bin/python3 "$(dirname "${BASH_SOURCE[0]}")/environment_v4_r4_dispatch.py" --verify-only\n  elif [[ "${GITHUB_WORKFLOW_REF:-}" == \'yangerstar1/task-workbench/.github/workflows/desert-rv-environment-diffuse-comparison-r1.yml@refs/heads/main\' ]]; then','  if [[ "${GITHUB_WORKFLOW_REF:-}" == \'yangerstar1/task-workbench/.github/workflows/desert-rv-environment-diffuse-comparison-r1.yml@refs/heads/main\' ]]; then')
   self.assertEqual(d.sha(text.encode()),'77626e29656dde81e2ed5c16374888d25d5f0c6bd5dd20eebcfa81ac58ba70e6')
 
@@ -245,13 +348,15 @@ class WorkflowScopeTests(unittest.TestCase):
   for name,expected in pins.items():self.assertEqual(d.sha((d.ROOT/name).read_bytes()),expected,name)
 
 class FinalControlTests(unittest.TestCase):
- def test_final_request_pins_and_manifest_payload_are_exact(self):
+ def test_published_r4_request_source_and_payload_preimages_are_exact(self):
+  preimages=published_r4_preimages()
   request=d.parse_request((d.ROOT/d.REQUEST).read_bytes());raw=(d.ROOT/d.MANIFEST).read_bytes();manifest=d.parse_manifest(raw)
-  self.assertEqual(d.sha(raw),request['filesManifestSha256']);self.assertEqual(d.sha((d.ROOT/d.SOURCE_STATE).read_bytes()),request['sourceStateSha256'])
+  self.assertEqual(d.sha(raw),request['filesManifestSha256']);self.assertEqual(d.sha(preimages[d.SOURCE_STATE]),request['sourceStateSha256'])
   self.assertEqual(d.sha((d.ROOT/d.CANDIDATE).read_bytes()),d.CANDIDATE_SHA)
   for row in manifest['files']:
    path=d.ROOT/row['path'];self.assertTrue(path.is_file());self.assertFalse(path.is_symlink())
-   self.assertEqual(d.sha(path.read_bytes()),row['sha256'],row['path']);self.assertEqual(path.stat().st_size,row['size'],row['path'])
+   original=published_r4_bytes(row['path'],preimages)
+   self.assertEqual(d.sha(original),row['sha256'],row['path']);self.assertEqual(len(original),row['size'],row['path'])
  def test_no_control_file_hash_cycle(self):
   manifest=d.parse_manifest((d.ROOT/d.MANIFEST).read_bytes());payload={row['path'] for row in manifest['files']}
   state=json.loads((d.ROOT/d.SOURCE_STATE).read_text());covered={row['path'] for row in state['files']}
@@ -268,7 +373,8 @@ class OldTestIntegrityTests(unittest.TestCase):
   current="self.assertIn('AuthorAndCaptureCorrectedTerrainCandidates',source)";original="self.assertIn('AuthorAndCaptureEnvironmentCandidates',source)"
   self.assertEqual(text.count(current),1);text=text.replace(current,original)
   self.assertEqual(d.sha(text.encode()),'4af06c0d5c7a184c12c6bba3f0610d6510d61692351553d907b940673599bfe2')
- def test_only_explicit_r4_pin_and_exact_guard_normalization_changes(self):
+ def test_published_old_tests_have_only_explicit_r4_changes(self):
+  preimages=published_r4_preimages()
   candidate=json.loads((d.ROOT/d.CANDIDATE).read_text())
   name='tasks/desert-rv/unity/Assets/DesertRV/Tests/EditorRender/JourneyEnvironmentRenderTests.cs'
   corrected_sha=next(row['sha256'] for row in candidate['files'] if row['path']==name)
@@ -277,7 +383,7 @@ class OldTestIntegrityTests(unittest.TestCase):
   pins={'test_environment_terrain_probe_dispatch.py': '015e38d89be08b97fc18369b2f33ba0c21afe10acd2090a583715c3ec710a731', 'test_environment_diffuse_comparison_dispatch.py': 'c67aa6bbe418148b535258da2c9cf05033a5873a7593e610c83ae0859e9f77dc', 'test_environment_diffuse_comparison_r1_dispatch.py': 'fbe7c6f9728e3108f233488374bde397157477b7ffe6b8314daa24d603420ecd'}
   normalizations={'test_environment_terrain_probe_dispatch.py': [], 'test_environment_diffuse_comparison_dispatch.py': ['  self.assertEqual(text.count(", \'.github/workflows/desert-rv-environment-v4-r4.yml\', \'.github/dispatch/desert-rv-environment-v4-r4-20261009-files.json\'"),1);text=text.replace(", \'.github/workflows/desert-rv-environment-v4-r4.yml\', \'.github/dispatch/desert-rv-environment-v4-r4-20261009-files.json\'",\'\')\n  self.assertEqual(text.count("        if os.environ.get(\'GITHUB_WORKFLOW_REF\') == REPOSITORY + \'/.github/workflows/desert-rv-environment-v4-r4.yml@refs/heads/main\':\\n            import environment_v4_r4_dispatch\\n            environment_v4_r4_dispatch.verify(ROOT, os.environ)  # Exact separate R4 corrected terrain twenty-view verification.\\n        elif os.environ.get(\'GITHUB_WORKFLOW_REF\') == REPOSITORY + \'/.github/workflows/desert-rv-environment-diffuse-comparison-r1.yml@refs/heads/main\':"),1);text=text.replace("        if os.environ.get(\'GITHUB_WORKFLOW_REF\') == REPOSITORY + \'/.github/workflows/desert-rv-environment-v4-r4.yml@refs/heads/main\':\\n            import environment_v4_r4_dispatch\\n            environment_v4_r4_dispatch.verify(ROOT, os.environ)  # Exact separate R4 corrected terrain twenty-view verification.\\n        elif os.environ.get(\'GITHUB_WORKFLOW_REF\') == REPOSITORY + \'/.github/workflows/desert-rv-environment-diffuse-comparison-r1.yml@refs/heads/main\':","        if os.environ.get(\'GITHUB_WORKFLOW_REF\') == REPOSITORY + \'/.github/workflows/desert-rv-environment-diffuse-comparison-r1.yml@refs/heads/main\':")\n', '  self.assertEqual(text.count(\'  if [[ "${GITHUB_WORKFLOW_REF:-}" == \\\'yangerstar1/task-workbench/.github/workflows/desert-rv-environment-v4-r4.yml@refs/heads/main\\\' ]]; then\\n    /usr/bin/python3 "$(dirname "${BASH_SOURCE[0]}")/environment_v4_r4_dispatch.py" --verify-only\\n  elif [[ "${GITHUB_WORKFLOW_REF:-}" == \\\'yangerstar1/task-workbench/.github/workflows/desert-rv-environment-diffuse-comparison-r1.yml@refs/heads/main\\\' ]]; then\'),1);text=text.replace(\'  if [[ "${GITHUB_WORKFLOW_REF:-}" == \\\'yangerstar1/task-workbench/.github/workflows/desert-rv-environment-v4-r4.yml@refs/heads/main\\\' ]]; then\\n    /usr/bin/python3 "$(dirname "${BASH_SOURCE[0]}")/environment_v4_r4_dispatch.py" --verify-only\\n  elif [[ "${GITHUB_WORKFLOW_REF:-}" == \\\'yangerstar1/task-workbench/.github/workflows/desert-rv-environment-diffuse-comparison-r1.yml@refs/heads/main\\\' ]]; then\',\'  if [[ "${GITHUB_WORKFLOW_REF:-}" == \\\'yangerstar1/task-workbench/.github/workflows/desert-rv-environment-diffuse-comparison-r1.yml@refs/heads/main\\\' ]]; then\')\n'], 'test_environment_diffuse_comparison_r1_dispatch.py': ['  self.assertEqual(text.count(", \'.github/workflows/desert-rv-environment-v4-r4.yml\', \'.github/dispatch/desert-rv-environment-v4-r4-20261009-files.json\'"),1);text=text.replace(", \'.github/workflows/desert-rv-environment-v4-r4.yml\', \'.github/dispatch/desert-rv-environment-v4-r4-20261009-files.json\'",\'\')\n  self.assertEqual(text.count("        if os.environ.get(\'GITHUB_WORKFLOW_REF\') == REPOSITORY + \'/.github/workflows/desert-rv-environment-v4-r4.yml@refs/heads/main\':\\n            import environment_v4_r4_dispatch\\n            environment_v4_r4_dispatch.verify(ROOT, os.environ)  # Exact separate R4 corrected terrain twenty-view verification.\\n        elif os.environ.get(\'GITHUB_WORKFLOW_REF\') == REPOSITORY + \'/.github/workflows/desert-rv-environment-diffuse-comparison-r1.yml@refs/heads/main\':"),1);text=text.replace("        if os.environ.get(\'GITHUB_WORKFLOW_REF\') == REPOSITORY + \'/.github/workflows/desert-rv-environment-v4-r4.yml@refs/heads/main\':\\n            import environment_v4_r4_dispatch\\n            environment_v4_r4_dispatch.verify(ROOT, os.environ)  # Exact separate R4 corrected terrain twenty-view verification.\\n        elif os.environ.get(\'GITHUB_WORKFLOW_REF\') == REPOSITORY + \'/.github/workflows/desert-rv-environment-diffuse-comparison-r1.yml@refs/heads/main\':","        if os.environ.get(\'GITHUB_WORKFLOW_REF\') == REPOSITORY + \'/.github/workflows/desert-rv-environment-diffuse-comparison-r1.yml@refs/heads/main\':")\n', '  self.assertEqual(text.count(\'  if [[ "${GITHUB_WORKFLOW_REF:-}" == \\\'yangerstar1/task-workbench/.github/workflows/desert-rv-environment-v4-r4.yml@refs/heads/main\\\' ]]; then\\n    /usr/bin/python3 "$(dirname "${BASH_SOURCE[0]}")/environment_v4_r4_dispatch.py" --verify-only\\n  elif [[ "${GITHUB_WORKFLOW_REF:-}" == \\\'yangerstar1/task-workbench/.github/workflows/desert-rv-environment-diffuse-comparison-r1.yml@refs/heads/main\\\' ]]; then\'),1);text=text.replace(\'  if [[ "${GITHUB_WORKFLOW_REF:-}" == \\\'yangerstar1/task-workbench/.github/workflows/desert-rv-environment-v4-r4.yml@refs/heads/main\\\' ]]; then\\n    /usr/bin/python3 "$(dirname "${BASH_SOURCE[0]}")/environment_v4_r4_dispatch.py" --verify-only\\n  elif [[ "${GITHUB_WORKFLOW_REF:-}" == \\\'yangerstar1/task-workbench/.github/workflows/desert-rv-environment-diffuse-comparison-r1.yml@refs/heads/main\\\' ]]; then\',\'  if [[ "${GITHUB_WORKFLOW_REF:-}" == \\\'yangerstar1/task-workbench/.github/workflows/desert-rv-environment-diffuse-comparison-r1.yml@refs/heads/main\\\' ]]; then\')\n']}
   for filename,expected in pins.items():
-   text=(Path(d.__file__).parent/filename).read_text()
+   text=published_r4_bytes('tasks/desert-rv/scripts/'+filename,preimages).decode()
    old="'"+name+"': '"+original_sha+"'";new="'"+name+"': '"+corrected_sha+"'"
    self.assertEqual(text.count(new),1,filename);text=text.replace(new,old)
    label='def test_original_production_sources_and_explicit_r4_render_entry(self):'

@@ -1,0 +1,8 @@
+{
+  "schema": 1,
+  "requestId": "desert-rv-environment-v4-r4-audit-20261009-once-9f732c61",
+  "baseCommit": "d1a5749787d81845433899455c47925a3ca40f0e",
+  "candidateManifestSha256": "dbea7cec8fb4e38bb28abeea33023116165e2142755b0ad6a6a0e220e782e40a",
+  "filesManifestSha256": "0b9b5c2d102b326fccc7dd10994fc49b9a1ed69bf14e70de26b94410007587a5",
+  "sourceStateSha256": "e767a060b9d73f8f54a37901b179dd1d21a023d780a4ae9361c86a1ff8191f5c"
+}

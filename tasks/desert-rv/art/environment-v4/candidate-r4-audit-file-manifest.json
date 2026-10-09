@@ -1,0 +1,35 @@
+{
+  "schema": 1,
+  "base_commit": "d1a5749787d81845433899455c47925a3ca40f0e",
+  "status": "READ_ONLY_R4_GENERATED_LIFECYCLE_DIAGNOSTIC_PENDING_NATIVE_NOT_ART_ACCEPTANCE",
+  "failure_run": 37982084448,
+  "failure_stage": "Strict host package after successful twenty-camera native case",
+  "known_facts": "Native frozen bytes passed after twenty captures; at least one generated file differs after Unity exit; exact changed path and fields remain unknown.",
+  "scope": "Observe freeze/postcapture/postexit authorized generated hashes and sizes plus already-loaded object dirty flags; never load/save/import assets for observation, never replace frozen hashes. Preserve original strict success package. Separate sanitized lifecycle report; on verified strict failure only, preserve original twenty PNGs labeled NATIVE_RENDERED_NOT_PACKAGE_VALIDATED. No raw internal copies or logs exported.",
+  "binary_payloads_unchanged": true,
+  "original_strict_wrapper_unchanged": true,
+  "editor_render_case_unchanged": true,
+  "files": [
+    {
+      "path": "tasks/desert-rv/scripts/environment_v4_r4_audit.py",
+      "change": "added",
+      "bytes": 20358,
+      "sha256": "fad617d770119f1f0a7db3bb30034e3c877959a3a83ec7f6974fd8eb85844668",
+      "before_sha256": null
+    },
+    {
+      "path": "tasks/desert-rv/scripts/test_environment_v4_r4_audit.py",
+      "change": "added",
+      "bytes": 17163,
+      "sha256": "c4a52408bf1ca1530d2c0453cd09a43b8fc2b4b963540313504bef7f4bec883b",
+      "before_sha256": null
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Editor/JourneySceneAuthoring.CorrectedTerrain.cs",
+      "change": "modified",
+      "bytes": 28764,
+      "sha256": "5d5cb18ced5011eac6fa5e8a5a8f602509d165662d7150c4acc136b2c035ba33",
+      "before_sha256": "38d3974a478feee192beb38810b8ec6035d43e57a0c037d5ff061322a53cc5b7"
+    }
+  ]
+}

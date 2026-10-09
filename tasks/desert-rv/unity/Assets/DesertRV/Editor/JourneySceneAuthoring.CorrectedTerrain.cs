@@ -125,6 +125,7 @@ namespace DesertRV.Editor
                 finally{VerifyProtectedFiles(protectedFiles);}
             }
             RequireCorrectedTerrainSavedBytes(report);
+            WriteCorrectedTerrainAuditPhase("freeze",report);
             WriteCorrectedTerrainReport(report);
         }
 
@@ -155,6 +156,7 @@ namespace DesertRV.Editor
             if(images.Length!=20||images.Any(p=>!File.Exists(p)||new FileInfo(p).Length==0))
                 throw new InvalidOperationException("The original twenty-camera capture set is incomplete.");
             report.postCaptureImageCount=images.Length;report.postCaptureVerified=true;WriteCorrectedTerrainReport(report);
+            WriteCorrectedTerrainAuditPhase("postcapture",report);
             Debug.Log("ENVIRONMENT_V4_R4_CORRECTED saved-two-materials-same-albedo-base-map-main-tex nine-reloaded-terrain-bindings after-twenty-original-views");
         }
 
@@ -288,6 +290,65 @@ namespace DesertRV.Editor
                     AssetDatabase.AssetPathToGUID(ComparisonOriginalDiffuse),report.correctedDiffuse.guid);
             }
         }
+        [Serializable] sealed class CorrectedTerrainAuditFile
+        { public string path,sha256;public long size; }
+        [Serializable] sealed class CorrectedTerrainAuditObject
+        { public string path,objectType;public long localFileId;public bool hasLocalFileId,isDirty; }
+        [Serializable] sealed class CorrectedTerrainAuditPhase
+        {
+            public int schema=1;public string phase;
+            public string observationPolicy="ENUMERATE_ALREADY_LOADED_NO_LOAD_ALL_ASSETS_NO_SAVE";
+            public CorrectedTerrainAuditFile[] files;public CorrectedTerrainAuditObject[] loadedObjects;
+        }
+        static bool IsCorrectedTerrainAuditPath(string path)
+        {
+            if(path==Folder+".meta"||path==PolishGenerated+".meta")return true;
+            string asset=path.EndsWith(".meta",StringComparison.Ordinal)?path.Substring(0,path.Length-5):path;
+            if(asset==BootstrapPath||asset==ManifestPath||RegionPaths.Contains(asset))return true;
+            if(Regex.IsMatch(asset,"^"+Regex.Escape(Folder)+@"/(?:Region-[123]-Sky|Layout-[A-F0-9]{6})\.mat$"))return true;
+            if(polishMaterialNames.Any(name=>asset==PolishGenerated+"/Surface-"+name+".mat"))return true;
+            for(int region=1;region<=3;region++)
+                if(PolishExpectedMeshNames(region).Any(name=>asset==PolishGenerated+"/R"+region+"-"+name+".asset"))return true;
+            return false;
+        }
+        static void WriteCorrectedTerrainAuditPhase(string phase,CorrectedTerrainReport frozen)
+        {
+            // Read-only observation: no SaveAssets, imports, scene transitions, or LoadAllAssetsAtPath here.
+            if(phase!="freeze"&&phase!="postcapture")throw new InvalidOperationException("Unknown corrected audit phase.");
+            const string root="JourneyEvidence/environment-v4-r4-audit";
+            string directory=root+"/internal/"+phase;
+            if(Directory.Exists(directory)||File.Exists(root+"/"+phase+".json"))throw new IOException("Refuse stale corrected audit phase.");
+            var paths=frozen.generatedFiles.Select(r=>r.path).OrderBy(p=>p,StringComparer.Ordinal).ToArray();
+            if(paths.Length<=243||paths.Length>=400||paths.Distinct().Count()!=paths.Length||paths.Any(p=>!IsCorrectedTerrainAuditPath(p)))
+                throw new InvalidOperationException("Corrected audit path closure rejected.");
+            var allowed=new HashSet<string>(paths,StringComparer.Ordinal);
+            // FindObjectsOfTypeAll enumerates already-loaded objects only; hidden AssetVersion subobjects
+            // are observed without loading any new asset or changing the material validation lifecycle.
+            var loaded=new List<CorrectedTerrainAuditObject>();
+            foreach(var item in Resources.FindObjectsOfTypeAll<Object>())
+            {
+                if(!item)continue;string path=AssetDatabase.GetAssetPath(item);
+                if(!allowed.Contains(path))continue;
+                bool hasLocalId=AssetDatabase.TryGetGUIDAndLocalFileIdentifier(item,out string ignoredGuid,out long localId);
+                loaded.Add(new CorrectedTerrainAuditObject{path=path,objectType=item.GetType().FullName,
+                    hasLocalFileId=hasLocalId,localFileId=hasLocalId?localId:0,isDirty=EditorUtility.IsDirty(item)});
+            }
+            var records=new List<CorrectedTerrainAuditFile>();long total=0;
+            foreach(string path in paths)
+            {
+                long size=new FileInfo(path).Length;total+=size;
+                if(size<=0||size>40L*1024*1024||total>100L*1024*1024)throw new InvalidOperationException("Corrected audit size limit exceeded.");
+                string hash=HashFile(path);
+                if(hash!=frozen.generatedFiles.Single(r=>r.path==path).afterSha256)throw new InvalidOperationException("Corrected audit differs from original frozen hash: "+path);
+                string copy=directory+"/"+path;Directory.CreateDirectory(Path.GetDirectoryName(copy));File.Copy(path,copy,false);
+                if(new FileInfo(copy).Length!=size||HashFile(copy)!=hash||HashFile(path)!=hash)throw new IOException("Corrected audit copy changed bytes: "+path);
+                records.Add(new CorrectedTerrainAuditFile{path=path,sha256=hash,size=size});
+            }
+            var report=new CorrectedTerrainAuditPhase{phase=phase,files=records.ToArray(),loadedObjects=loaded.OrderBy(r=>r.path,StringComparer.Ordinal).ThenBy(r=>r.localFileId).ThenBy(r=>r.objectType,StringComparer.Ordinal).ToArray()};
+            string text=JsonUtility.ToJson(report,true),receipt=root+"/"+phase+".json";File.WriteAllText(receipt,text);
+            if(File.ReadAllText(receipt)!=text)throw new IOException("Corrected audit phase save failed.");
+        }
+
         static void WriteCorrectedTerrainReport(CorrectedTerrainReport report)
         {
             Directory.CreateDirectory(Path.GetDirectoryName(CorrectedTerrainReceipt));string text=JsonUtility.ToJson(report,true);
