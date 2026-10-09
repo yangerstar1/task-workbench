@@ -26,7 +26,19 @@ namespace DesertRV.Editor
             public NativeProof[] nativeProofs;
         }
         [Serializable] public sealed class NativeProof { public string kind; public JourneyCandidateAssetIntegration.FilePin xml; public string[] cases; }
-        [Serializable] public sealed class AuthoredAssets { public string status = "ACTUAL_NATIVE_JOURNEY_ASSETS_UNREVIEWED", sourceCommit; public JourneyCandidateAssetIntegration.FilePin[] files; }
+        [Serializable] public sealed class AuthoredAssets
+        {
+            public int schema = 2;
+            public string status = "ACTUAL_NATIVE_JOURNEY_ASSETS_UNREVIEWED", sourceCommit, unityVersion, importRunUrl;
+            public bool approved;
+            public JourneyCandidateAssetIntegration.FilePin[] files;
+            public DependencyPin[] dependencies;
+        }
+        [Serializable] public sealed class DependencyPin
+        {
+            public string path, sha256, kind, packageName, packageVersion;
+            public long bytes;
+        }
         [Serializable] sealed class ExportReceipt
         {
             public string status, importCommit, importRunUrl, kind, contractSha256, nativeXmlSha256;
@@ -39,6 +51,36 @@ namespace DesertRV.Editor
         {
             using (var stream = new FileStream(path, FileMode.CreateNew, FileAccess.Write))
             using (var writer = new StreamWriter(stream)) writer.Write(JsonUtility.ToJson(value, true));
+        }
+        static DependencyPin[] DependencySnapshot()
+        {
+            var result = new List<DependencyPin>();
+            // Unity, before exit, enumerates the recursive closure of the four scenes and content manifest.
+            foreach (string asset in AssetDatabase.GetDependencies(JourneyDiagnosticScope.Scenes.Concat(new[] { JourneySceneAuthoring.Folder + "/JourneyContent.asset" }).ToArray(), true).OrderBy(p => p, StringComparer.Ordinal))
+            {
+                Check(!Path.IsPathRooted(asset) && !asset.Contains("..") && !asset.Contains("\\"), "Unsafe native dependency path.");
+                if (asset == "Resources/unity_builtin_extra" || asset == "Library/unity default resources")
+                {
+                    result.Add(new DependencyPin { path = asset, kind = "builtin", sha256 = "", packageName = "", packageVersion = "" });
+                    continue;
+                }
+                string physical = asset, kind = "asset", packageName = "", packageVersion = "";
+                if (asset.StartsWith("Packages/", StringComparison.Ordinal))
+                {
+                    var package = UnityEditor.PackageManager.PackageInfo.FindForAssetPath(asset);
+                    Check(package != null && asset.StartsWith("Packages/" + package.name + "/", StringComparison.Ordinal), "Unresolved official package dependency.");
+                    packageName = package.name; packageVersion = package.version; kind = "package";
+                    physical = Path.Combine(package.resolvedPath, asset.Substring(("Packages/" + package.name + "/").Length));
+                }
+                else Check(asset.StartsWith("Assets/", StringComparison.Ordinal), "Unknown native dependency location.");
+                foreach (string suffix in new[] { "", ".meta" })
+                {
+                    Check(File.Exists(physical + suffix), "Missing dependency bytes/meta: " + asset + suffix);
+                    result.Add(new DependencyPin { path = asset + suffix, kind = kind, sha256 = Hash(physical + suffix),
+                        bytes = new FileInfo(physical + suffix).Length, packageName = packageName, packageVersion = packageVersion });
+                }
+            }
+            return result.OrderBy(p => p.path, StringComparer.Ordinal).ToArray();
         }
         public static void PrepareVerifiedSameWorkspace()
         {
@@ -129,7 +171,9 @@ namespace DesertRV.Editor
                 Check(Hash(Input) == inputHash, "Preparation input changed during authoring.");
                 var authored = Directory.GetFiles(JourneySceneAuthoring.Folder, "*", SearchOption.AllDirectories).Concat(new[] { JourneySceneAuthoring.Folder + ".meta" }).OrderBy(p => p).ToArray();
                 WriteFresh(Folder + "/authored-assets.json", new AuthoredAssets { sourceCommit = input.sourceCommit,
-                    files = authored.Select(p => new JourneyCandidateAssetIntegration.FilePin { path = p.Replace('\\', '/'), sha256 = Hash(p) }).ToArray() });
+                    unityVersion = Application.unityVersion, importRunUrl = run, approved = false,
+                    files = authored.Select(p => new JourneyCandidateAssetIntegration.FilePin { path = p.Replace('\\', '/'), sha256 = Hash(p) }).ToArray(),
+                    dependencies = DependencySnapshot() });
                 Debug.Log("JOURNEY_SAME_WORKSPACE_SCOPE_PREPARED_UNREVIEWED: no input plan, runtime session or approval has been manufactured.");
             }
             finally { foreach (var pair in saved) Environment.SetEnvironmentVariable(pair.Key, pair.Value); }

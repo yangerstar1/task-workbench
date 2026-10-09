@@ -52,8 +52,8 @@
     },
     {
       "path": ".github/workflows/desert-rv-journey-prepare.yml",
-      "sha256": "7517bec277cc6f8e89e485ba5a3c42c03251e27a94705d36c41cff0e85f763f8",
-      "size": 9880
+      "sha256": "c13d372304bc0e251438f5a4f150e14799b1dc8623e93e3996b1a03b7eac3078",
+      "size": 9972
     },
     {
       "path": ".github/workflows/desert-rv-player-smoke.yml",
@@ -351,14 +351,24 @@
       "size": 48322
     },
     {
+      "path": "tasks/desert-rv/art/journey-preparation/generated_export.py",
+      "sha256": "7c112826b3421d2c772dba8d1e096150fbe73a4440b4883c16f5308c1f69cee7",
+      "size": 12535
+    },
+    {
       "path": "tasks/desert-rv/art/journey-preparation/pipeline.py",
-      "sha256": "68bb307cdac92ac41768222dae4817c91857bd32e1de8408d5926762d17111bf",
-      "size": 20460
+      "sha256": "18cb52b25626fd1a98a549eca49f48e4c9df23fe036d28d8d556b66a6ab3592c",
+      "size": 22817
+    },
+    {
+      "path": "tasks/desert-rv/art/journey-preparation/test_generated_export.py",
+      "sha256": "336fd1b5d4f667215e2cd4e744d110a9b2df51e2a61f68511a9cc170ee80b92f",
+      "size": 16170
     },
     {
       "path": "tasks/desert-rv/art/journey-preparation/test_pipeline.py",
-      "sha256": "5635142b91da390efdea6da8c989486408686b9e1d03786b1d17270a459ef1ac",
-      "size": 18995
+      "sha256": "e81b13d09eaeb442592e6be9bf7df3cf24b17f93c2f883f0b6f5619f9e2cb8cd",
+      "size": 22198
     },
     {
       "path": "tasks/desert-rv/art/journey-preparation/three-strict-candidates.json",
@@ -4042,8 +4052,8 @@
     },
     {
       "path": "tasks/desert-rv/unity/Assets/DesertRV/Editor/JourneyCandidatePreparation.cs",
-      "sha256": "8486edb8091737607924dbef1d62cff676c12667338f6bfc03dda6e0234ebed4",
-      "size": 12715
+      "sha256": "29afac54b724a0d5d12170e6d4e13ff2a9f0c27d128b0bdfc621ba9e57401bfd",
+      "size": 15548
     },
     {
       "path": "tasks/desert-rv/unity/Assets/DesertRV/Editor/JourneyCandidatePreparation.cs.meta",

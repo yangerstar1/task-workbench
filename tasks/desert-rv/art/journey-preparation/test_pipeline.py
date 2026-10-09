@@ -24,6 +24,38 @@ class PipelineTests(unittest.TestCase):
         for source in plan['sources']:
             dest=self.root/source['contract'];dest.parent.mkdir(parents=True,exist_ok=True);dest.write_bytes((ORIGINAL_REPO/source['contract']).read_bytes())
         p.validate_selection(plan)
+    def test_native_report_directory_is_host_created_empty_and_writable(self):
+        p.prepare_report_directory();reports=p.PROJECT/'JourneyEvidence/CandidateArt'
+        self.assertEqual(list(reports.iterdir()),[]);self.assertTrue(os.access(reports,os.W_OK))
+        if hasattr(os,'getuid'):self.assertEqual(reports.stat().st_uid,os.getuid())
+    def test_existing_native_reports_are_never_replaced(self):
+        report=self.file('JourneyEvidence/CandidateArt/import-report.json',b'actual prior bytes')
+        with self.assertRaisesRegex(Exception,'REPORT_DESTINATION_EXISTS'):p.prepare_report_directory()
+        self.assertEqual(report.read_bytes(),b'actual prior bytes')
+    def test_linked_report_directory_is_rejected(self):
+        target=p.PROJECT/'Elsewhere';target.mkdir();(p.PROJECT/'JourneyEvidence/CandidateArt').symlink_to(target,target_is_directory=True)
+        with self.assertRaisesRegex(Exception,'REPORT_DESTINATION_EXISTS'):p.prepare_report_directory()
+    @unittest.skipUnless(os.name=='posix' and hasattr(os,'getuid') and os.getuid()!=0,'Linux non-root permission semantics required')
+    def test_nonwritable_native_directory_reproduces_cross_parent_permission_error(self):
+        reports=p.PROJECT/'JourneyEvidence/CandidateArt';reports.mkdir();self.file('JourneyEvidence/CandidateArt/report.json',b'fixture')
+        destination=p.PRIVATE/'native/armored';destination.mkdir(parents=True);reports.chmod(0o555)
+        try:
+            with self.assertRaises(PermissionError):reports.rename(destination/'art')
+            diagnostic=p.ArchiveStageFailure('REPORT_RENAME','armored',PermissionError('private-path-not-exported')).diagnostic
+            self.assertEqual(diagnostic['phase'],'REPORT_RENAME')
+            row=next(r for r in diagnostic['directories'] if r['role']=='REPORT');self.assertFalse(row['currentUidWritable']);self.assertEqual(row['mode'],'0555')
+        finally:reports.chmod(0o755)
+    def test_host_report_directory_can_archive_readonly_native_files_without_byte_changes(self):
+        p.prepare_report_directory();report=self.file('JourneyEvidence/CandidateArt/report.json',b'actual fixture bytes');report.chmod(0o444)
+        before=p.tree(report.parent);destination=p.PRIVATE/'native/armored';destination.mkdir(parents=True)
+        report.parent.rename(destination/'art');self.assertEqual(p.tree(destination/'art'),before)
+    def test_archive_diagnostic_has_fixed_roles_and_no_raw_exception_path_or_uid(self):
+        value=p.ArchiveStageFailure('STATE_SAVE','weapon',PermissionError('/private/token')).diagnostic
+        self.assertEqual(set(value),{'phase','errorClass','directories'});self.assertNotIn('/private/token',json.dumps(value))
+        self.assertEqual({row['role'] for row in value['directories']},{'INPUT','INPUT_PARENT','REPORT','REPORT_PARENT','ARCHIVE_PARENT','ARCHIVE','ARCHIVED_INPUT','ARCHIVED_REPORT'})
+        for row in value['directories']:self.assertEqual(set(row),{'role','exists','isDirectory','mode','currentUidWritable'})
+    def test_unknown_archive_diagnostic_stage_is_rejected(self):
+        with self.assertRaisesRegex(Exception,'DIAGNOSTIC_PHASE'):p.ArchiveStageFailure('ARBITRARY','armored',PermissionError())
     def test_wrong_kind_order_is_rejected(self):
         plan=json.loads(SELECTION.read_text());plan['sources'].reverse()
         with self.assertRaises(Exception):p.validate_selection(plan)

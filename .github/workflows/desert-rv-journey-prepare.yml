@@ -52,6 +52,7 @@ jobs:
         run: |
           python3 -c 'import os; assert bool(os.getenv("INPUT_PLAN")) == bool(os.getenv("PLAN_SHA256")), "Supply both existing plan and its hash, or neither."'
           /usr/bin/python3 tasks/desert-rv/art/journey-preparation/test_pipeline.py
+          /usr/bin/python3 tasks/desert-rv/art/journey-preparation/test_generated_export.py
           /usr/bin/python3 tasks/desert-rv/scripts/rendered/test_prepared_source.py
           python3 tasks/desert-rv/art/journey-preparation/pipeline.py init --selection "$SELECTION" --sha256 "$SELECTION_SHA"
       - name: Prepare existing licensed runner after input validation

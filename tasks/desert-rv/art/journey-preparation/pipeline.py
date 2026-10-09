@@ -1,5 +1,5 @@
 """Three fixed strict stages in one hosted Unity workspace; existing quality gates remain authoritative."""
-import argparse, hashlib, json, os, re, shutil, subprocess, sys
+import argparse, hashlib, json, os, re, shutil, stat, subprocess, sys
 from pathlib import Path
 import xml.etree.ElementTree as ET
 
@@ -100,10 +100,34 @@ def check_state(s):
     require(protected()==s['protected'],'PREP_PROTECTED_SOURCE_CHANGED')
     for path,h in s['assetFiles'].items():require(sha(PROJECT/path)==h,'PREP_EARLIER_ASSET_CHANGED')
 
+def prepare_report_directory():
+    # Native GameCI runs as root. Keep this one directory host-created so its later
+    # cross-parent rename can update '..' without changing ownership/permissions.
+    reports=PROJECT/'JourneyEvidence/CandidateArt'
+    require(not reports.exists() and not reports.is_symlink(),'PREP_REPORT_DESTINATION_EXISTS')
+    require(reports.parent.is_dir() and not any(path.is_symlink() for path in (reports.parent,*reports.parents)),'PREP_REPORT_PARENT_UNSAFE')
+    reports.mkdir()
+
+class ArchiveStageFailure(RuntimeError):
+    def __init__(self,phase,kind,error):
+        super().__init__('PREP_ARCHIVE_STAGE_FAILED')
+        require(phase in {'ARCHIVE_MKDIR','INPUT_RENAME','REPORT_RENAME','PROOF_REHASH','STATE_SAVE'},'PREP_DIAGNOSTIC_PHASE')
+        archive=PRIVATE/'native'/kind
+        paths={'INPUT':PROJECT/'CandidateImportInput','INPUT_PARENT':PROJECT,'REPORT':PROJECT/'JourneyEvidence/CandidateArt',
+               'REPORT_PARENT':PROJECT/'JourneyEvidence','ARCHIVE_PARENT':archive.parent,'ARCHIVE':archive,'ARCHIVED_INPUT':archive/'input','ARCHIVED_REPORT':archive/'art'}
+        directories=[]
+        for role,path in paths.items():
+            try:
+                info=path.lstat();is_dir=stat.S_ISDIR(info.st_mode)
+                directories.append(dict(role=role,exists=True,isDirectory=is_dir,mode=format(stat.S_IMODE(info.st_mode),'04o'),currentUidWritable=bool(is_dir and not path.is_symlink() and os.access(path,os.W_OK))))
+            except OSError:directories.append(dict(role=role,exists=False,isDirectory=False,mode=None,currentUidWritable=False))
+        self.diagnostic=dict(phase=phase,errorClass=type(error).__name__ if type(error).__name__ in {'PermissionError','FileNotFoundError','FileExistsError','OSError','StrictError'} else 'OtherError',directories=directories)
+
 def stage(kind):
     s=state();check_state(s);require(len(s['completed'])<3 and KINDS[len(s['completed'])]==kind,'PREP_WRONG_STAGE_ORDER')
     selected=s['plan']['sources'][len(s['completed'])]
     prepare(REPO/selected['contract'],selected['sha256'],PROJECT/'CandidateImportInput','STRICT_BINDING')
+    prepare_report_directory()
 
 def import_inventory():
     result={(IMPORTS/rel).as_posix():h for rel,h in tree(PROJECT/IMPORTS).items()}
@@ -181,16 +205,19 @@ def collect(kind,native):
     require(exported==current,'PREP_CURRENT_EXPORT_SET_MISMATCH')
     merged={**s['assetFiles'],**exported};assert_union(merged) # Exact files AND directories of all validated candidates, never just filtered views.
     require(not (PUBLIC/kind).exists(),'PREP_PUBLIC_STAGE_EXISTS');validated.rename(PUBLIC/kind)
-    archive=PRIVATE/'native'/kind;archive.mkdir(parents=True)
-    (PROJECT/'CandidateImportInput').rename(archive/'input')
-    (PROJECT/'JourneyEvidence/CandidateArt').rename(archive/'art')
-    proof={}
-    for path,(rel,h) in sources.items():
-        if path.is_relative_to(PROJECT/'CandidateImportInput'):path=archive/'input'/path.relative_to(PROJECT/'CandidateImportInput')
-        elif path.is_relative_to(PROJECT/'JourneyEvidence/CandidateArt'):path=archive/'art'/path.relative_to(PROJECT/'JourneyEvidence/CandidateArt')
-        require(sha(path)==h,'PREP_ARCHIVE_CHANGED');proof[str(path.relative_to(REPO))]=h
-    s['completed'].append(dict(kind=kind,id=c['id'],proof=proof,exportReceiptSha256=sha(PUBLIC/kind/'receipt.json'),nativeXml=native_xml,nativeCases=native_cases))
-    s['assetFiles']=merged;save(s)
+    phase='ARCHIVE_MKDIR'
+    try:
+        archive=PRIVATE/'native'/kind;archive.mkdir(parents=True)
+        phase='INPUT_RENAME';(PROJECT/'CandidateImportInput').rename(archive/'input')
+        phase='REPORT_RENAME';(PROJECT/'JourneyEvidence/CandidateArt').rename(archive/'art')
+        phase='PROOF_REHASH';proof={}
+        for path,(rel,h) in sources.items():
+            if path.is_relative_to(PROJECT/'CandidateImportInput'):path=archive/'input'/path.relative_to(PROJECT/'CandidateImportInput')
+            elif path.is_relative_to(PROJECT/'JourneyEvidence/CandidateArt'):path=archive/'art'/path.relative_to(PROJECT/'JourneyEvidence/CandidateArt')
+            require(sha(path)==h,'PREP_ARCHIVE_CHANGED');proof[str(path.relative_to(REPO))]=h
+        s['completed'].append(dict(kind=kind,id=c['id'],proof=proof,exportReceiptSha256=sha(PUBLIC/kind/'receipt.json'),nativeXml=native_xml,nativeCases=native_cases))
+        s['assetFiles']=merged;phase='STATE_SAVE';save(s)
+    except Exception as error:raise ArchiveStageFailure(phase,kind,error) from None
 
 def ready():
     s=state();check_state(s);require([x['kind'] for x in s['completed']]==list(KINDS),'PREP_THREE_STRICT_SUCCESSES_REQUIRED');assert_union(s['assetFiles'])
@@ -233,8 +260,10 @@ def finish(native):
         require(rel(item['path']) and item['path'].startswith(('Assets/DesertRV/','JourneyEvidence/CandidateArt/')),'PREP_SCOPE_PATH')
         require(sha(PROJECT/item['path'])==item['sha256'],'PREP_SCOPE_PIN_CHANGED')
     sys.path.insert(0,str(ROOT/'scripts/rendered'));import prepared_source;prepared_source.seal()
-    # Only bounded status/path/hash metadata is newly exported. Raw logs, licenses, inputs and private views remain private.
-    out=dict(status='PREPARED_EDITOR_SCOPE_UNREVIEWED',pathsAreSameJobOnly=True,renderedObservationProduced=False,sourceCommit=os.environ['GITHUB_SHA'],visualApproved=False,gameplayAccepted=False,preparation_receipt=str(receipt.relative_to(REPO)),preparation_sha256=sha(receipt),diagnostic_scope=str(scope.relative_to(REPO)),scope_sha256=sha(scope),nativeXmlSha256=sha(reports[0][0]),nativeCase=cases[0].get('fullname'))
+    from generated_export import export_generated
+    generated=export_generated(prepared_source,sha(reports[0][0]))
+    # Exact generated assets are persisted; same-job report paths are historical evidence, never a restored scope.
+    out=dict(generatedExport=generated,status='PREPARED_EDITOR_SCOPE_UNREVIEWED',pathsAreSameJobOnly=True,renderedObservationProduced=False,sourceCommit=os.environ['GITHUB_SHA'],visualApproved=False,gameplayAccepted=False,preparation_receipt=str(receipt.relative_to(REPO)),preparation_sha256=sha(receipt),diagnostic_scope=str(scope.relative_to(REPO)),scope_sha256=sha(scope),nativeXmlSha256=sha(reports[0][0]),nativeCase=cases[0].get('fullname'))
     (PUBLIC/'preparation.json').write_text(json.dumps(out,indent=2)+'\n')
     if os.environ.get('GITHUB_OUTPUT'):
         with open(os.environ['GITHUB_OUTPUT'],'a') as f:
@@ -252,7 +281,9 @@ def main():
     except Exception as error:
         code=str(error) if re.fullmatch('[A-Z][A-Z0-9_]{0,100}',str(error)) else type(error).__name__
         print('JOURNEY_PREPARATION_NOT_READY: '+code)
-        if PUBLIC.is_dir(): (PUBLIC/'not-ready.json').write_text(json.dumps(dict(status='NOT_READY',approved=False,command=a.command,kind=a.kind,errorCode=code),indent=2)+'\n')
+        failure=dict(status='NOT_READY',approved=False,command=a.command,kind=a.kind,errorCode=code)
+        if isinstance(error,ArchiveStageFailure):failure['archiveDiagnostic']=error.diagnostic
+        if PUBLIC.is_dir(): (PUBLIC/'not-ready.json').write_text(json.dumps(failure,indent=2)+'\n')
         return 1
     return 0
 if __name__=='__main__':raise SystemExit(main())
