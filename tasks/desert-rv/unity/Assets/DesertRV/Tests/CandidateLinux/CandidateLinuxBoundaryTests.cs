@@ -119,6 +119,25 @@ namespace DesertRV.Tests
             {
                 string output=JsonUtility.ToJson(Call("ClassifyBuildMessage",raw));Assert.IsFalse(output.Contains("SECRET"));Assert.IsFalse(output.Contains("/home/private"));
             }
+            InventoryFixture((folder,request)=>
+            {
+                var pins=(Array)request.GetType().GetField("files").GetValue(request);
+                foreach(var pin in pins)
+                {
+                    var type=pin.GetType();string name=(string)type.GetField("path").GetValue(pin);
+                    type.GetField("sha256").SetValue(pin,Call("Hash",Path.Combine(folder,name.Substring("tasks/desert-rv/unity/".Length))));
+                }
+                File.Delete(Path.Combine(folder,"Assets","Real.asset.meta"));
+                Directory.CreateDirectory(Path.Combine(folder,"Assets","Generated"));
+                string generated=Path.Combine(folder,"ProjectSettings","BuildGenerated.asset");File.WriteAllText(generated,"real temporary byte fixture");
+                var diff=Call("InspectInventory",request,folder);var typeOfDiff=diff.GetType();string text=JsonUtility.ToJson(diff);
+                Assert.AreEqual(3,typeOfDiff.GetField("totalChanges").GetValue(diff));Assert.AreEqual(1,typeOfDiff.GetField("addedFiles").GetValue(diff));Assert.AreEqual(1,typeOfDiff.GetField("removedFiles").GetValue(diff));Assert.AreEqual(1,typeOfDiff.GetField("addedDirectories").GetValue(diff));
+                Assert.IsTrue(text.Contains("ProjectSettings/BuildGenerated.asset"));Assert.IsTrue(text.Contains((string)Call("Hash",generated)));Assert.IsFalse(text.Contains(folder));
+                RejectInventory(folder,request);
+                for(int i=0;i<40;i++) File.WriteAllText(Path.Combine(folder,"ProjectSettings","Generated"+i+".asset"),"bounded fixture");
+                var truncated=Call("InspectInventory",request,folder);Assert.AreEqual(43,truncated.GetType().GetField("totalChanges").GetValue(truncated));Assert.IsTrue((bool)truncated.GetType().GetField("truncated").GetValue(truncated));Assert.AreEqual(32,((Array)truncated.GetType().GetField("entries").GetValue(truncated)).Length);
+                Assert.AreEqual(3,typeOfDiff.GetField("totalChanges").GetValue(diff));
+            });
             string known=JsonUtility.ToJson(Call("ClassifyBuildMessage","BuildFailedException: DESERTRV_CANDIDATE_ROOT_IMPORT_HASH"));Assert.IsTrue(known.Contains("ROOT_IMPORT_HASH"));
         }
     }

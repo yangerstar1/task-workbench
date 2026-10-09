@@ -384,7 +384,7 @@
     },
     {
       "path": "tasks/desert-rv/art/journey-preparation/restoration-transition.json",
-      "sha256": "4503d931ed112967e840ce80a9d04006f19d7df6b6b1dbf4d29d2847e2ba2573",
+      "sha256": "b96962254e1b0b072037779d64ad76068aff184ae8d312624d936afc2f10bd72",
       "size": 7040
     },
     {
@@ -474,8 +474,8 @@
     },
     {
       "path": "tasks/desert-rv/scripts/player/journey_linux_export.py",
-      "sha256": "de55eea10d2a1c23a521bff6ca581797aa970a6495fac2e900e12d4d8d569204",
-      "size": 24084
+      "sha256": "f17e747e7d3635c11936493d2891146a6d0eee56a2237ae7bafd9c340f1d98ac",
+      "size": 27159
     },
     {
       "path": "tasks/desert-rv/scripts/player/observe_journey_player.py",
@@ -489,8 +489,8 @@
     },
     {
       "path": "tasks/desert-rv/scripts/player/test_journey_linux_export.py",
-      "sha256": "3351195e367340788132e91fa226fbdbe5c4a0500e2364125cf26a12765c3c2b",
-      "size": 15951
+      "sha256": "75d12c29983630aaee1ce0d5e8082d776218290bbac8c576e346f56d0eaf3554",
+      "size": 18520
     },
     {
       "path": "tasks/desert-rv/scripts/player/test_observe_journey_player.py",
@@ -4109,8 +4109,8 @@
     },
     {
       "path": "tasks/desert-rv/unity/Assets/DesertRV/Editor/JourneyCandidateLinuxBuild.cs",
-      "sha256": "6799c01ef28d3627254511c175dbc7fb7f0f47609b740f8727b82844b3963d69",
-      "size": 39142
+      "sha256": "27262d397b1240291f800161b58f274711d7f8b7d2ffaa522fa6bb7a7750eaf1",
+      "size": 43776
     },
     {
       "path": "tasks/desert-rv/unity/Assets/DesertRV/Editor/JourneyCandidateLinuxBuild.cs.meta",
@@ -5059,8 +5059,8 @@
     },
     {
       "path": "tasks/desert-rv/unity/Assets/DesertRV/Tests/CandidateLinux/CandidateLinuxBoundaryTests.cs",
-      "sha256": "09e88fb99a6899aec94c1618bad842510a2e3db14f2b455b8e82cdfd014536bb",
-      "size": 10498
+      "sha256": "47cecd4f7655fbf087bf59b199caef825acaec6ce9449f62adf1eb44b26d7aaf",
+      "size": 12526
     },
     {
       "path": "tasks/desert-rv/unity/Assets/DesertRV/Tests/CandidateLinux/CandidateLinuxBoundaryTests.cs.meta",

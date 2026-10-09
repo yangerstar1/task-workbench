@@ -12,7 +12,7 @@ sys.path.insert(0,str(TASK/'art/journey-preparation'));import linux_build_input
 MODE='CANDIDATE_LINUX_DEVELOPMENT_BUILT_UNREVIEWED'
 SCENES=['Assets/DesertRV/Scenes/Journey/'+n+'.unity' for n in ('JourneyBootstrap','FirstStation','Scrapyard','NightBeacon')]
 RECEIPT_KEYS={'schema','label','sourceCommit','producerRunUrl','generatedReceiptSha256','requestSha256','executableSha256','unityVersion','target','backend','define','executable','scenes','candidateOnly','development','settingsRestored','sourceBytesUnchanged','approved','visualReviewed','gameplayReviewed','audioAuditioned','temporarySettingsFiles','temporarySettingsApiFields','boundaryNativeXmlSha256','boundaryNativeCases','restorationProof','assetProducerSourceCommit','assetProducerRunUrl','restorationNativeXmlSha256'}
-DIAG_KEYS={'activeTargetAtEntry','activeTargetBeforeBuild','activeTargetAfterBuild','reportTarget','sourceBytesUnchanged', 'primaryCallbackGate', 'settingsRestored', 'buildReportAvailable', 'restorationExceptionKind', 'verificationSceneRole', 'totalErrors', 'leaseClosedReason', 'exceptionKind', 'buildResult', 'primarySceneRole', 'buildMessages', 'verificationFailureCode', 'receiptWritten', 'primaryRootMismatch', 'restorationFailureCode', 'assemblyReloadObserved', 'primaryFailureCode', 'verificationCallbackGate', 'label', 'verificationRootMismatch', 'buildMessagesTruncated', 'stage', 'leaseActiveAtBuildReturn', 'primaryExceptionKind', 'verificationExceptionKind', 'schema', 'buildErrorKinds', 'totalWarnings'}
+DIAG_KEYS={'primaryInventory','verificationInventory','activeTargetAtEntry','activeTargetBeforeBuild','activeTargetAfterBuild','reportTarget','sourceBytesUnchanged', 'primaryCallbackGate', 'settingsRestored', 'buildReportAvailable', 'restorationExceptionKind', 'verificationSceneRole', 'totalErrors', 'leaseClosedReason', 'exceptionKind', 'buildResult', 'primarySceneRole', 'buildMessages', 'verificationFailureCode', 'receiptWritten', 'primaryRootMismatch', 'restorationFailureCode', 'assemblyReloadObserved', 'primaryFailureCode', 'verificationCallbackGate', 'label', 'verificationRootMismatch', 'buildMessagesTruncated', 'stage', 'leaseActiveAtBuildReturn', 'primaryExceptionKind', 'verificationExceptionKind', 'schema', 'buildErrorKinds', 'totalWarnings'}
 FAILURE_CODES={'PIN_LINK', 'RESTORATION_XML', 'INVENTORY_NONREGULAR', 'ROOT_BYTES', 'BUILD_OR_SCENE_FAILED', 'INVENTORY_LINK', 'ROOT_IMPORT_HASH', 'PACKAGE_IDENTITY', 'PIN_BYTES', 'DEPENDENCY_PATH', 'INVENTORY_DIRECTORY', 'SAVED_RUNTIME_IDENTITY', 'BOOTSTRAP_OWNER', 'ROOT_DEPENDENCY', 'REQUEST_RECEIPT_HASH', 'BOOTSTRAP_BINDING', 'REGION_BINDING', 'REGION_OWNER', 'SCENE_COMPONENT', 'DEPENDENCY_KIND', 'INVENTORY_SET', 'ROOT_DEPENDENCY_BYTES', 'SCENE_SEQUENCE', 'PIN_MISSING', 'REGION_IDENTITY', 'BUILTIN_DEPENDENCY', 'IMPORT_FINGERPRINT', 'TARGET_OUTPUT', 'REQUEST_IDENTITY', 'PIN_PATH', 'UNCLASSIFIED_EXCEPTION', 'DIRTY_SCENE', 'ENTRY_PROFILE', 'LEASE_PROFILE', 'RESTORATION_PROOF', 'REQUEST_HASH', 'DEPENDENCY_BYTES', 'BUILD_PROFILE'}
 EXCEPTIONS={'NONE','BUILD_FAILED','UNAUTHORIZED_ACCESS','IO','OTHER'}
 CALLBACKS={'NONE','PRODUCTION_PREPROCESS','PRODUCTION_SCENE','CANDIDATE_SCENE'}
@@ -54,6 +54,29 @@ def native_receipt(value):
     else:require(pin is None or pin=={'path':'','sha256':''});require(all(value[k] in ('',None) for k in ('assetProducerSourceCommit','assetProducerRunUrl','restorationNativeXmlSha256')))
     return value
 
+def inventory_observation(value):
+    require(isinstance(value,dict) and set(value)=={'observed','truncated','totalChanges','addedFiles','removedFiles','addedDirectories','removedDirectories','unsafePathsOmitted','entries'})
+    require(type(value['observed']) is bool and type(value['truncated']) is bool)
+    for k in ('totalChanges','addedFiles','removedFiles','addedDirectories','removedDirectories','unsafePathsOmitted'):require(type(value[k]) is int and 0<=value[k]<=2147483647)
+    require(value['totalChanges']==sum(value[k] for k in ('addedFiles','removedFiles','addedDirectories','removedDirectories')))
+    rows=value['entries'];require(isinstance(rows,list) and len(rows)<=32 and len(rows)+value['unsafePathsOmitted']<=value['totalChanges'] and value['truncated']==(value['totalChanges']>len(rows)))
+    if not value['observed']:require(value['totalChanges']==0 and value['unsafePathsOmitted']==0 and rows==[])
+    previous=None;counts={('ADDED','FILE'):0,('REMOVED','FILE'):0,('ADDED','DIRECTORY'):0,('REMOVED','DIRECTORY'):0}
+    for row in rows:
+        require(isinstance(row,dict) and set(row)=={'path','change','kind','sha256','measurement','bytes'})
+        name=row['path'];require(isinstance(name,str) and re.fullmatch(r'(Assets|Packages|ProjectSettings)/[A-Za-z0-9_./ @+()\-]{1,480}',name) and all(n not in ('','.','..') for n in name.split('/')))
+        require(row['change'] in {'ADDED','REMOVED'} and row['kind'] in {'FILE','DIRECTORY'});key=(name,row['kind'],row['change']);require(previous is None or key>previous);previous=key;counts[(row['change'],row['kind'])]+=1
+        require(type(row['bytes']) is int and -1<=row['bytes']<=9223372036854775807 and isinstance(row['sha256'],str))
+        if row['kind']=='DIRECTORY':require(row['measurement']=='NOT_APPLICABLE' and row['bytes']==0 and row['sha256']=='')
+        elif row['change']=='REMOVED':
+            require(re.fullmatch('[a-f0-9]{64}',row['sha256']))
+            require(row['measurement']=='EXPECTED_PIN_PRIOR_SIZE' and row['bytes']>=0 or row['measurement']=='EXPECTED_PIN_SIZE_UNAVAILABLE' and row['bytes']==-1)
+        elif row['measurement']=='ACTUAL_BYTES':require(0<=row['bytes']<=128*1024**2 and re.fullmatch('[a-f0-9]{64}',row['sha256']))
+        elif row['measurement']=='SIZE_ONLY_LIMIT':require(row['bytes']>128*1024**2 and row['sha256']=='')
+        else:require(row['measurement']=='UNREADABLE' and row['bytes']==-1 and row['sha256']=='')
+    for kind,key in [(('ADDED','FILE'),'addedFiles'),(('REMOVED','FILE'),'removedFiles'),(('ADDED','DIRECTORY'),'addedDirectories'),(('REMOVED','DIRECTORY'),'removedDirectories')]:require(counts[kind]<=value[key])
+    if not value['truncated']:require(all(counts[kind]==value[key] for kind,key in [(('ADDED','FILE'),'addedFiles'),(('REMOVED','FILE'),'removedFiles'),(('ADDED','DIRECTORY'),'addedDirectories'),(('REMOVED','DIRECTORY'),'removedDirectories')]))
+
 def root_observation(value):
     require(isinstance(value,dict) and set(value)=={'observed','rootBytesMatch','rootDependencyBytesMatch','slot','expectedImportHash','observedImportHash'})
     for k in ('observed','rootBytesMatch','rootDependencyBytesMatch'):require(type(value[k]) is bool)
@@ -91,14 +114,14 @@ def native_diagnostic(value):
         require((value[prefix+'FailureCode']=='NONE')==(value[prefix+'ExceptionKind']=='NONE'))
     require(value['leaseClosedReason'] in {'NONE','EXPLICIT','ASSEMBLY_RELOAD','EDITOR_QUIT'})
     for prefix in ('primary','verification'):
-        require(value[prefix+'CallbackGate'] in CALLBACKS and value[prefix+'SceneRole'] in ROLES);root_observation(value[prefix+'RootMismatch'])
+        require(value[prefix+'CallbackGate'] in CALLBACKS and value[prefix+'SceneRole'] in ROLES);root_observation(value[prefix+'RootMismatch']);inventory_observation(value[prefix+'Inventory'])
     kinds=value['buildErrorKinds'];require(isinstance(kinds,list) and kinds==sorted(set(kinds)) and set(kinds)<=BUILD_ERROR_KINDS)
     messages=value['buildMessages'];require(isinstance(messages,list) and len(messages)<=32)
     for message in messages:safe_build_message(message);require(message['category'] in kinds)
     return value
 
 def diagnostic_success(d):
-    return d is not None and d['stage']=='RECEIPT_WRITTEN' and d['buildResult']=='SUCCEEDED' and d['exceptionKind']=='NONE' and d['buildReportAvailable'] is True and d['reportTarget']=='LINUX64' and d['totalErrors']==0 and all(d[p+'FailureCode']=='NONE' for p in ('primary','restoration','verification')) and all(d[k] is True for k in ('settingsRestored','sourceBytesUnchanged','receiptWritten'))
+    return d is not None and d['stage']=='RECEIPT_WRITTEN' and d['buildResult']=='SUCCEEDED' and d['exceptionKind']=='NONE' and d['buildReportAvailable'] is True and d['reportTarget']=='LINUX64' and d['totalErrors']==0 and all(d[p+'FailureCode']=='NONE' for p in ('primary','restoration','verification')) and all(d[p+'Inventory']['totalChanges']==0 for p in ('primary','verification')) and all(d[k] is True for k in ('settingsRestored','sourceBytesUnchanged','receiptWritten'))
 
 def validate_records(records):
     require(isinstance(records,list) and 0<len(records)<=20000);previous='';total=0;roots=set()

@@ -59,6 +59,17 @@ namespace DesertRV.Editor
             public string category="UNCLASSIFIED_BUILD_ERROR", code="NONE", source="", text="";
             public int line;
         }
+        [Serializable] sealed class InventoryEntry
+        {
+            public string path,change,kind,sha256="",measurement="NOT_APPLICABLE";
+            public long bytes;
+        }
+        [Serializable] sealed class InventoryObservation
+        {
+            public bool observed,truncated;
+            public int totalChanges,addedFiles,removedFiles,addedDirectories,removedDirectories,unsafePathsOmitted;
+            public InventoryEntry[] entries=Array.Empty<InventoryEntry>();
+        }
         [Serializable] sealed class Diagnostic
         {
             public int schema = 1;
@@ -71,9 +82,11 @@ namespace DesertRV.Editor
             public string[] buildErrorKinds = Array.Empty<string>();
             public string primaryCallbackGate="NONE", primarySceneRole="NONE", verificationCallbackGate="NONE", verificationSceneRole="NONE";
             public RootObservation primaryRootMismatch=new RootObservation(), verificationRootMismatch=new RootObservation();
+            public InventoryObservation primaryInventory=new InventoryObservation(), verificationInventory=new InventoryObservation();
             public SafeBuildMessage[] buildMessages=Array.Empty<SafeBuildMessage>();
             public bool buildMessagesTruncated;
         }
+        static readonly Dictionary<string,long> inventoryBaselineSizes=new Dictionary<string,long>(StringComparer.Ordinal);
         static Diagnostic currentDiagnostic;
         static string diagnosticContext = "PRIMARY", currentSceneRole="NONE";
         static string SceneRole(string path) => path==JourneySceneAuthoring.ManifestPath ? "CONTENT" : Array.IndexOf(Paths,path)==0 ? "BOOTSTRAP" : Array.IndexOf(Paths,path)==1 ? "FIRST_STATION" : Array.IndexOf(Paths,path)==2 ? "SCRAPYARD" : Array.IndexOf(Paths,path)==3 ? "NIGHT_BEACON" : "NONE";
@@ -195,8 +208,9 @@ namespace DesertRV.Editor
                 Check((File.GetAttributes(path) & FileAttributes.ReparsePoint) == 0, "PIN_LINK");
             return full;
         }
-        static void VerifyInventory(Request request, string projectRoot = ".")
+        static InventoryObservation InspectInventory(Request request, string projectRoot = ".")
         {
+            Check(request.directories!=null,"INVENTORY_SET");
             const string prefix = "tasks/desert-rv/unity/";
             var expected = new HashSet<string>(request.files.Where(p => p.path.StartsWith(prefix,StringComparison.Ordinal)).Select(p => p.path.Substring(prefix.Length))
                 .Where(p => p.StartsWith("Assets/",StringComparison.Ordinal) || p.StartsWith("Packages/",StringComparison.Ordinal) || p.StartsWith("ProjectSettings/",StringComparison.Ordinal)),StringComparer.Ordinal);
@@ -215,7 +229,52 @@ namespace DesertRV.Editor
                     else { Check(File.Exists(child),"INVENTORY_NONREGULAR");actual.Add(path); }
                 }
             }
-            Check(actual.SetEquals(expected) && request.directories != null && directories.SetEquals(request.directories),"INVENTORY_SET");
+            var expectedDirectories=new HashSet<string>(request.directories,StringComparer.Ordinal);
+            var difference=new InventoryObservation { observed=true,addedFiles=actual.Except(expected).Count(),removedFiles=expected.Except(actual).Count(),addedDirectories=directories.Except(expectedDirectories).Count(),removedDirectories=expectedDirectories.Except(directories).Count() };
+            difference.totalChanges=difference.addedFiles+difference.removedFiles+difference.addedDirectories+difference.removedDirectories;
+            var changes=actual.Except(expected).Select(p=>new InventoryEntry {path=p,kind="FILE",change="ADDED"})
+                .Concat(expected.Except(actual).Select(p=>new InventoryEntry {path=p,kind="FILE",change="REMOVED"}))
+                .Concat(directories.Except(expectedDirectories).Select(p=>new InventoryEntry {path=p,kind="DIRECTORY",change="ADDED"}))
+                .Concat(expectedDirectories.Except(directories).Select(p=>new InventoryEntry {path=p,kind="DIRECTORY",change="REMOVED"}))
+                .OrderBy(p=>p.path,StringComparer.Ordinal).ThenBy(p=>p.kind,StringComparer.Ordinal).ThenBy(p=>p.change,StringComparer.Ordinal).ToArray();
+            var entries=new List<InventoryEntry>();
+            foreach(var row in changes)
+            {
+                bool safe=Regex.IsMatch(row.path,@"\A(Assets|Packages|ProjectSettings)/[A-Za-z0-9_./ @+()\-]{1,480}\z") && !row.path.Split('/').Any(n=>n=="." || n==".." || n.Length==0);
+                if(!safe) {difference.unsafePathsOmitted++;continue;}
+                if(entries.Count>=32) continue;
+                if(row.kind=="FILE")
+                {
+                    if(row.change=="REMOVED")
+                    {
+                        row.sha256=request.files.Single(p=>p.path=="tasks/desert-rv/unity/"+row.path).sha256;
+                        if(inventoryBaselineSizes.TryGetValue(row.path,out var priorSize)) {row.bytes=priorSize;row.measurement="EXPECTED_PIN_PRIOR_SIZE";}
+                        else {row.bytes=-1;row.measurement="EXPECTED_PIN_SIZE_UNAVAILABLE";}
+                    }
+                    else
+                    {
+                        try
+                        {
+                            string full=Path.Combine(root,row.path);row.bytes=new FileInfo(full).Length;
+                            if(row.bytes<=128L*1024*1024) {row.sha256=Hash(full);row.measurement="ACTUAL_BYTES";}
+                            else row.measurement="SIZE_ONLY_LIMIT";
+                        }
+                        catch { row.bytes=-1;row.sha256="";row.measurement="UNREADABLE"; }
+                    }
+                }
+                entries.Add(row);
+            }
+            difference.entries=entries.ToArray();difference.truncated=difference.totalChanges>entries.Count;return difference;
+        }
+        static void VerifyInventory(Request request, string projectRoot = ".")
+        {
+            var difference=InspectInventory(request,projectRoot);
+            if(currentDiagnostic!=null && difference.totalChanges>0)
+            {
+                if(diagnosticContext=="VERIFICATION") {if(!currentDiagnostic.verificationInventory.observed) currentDiagnostic.verificationInventory=difference;}
+                else if(!currentDiagnostic.primaryInventory.observed) currentDiagnostic.primaryInventory=difference;
+            }
+            Check(difference.totalChanges==0,"INVENTORY_SET");
         }
         [Serializable] sealed class RestorationReport
         {
@@ -352,14 +411,14 @@ namespace DesertRV.Editor
         }
         public static void BuildPreparedLinuxDiagnostic()
         {
-            var diagnostic = new Diagnostic { activeTargetAtEntry=TargetKind(EditorUserBuildSettings.activeBuildTarget) }; currentDiagnostic=diagnostic;diagnosticContext="PRIMARY";Persist(diagnostic);
+            var diagnostic = new Diagnostic { activeTargetAtEntry=TargetKind(EditorUserBuildSettings.activeBuildTarget) }; inventoryBaselineSizes.Clear();currentDiagnostic=diagnostic;diagnosticContext="PRIMARY";Persist(diagnostic);
             try { BuildPrepared(diagnostic); }
             catch (Exception error)
             {
                 RecordUnhandled(diagnostic,error);
                 throw;
             }
-            finally { Close(); Persist(diagnostic);currentDiagnostic=null;diagnosticContext="PRIMARY";currentSceneRole="NONE"; }
+            finally { Close(); Persist(diagnostic);currentDiagnostic=null;inventoryBaselineSizes.Clear();diagnosticContext="PRIMARY";currentSceneRole="NONE"; }
         }
         static void BuildPrepared(Diagnostic diagnostic)
         {
@@ -376,7 +435,10 @@ namespace DesertRV.Editor
                 new HashSet<string>(request.scenes.Select(p=>p.path)).SetEquals(Paths.Concat(new[] { JourneySceneAuthoring.ManifestPath })), "REQUEST_IDENTITY");
             Check(BuildPipeline.IsBuildTargetSupported(BuildTargetGroup.Standalone,BuildTarget.StandaloneLinux64) && !Directory.Exists(Path.GetDirectoryName(Output)), "TARGET_OUTPUT");
             var setup = EditorSceneManager.GetSceneManagerSetup(); Check(!setup.Any(s => s.isLoaded && SceneManager.GetSceneByPath(s.path).isDirty), "DIRTY_SCENE");
-            var lease = new Lease { request=request,requestHash=requestHash,fingerprint=JourneyContentChecks.BuildFingerprint() }; Verify(lease,false);diagnostic.stage="SOURCE_VERIFIED";Persist(diagnostic);
+            var lease = new Lease { request=request,requestHash=requestHash,fingerprint=JourneyContentChecks.BuildFingerprint() }; Verify(lease,false);
+            foreach(var pin in request.files.Where(p=>p.path.StartsWith("tasks/desert-rv/unity/Assets/",StringComparison.Ordinal) || p.path.StartsWith("tasks/desert-rv/unity/Packages/",StringComparison.Ordinal) || p.path.StartsWith("tasks/desert-rv/unity/ProjectSettings/",StringComparison.Ordinal)))
+                inventoryBaselineSizes[pin.path.Substring("tasks/desert-rv/unity/".Length)]=new FileInfo(RepoFile(pin.path)).Length;
+            diagnostic.stage="SOURCE_VERIFIED";Persist(diagnostic);
             JourneyCandidateAssetIntegration.RequireOnlyMissingApprovals(JourneyContentChecks.Inspect(true).ToArray());
             try { foreach (var path in Paths) CheckSceneObjects(EditorSceneManager.OpenScene(path,OpenSceneMode.Single),AssetDatabase.LoadAssetAtPath<JourneyContentManifest>(JourneySceneAuthoring.ManifestPath)); }
             finally { JourneySceneAuthoring.RestoreSceneSetup(setup); }

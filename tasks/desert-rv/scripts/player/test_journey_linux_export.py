@@ -16,7 +16,30 @@ class JourneyLinuxExportTests(unittest.TestCase):
   recovery=x.recovery.empty_recovery();recovery.update(status='SUCCEEDED',sourceModesRestored=True,afterPreserved=True)
   return dict(schema=1,mode='JOURNEY_LINUX_BUILD_CONTROL',activation='SUCCEEDED',build='SUCCEEDED',licenseReturn='SUCCEEDED',privateCleanup='SUCCEEDED',buildDiagnostic=dict(batchExitCode=0,batchTimedOut=False,native=self.diagnostic(),logClassification=x.recovery.startup.empty_report()),sourceRecovery=recovery)
  def diagnostic(self):
-  return dict(activeTargetAtEntry='LINUX64',activeTargetBeforeBuild='LINUX64',activeTargetAfterBuild='LINUX64',reportTarget='LINUX64',schema=1,label='CANDIDATE_LINUX_BUILD_DIAGNOSTIC',stage='RECEIPT_WRITTEN',exceptionKind='NONE',buildResult='SUCCEEDED',settingsRestored=True,sourceBytesUnchanged=True,receiptWritten=True,buildReportAvailable=True,leaseActiveAtBuildReturn=True,assemblyReloadObserved=False,totalErrors=0,totalWarnings=0,primaryFailureCode='NONE',primaryExceptionKind='NONE',restorationFailureCode='NONE',restorationExceptionKind='NONE',verificationFailureCode='NONE',verificationExceptionKind='NONE',leaseClosedReason='EXPLICIT',buildErrorKinds=[],primaryCallbackGate='NONE',primarySceneRole='NONE',verificationCallbackGate='NONE',verificationSceneRole='NONE',primaryRootMismatch=self.root_observation(),verificationRootMismatch=self.root_observation(),buildMessages=[],buildMessagesTruncated=False)
+  return dict(primaryInventory=self.inventory(),verificationInventory=self.inventory(),activeTargetAtEntry='LINUX64',activeTargetBeforeBuild='LINUX64',activeTargetAfterBuild='LINUX64',reportTarget='LINUX64',schema=1,label='CANDIDATE_LINUX_BUILD_DIAGNOSTIC',stage='RECEIPT_WRITTEN',exceptionKind='NONE',buildResult='SUCCEEDED',settingsRestored=True,sourceBytesUnchanged=True,receiptWritten=True,buildReportAvailable=True,leaseActiveAtBuildReturn=True,assemblyReloadObserved=False,totalErrors=0,totalWarnings=0,primaryFailureCode='NONE',primaryExceptionKind='NONE',restorationFailureCode='NONE',restorationExceptionKind='NONE',verificationFailureCode='NONE',verificationExceptionKind='NONE',leaseClosedReason='EXPLICIT',buildErrorKinds=[],primaryCallbackGate='NONE',primarySceneRole='NONE',verificationCallbackGate='NONE',verificationSceneRole='NONE',primaryRootMismatch=self.root_observation(),verificationRootMismatch=self.root_observation(),buildMessages=[],buildMessagesTruncated=False)
+ def inventory(self):return dict(observed=False,truncated=False,totalChanges=0,addedFiles=0,removedFiles=0,addedDirectories=0,removedDirectories=0,unsafePathsOmitted=0,entries=[])
+ def inventory_change(self):
+  d=self.inventory();d.update(observed=True,totalChanges=3,addedFiles=1,removedFiles=1,addedDirectories=1,entries=[dict(path='Assets/Generated',kind='DIRECTORY',change='ADDED',sha256='',bytes=0,measurement='NOT_APPLICABLE'),dict(path='Assets/Old.asset',kind='FILE',change='REMOVED',sha256='a'*64,bytes=15,measurement='EXPECTED_PIN_PRIOR_SIZE'),dict(path='ProjectSettings/Generated.asset',kind='FILE',change='ADDED',sha256='b'*64,bytes=19,measurement='ACTUAL_BYTES')]);return d
+ def test_inventory_delta_has_exact_sorted_paths_hashes_sizes_and_independent_phases(self):
+  d=self.diagnostic();d['primaryInventory']=self.inventory_change();d['primaryFailureCode']='INVENTORY_SET';d['primaryExceptionKind']='BUILD_FAILED';x.native_diagnostic(d);self.assertFalse(x.diagnostic_success(d));self.assertFalse(d['verificationInventory']['observed'])
+ def test_inventory_private_path_traversal_unknown_fields_hash_size_rejected(self):
+  for key,value in [('path','/private/log'),('path','Assets/../private.log'),('path','Assets/foo\nPRIVATE'),('sha256','TOKEN'),('bytes',True),('raw','SECRET')]:
+   d=self.inventory_change();d['entries'][2][key]=value
+   with self.assertRaises(ValueError):x.inventory_observation(d)
+ def test_inventory_missing_duplicate_unsorted_and_wrong_counts_rejected(self):
+  d=self.inventory_change();d['entries'].pop()
+  with self.assertRaises(ValueError):x.inventory_observation(d)
+  d=self.inventory_change();d['entries'][1]=d['entries'][0]
+  with self.assertRaises(ValueError):x.inventory_observation(d)
+  d=self.inventory_change();d['entries'].reverse()
+  with self.assertRaises(ValueError):x.inventory_observation(d)
+  d=self.inventory_change();d['addedFiles']=2
+  with self.assertRaises(ValueError):x.inventory_observation(d)
+ def test_inventory_truncation_and_unavailable_measurements_are_explicit(self):
+  d=self.inventory_change();d['entries']=d['entries'][:1];d['truncated']=True;x.inventory_observation(d)
+  d=self.inventory_change();d['entries'][1].update(bytes=-1,measurement='EXPECTED_PIN_SIZE_UNAVAILABLE');x.inventory_observation(d)
+  d=self.inventory_change();d['entries'][2].update(bytes=129*1024**2,sha256='',measurement='SIZE_ONLY_LIMIT');x.inventory_observation(d)
+  d['entries'][2].update(bytes=-1,measurement='UNREADABLE');x.inventory_observation(d)
  def root_observation(self):return dict(observed=False,rootBytesMatch=False,rootDependencyBytesMatch=False,slot='NONE',expectedImportHash='',observedImportHash='')
  def test_primary_and_secondary_diagnostic_reasons_remain_distinct(self):
   d=self.diagnostic();d.update(stage='BUILD_PLAYER_RETURNED',buildResult='FAILED',totalErrors=2,exceptionKind='BUILD_FAILED',primaryFailureCode='ROOT_IMPORT_HASH',primaryExceptionKind='BUILD_FAILED',verificationFailureCode='IMPORT_FINGERPRINT',verificationExceptionKind='BUILD_FAILED',sourceBytesUnchanged=False,receiptWritten=False)

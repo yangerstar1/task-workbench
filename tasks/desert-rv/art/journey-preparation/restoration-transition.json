@@ -53,8 +53,8 @@
       "path": "tasks/desert-rv/scripts/player/journey_linux_export.py",
       "beforeSha256": "e16f9713ad4758ff362df9b89939cd7f56430c03facb596749652f1ebcdf4a06",
       "beforeBytes": 17390,
-      "afterSha256": "de55eea10d2a1c23a521bff6ca581797aa970a6495fac2e900e12d4d8d569204",
-      "afterBytes": 24084
+      "afterSha256": "f17e747e7d3635c11936493d2891146a6d0eee56a2237ae7bafd9c340f1d98ac",
+      "afterBytes": 27159
     },
     {
       "path": "tasks/desert-rv/scripts/player/observe_journey_player.py",
@@ -67,8 +67,8 @@
       "path": "tasks/desert-rv/scripts/player/test_journey_linux_export.py",
       "beforeSha256": "76f1becbfa0a76afceb057d6f8c695b4144cf7fb544e42cbd2ef5b3505c399d5",
       "beforeBytes": 10516,
-      "afterSha256": "3351195e367340788132e91fa226fbdbe5c4a0500e2364125cf26a12765c3c2b",
-      "afterBytes": 15951
+      "afterSha256": "75d12c29983630aaee1ce0d5e8082d776218290bbac8c576e346f56d0eaf3554",
+      "afterBytes": 18520
     },
     {
       "path": "tasks/desert-rv/scripts/player/test_observe_journey_player.py",
@@ -95,8 +95,8 @@
       "path": "tasks/desert-rv/unity/Assets/DesertRV/Editor/JourneyCandidateLinuxBuild.cs",
       "beforeSha256": "f853af2763627c96c5b2be4b53c8081517495b9eeaa20f2e1a6fcb35b8a75f36",
       "beforeBytes": 21039,
-      "afterSha256": "6799c01ef28d3627254511c175dbc7fb7f0f47609b740f8727b82844b3963d69",
-      "afterBytes": 39142
+      "afterSha256": "27262d397b1240291f800161b58f274711d7f8b7d2ffaa522fa6bb7a7750eaf1",
+      "afterBytes": 43776
     },
     {
       "path": "tasks/desert-rv/unity/Assets/DesertRV/Editor/JourneyCandidatePreparation.cs",
@@ -123,8 +123,8 @@
       "path": "tasks/desert-rv/unity/Assets/DesertRV/Tests/CandidateLinux/CandidateLinuxBoundaryTests.cs",
       "beforeSha256": "4af8dfba2b69f9f92d0de63b95b3266f8f1d3cfba4122819e32e83d1898ee8f9",
       "beforeBytes": 6871,
-      "afterSha256": "09e88fb99a6899aec94c1618bad842510a2e3db14f2b455b8e82cdfd014536bb",
-      "afterBytes": 10498
+      "afterSha256": "47cecd4f7655fbf087bf59b199caef825acaec6ce9449f62adf1eb44b26d7aaf",
+      "afterBytes": 12526
     },
     {
       "path": "tasks/desert-rv/unity/Assets/DesertRV/Tests/JourneyRestoration.meta",
