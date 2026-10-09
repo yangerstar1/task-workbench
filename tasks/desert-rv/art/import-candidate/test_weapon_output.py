@@ -96,7 +96,7 @@ class WeaponExportTests(unittest.TestCase):
         self.native=self.root/'artifacts/candidate-art/results.xml';self.native.parent.mkdir(parents=True)
         self.names=[strict.NATIVE,'DesertRV.Tests.CandidateAnimationPolicyTests.OnlyArmoredAttackGetsTheSourceLoopException',
             'DesertRV.Tests.CandidateAnimationPolicyTests.EqualKeyValuesDoNotExcuseUnsafeTangents',
-            'DesertRV.Tests.CandidateAnimationPolicyTests.MissingNativeAnimatorGetsCreatedAndReused',w.EMISSION_CASE,'DesertRV.Tests.CandidateAnimationPolicyTests.RenderTargetCleanupDetachesCameraBeforeDestroy']
+            'DesertRV.Tests.CandidateAnimationPolicyTests.MissingNativeAnimatorGetsCreatedAndReused',w.EMISSION_CASE,'DesertRV.Tests.CandidateAnimationPolicyTests.RenderTargetCleanupDetachesCameraBeforeDestroy',w.MATERIAL_IDENTITY_CASE]
         self.native.write_text('<test-run result="Passed">'+''.join('<test-case fullname="'+name+'" result="Passed"/>' for name in self.names)+'</test-run>')
         self.flush()
 
@@ -137,7 +137,7 @@ class WeaponExportTests(unittest.TestCase):
                 upperBindRotation=dict(x=0,y=0,z=0,w=1),foreBindRotation=dict(x=0,y=0,z=0,w=1),neutralPoseEvidence=evidence)
         for i,m in enumerate(self.c['materials']):
             result['materials'].append(dict(sourceName=m['sourceName'],materialPath=self.prefix+f'/Materials/Material_{i:02}.mat',
-                shader='Universal Render Pipeline/Lit',expectedColor=m['baseColor'].copy(),actualColor=m['baseColor'].copy(),
+                shader='Universal Render Pipeline/Lit',actualName=m['sourceName']+'_Candidate',materialGuid=w._meta_guid(self.folder/f'Materials/Material_{i:02}.mat'),materialLocalId=2100000,expectedColor=m['baseColor'].copy(),actualColor=m['baseColor'].copy(),
                 expectedMetallic=m['metallic'],actualMetallic=m['metallic'],expectedSmoothness=m['smoothness'],actualSmoothness=m['smoothness'],actualCull=0))
         return result
 
@@ -163,6 +163,23 @@ class WeaponExportTests(unittest.TestCase):
         self.assertFalse(list(self.out.parent.glob('.weapon-safe-*')))
         if code:self.assertEqual(receipt['errorCode'],code)
 
+    def test_persisted_display_name_is_observed_not_source_identity(self):
+        # Emulate a valid native filename-derived display name without guessing it in production.
+        p=self.folder/'Materials/Material_00.mat';old=self.c['materials'][0]['sourceName']+'_Candidate'
+        p.write_text(p.read_text().replace('m_Name: '+old,'m_Name: Material_00'))
+        self.imp['weaponCalibration']['materials'][0]['actualName']='Material_00'
+        self.rehash_dependencies();self.run_export()
+    def test_observed_name_must_match_disk(self):
+        self.imp['weaponCalibration']['materials'][0]['actualName']='same-name-impostor';self.rejected('WEAPON_MATERIAL_ASSET')
+    def test_material_guid_identity_cannot_be_spoofed(self):
+        self.imp['weaponCalibration']['materials'][0]['materialGuid']='f'*32;self.rejected('WEAPON_MATERIAL_PERSISTENT_IDENTITY')
+    def test_material_local_id_must_match_actual_document(self):
+        self.imp['weaponCalibration']['materials'][0]['materialLocalId']=2100001;self.rejected('WEAPON_MATERIAL_LOCAL_ID')
+    def test_matching_name_does_not_excuse_wrong_material_path(self):
+        self.imp['weaponCalibration']['materials'][0]['materialPath']=self.prefix+'/Materials/Material_01.mat';self.rejected('WEAPON_MATERIAL_READBACK')
+    def test_material_identity_native_case_is_required(self):
+        self.native.write_text(self.native.read_text().replace(w.MATERIAL_IDENTITY_CASE,'Synthetic.UnrecognizedCase'))
+        self.rejected()
     def test_staging_unlisted_file_cannot_escape(self):
         original=w.shutil.copyfile
         def inject(src,dest,*args,**kwargs):
@@ -173,7 +190,7 @@ class WeaponExportTests(unittest.TestCase):
             return result
         with patch.object(w.shutil,'copyfile',inject):self.rejected('STRICT_STAGING_ALLOWLIST')
     def test_full_synthetic_export_is_explicitly_unaccepted(self):
-        result=self.run_export();self.assertEqual((result['images'],result['weaponSamples'],result['nativeCases']),(25,4463,6))
+        result=self.run_export();self.assertEqual((result['images'],result['weaponSamples'],result['nativeCases']),(25,4463,7))
         for key in ('approved','calibratedForScene','visualApproved','gameplayAccepted'):self.assertIs(result[key],False)
         self.assertEqual((result['denseSamples'],result['worldSamples'],result['imageSamples']),(4303,135,25))
         for row in result['files']:self.assertEqual(w.sha(self.out/row['path']),row['sha256'])

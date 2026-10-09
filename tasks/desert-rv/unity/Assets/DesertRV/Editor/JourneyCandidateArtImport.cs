@@ -342,7 +342,7 @@ namespace DesertRV.Editor
             // Intentionally leave flash unbound: normal ValidateBindings/production preflight cannot pass
             // before an explicit scene integration calibrates the imported barrel axis and authors the FX.
             p.muzzleFlash=null;
-            report.weaponCalibration=CandidateWeaponBinding.Bind(c.weapon,p,visual,destination+"/Source/"+c.modelFile,clips,c.materials,report.muzzle);
+            report.weaponCalibration=CandidateWeaponBinding.Bind(c.weapon,p,visual,destination+"/Source/"+c.modelFile,clips,c.materials,destination+"/Materials",report.muzzle);
         }
         static Vector3 Center(Renderer renderer)
         {

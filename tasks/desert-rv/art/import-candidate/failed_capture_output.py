@@ -22,6 +22,7 @@ import zlib
 import strict_output as strict
 
 NATIVE_NAMES = frozenset((
+    'DesertRV.Tests.CandidateMaterialIdentityTests.PersistedWeaponMaterialIdentitySurvivesNeutralSamplingAndRejectsImpostors',
     'DesertRV.Tests.CandidateArtImportTests.ExecutePinnedDiscoveryOrBindingDiagnostics',
     'DesertRV.Tests.CandidateAnimationPolicyTests.OnlyArmoredAttackGetsTheSourceLoopException',
     'DesertRV.Tests.CandidateAnimationPolicyTests.EqualKeyValuesDoNotExcuseUnsafeTangents',
@@ -192,6 +193,22 @@ def freeze(root):
     return snap, contract, imp, capture, paths
 
 
+def validate_native_aggregate(root, results):
+    """Exact NUnit outcome/count consistency, independent of historical case inventory.
+
+    Production calls this only after validating the current exact test names.
+    Historical public XML fixtures exercise this parser without changing their cases.
+    """
+    require(root.get('result') in ('Passed', 'Failed', 'Failed(Child)'))
+    require(all(value in ('Passed', 'Failed') for value in results.values()))
+    require((root.get('result') in ('Failed', 'Failed(Child)')) == ('Failed' in results.values()))
+    if root.get('result') == 'Failed(Child)':
+        expected = dict(testcasecount=len(results), total=len(results),
+                        passed=sum(v == 'Passed' for v in results.values()),
+                        failed=sum(v == 'Failed' for v in results.values()), inconclusive=0, skipped=0)
+        require(all(root.get(key) == str(value) for key, value in expected.items()))
+
+
 def validate_native(snap, paths):
     reports = []
     for path in paths:
@@ -203,7 +220,7 @@ def validate_native(snap, paths):
     require(len(reports) == 1)
     data, root = reports[0]
     cases = list(root.iter('test-case'))
-    require(root.get('result') in ('Passed', 'Failed', 'Failed(Child)') and len(cases) == 6
+    require(root.get('result') in ('Passed', 'Failed', 'Failed(Child)') and len(cases) == len(NATIVE_NAMES)
             and {c.get('fullname') for c in cases} == NATIVE_NAMES)
     results = {}
     for case in cases:
@@ -217,14 +234,8 @@ def validate_native(snap, paths):
         require(start.tzinfo is not None and end.tzinfo is not None and end >= start
                 and math.isfinite(duration) and 0 <= duration <= 86400)
         results[case.attrib['fullname']] = case.attrib['result']
-    require((root.get('result') in ('Failed', 'Failed(Child)')) == ('Failed' in results.values()))
-    # Unity Test Framework emits this exact aggregate spelling for child errors.
-    # It remains a failed run and must agree with all six executed case results.
-    if root.get('result') == 'Failed(Child)':
-        expected = dict(testcasecount=6, total=6, passed=sum(v == 'Passed' for v in results.values()),
-                        failed=sum(v == 'Failed' for v in results.values()), inconclusive=0, skipped=0)
-        require(all(root.get(key) == str(value) for key, value in expected.items()))
-    return dict(sha256=digest(data), cases=6, passed=sum(v == 'Passed' for v in results.values()),
+    validate_native_aggregate(root, results)
+    return dict(sha256=digest(data), cases=len(NATIVE_NAMES), passed=sum(v == 'Passed' for v in results.values()),
                 failed=sum(v == 'Failed' for v in results.values()), entryResult=results[ENTRY],
                 caseResults=[dict(fullname=name, result=results[name]) for name in sorted(NATIVE_NAMES)])
 
@@ -573,7 +584,7 @@ def _export(root, output, c, summary, native, protected):
         records.append(dict(path='failed-diagnostics.json', sha256=digest(data), bytes=len(data)))
         result = dict(source_identity, status='FAILED_DIAGNOSTICS', approved=False,
             errorCode=code, visualApproved=False, gameplayAccepted=False, calibratedForScene=False,
-            protectedSource='UNCHANGED', nativeXmlSha256=native_info['sha256'], nativeCases=6,
+            protectedSource='UNCHANGED', nativeXmlSha256=native_info['sha256'], nativeCases=len(NATIVE_NAMES),
             nativeFailedCases=native_info['failed'], images=len(records)-1,
             observedFrames=len(document['frames']), weaponSamples=len(document['weaponSamples']), files=records)
         result['normalizedAwayFields'] = normalized_away

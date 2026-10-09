@@ -149,7 +149,7 @@ class PouncerExportTests(unittest.TestCase):
 
     def test_valid_unreviewed_export_rehashes_every_file(self):
         result = self.run_export()
-        self.assertEqual((result['images'], result['nativeCases'], result['weakpointImages']), (184, 6, 0))
+        self.assertEqual((result['images'], result['nativeCases'], result['weakpointImages']), (184, 7, 0))
         self.assertEqual([result[k] for k in ('directImages','attackRecoverImages','deathTransitionImages','resetImages')], [35,21,126,2])
         self.assertTrue(all(result[k] is False for k in ('approved','calibratedForScene','visualApproved','gameplayAccepted')))
         self.assertEqual(len(list((self.out/'frames').glob('*.png'))), 184)

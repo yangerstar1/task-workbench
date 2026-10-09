@@ -22,7 +22,8 @@ namespace DesertRV.Editor
         }
         [Serializable] public sealed class MaterialReadback
         {
-            public string sourceName,materialPath,shader;
+            public string sourceName,materialPath,shader,actualName,materialGuid;
+            public long materialLocalId;
             public Color expectedColor,actualColor;
             public float expectedMetallic,actualMetallic,expectedSmoothness,actualSmoothness,actualCull;
         }
@@ -43,19 +44,22 @@ namespace DesertRV.Editor
             public bool sceneCalibrated=false,visualApproved=false;
         }
         public static Readback Bind(Spec spec,WeaponPresentation presenter,GameObject visual,string modelPath,
-            IEnumerable<AnimationClip> clips,IEnumerable<MaterialSpec> materialSpecs,MuzzleObservation muzzle)
+            IEnumerable<AnimationClip> clips,IEnumerable<MaterialSpec> materialSpecs,string materialFolder,MuzzleObservation muzzle)
         {
             Check(spec!=null&&spec.left!=null&&spec.right!=null,"Explicit measured arm and muzzle source-axis contract required.");
             Check(Regex.IsMatch(spec.discoveryReportSha256??"","^[a-f0-9]{64}$"),"Pin the real Unity discovery report.");
             var neutral=clips.Where(c=>c.name==spec.neutralState).ToArray();
             Check(neutral.Length==1&&spec.neutralState=="Idle"&&Finite(spec.neutralTimeSeconds)&&spec.neutralTimeSeconds>=0&&spec.neutralTimeSeconds<=neutral[0].length,"Explicit actual neutral Idle clip and time required.");
             var source=AssetDatabase.LoadAssetAtPath<GameObject>(modelPath);Check(source,"Actual FBX source is missing.");
+            var expectedMaterials=materialSpecs.ToArray();
+            var materialSnapshot=CaptureMaterialIdentity(visual,materialFolder,expectedMaterials.Length);
             var reach=presenter.gameObject.AddComponent<WeaponArmReach>();reach.animator=presenter.animator;
             reach.rigRoot=At(visual.transform,spec.rigRoot);reach.left=Arm(spec.left);reach.right=Arm(spec.right);
             Check(reach.left.wristTarget.IsChildOf(presenter.leftHand)&&reach.right.wristTarget.IsChildOf(presenter.rightHand),"Measured wrist targets must stay hand-owned.");
             // Sample the real imported clip on its correct model-root-relative hierarchy.
             // No guessed bind rotations or lengths are serialized by the offline preparation.
             neutral[0].SampleAnimation(presenter.animator.gameObject,spec.neutralTimeSeconds);
+            ValidateMaterialIdentityUnchanged(visual,materialSnapshot);
             string evidence="Unity6000.3.19f1: "+modelPath+" sha256="+Sha(modelPath)+" neutral="+spec.neutralState+" seconds="+
                 spec.neutralTimeSeconds.ToString("R",System.Globalization.CultureInfo.InvariantCulture)+" discovery="+spec.discoveryReportSha256;
             Check(WeaponArmCalibration.CaptureCurrentNeutral(reach,source,evidence,spec.sourceToRigScale,
@@ -74,21 +78,90 @@ namespace DesertRV.Editor
             var readback=new Readback{neutralState=spec.neutralState,neutralTimeSeconds=spec.neutralTimeSeconds,neutralPoseEvidence=evidence,
                 sourceSha256=reach.sourceSha256,rigRoot=spec.rigRoot,rigWorldScale=scale,positionToleranceWorld=spec.positionToleranceRig*scale,
                 numericToleranceWorld=spec.numericToleranceRig*scale,left=ReadArm(reach.left,visual.transform),right=ReadArm(reach.right,visual.transform)};
-            var actualMaterials=visual.GetComponentsInChildren<Renderer>(true).SelectMany(r=>r.sharedMaterials).Distinct().ToArray();
-            foreach(var expected in materialSpecs)
+            for(int i=0;i<expectedMaterials.Length;i++)
             {
-                var matches=actualMaterials.Where(m=>m&&m.name==expected.sourceName+"_Candidate").ToArray();
-                Check(matches.Length==1,"Missing/ambiguous actual candidate material: "+expected.sourceName);
-                var material=matches[0];var color=material.GetColor("_BaseColor");
+                var expected=expectedMaterials[i];string expectedPath=MaterialPath(materialFolder,i);
+                var material=AssetDatabase.LoadAssetAtPath<Material>(expectedPath);
+                string identity=MaterialIdentity(material,out string guid,out long localId);
+                Check(identity==materialSnapshot.expectedIdentities[i],"Persistent candidate material identity changed: "+expected.sourceName);
+                var color=material.GetColor("_BaseColor");
                 float metallic=material.GetFloat("_Metallic"),smoothness=material.GetFloat("_Smoothness"),cull=material.GetFloat("_Cull");
                 Check(ColorNear(color,expected.baseColor)&&Mathf.Abs(metallic-expected.metallic)<.00001f&&Mathf.Abs(smoothness-expected.smoothness)<.00001f&&
                     Mathf.Abs(cull-(expected.doubleSided?0:2))<.00001f,"Actual material readback differs from the reviewed source mapping: "+expected.sourceName);
-                readback.materials.Add(new MaterialReadback{sourceName=expected.sourceName,materialPath=AssetDatabase.GetAssetPath(material),shader=material.shader.name,
+                readback.materials.Add(new MaterialReadback{sourceName=expected.sourceName,materialPath=AssetDatabase.GetAssetPath(material),shader=material.shader.name,actualName=material.name,materialGuid=guid,materialLocalId=localId,
                     expectedColor=expected.baseColor,actualColor=color,expectedMetallic=expected.metallic,actualMetallic=metallic,expectedSmoothness=expected.smoothness,actualSmoothness=smoothness,actualCull=cull});
             }
             return readback;
             ArmReachBinding Arm(ArmPaths paths)=>new ArmReachBinding{upperArm=At(visual.transform,paths.upperArm),forearm=At(visual.transform,paths.forearm),wristTip=At(visual.transform,paths.wristTip),wristTarget=At(visual.transform,paths.wristTarget)};
         }
+        public sealed class MaterialSnapshot
+        {
+            public Renderer[] renderers;
+            public string[][] slotIdentities;
+            public string[] expectedPaths,expectedIdentities;
+        }
+        // Names are observation metadata, not identity. The creator's exact output path,
+        // persistent object, GUID/localID, source mapping and every slot remain required.
+        public static MaterialSnapshot CaptureMaterialIdentity(GameObject visual,string materialFolder,int count)
+        {
+            Check(visual&&count>0&&count<=32,"Bounded actual material set required.");
+            var snapshot=new MaterialSnapshot{renderers=visual.GetComponentsInChildren<Renderer>(true),expectedPaths=new string[count],expectedIdentities=new string[count]};
+            Check(snapshot.renderers.Length>0,"Material identity check requires actual renderers.");
+            for(int i=0;i<count;i++)
+            {
+                string path=MaterialPath(materialFolder,i);var material=AssetDatabase.LoadAssetAtPath<Material>(path);
+                snapshot.expectedPaths[i]=path;snapshot.expectedIdentities[i]=MaterialIdentity(material,out string guid,out long localId);
+                Check(AssetDatabase.GetAssetPath(material)==path,"Loaded material path differs from exact created path.");
+                LogMaterial("before-neutral",path,material.name,guid,localId);
+            }
+            Check(snapshot.expectedIdentities.Distinct().Count()==count,"Declared material identities must be distinct.");
+            snapshot.slotIdentities=new string[snapshot.renderers.Length][];var used=new HashSet<string>();
+            for(int r=0;r<snapshot.renderers.Length;r++)
+            {
+                var slots=snapshot.renderers[r].sharedMaterials;Check(slots.Length>0,"Actual renderer has no material slots.");
+                snapshot.slotIdentities[r]=slots.Select(m=>MaterialIdentity(m,out _,out _)).ToArray();
+                foreach(string id in snapshot.slotIdentities[r]){Check(snapshot.expectedIdentities.Contains(id),"Renderer uses material outside the exact created set.");used.Add(id);}
+            }
+            Check(used.SetEquals(snapshot.expectedIdentities),"Created material set does not match the exact used slots.");
+            return snapshot;
+        }
+        public static void ValidateMaterialIdentityUnchanged(GameObject visual,MaterialSnapshot snapshot)
+        {
+            Check(visual&&snapshot!=null&&visual.GetComponentsInChildren<Renderer>(true).SequenceEqual(snapshot.renderers),"Renderer set changed during neutral sampling.");
+            // Emit actual post-sample names even when a slot will fail the identity check.
+            foreach(var observed in snapshot.renderers.SelectMany(r=>r.sharedMaterials).Distinct().Take(32))
+            {
+                string guid=null;long localId=0;
+                if(observed)AssetDatabase.TryGetGUIDAndLocalFileIdentifier(observed,out guid,out localId);
+                LogMaterial("after-neutral-observed",observed?AssetDatabase.GetAssetPath(observed):"<null>",observed?observed.name:"<null>",guid??"<unresolved>",localId);
+            }
+            for(int r=0;r<snapshot.renderers.Length;r++)
+            {
+                var slots=snapshot.renderers[r].sharedMaterials;Check(slots.Length==snapshot.slotIdentities[r].Length,"Material slot count changed during neutral sampling.");
+                for(int slot=0;slot<slots.Length;slot++)
+                    Check(MaterialIdentity(slots[slot],out _,out _)==snapshot.slotIdentities[r][slot],"Material slot identity changed during neutral sampling: "+
+                        AnimationUtility.CalculateTransformPath(snapshot.renderers[r].transform,visual.transform)+" slot="+slot);
+            }
+            for(int i=0;i<snapshot.expectedPaths.Length;i++)
+            {
+                var material=AssetDatabase.LoadAssetAtPath<Material>(snapshot.expectedPaths[i]);
+                Check(MaterialIdentity(material,out string guid,out long localId)==snapshot.expectedIdentities[i],"Declared asset identity changed during neutral sampling.");
+                LogMaterial("after-neutral",snapshot.expectedPaths[i],material.name,guid,localId);
+            }
+        }
+        static string MaterialPath(string folder,int index)
+        {SafeRelative(folder);return folder+"/Material_"+index.ToString("D2")+".mat";}
+        static string MaterialIdentity(Material material,out string guid,out long localId)
+        {
+            guid=null;localId=0;Check(material&&EditorUtility.IsPersistent(material),"Material must be a real persistent asset, not a same-name instance.");
+            string path=AssetDatabase.GetAssetPath(material);
+            Check(!string.IsNullOrEmpty(path)&&AssetDatabase.LoadAssetAtPath<Material>(path)==material&&
+                AssetDatabase.TryGetGUIDAndLocalFileIdentifier(material,out guid,out localId)&&Regex.IsMatch(guid??"","^[a-f0-9]{32}$")&&localId!=0,
+                "Material object/path/GUID/localID must identify the actual main material asset.");
+            return path+"|"+guid+"|"+localId.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        }
+        static void LogMaterial(string phase,string path,string name,string guid,long localId)
+            =>Debug.Log("CANDIDATE_WEAPON_MATERIAL phase="+phase+" path="+path+" actualName="+name+" guid="+guid+" localId="+localId);
         static ArmReadback ReadArm(ArmReachBinding arm,Transform modelRoot)=>new ArmReadback
         {
             upperArm=AnimationUtility.CalculateTransformPath(arm.upperArm,modelRoot),forearm=AnimationUtility.CalculateTransformPath(arm.forearm,modelRoot),

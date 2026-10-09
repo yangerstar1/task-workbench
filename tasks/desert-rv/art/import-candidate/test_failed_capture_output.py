@@ -28,6 +28,7 @@ NATIVE_CASES = [
     'DesertRV.Tests.CandidateAnimationPolicyTests.MissingNativeAnimatorGetsCreatedAndReused',
     'DesertRV.Tests.CandidateAnimationPolicyTests.OpenCoreEmissionSurvivesRealSaveReimportAndReload',
     'DesertRV.Tests.CandidateAnimationPolicyTests.RenderTargetCleanupDetachesCameraBeforeDestroy',
+    'DesertRV.Tests.CandidateMaterialIdentityTests.PersistedWeaponMaterialIdentitySurvivesNeutralSamplingAndRejectsImpostors',
 ]
 
 
@@ -171,7 +172,7 @@ class FailedCaptureTests(unittest.TestCase):
         self.assertTrue(self.run_export())
         self.assertEqual(self.summary['status'], 'FAILED_DIAGNOSTICS')
         self.assertIs(self.summary['approved'], False)
-        self.assertEqual((self.summary['nativeCases'],self.summary['nativeFailedCases'],self.summary['images']), (6,1,8))
+        self.assertEqual((self.summary['nativeCases'],self.summary['nativeFailedCases'],self.summary['images']), (7,1,8))
         names = {p.relative_to(self.out).as_posix() for p in self.out.rglob('*') if p.is_file()}
         self.assertEqual(names, {'receipt.json','failed-diagnostics.json'} | {r['path'] for r in self.summary['files']})
         for name in names:
@@ -206,27 +207,33 @@ class FailedCaptureTests(unittest.TestCase):
     def test_protected_failure_forbids_export(self): self.rejected(protected='failure')
     def test_exact_unity_failed_child_aggregate_exports_failed_diagnostics(self):
         self.native.write_text(native_xml().replace('<test-run result="Failed">',
-            '<test-run result="Failed(Child)" testcasecount="6" total="6" passed="5" failed="1" inconclusive="0" skipped="0">'))
+            '<test-run result="Failed(Child)" testcasecount="7" total="7" passed="6" failed="1" inconclusive="0" skipped="0">'))
         self.assertTrue(self.run_export())
         self.assertEqual(self.summary['status'], 'FAILED_DIAGNOSTICS')
         self.assertIs(self.summary['approved'], False)
         self.assertEqual(self.summary['nativeFailedCases'], 1)
 
     def test_failed_child_aggregate_count_mismatch_and_unknown_suffix_reject(self):
-        for result, passed in [('Failed(Child)', '6'), ('Failed(Forged)', '5')]:
+        for result, passed in [('Failed(Child)', '7'), ('Failed(Forged)', '6')]:
             with self.subTest(result=result):
                 self.native.write_text(native_xml().replace('<test-run result="Failed">',
-                    '<test-run result="'+result+'" testcasecount="6" total="6" passed="'+passed+'" failed="1" inconclusive="0" skipped="0">'))
+                    '<test-run result="'+result+'" testcasecount="7" total="7" passed="'+passed+'" failed="1" inconclusive="0" skipped="0">'))
                 self.rejected()
 
+    def actual_xml_results(self, root):
+        return {c.attrib['fullname']:c.attrib['result'] for c in root.iter('test-case')}
+
     def assert_actual_public_unity_failed_child_report(self, name):
-        # Original XML from public Actions logs. Only parser compatibility is
-        # proven here; the image and asset fixture remains explicitly synthetic.
-        self.native.write_bytes((Path(__file__).parent / 'fixtures' / name).read_bytes())
-        self.assertTrue(self.run_export())
-        self.assertEqual(self.summary['status'], 'FAILED_DIAGNOSTICS')
-        self.assertIs(self.summary['approved'], False)
-        self.assertEqual(self.summary['nativeFailedCases'], 1)
+        import xml.etree.ElementTree as ET
+        data=(Path(__file__).parent / 'fixtures' / name).read_bytes()
+        root=ET.fromstring(data)
+        results=self.actual_xml_results(root)
+        self.assertEqual(len(results),6)
+        self.assertEqual(list(results.values()).count('Failed'),1)
+        f.validate_native_aggregate(root,results)
+        # Historical XML remains unchanged. Six-case history may validate the
+        # aggregate parser, but cannot satisfy this revision's seven-case gate.
+        self.native.write_bytes(data);self.rejected()
 
     def test_actual_public_armored_unity_failed_child_report(self):
         self.assert_actual_public_unity_failed_child_report('armored-failed-child-37866263641.xml')
@@ -241,13 +248,13 @@ class FailedCaptureTests(unittest.TestCase):
                              ('inconclusive','1'),('skipped','1'),('result','Failed(ChildForged)')]:
             with self.subTest(field=field):
                 root=ET.fromstring(original);root.set(field,value)
-                self.native.write_bytes(ET.tostring(root))
-                self.rejected()
+                with self.assertRaises(ValueError):
+                    f.validate_native_aggregate(root,self.actual_xml_results(root))
         root=ET.fromstring(original)
-        for case in root.iter('test-case'):
-            case.set('result','Passed')
+        for case in root.iter('test-case'):case.set('result','Passed')
         root.set('passed','6');root.set('failed','0')
-        self.native.write_bytes(ET.tostring(root));self.rejected()
+        with self.assertRaises(ValueError):
+            f.validate_native_aggregate(root,self.actual_xml_results(root))
 
     def test_cancelled_native_forbids_export(self): self.rejected(native='cancelled')
     def test_unapproved_failure_code_forbids_export(self): self.summary['errorCode']='STRICT_SCHEMA_MISMATCH';self.rejected()

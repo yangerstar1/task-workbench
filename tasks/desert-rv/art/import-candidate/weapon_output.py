@@ -42,8 +42,9 @@ ORIGINAL_SCRIPTS = {'Assets/DesertRV/Runtime/WeaponPresentation.cs', 'Assets/Des
 PACKAGE_SHADER = 'Packages/com.unity.render-pipelines.universal/Shaders/Lit.shader'
 # URP's stable Lit shader asset GUID; virtual Packages are deliberately not byte-hash claims.
 URP_LIT_GUID = '933532a4fcc9baf4fa0491de14d08ed7'
-NATIVE_CASES = 6
+NATIVE_CASES = 7
 EMISSION_CASE = 'DesertRV.Tests.CandidateAnimationPolicyTests.OpenCoreEmissionSurvivesRealSaveReimportAndReload'
+MATERIAL_IDENTITY_CASE = 'DesertRV.Tests.CandidateMaterialIdentityTests.PersistedWeaponMaterialIdentitySurvivesNeutralSamplingAndRejectsImpostors'
 ZERO = dict(x=0, y=0, z=0)
 ONE = dict(x=1, y=1, z=1)
 
@@ -167,7 +168,8 @@ def _meta_guid(path):
 def material_file(project, prefix, m, index, readback):
     path = f'{prefix}/Materials/Material_{index:02}.mat'
     keys(readback, ('sourceName', 'materialPath', 'shader', 'expectedColor', 'actualColor',
-        'expectedMetallic', 'actualMetallic', 'expectedSmoothness', 'actualSmoothness', 'actualCull'))
+        'expectedMetallic', 'actualMetallic', 'expectedSmoothness', 'actualSmoothness', 'actualCull',
+        'actualName', 'materialGuid', 'materialLocalId'))
     require(readback['sourceName'] == m['sourceName'] and readback['materialPath'] == path
         and readback['shader'] == 'Universal Render Pipeline/Lit', 'WEAPON_MATERIAL_READBACK')
     for key in ('expectedColor', 'actualColor'):
@@ -176,10 +178,15 @@ def material_file(project, prefix, m, index, readback):
                        ('expectedSmoothness','smoothness'), ('actualSmoothness','smoothness')]:
         require(close(readback[key], m[field], 1e-5), 'WEAPON_MATERIAL_SCALAR')
     require(close(readback['actualCull'], 0, 1e-5), 'WEAPON_MATERIAL_CULL')
+    require(isinstance(readback['actualName'],str) and re.fullmatch(r'[A-Za-z0-9_. -]{1,160}',readback['actualName']), 'WEAPON_MATERIAL_NAME_OBSERVATION')
+    require(digest(readback['materialGuid'],32) and readback['materialGuid']==_meta_guid(project/path)
+        and type(readback['materialLocalId']) is int and readback['materialLocalId']!=0, 'WEAPON_MATERIAL_PERSISTENT_IDENTITY')
+    material_headers=re.findall(r'^--- !u!21 &(-?[0-9]+)$',safe(project/path).read_text(),re.M)
+    require(len(material_headers)==1 and int(material_headers[0])==readback['materialLocalId'], 'WEAPON_MATERIAL_LOCAL_ID')
     docs = _unity_yaml(project/path)
     require(len(docs) == 1 and isinstance(docs[0], dict) and set(docs[0]) == {'Material'}, 'WEAPON_MATERIAL_ASSET')
     asset = docs[0]['Material']; props = asset.get('m_SavedProperties', {})
-    require(asset.get('m_Name') == m['sourceName']+'_Candidate'
+    require(asset.get('m_Name') == readback['actualName']
         and asset.get('m_Shader', {}).get('guid') == URP_LIT_GUID, 'WEAPON_MATERIAL_ASSET')
     def properties(name):
         rows = props.get(name, [])
@@ -535,7 +542,8 @@ def weapon_native_report(root):
     matching=[p for p in (root/'artifacts/candidate-art').rglob('*.xml') if sha(p)==result]
     require(len(matching)==1,'WEAPON_NATIVE_VERSION')
     cases=list(ET.parse(safe(matching[0])).getroot().iter('test-case'))
-    require(len(cases)==NATIVE_CASES and sum(c.get('fullname')==EMISSION_CASE for c in cases)==1,
+    require(len(cases)==NATIVE_CASES and sum(c.get('fullname')==EMISSION_CASE for c in cases)==1
+        and sum(c.get('fullname')==MATERIAL_IDENTITY_CASE for c in cases)==1,
         'WEAPON_NATIVE_VERSION')
     return result
 
