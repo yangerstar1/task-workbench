@@ -24,7 +24,7 @@ namespace DesertRV.Tests
                 .Invoke(null, new object[] { Array.Empty<SceneSetup>() });
             Assert.That(SceneManager.GetActiveScene().IsValid(), Is.True);
             Assert.That(SceneManager.GetActiveScene().isLoaded, Is.True);
-            type.GetMethod("AuthorAndCaptureEnvironmentCandidates", BindingFlags.Static | BindingFlags.Public).Invoke(null, null);
+            type.GetMethod("AuthorAndCaptureCorrectedTerrainCandidates", BindingFlags.Static | BindingFlags.Public).Invoke(null, null);
             UnityEngine.Debug.Log("ENVIRONMENT_V4_STAGE author-and-18-views-ms=" + stageClock.ElapsedMilliseconds);
             // V4 renderer-only delta: add two real eye-height views, without importing combat art.
             type.GetMethod("CaptureEnvironmentPolishCloseups", BindingFlags.Static | BindingFlags.Public).Invoke(null, null);
@@ -32,6 +32,7 @@ namespace DesertRV.Tests
             Assert.That(surface, Is.Not.Null); Assert.That(surface.isSupported, Is.True);
             Assert.That(UnityEditor.ShaderUtil.ShaderHasError(surface), Is.False, "Retained feathered overlay shader compiled without error after all actual captures");
             ValidateOpaqueTerrain();
+            type.GetMethod("VerifyCorrectedTerrainCandidatesAfterCapture", BindingFlags.Static | BindingFlags.Public).Invoke(null, null);
             UnityEngine.Debug.Log("ENVIRONMENT_V4_R3_SURFACE standard-lit-depth-normal-shadow shared-world-uv skirt-join-after-20-views");
             UnityEngine.Debug.Log("ENVIRONMENT_V4_STAGE complete-20-views-ms=" + stageClock.ElapsedMilliseconds);
         }

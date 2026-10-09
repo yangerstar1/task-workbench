@@ -5,7 +5,9 @@ test "${RUNNER_ENVIRONMENT:-}" = github-hosted
 test "${RUNNER_OS:-}" = Linux
 test "${GITHUB_ACTIONS:-}" = true
 if [[ "${GITHUB_EVENT_NAME:-}" != workflow_dispatch ]]; then
-  if [[ "${GITHUB_WORKFLOW_REF:-}" == 'yangerstar1/task-workbench/.github/workflows/desert-rv-environment-diffuse-comparison-r1.yml@refs/heads/main' ]]; then
+  if [[ "${GITHUB_WORKFLOW_REF:-}" == 'yangerstar1/task-workbench/.github/workflows/desert-rv-environment-v4-r4.yml@refs/heads/main' ]]; then
+    /usr/bin/python3 "$(dirname "${BASH_SOURCE[0]}")/environment_v4_r4_dispatch.py" --verify-only
+  elif [[ "${GITHUB_WORKFLOW_REF:-}" == 'yangerstar1/task-workbench/.github/workflows/desert-rv-environment-diffuse-comparison-r1.yml@refs/heads/main' ]]; then
     /usr/bin/python3 "$(dirname "${BASH_SOURCE[0]}")/environment_diffuse_comparison_r1_dispatch.py" --verify-only
   elif [[ "${GITHUB_WORKFLOW_REF:-}" == 'yangerstar1/task-workbench/.github/workflows/desert-rv-environment-diffuse-comparison.yml@refs/heads/main' ]]; then
     /usr/bin/python3 "$(dirname "${BASH_SOURCE[0]}")/environment_diffuse_comparison_dispatch.py" --verify-only

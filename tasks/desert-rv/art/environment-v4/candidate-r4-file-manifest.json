@@ -1,0 +1,65 @@
+{
+  "schema": 1,
+  "base_commit": "e40671685c2ff824e30e5709585407068d0c65fc",
+  "status": "R4_SAVED_CORRECTED_DIFFUSE_CANDIDATE_PENDING_TWENTY_NATIVE_VIEWS_NOT_ART_ACCEPTANCE",
+  "comparison_run": 37977926436,
+  "scope": "New reusable saved authoring entry replaces only the two albedo alias references (_BaseMap and URP-compatible _MainTex) on two generated terrain materials, verifies two save/import cycles and nine saved scene bindings, then retains the original twenty-view render case and every opaque/clearance/export gate. No geometry, camera, lighting, roughness, normal, UV or binary changes.",
+  "new_generated_assets": 0,
+  "generated_v4_payload_files": 121,
+  "generated_v4_metadata_files": 122,
+  "original_binary_payloads_unchanged": 29,
+  "derived_texture_unchanged": true,
+  "historical_authors_and_camera_functions_unchanged": true,
+  "known_visual_issue": "Dune intersection/contour hard segments remain; density and building detail are not final-quality accepted.",
+  "files": [
+    {
+      "path": "tasks/desert-rv/art/environment-v4/r4-native-yaml-fixture.json",
+      "change": "added",
+      "bytes": 65260,
+      "sha256": "53bb5a33cdf1072794030c8b27f0887c955f157a775901469e20ca1f32f7f86c",
+      "before_sha256": null
+    },
+    {
+      "path": "tasks/desert-rv/art/environment-v4/test_candidate_r4.py",
+      "change": "added",
+      "bytes": 8686,
+      "sha256": "97b84c5713bbd7a2482cfba4afeb8672ff12afb9c2ebb12457d098e02ad70d3c",
+      "before_sha256": null
+    },
+    {
+      "path": "tasks/desert-rv/scripts/environment_v4_r4_evidence.py",
+      "change": "added",
+      "bytes": 14894,
+      "sha256": "958739e1d1b38bc8916e0e730d43c9f1abf52ba9ba524ffb72848f102cfa8f2f",
+      "before_sha256": null
+    },
+    {
+      "path": "tasks/desert-rv/scripts/test_environment_v4_r4_evidence.py",
+      "change": "added",
+      "bytes": 10789,
+      "sha256": "52b181b64d6ddc952279653396795ee5b5f58fca2d67b3bc3867ab712125e1a1",
+      "before_sha256": null
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Editor/JourneySceneAuthoring.CorrectedTerrain.cs",
+      "change": "added",
+      "bytes": 23875,
+      "sha256": "38d3974a478feee192beb38810b8ec6035d43e57a0c037d5ff061322a53cc5b7",
+      "before_sha256": null
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Editor/JourneySceneAuthoring.CorrectedTerrain.cs.meta",
+      "change": "added",
+      "bytes": 243,
+      "sha256": "3c9670b44f7769d823692c1d6e57064f8b184e0d3bafdfe58d1def893abbecc9",
+      "before_sha256": null
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Tests/EditorRender/JourneyEnvironmentRenderTests.cs",
+      "change": "modified",
+      "bytes": 5415,
+      "sha256": "4a16e5d04dabc2a0ed78dd0be8eb6b4730e2edc9a2a40ac3b0acd20382246858",
+      "before_sha256": "f5b8d102ce5debf111805742fa300bf3ded062b02f4d53856e429e057e0097f2"
+    }
+  ]
+}

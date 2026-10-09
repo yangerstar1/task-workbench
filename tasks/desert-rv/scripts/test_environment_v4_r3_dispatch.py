@@ -174,7 +174,7 @@ class RendererScopeTests(unittest.TestCase):
  def test_single_native_case_and_timeout_retained(self):
   source=(d.ROOT/'tasks/desert-rv/unity/Assets/DesertRV/Tests/EditorRender/JourneyEnvironmentRenderTests.cs').read_text()
   self.assertEqual(source.count('[Test,'),1);self.assertIn('[Test, Timeout(600000)]',source)
-  self.assertIn('AuthorAndCaptureEnvironmentCandidates',source);self.assertIn('CaptureEnvironmentPolishCloseups',source)
+  self.assertIn('AuthorAndCaptureCorrectedTerrainCandidates',source);self.assertIn('CaptureEnvironmentPolishCloseups',source)
   workflow=(d.ROOT/d.WORKFLOW).read_text();self.assertIn('timeout-minutes: 55',workflow)
   self.assertIn('customParameters: -assemblyNames DesertRV.EditorRenderTests -force-glcore -job-worker-count 2',workflow)
  def test_exact_generated_asset_membership_retained(self):
