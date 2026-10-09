@@ -1,29 +1,21 @@
-name: Desert RV restore verified Journey and rebuild candidate Linux
+name: Desert RV fixed official Linux template metadata probe
 on:
   push:
     branches: [journey-linux-export-recovery-938]
-    paths: [.github/dispatch/desert-rv-rebuild-export-recovery938-20261009.json]
-  workflow_dispatch:
-    inputs:
-      transition_sha256:
-        description: Exact reviewed restoration-transition.json SHA256
-        required: true
-        type: string
+    paths: [.github/dispatch/desert-rv-linux-template-probe-20261009.json]
 permissions:
   contents: read
-  actions: read
 concurrency:
   group: desert-rv-journey-prepare
   cancel-in-progress: false
 jobs:
-  rebuild:
+  probe:
     if: >-
       github.repository == 'yangerstar1/task-workbench' &&
-      ((github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main') ||
-       (github.event_name == 'push' && github.ref == 'refs/heads/journey-linux-export-recovery-938')) &&
+      github.event_name == 'push' && github.ref == 'refs/heads/journey-linux-export-recovery-938' &&
       github.actor == 'yangerstar1' && github.triggering_actor == 'yangerstar1'
     runs-on: ubuntu-24.04
-    timeout-minutes: 130
+    timeout-minutes: 25
     env:
       GITHUB_REPOSITORY_VISIBILITY: ${{ github.event.repository.visibility }}
     steps:
@@ -32,146 +24,38 @@ jobs:
           persist-credentials: false
           lfs: false
           fetch-depth: 2
-      - name: Verify explicit manual input or the single reviewed export-recovery branch push
-        id: dispatch_identity
-        env:
-          MANUAL_TRANSITION_SHA: ${{ inputs.transition_sha256 }}
+      - name: Verify the single fixed branch metadata request and exact source
         run: |
           /usr/bin/python3 tasks/desert-rv/scripts/test_journey_rebuild_dispatch.py
+          /usr/bin/python3 tasks/desert-rv/scripts/player/test_journey_linux_template_probe.py
           /usr/bin/python3 tasks/desert-rv/scripts/journey_rebuild_dispatch.py
-      - name: Verify fresh source and restore exact original font
+          /usr/bin/python3 tasks/desert-rv/scripts/verify_evidence.py guard
+      - name: Add only official Python tooling to the pinned Unity image
         run: |
-          python3 tasks/desert-rv/scripts/verify_evidence.py guard
-          sudo apt-get update && sudo apt-get install -y --no-install-recommends python3-pil python3-yaml
-          python3 tasks/desert-rv/scripts/backup/restore_unity_font.py
-      - name: Verify restoration policy and recover original public producer bytes
-        id: restore_assets
-        env:
-          GH_TOKEN: ${{ github.token }}
-          TRANSITION_SHA: ${{ steps.dispatch_identity.outputs.transition_sha256 }}
+          docker build --file tasks/desert-rv/scripts/player/TemplateProbe.Dockerfile --tag desert-rv-template-probe:local tasks/desert-rv/scripts/player
+      - name: Probe official Linux module metadata without starting Unity
+        id: module_probe
         run: |
-          /usr/bin/python3 tasks/desert-rv/art/journey-preparation/test_restore_preparation.py
-          /usr/bin/python3 tasks/desert-rv/art/journey-preparation/test_linux_build_input.py
-          /usr/bin/python3 tasks/desert-rv/scripts/player/test_journey_linux_export.py
-          python3 tasks/desert-rv/art/journey-preparation/restore_preparation.py stage --policy-sha256 "$TRANSITION_SHA"
-      - name: Prepare existing licensed runner after input validation
-        env:
-          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
-          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
-          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+          mkdir tasks/desert-rv/linux-template-probe-private
+          timeout --signal=TERM --kill-after=10s 10m docker run --rm --init \
+            --network none --read-only --cap-drop ALL --security-opt no-new-privileges \
+            --cpus=2 --memory=2g --pids-limit=128 --user "$(id -u):$(id -g)" \
+            --volume "$GITHUB_WORKSPACE/tasks/desert-rv/scripts/player/journey_linux_template_probe.py:/probe.py:ro" \
+            --volume "$GITHUB_WORKSPACE/tasks/desert-rv/linux-template-probe-private:/probe-output:rw" \
+            --env PROBE_SOURCE_COMMIT="$GITHUB_SHA" --env PROBE_RUN_ID="$GITHUB_RUN_ID" \
+            --entrypoint /usr/bin/python3 desert-rv-template-probe:local /probe.py scan
+      - name: Validate source and the bounded module metadata receipt
+        id: probe_export
+        if: always() && steps.module_probe.outcome != 'skipped'
         run: |
-          bash tasks/desert-rv/scripts/prepare_runner.sh
-          docker build --build-arg BASE_IMAGE=unityci/editor@sha256:17406791cf1e438bea2dac20671668e05d83db5ed38c916744815db4584a8264 --file tasks/desert-rv/scripts/Environment.Dockerfile --tag desert-rv-environment:local tasks/desert-rv/scripts
-      - name: Native exact candidate Linux boundary tests
-        id: linux_boundary
-        uses: game-ci/unity-test-runner@0ff419b913a3630032cbe0de48a0099b5a9f0ed9
-        env:
-          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
-          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
-          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
-        with:
-          unityVersion: 6000.3.19f1
-          customImage: desert-rv-environment:local
-          projectPath: tasks/desert-rv/unity
-          testMode: editmode
-          artifactsPath: tasks/desert-rv/artifacts/journey-linux-boundary
-          customParameters: -assemblyNames DesertRV.CandidateLinuxTests -force-glcore -job-worker-count 2
-          dockerCpuLimit: 2
-          dockerMemoryLimit: 12g
-      - name: Require this consumer's exact seventeen native boundary passes
-        run: python3 tasks/desert-rv/art/journey-preparation/restore_preparation.py verify-boundary
-      - name: Native revalidation of immutable restored Journey contents
-        id: restore_native
-        uses: game-ci/unity-test-runner@0ff419b913a3630032cbe0de48a0099b5a9f0ed9
-        env:
-          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
-          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
-          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
-        with:
-          unityVersion: 6000.3.19f1
-          customImage: desert-rv-environment:local
-          projectPath: tasks/desert-rv/unity
-          testMode: editmode
-          artifactsPath: tasks/desert-rv/artifacts/journey-restoration
-          customParameters: -assemblyNames DesertRV.JourneyRestorationTests -journeyRestorationRunId ${{ github.run_id }} -force-glcore -job-worker-count 2
-          dockerCpuLimit: 2
-          dockerMemoryLimit: 12g
-      - name: Verify this consumer's exact restoration pass and immutable bytes
-        id: restore_finish
-        if: always() && steps.restore_native.outcome != 'skipped'
-        env:
-          NATIVE: ${{ steps.restore_native.outcome }}
-        run: python3 tasks/desert-rv/art/journey-preparation/restore_preparation.py finish --native "$NATIVE"
-      - name: Prepare freshly revalidated candidate Linux input
-        id: linux_input
-        if: success() && steps.restore_finish.outcome == 'success'
-        run: python3 tasks/desert-rv/art/journey-preparation/linux_build_input.py prepare-restored
-      - name: Read pinned official activation and return scripts
-        if: success() && steps.linux_input.outcome == 'success'
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
-        with:
-          repository: game-ci/unity-test-runner
-          ref: 0ff419b913a3630032cbe0de48a0099b5a9f0ed9
-          path: _ci/gameci-journey-linux
-          persist-credentials: false
-          lfs: false
-      - name: Validate build-only source and reuse existing pinned image
-        if: success() && steps.linux_input.outcome == 'success'
-        run: |
-          python3 tasks/desert-rv/scripts/player/journey_linux_export.py before
-          docker build --build-arg BASE_IMAGE=desert-rv-environment:local --file tasks/desert-rv/scripts/rendered/Rendered.Dockerfile --tag desert-rv-journey-linux:local tasks/desert-rv/scripts/rendered
-      - name: Build candidate Linux player without launching it
-        id: linux_native
-        if: success() && steps.linux_input.outcome == 'success'
-        env:
-          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
-          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
-          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
-        run: |
-          set +x
-          docker run --rm --init --cpus=2 --memory=12g --stop-timeout=210 \
-            --workdir /github/workspace \
-            --volume "$GITHUB_WORKSPACE:/github/workspace" \
-            --volume "$GITHUB_WORKSPACE/_ci/gameci-journey-linux/dist:/gameci:ro" \
-            --env UNITY_LICENSE --env UNITY_EMAIL --env UNITY_PASSWORD \
-            --env GITHUB_ACTIONS --env GITHUB_SHA --env GITHUB_RUN_ID --env GITHUB_RUN_ATTEMPT \
-            --env GITHUB_REPOSITORY --env GITHUB_REF --env GITHUB_ACTOR --env GITHUB_TRIGGERING_ACTOR \
-            --env GITHUB_EVENT_NAME --env GITHUB_WORKFLOW_REF --env GITHUB_EVENT_PATH=/github/workflow/event.json \
-            --volume "$GITHUB_EVENT_PATH:/github/workflow/event.json:ro" \
-            --env RUNNER_ENVIRONMENT --env RUNNER_OS --env GITHUB_REPOSITORY_VISIBILITY \
-            --entrypoint /bin/bash desert-rv-journey-linux:local \
-            /github/workspace/tasks/desert-rv/scripts/player/journey_linux_container.sh
-      - name: Reverify prepared source and exact candidate asset union
-        id: linux_verify
-        if: success() && steps.linux_native.outcome == 'success'
-        run: python3 tasks/desert-rv/art/journey-preparation/linux_build_input.py verify
-      - name: Export only reusable candidate runtime or fixed failure status
-        id: linux_public
-        if: always() && steps.linux_native.outcome != 'skipped'
-        env:
-          NATIVE_OUTCOME: ${{ steps.linux_native.outcome }}
-          UNION_OUTCOME: ${{ steps.linux_verify.outcome }}
-        run: python3 tasks/desert-rv/scripts/player/journey_linux_export.py export
-      - name: Upload bounded unreviewed Linux candidate bundle
-        if: always() && steps.linux_public.outputs.export_ready == 'true'
+          git diff --quiet --exit-code && git diff --cached --quiet --exit-code
+          /usr/bin/python3 tasks/desert-rv/scripts/player/journey_linux_template_probe.py export
+          git diff --quiet --exit-code && git diff --cached --quiet --exit-code
+      - name: Upload only official module metadata
+        if: always() && steps.probe_export.outcome == 'success' && steps.probe_export.outputs.export_ready == 'true'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: journey-linux-CANDIDATE-NOT-PLAYTESTED-${{ github.run_id }}-${{ github.run_attempt }}
-          path: tasks/desert-rv/journey-linux-public-export/
-          if-no-files-found: error
-          retention-days: 7
-      - name: Prove tracked consumer source was not edited
-        if: always()
-        run: git diff --quiet --exit-code && git diff --cached --quiet --exit-code
-      - name: Preserve validated restoration proof or fixed failure diagnostics
-        id: restore_public
-        if: always()
-        run: python3 tasks/desert-rv/art/journey-preparation/restore_preparation.py diagnose
-      - name: Upload only validated restoration evidence
-        if: always() && steps.restore_public.outputs.export_ready == 'true'
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        with:
-          name: journey-restoration-UNREVIEWED-${{ github.run_id }}-${{ github.run_attempt }}
-          path: tasks/desert-rv/journey-restoration-public-export/
+          name: journey-linux-template-METADATA-ONLY-${{ github.run_id }}-${{ github.run_attempt }}
+          path: tasks/desert-rv/linux-template-probe-public-export/
           if-no-files-found: error
           retention-days: 7
