@@ -1,0 +1,8 @@
+{
+  "schema": 1,
+  "requestId": "desert-rv-environment-terrain-probe-20261009-once-68d50a31",
+  "baseCommit": "d0ee3a545dfd904472af0d84296f29d2113fc50b",
+  "candidateManifestSha256": "0b90c13b4a0187a5a99b608010ddf1ce64e82cabf641fe185f39f24e99525101",
+  "filesManifestSha256": "4e7484ee6d3624acc5c964fd542d4050779b7129236353f1381bc10ef57fe9e8",
+  "sourceStateSha256": "0fb6c67e77441b5380a83c1665550b25a53203a22212ae2d414832c3ad079ec7"
+}

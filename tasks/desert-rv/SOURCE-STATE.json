@@ -31,7 +31,9 @@
     ".github/workflows/desert-rv-armored-v004-r1-discovery.yml",
     ".github/workflows/desert-rv-environment-v4-r3.yml",
     ".github/dispatch/desert-rv-environment-v4-r3-20261009-files.json",
-    ".github/workflows/desert-rv-armored-v004-r1-strict.yml"
+    ".github/workflows/desert-rv-armored-v004-r1-strict.yml",
+    ".github/workflows/desert-rv-environment-terrain-probe.yml",
+    ".github/dispatch/desert-rv-environment-terrain-probe-20261009-files.json"
   ],
   "restoredFiles": [
     {
@@ -45,6 +47,11 @@
       "path": ".github/actions/desert-rv-rendered/action.yml",
       "sha256": "acb99f2cacd1bcd42287d3f950a5811070d5f913b94687cdf82e633c6261c9d3",
       "size": 5344
+    },
+    {
+      "path": ".github/dispatch/desert-rv-environment-terrain-probe-20261009-files.json",
+      "sha256": "4e7484ee6d3624acc5c964fd542d4050779b7129236353f1381bc10ef57fe9e8",
+      "size": 4166
     },
     {
       "path": ".github/dispatch/desert-rv-environment-v4-20261009-files.json",
@@ -80,6 +87,11 @@
       "path": ".github/workflows/desert-rv-candidate-art-import.yml",
       "sha256": "631d3e8d75d6a67b424d82b0a902c2261f444b86fc9a9690a7336613d430621c",
       "size": 5505
+    },
+    {
+      "path": ".github/workflows/desert-rv-environment-terrain-probe.yml",
+      "sha256": "bcae3cc5aa89f9f8794dc210c90009738ccc5a819aae4862019fdef27deeeaac",
+      "size": 6139
     },
     {
       "path": ".github/workflows/desert-rv-environment-v4-r2.yml",
@@ -157,6 +169,11 @@
       "size": 3842
     },
     {
+      "path": "tasks/desert-rv/art/environment-v4/TERRAIN-PROBE.md",
+      "sha256": "4f074dbe72864d6ec1f7281264631d47ba094df6ac9debda5dcc6662c2a82fe3",
+      "size": 3396
+    },
+    {
       "path": "tasks/desert-rv/art/environment-v4/candidate-file-manifest.json",
       "sha256": "e30c0d17c54735ecbceac325b067f6f560fb7216c137762cfd70d3fbfe7d16c2",
       "size": 20437
@@ -195,6 +212,11 @@
       "path": "tasks/desert-rv/art/environment-v4/preservation-check.json",
       "sha256": "119a8b10b4efebfe3cef44e3db3d7c7f3fb80e2b0bb58a26e7c7733cdb33f7fd",
       "size": 458
+    },
+    {
+      "path": "tasks/desert-rv/art/environment-v4/terrain-probe-file-manifest.json",
+      "sha256": "0b90c13b4a0187a5a99b608010ddf1ce64e82cabf641fe185f39f24e99525101",
+      "size": 2973
     },
     {
       "path": "tasks/desert-rv/art/environment-v4/test_candidate.py",
@@ -592,6 +614,16 @@
       "size": 19723
     },
     {
+      "path": "tasks/desert-rv/scripts/environment_terrain_probe_dispatch.py",
+      "sha256": "6c0e883271251f0e9a9b02e00ed241aaeb31f1a884ea53f0c3715a275bf7b83d",
+      "size": 8015
+    },
+    {
+      "path": "tasks/desert-rv/scripts/environment_terrain_probe_evidence.py",
+      "sha256": "bffbd79990a82a9d2aed171892eafb5dda97b8ab186714c00dbbac126e5abf12",
+      "size": 7401
+    },
+    {
       "path": "tasks/desert-rv/scripts/environment_v4_dispatch.py",
       "sha256": "5aaf1d2c006246a9a17aeca2103be09bcadf57e08f13b3820ef5054030fbac5b",
       "size": 7891
@@ -668,8 +700,8 @@
     },
     {
       "path": "tasks/desert-rv/scripts/prepare_runner.sh",
-      "sha256": "9c6b80a2d3ea878b0a1a2157334428f161770f954cd15e5a02c4c11377ba67be",
-      "size": 2474
+      "sha256": "5dcd29dcbe5e648908fbb072530509a3b6d407386fbd81ee1674ea42b7f566c3",
+      "size": 2732
     },
     {
       "path": "tasks/desert-rv/scripts/prepare_safe_diagnostic_export.py",
@@ -797,6 +829,21 @@
       "size": 16047
     },
     {
+      "path": "tasks/desert-rv/scripts/test_environment_terrain_probe_dispatch.py",
+      "sha256": "015e38d89be08b97fc18369b2f33ba0c21afe10acd2090a583715c3ec710a731",
+      "size": 21984
+    },
+    {
+      "path": "tasks/desert-rv/scripts/test_environment_terrain_probe_evidence.py",
+      "sha256": "419e70c01df1b0543aad50dbfafc915a263faaf2583d07c43b3da4c8f043decc",
+      "size": 12216
+    },
+    {
+      "path": "tasks/desert-rv/scripts/test_environment_terrain_probe_runner_prefix.py",
+      "sha256": "90ca29ac47deeb2219b53a657bf0019cf61e5b57126c7579d4ff3b1ad2f2c8e6",
+      "size": 4898
+    },
+    {
       "path": "tasks/desert-rv/scripts/test_environment_v4_dispatch.py",
       "sha256": "9ffda89ab5252d2066ef727b1bd87a11ae91d1494a66e1efc8351347ab2a8f15",
       "size": 15122
@@ -868,8 +915,8 @@
     },
     {
       "path": "tasks/desert-rv/scripts/verify_evidence.py",
-      "sha256": "7df61b6e3b574f90a359cbddb999ba561f693d3a8f1a6ea662697c146aac97a8",
-      "size": 18501
+      "sha256": "4ff24d3c6285bad2508db2ac63effef96c270d64513da13b9878684e86bc4e60",
+      "size": 18961
     },
     {
       "path": "tasks/desert-rv/unity/Assets/DefaultVolumeProfile.asset",
@@ -4762,6 +4809,16 @@
       "size": 60
     },
     {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Editor/JourneySceneAuthoring.TerrainProbe.cs",
+      "sha256": "e0c8643bd5a399095aad86e49b9929d04e9737385f373e04a35e8208e81b21d1",
+      "size": 11855
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Editor/JourneySceneAuthoring.TerrainProbe.cs.meta",
+      "sha256": "e67587a38932b902049bf773196f7ce19cbc0df5245fbb12210112de86099adc",
+      "size": 243
+    },
+    {
       "path": "tasks/desert-rv/unity/Assets/DesertRV/Editor/JourneySceneAuthoring.cs",
       "sha256": "ced4da08b8447265c14a26b5b63503bb4a08861e5bc5536d1921a4c7e880ee49",
       "size": 66434
@@ -5899,6 +5956,31 @@
     {
       "path": "tasks/desert-rv/unity/Assets/DesertRV/Tests/EditorRender/JourneyEnvironmentRenderTests.cs.meta",
       "sha256": "8e47cc348c7b0019642d1c32d810262b744716c447d1dea27e122f62f0df480d",
+      "size": 243
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Tests/EditorTerrainProbe.meta",
+      "sha256": "5b30d129e7b788ef73b9fe4954e7e0428a6442dcd660ca5ccffe6dfeb43f89b3",
+      "size": 172
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Tests/EditorTerrainProbe/DesertRV.EditorTerrainProbeTests.asmdef",
+      "sha256": "50932f8f3a39fd70c4d358278dec5f222d7ee4190fa75977c58fe05b5e481ff4",
+      "size": 393
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Tests/EditorTerrainProbe/DesertRV.EditorTerrainProbeTests.asmdef.meta",
+      "sha256": "c4b35c563239ee676b7b6af3a5e2c72eb7c44aad4bde281f8876431dfcca5f98",
+      "size": 166
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Tests/EditorTerrainProbe/JourneyTerrainProbeTests.cs",
+      "sha256": "cd8cf81e2af6b148947582db282d2292510d6447ea477b5fc65793e32fc04cc9",
+      "size": 779
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Tests/EditorTerrainProbe/JourneyTerrainProbeTests.cs.meta",
+      "sha256": "eeb62348060bdaed935679fff2da49adc1ec08a25945097536c64f3cdd68d3e5",
       "size": 243
     },
     {

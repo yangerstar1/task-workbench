@@ -1,0 +1,80 @@
+{
+  "schema": 1,
+  "base_commit": "d0ee3a545dfd904472af0d84296f29d2113fc50b",
+  "status": "DIAGNOSTIC_ONLY_PENDING_NATIVE_CHANNEL_ABLATION",
+  "binary_payloads_unchanged": 29,
+  "production_twenty_views_unchanged": true,
+  "generated_contract_unchanged": true,
+  "files": [
+    {
+      "path": "tasks/desert-rv/art/environment-v4/TERRAIN-PROBE.md",
+      "change": "added",
+      "bytes": 3396,
+      "sha256": "4f074dbe72864d6ec1f7281264631d47ba094df6ac9debda5dcc6662c2a82fe3",
+      "before_sha256": null
+    },
+    {
+      "path": "tasks/desert-rv/scripts/environment_terrain_probe_evidence.py",
+      "change": "added",
+      "bytes": 7401,
+      "sha256": "bffbd79990a82a9d2aed171892eafb5dda97b8ab186714c00dbbac126e5abf12",
+      "before_sha256": null
+    },
+    {
+      "path": "tasks/desert-rv/scripts/test_environment_terrain_probe_evidence.py",
+      "change": "added",
+      "bytes": 12216,
+      "sha256": "419e70c01df1b0543aad50dbfafc915a263faaf2583d07c43b3da4c8f043decc",
+      "before_sha256": null
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Editor/JourneySceneAuthoring.TerrainProbe.cs",
+      "change": "added",
+      "bytes": 11855,
+      "sha256": "e0c8643bd5a399095aad86e49b9929d04e9737385f373e04a35e8208e81b21d1",
+      "before_sha256": null
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Editor/JourneySceneAuthoring.TerrainProbe.cs.meta",
+      "change": "added",
+      "bytes": 243,
+      "sha256": "e67587a38932b902049bf773196f7ce19cbc0df5245fbb12210112de86099adc",
+      "before_sha256": null
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Tests/EditorTerrainProbe/DesertRV.EditorTerrainProbeTests.asmdef",
+      "change": "added",
+      "bytes": 393,
+      "sha256": "50932f8f3a39fd70c4d358278dec5f222d7ee4190fa75977c58fe05b5e481ff4",
+      "before_sha256": null
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Tests/EditorTerrainProbe/DesertRV.EditorTerrainProbeTests.asmdef.meta",
+      "change": "added",
+      "bytes": 166,
+      "sha256": "c4b35c563239ee676b7b6af3a5e2c72eb7c44aad4bde281f8876431dfcca5f98",
+      "before_sha256": null
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Tests/EditorTerrainProbe/JourneyTerrainProbeTests.cs",
+      "change": "added",
+      "bytes": 779,
+      "sha256": "cd8cf81e2af6b148947582db282d2292510d6447ea477b5fc65793e32fc04cc9",
+      "before_sha256": null
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Tests/EditorTerrainProbe/JourneyTerrainProbeTests.cs.meta",
+      "change": "added",
+      "bytes": 243,
+      "sha256": "eeb62348060bdaed935679fff2da49adc1ec08a25945097536c64f3cdd68d3e5",
+      "before_sha256": null
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Tests/EditorTerrainProbe.meta",
+      "change": "added",
+      "bytes": 172,
+      "sha256": "5b30d129e7b788ef73b9fe4954e7e0428a6442dcd660ca5ccffe6dfeb43f89b3",
+      "before_sha256": null
+    }
+  ]
+}

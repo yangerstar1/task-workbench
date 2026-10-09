@@ -1,0 +1,110 @@
+{
+  "schema": 1,
+  "requestId": "desert-rv-environment-terrain-probe-20261009-once-68d50a31",
+  "baseCommit": "d0ee3a545dfd904472af0d84296f29d2113fc50b",
+  "candidateManifestSha256": "0b90c13b4a0187a5a99b608010ddf1ce64e82cabf641fe185f39f24e99525101",
+  "files": [
+    {
+      "path": ".github/workflows/desert-rv-environment-terrain-probe.yml",
+      "sha256": "bcae3cc5aa89f9f8794dc210c90009738ccc5a819aae4862019fdef27deeeaac",
+      "size": 6139,
+      "mode": "100644"
+    },
+    {
+      "path": "tasks/desert-rv/art/environment-v4/TERRAIN-PROBE.md",
+      "sha256": "4f074dbe72864d6ec1f7281264631d47ba094df6ac9debda5dcc6662c2a82fe3",
+      "size": 3396,
+      "mode": "100644"
+    },
+    {
+      "path": "tasks/desert-rv/art/environment-v4/terrain-probe-file-manifest.json",
+      "sha256": "0b90c13b4a0187a5a99b608010ddf1ce64e82cabf641fe185f39f24e99525101",
+      "size": 2973,
+      "mode": "100644"
+    },
+    {
+      "path": "tasks/desert-rv/scripts/environment_terrain_probe_dispatch.py",
+      "sha256": "6c0e883271251f0e9a9b02e00ed241aaeb31f1a884ea53f0c3715a275bf7b83d",
+      "size": 8015,
+      "mode": "100644"
+    },
+    {
+      "path": "tasks/desert-rv/scripts/environment_terrain_probe_evidence.py",
+      "sha256": "bffbd79990a82a9d2aed171892eafb5dda97b8ab186714c00dbbac126e5abf12",
+      "size": 7401,
+      "mode": "100644"
+    },
+    {
+      "path": "tasks/desert-rv/scripts/prepare_runner.sh",
+      "sha256": "5dcd29dcbe5e648908fbb072530509a3b6d407386fbd81ee1674ea42b7f566c3",
+      "size": 2732,
+      "mode": "100644"
+    },
+    {
+      "path": "tasks/desert-rv/scripts/test_environment_terrain_probe_dispatch.py",
+      "sha256": "015e38d89be08b97fc18369b2f33ba0c21afe10acd2090a583715c3ec710a731",
+      "size": 21984,
+      "mode": "100644"
+    },
+    {
+      "path": "tasks/desert-rv/scripts/test_environment_terrain_probe_evidence.py",
+      "sha256": "419e70c01df1b0543aad50dbfafc915a263faaf2583d07c43b3da4c8f043decc",
+      "size": 12216,
+      "mode": "100644"
+    },
+    {
+      "path": "tasks/desert-rv/scripts/test_environment_terrain_probe_runner_prefix.py",
+      "sha256": "90ca29ac47deeb2219b53a657bf0019cf61e5b57126c7579d4ff3b1ad2f2c8e6",
+      "size": 4898,
+      "mode": "100644"
+    },
+    {
+      "path": "tasks/desert-rv/scripts/verify_evidence.py",
+      "sha256": "4ff24d3c6285bad2508db2ac63effef96c270d64513da13b9878684e86bc4e60",
+      "size": 18961,
+      "mode": "100644"
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Editor/JourneySceneAuthoring.TerrainProbe.cs",
+      "sha256": "e0c8643bd5a399095aad86e49b9929d04e9737385f373e04a35e8208e81b21d1",
+      "size": 11855,
+      "mode": "100644"
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Editor/JourneySceneAuthoring.TerrainProbe.cs.meta",
+      "sha256": "e67587a38932b902049bf773196f7ce19cbc0df5245fbb12210112de86099adc",
+      "size": 243,
+      "mode": "100644"
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Tests/EditorTerrainProbe.meta",
+      "sha256": "5b30d129e7b788ef73b9fe4954e7e0428a6442dcd660ca5ccffe6dfeb43f89b3",
+      "size": 172,
+      "mode": "100644"
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Tests/EditorTerrainProbe/DesertRV.EditorTerrainProbeTests.asmdef",
+      "sha256": "50932f8f3a39fd70c4d358278dec5f222d7ee4190fa75977c58fe05b5e481ff4",
+      "size": 393,
+      "mode": "100644"
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Tests/EditorTerrainProbe/DesertRV.EditorTerrainProbeTests.asmdef.meta",
+      "sha256": "c4b35c563239ee676b7b6af3a5e2c72eb7c44aad4bde281f8876431dfcca5f98",
+      "size": 166,
+      "mode": "100644"
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Tests/EditorTerrainProbe/JourneyTerrainProbeTests.cs",
+      "sha256": "cd8cf81e2af6b148947582db282d2292510d6447ea477b5fc65793e32fc04cc9",
+      "size": 779,
+      "mode": "100644"
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Tests/EditorTerrainProbe/JourneyTerrainProbeTests.cs.meta",
+      "sha256": "eeb62348060bdaed935679fff2da49adc1ec08a25945097536c64f3cdd68d3e5",
+      "size": 243,
+      "mode": "100644"
+    }
+  ]
+}
