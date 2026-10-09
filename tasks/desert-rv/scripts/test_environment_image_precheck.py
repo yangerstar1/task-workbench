@@ -670,7 +670,7 @@ class ReportTests(OfflineCase):
     def test_schema_fixed_and_validator_pure(self):
         report, _ = self.exercise([target(), quota()])
         self.assertEqual(set(report), p.REPORT_KEYS)
-        self.assertEqual(report["schemaVersion"], 2)
+        self.assertEqual(report["schemaVersion"], 3)
         with mock.patch.object(p, "utc_now", side_effect=AssertionError("clock")), mock.patch.object(p, "cache_hit", side_effect=AssertionError("I/O")):
             self.assertTrue(p.validate_report(report))
 
@@ -912,6 +912,138 @@ sys.exit(p.main([]))
                 if mode=="read-alarm":
                     self.assertEqual(report["quota"]["currentStage"], "INITIAL_HEAD")
                     self.assertEqual(report["quota"]["reason"], "DEADLINE")
+
+
+class RateDiagnosticTests(OfflineCase):
+    def diagnostic(self, value, name="RateLimit-Limit"):
+        return p.diagnose_rate_header(p.Response(200, ((name, value),)), name.lower())
+
+    def test_unknown_safe_ascii_raw_is_preserved_not_only_numeric(self):
+        for value in ('100;window=21600', 'unrecognized-policy="daily"', '100;w=21600;vendor=yes', '\\' * 256, '"' * 256):
+            diagnostic = self.diagnostic(value)
+            self.assertEqual(diagnostic["boundedRaw"], value)
+            self.assertEqual(diagnostic["format"], "UNKNOWN_SYNTAX")
+            self.assertEqual(diagnostic["lengthBytes"], len(value))
+            self.assertEqual(diagnostic["sha256"], p.hashlib.sha256(value.encode()).hexdigest())
+            self.assertTrue(p.validate_rate_header(diagnostic))
+
+    def test_actual_numeric_windows_and_known_formats_are_diagnostic_only(self):
+        cases = [('100;w=21600', 'STRICT_FORMAT_MATCH', [{'value': 100, 'windowSeconds': 21600}]), ('100;w=3600', 'WINDOW_NOT_21600', [{'value': 100, 'windowSeconds': 3600}]), ('100', 'WINDOW_MISSING', [{'value': 100, 'windowSeconds': None}]), ('100, 100;w=21600', 'MULTIPLE_POLICIES', [{'value': 100, 'windowSeconds': None}, {'value': 100, 'windowSeconds': 21600}]), ('100 ; w = 21600', 'NONCANONICAL_SYNTAX', [{'value': 100, 'windowSeconds': 21600}]), ('0100;w=21600', 'NONCANONICAL_NUMBER', [{'value': 100, 'windowSeconds': 21600}]), ('1000000000;w=21600', 'NONCANONICAL_NUMBER', [{'value': 1000000000, 'windowSeconds': 21600}])]
+        for value, classification, policies in cases:
+            diagnostic = self.diagnostic(value)
+            self.assertEqual(diagnostic["gateCompatibility"], classification)
+            self.assertEqual(diagnostic["policies"], policies)
+            self.assertTrue(p.validate_rate_header(diagnostic))
+            if classification != 'STRICT_FORMAT_MATCH':
+                report, _ = self.exercise([Raw(200, TARGET_HEADERS + (("RateLimit-Limit", value), QUOTA_HEADERS[1]))])
+                self.assertEqual(report["status"], 'UNKNOWN')
+                self.assertEqual(report["target"]["rateDiagnostics"]["firstFailedPredicate"], 'LIMIT_STRICT_REGEX')
+                self.pull_mock.assert_not_called()
+
+    def test_both_headers_diagnosed_even_when_first_limit_fails(self):
+        report, _ = self.exercise([Raw(200, TARGET_HEADERS + (("RateLimit-Limit", '100;w=3600'), ("RateLimit-Remaining", '12;w=7200')))])
+        diagnostic = report["target"]["rateDiagnostics"]
+        self.assertEqual(diagnostic["firstFailedPredicate"], 'LIMIT_STRICT_REGEX')
+        self.assertEqual(diagnostic["remaining"]["policies"][0]["windowSeconds"], 7200)
+        self.assertEqual(report["target"]["headers"]["remaining"], 'VALID')
+        self.assertEqual(diagnostic["remaining"]["gateCompatibility"], 'WINDOW_NOT_21600')
+
+    def test_exact_first_failed_predicates(self):
+        cases = [((("RateLimit-Limit", '100;w=21600'),), 'REMAINING_MISSING'), ((("RateLimit-Remaining", '1;w=21600'),), 'LIMIT_MISSING'), ((("RateLimit-Limit", '100;w=21600'), ("RateLimit-Remaining", '1;w=60')), 'REMAINING_STRICT_REGEX'), ((("RateLimit-Limit", '0;w=21600'), ("RateLimit-Remaining", '0;w=21600')), 'LIMIT_NOT_POSITIVE'), ((("RateLimit-Limit", '100;w=21600'), ("RateLimit-Remaining", '101;w=21600')), 'REMAINING_GT_LIMIT'), ((("RateLimit-Limit", '100;w=21600'), ("RateLimit-Remaining", '0;w=21600')), 'REMAINING_NOT_POSITIVE')]
+        for headers, predicate in cases:
+            report, _ = self.exercise([Raw(200, TARGET_HEADERS + headers)])
+            self.assertEqual(report["target"]["rateDiagnostics"]["firstFailedPredicate"], predicate)
+            self.pull_mock.assert_not_called()
+
+    def test_missing_and_duplicates_are_distinct_and_never_merged(self):
+        missing = p.diagnose_rate_header(p.Response(200, ()), 'ratelimit-limit')
+        self.assertEqual(missing["occurrenceCount"], 0)
+        duplicate = p.diagnose_rate_header(p.Response(200, (("RateLimit-Limit", '100;w=21600'), ("ratelimit-limit", '100;w=21600'))), 'ratelimit-limit')
+        self.assertEqual(duplicate["occurrenceCount"], 2)
+        self.assertEqual(duplicate["format"], 'DUPLICATE')
+        self.assertIsNone(duplicate["boundedRaw"])
+        self.assertEqual(duplicate["policies"], [])
+        self.assertTrue(p.validate_rate_header(duplicate))
+        report, _ = self.exercise([target(), Raw(200, QUOTA_HEADERS + QUOTA_HEADERS)])
+        self.assertEqual(report['quota']['rateDiagnostics']['limit']['occurrenceCount'], 2)
+        self.assertEqual(report['quota']['rateDiagnostics']['firstFailedPredicate'], 'HEADER_SAFETY')
+        self.pull_mock.assert_not_called()
+
+    def test_control_unicode_and_overlength_only_hash_and_length(self):
+        for value, classification in [('x\r\ny', 'NON_ASCII_OR_CONTROL'), ('x\x00y', 'NON_ASCII_OR_CONTROL'), ('100;\tw=21600', 'NON_ASCII_OR_CONTROL'), ('未知', 'NON_ASCII_OR_CONTROL'), ('x' * 257, 'TOO_LONG')]:
+            diagnostic = self.diagnostic(value)
+            self.assertIsNone(diagnostic['boundedRaw'])
+            self.assertEqual(diagnostic['format'], classification)
+            self.assertEqual(diagnostic['lengthBytes'], len(value.encode()))
+            self.assertTrue(p.validate_rate_header(diagnostic))
+
+    def test_obvious_bearer_jwt_ip_and_credentials_redacted(self):
+        for value in (SECRET, QUOTA_SECRET, RAW_SECRET, 'Bearer abc', 'token=opaque', 'password=hidden', 'https://example.invalid/a', '203.0.113.99', '2001:db8::1', 'abcdefgh.abcdefgh.abcdefgh'):
+            diagnostic = self.diagnostic(value)
+            self.assertIsNone(diagnostic['boundedRaw'])
+            self.assertEqual(diagnostic['format'], 'REDACTED_SENSITIVE')
+            self.assertTrue(p.validate_rate_header(diagnostic))
+
+    def test_only_head_allowlisted_headers_are_observed(self):
+        response = token_response(value={'token': SECRET, 'expires_in': 0}, headers=(("Content-Type", "application/json"), ("RateLimit-Limit", "100;w=3600")))
+        report, _ = self.auth(target_token=response)
+        self.assertEqual(report['target']['currentStage'], 'TOKEN_GET')
+        self.assertEqual(report['target']['rateDiagnostics'], p.blank_rate_diagnostics())
+        report, _ = self.exercise([Raw(200, TARGET_HEADERS + (("X-Rate", 'private'), ("docker-ratelimit-source", '203.0.113.99'))), quota()])
+        self.assertNotIn('private', json.dumps(report))
+        self.assertNotIn('203.0.113.99', json.dumps(report))
+
+    def test_diagnostic_validator_rejects_added_raw_and_inconsistent_parse(self):
+        diagnostic = self.diagnostic('100;w=3600')
+        for changes in ({'boundedRaw': SECRET}, {'occurrenceCount': 2}, {'sha256': '0' * 64}, {'lengthBytes': 1}, {'policies': [{'value': 100, 'windowSeconds': 21600}]}, {'extra': 'raw'}):
+            self.assertFalse(p.validate_rate_header(dict(diagnostic, **changes)))
+        self.assertFalse(p.validate_rate_header(dict(diagnostic, policies=[{'value': True, 'windowSeconds': 3600}])))
+
+    def test_schema_diagnostic_keys_predicate_and_raw_bounds(self):
+        report, _ = self.exercise([target(), quota()])
+        for mutation in ('extra', 'predicate', 'raw'):
+            bad = copy.deepcopy(report)
+            diagnostic = bad['target']['rateDiagnostics']
+            if mutation == 'extra': diagnostic['extra'] = SECRET
+            elif mutation == 'predicate': diagnostic['firstFailedPredicate'] = SECRET
+            else: diagnostic['limit']['boundedRaw'] = 'x' * 257
+            self.assertFalse(p.validate_report(bad))
+
+    def test_reachable_large_escaped_report_stays_within_budget(self):
+        target_headers = TARGET_HEADERS + (("RateLimit-Limit", "999999999;w=21600"), ("RateLimit-Remaining", "999999999;w=21600"))
+        raw = "\\" * 256
+        report, _ = self.auth(target_response=Raw(200, target_headers), quota_response=Raw(200, (("RateLimit-Limit", raw), ("RateLimit-Remaining", raw))))
+        self.assertEqual(report["status"], "UNKNOWN")
+        self.assertEqual(report["quota"]["rateDiagnostics"]["firstFailedPredicate"], "LIMIT_STRICT_REGEX")
+        self.assertTrue(p.validate_report(report))
+        size = len(json.dumps(report, sort_keys=True, separators=(",", ":")).encode()) + 1
+        self.assertLess(size, SERIALIZED_CONSERVATIVE_MAX)
+        self.assertLess(size, p.MAX_SERIALIZED_REPORT_BYTES)
+
+    def test_serialized_upper_bound_includes_quote_backslash_expansion(self):
+        # Independent maxima intentionally overestimate impossible combinations:
+        # 256 fully escaped raw chars PLUS four max-sized numeric policies.
+        # This bounds every allowlisted schema field, not just reachable reports.
+        longest = lambda choices: max(choices, key=len)
+        upper = p.blank_result()
+        upper.update(status='RATE_LIMITED', reason=longest(p.TOP_REASONS), limit=999999999, remaining=999999999, windowSeconds=21600, retryAfter={'utc': '9999-12-31T23:59:59Z'}, checkedAt='9999-12-31T23:59:59Z')
+        diagnostic = {'occurrenceCount': None, 'lengthBytes': 16777216, 'sha256': 'f' * 64, 'format': longest(p.DIAG_FORMATS), 'gateCompatibility': longest(p.DIAG_COMPATIBILITY), 'boundedRaw': '\\' * 256, 'policies': [{'value': 9999999999, 'windowSeconds': 9999999999}] * 4}
+        for route in ('target', 'quota'):
+            record = upper[route]
+            record.update(complete=False, currentStage=longest(p.STAGES), httpStatus=599, reason=longest(p.CHANNEL_REASONS), headers={key: longest(p.HEADER_STATES) for key in p.HEADER_KEYS}, rateDiagnostics={'firstFailedPredicate': longest(p.FAILED_PREDICATES), 'limit': copy.deepcopy(diagnostic), 'remaining': copy.deepcopy(diagnostic)})
+        upper['pull'].update(attempted=False, currentStage=longest(p.PULL_STAGES), outcome=longest(p.PULL_OUTCOMES), exitCode=-128, cacheVerified=False, failureClass=longest(p.PULL_FAILURE_CLASSES))
+        budget = len(json.dumps(upper, sort_keys=True, separators=(',', ':')).encode()) + 1
+        self.assertEqual(budget, SERIALIZED_CONSERVATIVE_MAX)
+        self.assertLess(budget, p.MAX_SERIALIZED_REPORT_BYTES)
+        self.assertEqual(p.MAX_SERIALIZED_REPORT_BYTES, 8192)
+        self.assertGreater(budget, 4096)
+        for char in ('\\', '"'):
+            diagnostic = self.diagnostic(char * 256)
+            self.assertTrue(p.validate_rate_header(diagnostic))
+            self.assertEqual(len(json.dumps(diagnostic['boundedRaw'])) - 2, 512)
+
+
+SERIALIZED_CONSERVATIVE_MAX = 5019
 
 
 if __name__ == "__main__":

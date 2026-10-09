@@ -18,6 +18,7 @@ https://docs.docker.com/reference/cli/docker/image/pull/
 import datetime as dt
 import email.utils
 import http.client
+import hashlib
 import json
 import os
 import re
@@ -178,12 +179,108 @@ CHANNEL_REASONS = CHANNEL_REASONS | {"TARGET_QUOTA_EXHAUSTED"}
 TOP_REASONS = frozenset(("NOT_STARTED", "ENVIRONMENT_OVERRIDE", "DAEMON_UNVERIFIED", "CACHE_HIT", "READY", "DEADLINE", "INTERNAL_ERROR", "TARGET_DIGEST_UNVERIFIED", "TARGET_AUTH_FAILED", "TARGET_TRANSPORT_ERROR", "TARGET_HEADERS_INVALID", "TARGET_HTTP_UNEXPECTED", "TARGET_RATE_LIMITED", "QUOTA_MISSING", "QUOTA_INVALID", "QUOTA_EXHAUSTED", "QUOTA_AUTH_FAILED", "QUOTA_TRANSPORT_ERROR", "QUOTA_HEADERS_INVALID", "QUOTA_HTTP_UNEXPECTED", "QUOTA_RATE_LIMITED", "PULL_SUCCEEDED", "PULL_FAILED", "PULL_TIMEOUT", "PULL_DIGEST_UNVERIFIED", "PULL_ERROR", "PULL_INTERRUPTED"))
 TOP_REASONS = TOP_REASONS | {"TARGET_QUOTA_EXHAUSTED", "TARGET_QUOTA_INVALID", "PULL_RATE_LIMITED", "PULL_STDERR_LIMIT_EXCEEDED"}
 HEADER_KEYS = frozenset(("safety", "digest", "limit", "remaining", "challenge"))
-CHANNEL_KEYS = frozenset(("complete", "currentStage", "httpStatus", "reason", "headers"))
+CHANNEL_KEYS = frozenset(("complete", "currentStage", "httpStatus", "reason", "headers", "rateDiagnostics"))
 REPORT_KEYS = frozenset(("schemaVersion", "status", "reason", "image", "digest", "cacheHit", "limit", "remaining", "windowSeconds", "retryAfter", "checkedAt", "target", "quota", "pull"))
 PULL_KEYS = frozenset(("attempted", "currentStage", "outcome", "exitCode", "cacheVerified", "failureClass"))
 PULL_STAGES = frozenset(("NOT_STARTED", "PULL", "VERIFY_CACHE", "COMPLETE"))
 PULL_OUTCOMES = frozenset(("NOT_ATTEMPTED", "SUCCESS", "NONZERO_EXIT", "TIMEOUT", "INSPECT_MISMATCH", "ERROR", "INTERRUPTED", "STDERR_LIMIT_EXCEEDED"))
 PULL_FAILURE_CLASSES = frozenset(("NOT_CHECKED", "NONE", "DOCKER_RATE_LIMITED", "UNKNOWN_CLI_FAILURE", "STDERR_LIMIT_EXCEEDED"))
+
+
+# Pure diagnostics only. These parsers NEVER decide PASS, routes or pull eligibility.
+# Only these two HEAD headers may echo bounded printable ASCII, including
+# unknown syntax. Obvious credentials/IPs are redacted; duplicates never merge.
+MAX_NUMERIC_RAW = 256
+MAX_SERIALIZED_REPORT_BYTES = 8192
+MAX_NUMERIC_POLICIES = 4
+POLICY_ATOM = r"[0-9]{1,10}(?:[ \t]*;[ \t]*w[ \t]*=[ \t]*[0-9]{1,10})?"
+NUMERIC_POLICY = re.compile(r"[ \t]*" + POLICY_ATOM + r"(?:[ \t]*,[ \t]*" + POLICY_ATOM + r"){0,3}[ \t]*", re.ASCII)
+DIAG_KEYS = frozenset(("occurrenceCount", "lengthBytes", "sha256", "format", "gateCompatibility", "boundedRaw", "policies"))
+DIAG_FORMATS = frozenset(("NOT_OBSERVED", "MISSING", "DUPLICATE", "TOO_LONG", "NON_ASCII_OR_CONTROL", "REDACTED_SENSITIVE", "UNKNOWN_SYNTAX", "NUMERIC_SINGLE", "NUMERIC_MULTI"))
+DIAG_COMPATIBILITY = frozenset(("NOT_EVALUATED", "MISSING", "DUPLICATE", "UNKNOWN_SYNTAX", "STRICT_FORMAT_MATCH", "WINDOW_MISSING", "WINDOW_NOT_21600", "MULTIPLE_POLICIES", "NONCANONICAL_NUMBER", "NONCANONICAL_SYNTAX"))
+FAILED_PREDICATES = frozenset(("NOT_EVALUATED", "NONE", "HEADER_SAFETY", "TARGET_DIGEST_MATCH", "HTTP_STATUS_200", "HTTP_STATUS_429", "QUOTA_BOTH_HEADERS_MISSING", "LIMIT_MISSING", "REMAINING_MISSING", "LIMIT_HEADER_NOT_VALID", "REMAINING_HEADER_NOT_VALID", "LIMIT_STRICT_REGEX", "REMAINING_STRICT_REGEX", "LIMIT_NOT_POSITIVE", "REMAINING_GT_LIMIT", "REMAINING_NOT_POSITIVE"))
+
+
+def blank_rate_header():
+    return {"occurrenceCount": None, "lengthBytes": None, "sha256": None,
+            "format": "NOT_OBSERVED", "gateCompatibility": "NOT_EVALUATED",
+            "boundedRaw": None, "policies": []}
+
+
+def blank_rate_diagnostics():
+    return {"firstFailedPredicate": "NOT_EVALUATED", "limit": blank_rate_header(), "remaining": blank_rate_header()}
+
+
+def sensitive_rate_text(value):
+    patterns = (r"bearer", r"https?://", r"(?:[0-9]{1,3}\.){3}[0-9]{1,3}",
+                r"(?:[0-9a-f]{0,4}:){2,}[0-9a-f:]*", r"[a-z0-9_-]{8,}\.[a-z0-9_-]{8,}\.[a-z0-9_-]{8,}",
+                r"(?:token|password|secret|authorization|api[_-]?key)[ \t]*[:=]")
+    return any(re.search(pattern, value, re.I | re.ASCII) for pattern in patterns)
+
+
+def diagnose_rate_header(response, name):
+    values = [value for key, value in response.headers if key.lower() == name]
+    result = blank_rate_header()
+    result["occurrenceCount"] = len(values)
+    result["lengthBytes"] = sum(len(value.encode("utf-8", "surrogatepass")) for value in values)
+    if not values:
+        result.update(format="MISSING", gateCompatibility="MISSING")
+        return result
+    # Single occurrence hashes exact UTF-8 bytes; duplicate hash uses unambiguous
+    # 8-byte lengths + UTF-8 values, in received order. No duplicate raw echo.
+    digest = hashlib.sha256()
+    for value in values:
+        encoded = value.encode("utf-8", "surrogatepass")
+        if len(values) > 1:
+            digest.update(len(encoded).to_bytes(8, "big"))
+        digest.update(encoded)
+    result["sha256"] = digest.hexdigest()
+    if len(values) != 1:
+        result.update(format="DUPLICATE", gateCompatibility="DUPLICATE")
+        return result
+    value = values[0]
+    if len(value) > MAX_NUMERIC_RAW:
+        result.update(format="TOO_LONG", gateCompatibility="UNKNOWN_SYNTAX")
+        return result
+    if any(ord(char) > 126 or ord(char) < 32 for char in value):
+        result.update(format="NON_ASCII_OR_CONTROL", gateCompatibility="UNKNOWN_SYNTAX")
+        return result
+    if sensitive_rate_text(value):
+        result.update(format="REDACTED_SENSITIVE", gateCompatibility="UNKNOWN_SYNTAX")
+        return result
+    result["boundedRaw"] = value
+    if not NUMERIC_POLICY.fullmatch(value):
+        result.update(format="UNKNOWN_SYNTAX", gateCompatibility="UNKNOWN_SYNTAX")
+        return result
+    policies = []
+    for policy in value.split(","):
+        parts = policy.strip(" \t").split(";")
+        policies.append({"value": int(parts[0].strip(" \t")), "windowSeconds": int(parts[1].split("=", 1)[1].strip(" \t")) if len(parts) == 2 else None})
+    result.update(format="NUMERIC_SINGLE" if len(policies) == 1 else "NUMERIC_MULTI", boundedRaw=value, policies=policies)
+    if len(policies) != 1:
+        compatibility = "MULTIPLE_POLICIES"
+    elif policies[0]["windowSeconds"] is None:
+        compatibility = "WINDOW_MISSING"
+    elif policies[0]["windowSeconds"] != WINDOW_SECONDS:
+        compatibility = "WINDOW_NOT_21600"
+    elif re.fullmatch(r"(?:0|[1-9][0-9]{0,8});w=21600", value):
+        compatibility = "STRICT_FORMAT_MATCH"
+    elif not re.fullmatch(r"(?:0|[1-9][0-9]{0,8})", value.split(";", 1)[0].strip(" \t")):
+        compatibility = "NONCANONICAL_NUMBER"
+    else:
+        compatibility = "NONCANONICAL_SYNTAX"
+    result["gateCompatibility"] = compatibility
+    return result
+
+
+def observe_rate_diagnostics(response):
+    return {"firstFailedPredicate": "NOT_EVALUATED",
+            "limit": diagnose_rate_header(response, "ratelimit-limit"),
+            "remaining": diagnose_rate_header(response, "ratelimit-remaining")}
+
+
+def rate_predicate(record, predicate):
+    record["rateDiagnostics"]["firstFailedPredicate"] = predicate
 
 
 def blank_pull():
@@ -192,7 +289,7 @@ def blank_pull():
 
 def blank_channel(route):
     return {"complete": False, "currentStage": "NOT_STARTED", "httpStatus": None,
-            "reason": "NOT_STARTED", "headers": blank_headers(route)}
+            "reason": "NOT_STARTED", "headers": blank_headers(route), "rateDiagnostics": blank_rate_diagnostics()}
 
 
 def blank_headers(route):
@@ -201,7 +298,7 @@ def blank_headers(route):
 
 
 def blank_result():
-    return {"schemaVersion": 2, "status": "UNKNOWN", "reason": "NOT_STARTED",
+    return {"schemaVersion": 3, "status": "UNKNOWN", "reason": "NOT_STARTED",
             "image": IMAGE, "digest": DIGEST, "cacheHit": False,
             "limit": None, "remaining": None, "windowSeconds": None,
             "retryAfter": None, "checkedAt": utc_text(utc_now()),
@@ -350,7 +447,7 @@ class RegistryClient:
 
 
 def start_request(record, route, stage):
-    record.update(complete=False, currentStage=stage, httpStatus=None, reason="NOT_STARTED", headers=blank_headers(route))
+    record.update(complete=False, currentStage=stage, httpStatus=None, reason="NOT_STARTED", headers=blank_headers(route), rateDiagnostics=blank_rate_diagnostics())
 
 
 def accept_response(record, response, route, is_token=False):
@@ -360,6 +457,7 @@ def accept_response(record, response, route, is_token=False):
     record["httpStatus"] = response.status
     record["headers"]["safety"] = "VALID" if safe_headers(response, route, is_token) else "INVALID"
     if not is_token:
+        record["rateDiagnostics"] = observe_rate_diagnostics(response)
         if route is Route.TARGET:
             record["headers"]["digest"] = header_state(response, "docker-content-digest")
         for key in ("limit", "remaining"):
@@ -374,20 +472,24 @@ def quota_values(record, response):
     missing = sum(record["headers"][key] == "MISSING" for key in ("limit", "remaining"))
     if missing:
         record["reason"] = "QUOTA_HEADERS_ABSENT" if missing == 2 else "QUOTA_HEADER_PARTIAL"
+        rate_predicate(record, "QUOTA_BOTH_HEADERS_MISSING" if missing == 2 else "LIMIT_MISSING" if record["headers"]["limit"] == "MISSING" else "REMAINING_MISSING")
         return None
     for key in ("limit", "remaining"):
         state = record["headers"][key]
         value = header(response, "ratelimit-" + key)
         if state != "VALID" or value is None or not re.fullmatch(r"(?:0|[1-9][0-9]{0,8});w=21600", value):
+            rate_predicate(record, key.upper() + ("_HEADER_NOT_VALID" if state != "VALID" or value is None else "_STRICT_REGEX"))
             if state == "VALID":
                 record["headers"][key] = "INVALID"
             record["reason"] = "QUOTA_INVALID"
             return None
         values.append(int(value.split(";", 1)[0]))
     if values[0] <= 0 or values[1] > values[0]:
+        rate_predicate(record, "LIMIT_NOT_POSITIVE" if values[0] <= 0 else "REMAINING_GT_LIMIT")
         record["headers"]["limit"] = record["headers"]["remaining"] = "INVALID"
         record["reason"] = "QUOTA_INVALID"
         return None
+    rate_predicate(record, "NONE")
     return tuple(values)
 
 
@@ -403,18 +505,22 @@ def finish_head(result, record, response, route):
                 result["limit"], result["remaining"] = values
                 result["windowSeconds"] = WINDOW_SECONDS
             record["reason"] = "HTTP_RATE_LIMITED"
+        rate_predicate(record, "HTTP_STATUS_429")
         return False
     if record["headers"]["safety"] != "VALID":
         record["reason"] = "HEADERS_INVALID"
+        rate_predicate(record, "HEADER_SAFETY")
         return False
     if response.status != 200:
         record["reason"] = "HTTP_UNEXPECTED"
+        rate_predicate(record, "HTTP_STATUS_200")
         return False
     if route is Route.TARGET:
         if header(response, "docker-content-digest") != DIGEST:
             if record["headers"]["digest"] == "VALID":
                 record["headers"]["digest"] = "MISMATCH"
             record["reason"] = "DIGEST_UNVERIFIED"
+            rate_predicate(record, "TARGET_DIGEST_MATCH")
             return False
         if not all(record["headers"][key] == "MISSING" for key in ("limit", "remaining")):
             values = quota_values(record, response)
@@ -422,7 +528,9 @@ def finish_head(result, record, response, route):
                 return False
             if values[1] == 0:
                 record["reason"] = "TARGET_QUOTA_EXHAUSTED"
+                rate_predicate(record, "REMAINING_NOT_POSITIVE")
                 return False
+        rate_predicate(record, "NONE")
         record.update(complete=True, reason="TARGET_VERIFIED")
         return True
     values = quota_values(record, response)
@@ -430,6 +538,7 @@ def finish_head(result, record, response, route):
         return False
     result["limit"], result["remaining"] = values
     result["windowSeconds"] = WINDOW_SECONDS
+    rate_predicate(record, "NONE" if values[1] > 0 else "REMAINING_NOT_POSITIVE")
     record.update(complete=True, reason="QUOTA_AVAILABLE" if values[1] > 0 else "QUOTA_EXHAUSTED")
     return values[1] > 0
 
@@ -636,10 +745,56 @@ def parse_report_utc(value):
         return None
 
 
+def validate_rate_header(diagnostic):
+    if type(diagnostic) is not dict or set(diagnostic) != DIAG_KEYS:
+        return False
+    if diagnostic == blank_rate_header():
+        return True
+    count, size, digest = (diagnostic[key] for key in ("occurrenceCount", "lengthBytes", "sha256"))
+    if type(count) is not int or not 0 <= count <= 100 or type(size) is not int or not 0 <= size <= 16777216:
+        return False
+    if diagnostic["format"] not in DIAG_FORMATS or diagnostic["gateCompatibility"] not in DIAG_COMPATIBILITY:
+        return False
+    raw, policies = diagnostic["boundedRaw"], diagnostic["policies"]
+    if type(policies) is not list or len(policies) > MAX_NUMERIC_POLICIES:
+        return False
+    for policy in policies:
+        if type(policy) is not dict or set(policy) != {"value", "windowSeconds"} or type(policy["value"]) is not int or not 0 <= policy["value"] <= 9999999999:
+            return False
+        window = policy["windowSeconds"]
+        if window is not None and (type(window) is not int or not 0 <= window <= 9999999999):
+            return False
+    if count == 0:
+        return diagnostic == diagnose_rate_header(Response(200, ()), "ratelimit-limit")
+    if type(digest) is not str or not re.fullmatch(r"[0-9a-f]{64}", digest):
+        return False
+    if count > 1:
+        return raw is None and policies == [] and diagnostic["format"] == diagnostic["gateCompatibility"] == "DUPLICATE"
+    if raw is not None:
+        if type(raw) is not str or len(raw) > MAX_NUMERIC_RAW or any(ord(c) < 32 or ord(c) > 126 for c in raw) or sensitive_rate_text(raw):
+            return False
+        return diagnostic == diagnose_rate_header(Response(200, (("RateLimit-Limit", raw),)), "ratelimit-limit")
+    if policies or diagnostic["gateCompatibility"] != "UNKNOWN_SYNTAX":
+        return False
+    if diagnostic["format"] == "TOO_LONG":
+        return size > MAX_NUMERIC_RAW
+    return diagnostic["format"] in ("NON_ASCII_OR_CONTROL", "REDACTED_SENSITIVE") and size > 0
+
+
+def validate_rate_diagnostics(diagnostic):
+    return (type(diagnostic) is dict and set(diagnostic) == {"firstFailedPredicate", "limit", "remaining"}
+            and diagnostic["firstFailedPredicate"] in FAILED_PREDICATES
+            and validate_rate_header(diagnostic["limit"]) and validate_rate_header(diagnostic["remaining"]))
+
+
 def validate_channel(record, route):
     if type(record) is not dict or set(record) != CHANNEL_KEYS or type(record["complete"]) is not bool:
         return False
     if record["currentStage"] not in STAGES or record["reason"] not in CHANNEL_REASONS:
+        return False
+    if not validate_rate_diagnostics(record["rateDiagnostics"]):
+        return False
+    if record["currentStage"] == "TOKEN_GET" and record["rateDiagnostics"] != blank_rate_diagnostics():
         return False
     code = record["httpStatus"]
     if code is not None and (type(code) is not int or not 100 <= code <= 599):
@@ -674,7 +829,9 @@ def validate_channel(record, route):
 def validate_report(report):
     """Pure fixed-schema/type/status consistency check; never performs I/O."""
     try:
-        if type(report) is not dict or set(report) != REPORT_KEYS or type(report["schemaVersion"]) is not int or report["schemaVersion"] != 2:
+        if type(report) is not dict or set(report) != REPORT_KEYS or type(report["schemaVersion"]) is not int or report["schemaVersion"] != 3:
+            return False
+        if len(json.dumps(report, sort_keys=True, separators=(",", ":"), allow_nan=False).encode("utf-8")) + 1 > MAX_SERIALIZED_REPORT_BYTES:
             return False
         if report["image"] != IMAGE or report["digest"] != DIGEST or type(report["cacheHit"]) is not bool:
             return False

@@ -25,7 +25,7 @@ class PushIdentityTests(unittest.TestCase):
  def test_nonfinite_json_rejected(self):self.reject('JSON_CONSTANT',raw=b'{"schema":NaN}')
  def test_boolean_schema_rejected(self):self.request['schema']=True;self.reject('REQUEST_IDENTITY')
  def test_consumed_first_request_cannot_authorize_new_run(self):
-  for nonce,parent in [('desert-rv-rebuild-performance-20261009-once','9abf31160845852d6b1eaffcf432522f60258a0a'),('desert-rv-rebuild-performance350-20261009-once','be129aef52363202d7d3cbb51c28281075bef0b5'),('desert-rv-rebuild-export-recovery938-20261009-once','93886445d69597efa0dbf190340b61a6f9ea447c'),('desert-rv-linux-template-probe-20261009-once','dac4109a2a643f25760b9761ea71454e23981e8f'),('desert-rv-rebuild-linux-layout-20261009-once','4ac351190f97783a9b99621a1a8e6bed954f0f9e'),('desert-rv-rebuild-linux-symbol-20261009-once','4bcc86731f7a030ee31b78017ad9ad27f1997383'),('desert-rv-rebuild-python-cache-20261009-once','af1f7e2f77e22a2983995d78406921b35e52706f')]:
+  for nonce,parent in [('desert-rv-rebuild-performance-20261009-once','9abf31160845852d6b1eaffcf432522f60258a0a'),('desert-rv-rebuild-performance350-20261009-once','be129aef52363202d7d3cbb51c28281075bef0b5'),('desert-rv-rebuild-export-recovery938-20261009-once','93886445d69597efa0dbf190340b61a6f9ea447c'),('desert-rv-linux-template-probe-20261009-once','dac4109a2a643f25760b9761ea71454e23981e8f'),('desert-rv-rebuild-linux-layout-20261009-once','4ac351190f97783a9b99621a1a8e6bed954f0f9e'),('desert-rv-rebuild-linux-symbol-20261009-once','4bcc86731f7a030ee31b78017ad9ad27f1997383'),('desert-rv-rebuild-python-cache-20261009-once','af1f7e2f77e22a2983995d78406921b35e52706f'),('desert-rv-rebuild-image-readiness-r2-20261009-once','5342c507985d5f97dfcb843e06e149f0ce269d41')]:
    self.request['requestId']=nonce;self.request['baseCommit']=parent;self.reject('REQUEST_IDENTITY')
  def test_wrong_nonce_rejected(self):self.request['requestId']='other';self.reject('REQUEST_IDENTITY')
  def test_wrong_request_base_rejected(self):self.request['baseCommit']='c'*40;self.reject('REQUEST_IDENTITY')
@@ -93,7 +93,11 @@ class WorkflowEarlyBoundaryTests(unittest.TestCase):
    env['PRECHECK_EXIT']='2';self.assertNotEqual(run(fragments[0]),0)
    unknown=check.blank_result();report.write_text(json.dumps(unknown));self.assertEqual(run(fragments[0]),0);self.assertEqual(run(fragments[1]),0)
    report.write_text(json.dumps(dict(unknown,privateLog='NEVER_PUBLIC')));self.assertNotEqual(run(fragments[1]),0)
-   report.write_text(json.dumps(dict(unknown,schemaVersion=1)));self.assertNotEqual(run(fragments[1]),0)
+   for version in (1,2):
+    report.write_text(json.dumps(dict(unknown,schemaVersion=version)));self.assertNotEqual(run(fragments[1]),0)
+   bounded=json.dumps(unknown).encode()
+   report.write_bytes(bounded+b' '*(8192-len(bounded)));self.assertEqual(run(fragments[1]),0)
+   report.write_bytes(bounded+b' '*(8193-len(bounded)));self.assertNotEqual(run(fragments[0]),0);self.assertNotEqual(run(fragments[1]),0)
    report.unlink();target=root/'outside';target.write_text(json.dumps(good));report.symlink_to(target);self.assertNotEqual(run(fragments[0]),0)
    # Execute the actual first shell block with a fixture-only helper CLI. The
    # validation functions remain exact; the fixture never contacts a registry.
