@@ -1,0 +1,2548 @@
+[
+  {
+    "lowest_vertex": {
+      "mesh": "Bulwark_Body",
+      "source_part": "ToeShoe_fore.L_2",
+      "source_vertex": 33,
+      "mesh_vertex": 2837,
+      "bone": "foot.fore.L",
+      "world_z": 0.005999961402267218,
+      "world_position": [
+        0.8479999303817749,
+        -0.9150000214576721,
+        0.005999961402267218
+      ]
+    },
+    "errors": [],
+    "whole_body_clipped_diagnostic": false,
+    "whole_body_required": true,
+    "label": "static-0",
+    "min_z": 0.005999961402267218,
+    "screen_min": [
+      0.31166669726371765,
+      0.1665634959936142
+    ],
+    "screen_max": [
+      0.6883333325386047,
+      0.849118709564209
+    ]
+  },
+  {
+    "lowest_vertex": {
+      "mesh": "Bulwark_Body",
+      "source_part": "ToeShoe_fore.L_2",
+      "source_vertex": 33,
+      "mesh_vertex": 2837,
+      "bone": "foot.fore.L",
+      "world_z": 0.005999961402267218,
+      "world_position": [
+        0.8479999303817749,
+        -0.9150000214576721,
+        0.005999961402267218
+      ]
+    },
+    "errors": [],
+    "whole_body_clipped_diagnostic": false,
+    "whole_body_required": true,
+    "label": "static-1",
+    "min_z": 0.005999961402267218,
+    "screen_min": [
+      0.21715731918811798,
+      0.09306390583515167
+    ],
+    "screen_max": [
+      0.7688478827476501,
+      0.8217893242835999
+    ]
+  },
+  {
+    "lowest_vertex": {
+      "mesh": "Bulwark_Body",
+      "source_part": "ToeShoe_fore.L_2",
+      "source_vertex": 33,
+      "mesh_vertex": 2837,
+      "bone": "foot.fore.L",
+      "world_z": 0.005999961402267218,
+      "world_position": [
+        0.8479999303817749,
+        -0.9150000214576721,
+        0.005999961402267218
+      ]
+    },
+    "errors": [],
+    "whole_body_clipped_diagnostic": false,
+    "whole_body_required": true,
+    "label": "static-2",
+    "min_z": 0.005999961402267218,
+    "screen_min": [
+      0.1979166716337204,
+      0.15711385011672974
+    ],
+    "screen_max": [
+      0.7593749761581421,
+      0.7861986756324768
+    ]
+  },
+  {
+    "lowest_vertex": {
+      "mesh": "Bulwark_Body",
+      "source_part": "ToeShoe_fore.L_2",
+      "source_vertex": 33,
+      "mesh_vertex": 2837,
+      "bone": "foot.fore.L",
+      "world_z": 0.005999961402267218,
+      "world_position": [
+        0.8479999303817749,
+        -0.9150000214576721,
+        0.005999961402267218
+      ]
+    },
+    "errors": [],
+    "whole_body_clipped_diagnostic": false,
+    "whole_body_required": true,
+    "label": "static-3",
+    "min_z": 0.005999961402267218,
+    "screen_min": [
+      0.2171572893857956,
+      0.08239904791116714
+    ],
+    "screen_max": [
+      0.7688478827476501,
+      0.7951467037200928
+    ]
+  },
+  {
+    "lowest_vertex": {
+      "mesh": "Bulwark_Body",
+      "source_part": "ToeShoe_fore.L_2",
+      "source_vertex": 33,
+      "mesh_vertex": 2837,
+      "bone": "foot.fore.L",
+      "world_z": 0.005999961402267218,
+      "world_position": [
+        0.8479999303817749,
+        -0.9150000214576721,
+        0.005999961402267218
+      ]
+    },
+    "errors": [],
+    "whole_body_clipped_diagnostic": false,
+    "whole_body_required": true,
+    "label": "static-4",
+    "min_z": 0.005999961402267218,
+    "screen_min": [
+      0.31166672706604004,
+      0.14071090519428253
+    ],
+    "screen_max": [
+      0.6883333921432495,
+      0.7805674076080322
+    ]
+  },
+  {
+    "lowest_vertex": {
+      "mesh": "Bulwark_Body",
+      "source_part": "ToeShoe_fore.L_2",
+      "source_vertex": 33,
+      "mesh_vertex": 2837,
+      "bone": "foot.fore.L",
+      "world_z": 0.005999961402267218,
+      "world_position": [
+        0.8479999303817749,
+        -0.9150000214576721,
+        0.005999961402267218
+      ]
+    },
+    "errors": [],
+    "whole_body_clipped_diagnostic": false,
+    "whole_body_required": true,
+    "label": "static-5",
+    "min_z": 0.005999961402267218,
+    "screen_min": [
+      0.23115214705467224,
+      0.08239904791116714
+    ],
+    "screen_max": [
+      0.7828426957130432,
+      0.7951467037200928
+    ]
+  },
+  {
+    "lowest_vertex": {
+      "mesh": "Bulwark_Body",
+      "source_part": "ToeShoe_fore.L_2",
+      "source_vertex": 33,
+      "mesh_vertex": 2837,
+      "bone": "foot.fore.L",
+      "world_z": 0.005999961402267218,
+      "world_position": [
+        0.8479999303817749,
+        -0.9150000214576721,
+        0.005999961402267218
+      ]
+    },
+    "errors": [],
+    "whole_body_clipped_diagnostic": false,
+    "whole_body_required": true,
+    "label": "static-6",
+    "min_z": 0.005999961402267218,
+    "screen_min": [
+      0.2406250387430191,
+      0.15711385011672974
+    ],
+    "screen_max": [
+      0.8020833134651184,
+      0.7861986756324768
+    ]
+  },
+  {
+    "lowest_vertex": {
+      "mesh": "Bulwark_Body",
+      "source_part": "ToeShoe_fore.L_2",
+      "source_vertex": 33,
+      "mesh_vertex": 2837,
+      "bone": "foot.fore.L",
+      "world_z": 0.005999961402267218,
+      "world_position": [
+        0.8479999303817749,
+        -0.9150000214576721,
+        0.005999961402267218
+      ]
+    },
+    "errors": [],
+    "whole_body_clipped_diagnostic": false,
+    "whole_body_required": true,
+    "label": "static-7",
+    "min_z": 0.005999961402267218,
+    "screen_min": [
+      0.23115208745002747,
+      0.09306390583515167
+    ],
+    "screen_max": [
+      0.7828426957130432,
+      0.8217893242835999
+    ]
+  },
+  {
+    "lowest_vertex": {
+      "mesh": "Bulwark_Body",
+      "source_part": "ToeShoe_fore.L_0",
+      "source_vertex": 33,
+      "mesh_vertex": 2765,
+      "bone": "foot.fore.L",
+      "world_z": 0.00599988317117095,
+      "world_position": [
+        0.6719999313354492,
+        -1.290000081062317,
+        0.00599988317117095
+      ]
+    },
+    "errors": [],
+    "whole_body_clipped_diagnostic": false,
+    "whole_body_required": true,
+    "label": "open-weakpoint",
+    "min_z": 0.00599988317117095,
+    "screen_min": [
+      0.19311176240444183,
+      0.04827340319752693
+    ],
+    "screen_max": [
+      0.815011739730835,
+      0.751402735710144
+    ]
+  },
+  {
+    "lowest_vertex": {
+      "mesh": "Bulwark_Body",
+      "source_part": "ToeShoe_fore.L_2",
+      "source_vertex": 33,
+      "mesh_vertex": 2837,
+      "bone": "foot.fore.L",
+      "world_z": 0.005999961402267218,
+      "world_position": [
+        0.8479999303817749,
+        -0.9150000214576721,
+        0.005999961402267218
+      ]
+    },
+    "errors": [],
+    "whole_body_clipped_diagnostic": true,
+    "whole_body_required": false,
+    "label": "fps-120-2m-closed",
+    "min_z": 0.005999961402267218,
+    "screen_min": [
+      -0.0903274193406105,
+      -0.15743298828601837
+    ],
+    "screen_max": [
+      0.6021705865859985,
+      0.676397442817688
+    ],
+    "state": "closed",
+    "recovery_time_seconds": null,
+    "eye_height_m": 1.65,
+    "horizontal_distance_to_actor_m": 2,
+    "angle_degrees_from_front": 120,
+    "vertical_fov_degrees": 60,
+    "visible_tissue_samples": 0,
+    "sample_grid": [
+      32,
+      24
+    ],
+    "projected_tissue_bbox_px": [
+      92.60939598083496,
+      69.00064766407013
+    ],
+    "estimated_visible_tissue_area_px": 0.0,
+    "gameplay": "Recover gives whole-body vulnerability; tissue is state feedback, not separate hitbox",
+    "visual_approved": false
+  },
+  {
+    "lowest_vertex": {
+      "mesh": "Bulwark_Body",
+      "source_part": "ToeShoe_fore.L_0",
+      "source_vertex": 33,
+      "mesh_vertex": 2765,
+      "bone": "foot.fore.L",
+      "world_z": 0.00599988317117095,
+      "world_position": [
+        0.6719999313354492,
+        -1.290000081062317,
+        0.00599988317117095
+      ]
+    },
+    "errors": [],
+    "whole_body_clipped_diagnostic": true,
+    "whole_body_required": false,
+    "label": "fps-120-2m-recover-0.00",
+    "min_z": 0.00599988317117095,
+    "screen_min": [
+      -0.10061971098184586,
+      -0.1942145973443985
+    ],
+    "screen_max": [
+      0.6285879015922546,
+      0.6779018044471741
+    ],
+    "state": "recover-0.00",
+    "recovery_time_seconds": 0,
+    "eye_height_m": 1.65,
+    "horizontal_distance_to_actor_m": 2,
+    "angle_degrees_from_front": 120,
+    "vertical_fov_degrees": 60,
+    "visible_tissue_samples": 577,
+    "sample_grid": [
+      32,
+      24
+    ],
+    "projected_tissue_bbox_px": [
+      90.0204849243164,
+      73.02280247211456
+    ],
+    "estimated_visible_tissue_area_px": 4938.720374211891,
+    "gameplay": "Recover gives whole-body vulnerability; tissue is state feedback, not separate hitbox",
+    "visual_approved": false,
+    "visible_tissue_bbox_px": [
+      87.20734477043152,
+      69.98018570244312
+    ]
+  },
+  {
+    "lowest_vertex": {
+      "mesh": "Bulwark_Body",
+      "source_part": "HeelRubber_fore.L",
+      "source_vertex": 28,
+      "mesh_vertex": 2632,
+      "bone": "foot.fore.L",
+      "world_z": 0.005999962333589792,
+      "world_position": [
+        0.7599999308586121,
+        -0.5699999332427979,
+        0.005999962333589792
+      ]
+    },
+    "errors": [],
+    "whole_body_clipped_diagnostic": true,
+    "whole_body_required": false,
+    "label": "fps-120-2m-recover-1.00",
+    "min_z": 0.005999962333589792,
+    "screen_min": [
+      -0.07433708757162094,
+      -0.16959774494171143
+    ],
+    "screen_max": [
+      0.6299915313720703,
+      0.6876448392868042
+    ],
+    "state": "recover-1.00",
+    "recovery_time_seconds": 1,
+    "eye_height_m": 1.65,
+    "horizontal_distance_to_actor_m": 2,
+    "angle_degrees_from_front": 120,
+    "vertical_fov_degrees": 60,
+    "visible_tissue_samples": 577,
+    "sample_grid": [
+      32,
+      24
+    ],
+    "projected_tissue_bbox_px": [
+      90.5401611328125,
+      72.24297165870667
+    ],
+    "estimated_visible_tissue_area_px": 4914.184505257262,
+    "gameplay": "Recover gives whole-body vulnerability; tissue is state feedback, not separate hitbox",
+    "visual_approved": false,
+    "visible_tissue_bbox_px": [
+      87.71078109741211,
+      69.23284783959387
+    ]
+  },
+  {
+    "lowest_vertex": {
+      "mesh": "Bulwark_Body",
+      "source_part": "ToeShoe_fore.L_2",
+      "source_vertex": 33,
+      "mesh_vertex": 2837,
+      "bone": "foot.fore.L",
+      "world_z": 0.005999966058880091,
+      "world_position": [
+        0.8479999303817749,
+        -0.9150000214576721,
+        0.005999966058880091
+      ]
+    },
+    "errors": [],
+    "whole_body_clipped_diagnostic": true,
+    "whole_body_required": false,
+    "label": "fps-120-2m-recover-1.95",
+    "min_z": 0.005999966058880091,
+    "screen_min": [
+      -0.09026404470205307,
+      -0.1574329435825348
+    ],
+    "screen_max": [
+      0.6357024908065796,
+      0.7260814905166626
+    ],
+    "state": "recover-1.95",
+    "recovery_time_seconds": 1.95,
+    "eye_height_m": 1.65,
+    "horizontal_distance_to_actor_m": 2,
+    "angle_degrees_from_front": 120,
+    "vertical_fov_degrees": 60,
+    "visible_tissue_samples": 577,
+    "sample_grid": [
+      32,
+      24
+    ],
+    "projected_tissue_bbox_px": [
+      92.6012134552002,
+      69.01392459869385
+    ],
+    "estimated_visible_tissue_area_px": 4801.4011915814,
+    "gameplay": "Recover gives whole-body vulnerability; tissue is state feedback, not separate hitbox",
+    "visual_approved": false,
+    "visible_tissue_bbox_px": [
+      89.70742553472519,
+      66.13834440708159
+    ]
+  },
+  {
+    "lowest_vertex": {
+      "mesh": "Bulwark_Body",
+      "source_part": "ToeShoe_fore.L_2",
+      "source_vertex": 33,
+      "mesh_vertex": 2837,
+      "bone": "foot.fore.L",
+      "world_z": 0.005999961402267218,
+      "world_position": [
+        0.8479999303817749,
+        -0.9150000214576721,
+        0.005999961402267218
+      ]
+    },
+    "errors": [],
+    "whole_body_clipped_diagnostic": false,
+    "whole_body_required": false,
+    "label": "fps-120-4m-closed",
+    "min_z": 0.005999961402267218,
+    "screen_min": [
+      0.22847796976566315,
+      0.2250155210494995
+    ],
+    "screen_max": [
+      0.5522926449775696,
+      0.5815882086753845
+    ],
+    "state": "closed",
+    "recovery_time_seconds": null,
+    "eye_height_m": 1.65,
+    "horizontal_distance_to_actor_m": 4,
+    "angle_degrees_from_front": 120,
+    "vertical_fov_degrees": 60,
+    "visible_tissue_samples": 0,
+    "sample_grid": [
+      32,
+      24
+    ],
+    "projected_tissue_bbox_px": [
+      48.9334774017334,
+      25.388250946998596
+    ],
+    "estimated_visible_tissue_area_px": 0.0,
+    "gameplay": "Recover gives whole-body vulnerability; tissue is state feedback, not separate hitbox",
+    "visual_approved": false
+  },
+  {
+    "lowest_vertex": {
+      "mesh": "Bulwark_Body",
+      "source_part": "ToeShoe_fore.L_0",
+      "source_vertex": 33,
+      "mesh_vertex": 2765,
+      "bone": "foot.fore.L",
+      "world_z": 0.00599988317117095,
+      "world_position": [
+        0.6719999313354492,
+        -1.290000081062317,
+        0.00599988317117095
+      ]
+    },
+    "errors": [],
+    "whole_body_clipped_diagnostic": false,
+    "whole_body_required": false,
+    "label": "fps-120-4m-recover-0.00",
+    "min_z": 0.00599988317117095,
+    "screen_min": [
+      0.21708732843399048,
+      0.20587170124053955
+    ],
+    "screen_max": [
+      0.5736688375473022,
+      0.5736058950424194
+    ],
+    "state": "recover-0.00",
+    "recovery_time_seconds": 0,
+    "eye_height_m": 1.65,
+    "horizontal_distance_to_actor_m": 4,
+    "angle_degrees_from_front": 120,
+    "vertical_fov_degrees": 60,
+    "visible_tissue_samples": 301,
+    "sample_grid": [
+      32,
+      24
+    ],
+    "projected_tissue_bbox_px": [
+      48.575477600097656,
+      26.772351264953613
+    ],
+    "estimated_visible_tissue_area_px": 509.69323502732124,
+    "gameplay": "Recover gives whole-body vulnerability; tissue is state feedback, not separate hitbox",
+    "visual_approved": false,
+    "visible_tissue_bbox_px": [
+      47.057493925094604,
+      25.65683662891389
+    ]
+  },
+  {
+    "lowest_vertex": {
+      "mesh": "Bulwark_Body",
+      "source_part": "HeelRubber_fore.L",
+      "source_vertex": 28,
+      "mesh_vertex": 2632,
+      "bone": "foot.fore.L",
+      "world_z": 0.005999962333589792,
+      "world_position": [
+        0.7599999308586121,
+        -0.5699999332427979,
+        0.005999962333589792
+      ]
+    },
+    "errors": [],
+    "whole_body_clipped_diagnostic": false,
+    "whole_body_required": false,
+    "label": "fps-120-4m-recover-1.00",
+    "min_z": 0.005999962333589792,
+    "screen_min": [
+      0.23052969574928284,
+      0.22209151089191437
+    ],
+    "screen_max": [
+      0.5737640857696533,
+      0.5790891647338867
+    ],
+    "state": "recover-1.00",
+    "recovery_time_seconds": 1,
+    "eye_height_m": 1.65,
+    "horizontal_distance_to_actor_m": 4,
+    "angle_degrees_from_front": 120,
+    "vertical_fov_degrees": 60,
+    "visible_tissue_samples": 292,
+    "sample_grid": [
+      32,
+      24
+    ],
+    "projected_tissue_bbox_px": [
+      48.6485481262207,
+      26.49150788784027
+    ],
+    "estimated_visible_tissue_area_px": 490.0023850963331,
+    "gameplay": "Recover gives whole-body vulnerability; tissue is state feedback, not separate hitbox",
+    "visual_approved": false,
+    "visible_tissue_bbox_px": [
+      47.128280997276306,
+      25.38769505918027
+    ]
+  },
+  {
+    "lowest_vertex": {
+      "mesh": "Bulwark_Body",
+      "source_part": "ToeShoe_fore.L_2",
+      "source_vertex": 33,
+      "mesh_vertex": 2837,
+      "bone": "foot.fore.L",
+      "world_z": 0.005999966058880091,
+      "world_position": [
+        0.8479999303817749,
+        -0.9150000214576721,
+        0.005999966058880091
+      ]
+    },
+    "errors": [],
+    "whole_body_clipped_diagnostic": false,
+    "whole_body_required": false,
+    "label": "fps-120-4m-recover-1.95",
+    "min_z": 0.005999966058880091,
+    "screen_min": [
+      0.22848591208457947,
+      0.2250155210494995
+    ],
+    "screen_max": [
+      0.5741336941719055,
+      0.6003686785697937
+    ],
+    "state": "recover-1.95",
+    "recovery_time_seconds": 1.95,
+    "eye_height_m": 1.65,
+    "horizontal_distance_to_actor_m": 4,
+    "angle_degrees_from_front": 120,
+    "vertical_fov_degrees": 60,
+    "visible_tissue_samples": 270,
+    "sample_grid": [
+      32,
+      24
+    ],
+    "projected_tissue_bbox_px": [
+      48.93241882324219,
+      25.392563939094543
+    ],
+    "estimated_visible_tissue_area_px": 436.8232876161553,
+    "gameplay": "Recover gives whole-body vulnerability; tissue is state feedback, not separate hitbox",
+    "visual_approved": false,
+    "visible_tissue_bbox_px": [
+      27.52448558807373,
+      21.160469949245464
+    ]
+  },
+  {
+    "lowest_vertex": {
+      "mesh": "Bulwark_Body",
+      "source_part": "ToeShoe_fore.L_2",
+      "source_vertex": 33,
+      "mesh_vertex": 2837,
+      "bone": "foot.fore.L",
+      "world_z": 0.005999961402267218,
+      "world_position": [
+        0.8479999303817749,
+        -0.9150000214576721,
+        0.005999961402267218
+      ]
+    },
+    "errors": [],
+    "whole_body_clipped_diagnostic": false,
+    "whole_body_required": false,
+    "label": "fps-120-6m-closed",
+    "min_z": 0.005999961402267218,
+    "screen_min": [
+      0.32108327746391296,
+      0.3376317322254181
+    ],
+    "screen_max": [
+      0.5342646241188049,
+      0.5523676872253418
+    ],
+    "state": "closed",
+    "recovery_time_seconds": null,
+    "eye_height_m": 1.65,
+    "horizontal_distance_to_actor_m": 6,
+    "angle_degrees_from_front": 120,
+    "vertical_fov_degrees": 60,
+    "visible_tissue_samples": 0,
+    "sample_grid": [
+      32,
+      24
+    ],
+    "projected_tissue_bbox_px": [
+      32.85080909729004,
+      14.778741002082825
+    ],
+    "estimated_visible_tissue_area_px": 0.0,
+    "gameplay": "Recover gives whole-body vulnerability; tissue is state feedback, not separate hitbox",
+    "visual_approved": false
+  },
+  {
+    "lowest_vertex": {
+      "mesh": "Bulwark_Body",
+      "source_part": "ToeShoe_fore.L_0",
+      "source_vertex": 33,
+      "mesh_vertex": 2765,
+      "bone": "foot.fore.L",
+      "world_z": 0.00599988317117095,
+      "world_position": [
+        0.6719999313354492,
+        -1.290000081062317,
+        0.00599988317117095
+      ]
+    },
+    "errors": [],
+    "whole_body_clipped_diagnostic": false,
+    "whole_body_required": false,
+    "label": "fps-120-6m-recover-0.00",
+    "min_z": 0.00599988317117095,
+    "screen_min": [
+      0.31491196155548096,
+      0.3290271759033203
+    ],
+    "screen_max": [
+      0.5543017387390137,
+      0.5449989438056946
+    ],
+    "state": "recover-0.00",
+    "recovery_time_seconds": 0,
+    "eye_height_m": 1.65,
+    "horizontal_distance_to_actor_m": 6,
+    "angle_degrees_from_front": 120,
+    "vertical_fov_degrees": 60,
+    "visible_tissue_samples": 356,
+    "sample_grid": [
+      32,
+      24
+    ],
+    "projected_tissue_bbox_px": [
+      32.7462100982666,
+      15.372195839881897
+    ],
+    "estimated_visible_tissue_area_px": 233.3381393924898,
+    "gameplay": "Recover gives whole-body vulnerability; tissue is state feedback, not separate hitbox",
+    "visual_approved": false,
+    "visible_tissue_bbox_px": [
+      21.489700376987457,
+      14.091179519891728
+    ]
+  },
+  {
+    "lowest_vertex": {
+      "mesh": "Bulwark_Body",
+      "source_part": "HeelRubber_fore.L",
+      "source_vertex": 28,
+      "mesh_vertex": 2632,
+      "bone": "foot.fore.L",
+      "world_z": 0.005999962333589792,
+      "world_position": [
+        0.7599999308586121,
+        -0.5699999332427979,
+        0.005999962333589792
+      ]
+    },
+    "errors": [],
+    "whole_body_clipped_diagnostic": false,
+    "whole_body_required": false,
+    "label": "fps-120-6m-recover-1.00",
+    "min_z": 0.005999962333589792,
+    "screen_min": [
+      0.32182905077934265,
+      0.33889397978782654
+    ],
+    "screen_max": [
+      0.5543338060379028,
+      0.5487573146820068
+    ],
+    "state": "recover-1.00",
+    "recovery_time_seconds": 1,
+    "eye_height_m": 1.65,
+    "horizontal_distance_to_actor_m": 6,
+    "angle_degrees_from_front": 120,
+    "vertical_fov_degrees": 60,
+    "visible_tissue_samples": 361,
+    "sample_grid": [
+      32,
+      24
+    ],
+    "projected_tissue_bbox_px": [
+      32.76766777038574,
+      15.249323844909668
+    ],
+    "estimated_visible_tissue_area_px": 234.87787066114674,
+    "gameplay": "Recover gives whole-body vulnerability; tissue is state feedback, not separate hitbox",
+    "visual_approved": false,
+    "visible_tissue_bbox_px": [
+      22.527771592140198,
+      13.978546857833852
+    ]
+  },
+  {
+    "lowest_vertex": {
+      "mesh": "Bulwark_Body",
+      "source_part": "ToeShoe_fore.L_2",
+      "source_vertex": 33,
+      "mesh_vertex": 2837,
+      "bone": "foot.fore.L",
+      "world_z": 0.005999966058880091,
+      "world_position": [
+        0.8479999303817749,
+        -0.9150000214576721,
+        0.005999966058880091
+      ]
+    },
+    "errors": [],
+    "whole_body_clipped_diagnostic": false,
+    "whole_body_required": false,
+    "label": "fps-120-6m-recover-1.95",
+    "min_z": 0.005999966058880091,
+    "screen_min": [
+      0.3210861384868622,
+      0.3376317322254181
+    ],
+    "screen_max": [
+      0.55445796251297,
+      0.5632902979850769
+    ],
+    "state": "recover-1.95",
+    "recovery_time_seconds": 1.95,
+    "eye_height_m": 1.65,
+    "horizontal_distance_to_actor_m": 6,
+    "angle_degrees_from_front": 120,
+    "vertical_fov_degrees": 60,
+    "visible_tissue_samples": 353,
+    "sample_grid": [
+      32,
+      24
+    ],
+    "projected_tissue_bbox_px": [
+      32.85043716430664,
+      14.780495166778564
+    ],
+    "estimated_visible_tissue_area_px": 223.1740128775519,
+    "gameplay": "Recover gives whole-body vulnerability; tissue is state feedback, not separate hitbox",
+    "visual_approved": false,
+    "visible_tissue_bbox_px": [
+      22.584675550460815,
+      13.548787236213695
+    ]
+  },
+  {
+    "lowest_vertex": {
+      "mesh": "Bulwark_Body",
+      "source_part": "ToeShoe_fore.L_2",
+      "source_vertex": 33,
+      "mesh_vertex": 2837,
+      "bone": "foot.fore.L",
+      "world_z": 0.005999961402267218,
+      "world_position": [
+        0.8479999303817749,
+        -0.9150000214576721,
+        0.005999961402267218
+      ]
+    },
+    "errors": [],
+    "whole_body_clipped_diagnostic": false,
+    "whole_body_required": false,
+    "label": "fps-180-2m-closed",
+    "min_z": 0.005999961402267218,
+    "screen_min": [
+      0.2677846848964691,
+      0.14195652306079865
+    ],
+    "screen_max": [
+      0.732215404510498,
+      0.8196861147880554
+    ],
+    "state": "closed",
+    "recovery_time_seconds": null,
+    "eye_height_m": 1.65,
+    "horizontal_distance_to_actor_m": 2,
+    "angle_degrees_from_front": 180,
+    "vertical_fov_degrees": 60,
+    "visible_tissue_samples": 0,
+    "sample_grid": [
+      32,
+      24
+    ],
+    "projected_tissue_bbox_px": [
+      175.97688674926758,
+      104.23956334590912
+    ],
+    "estimated_visible_tissue_area_px": 0.0,
+    "gameplay": "Recover gives whole-body vulnerability; tissue is state feedback, not separate hitbox",
+    "visual_approved": false
+  },
+  {
+    "lowest_vertex": {
+      "mesh": "Bulwark_Body",
+      "source_part": "ToeShoe_fore.L_0",
+      "source_vertex": 33,
+      "mesh_vertex": 2765,
+      "bone": "foot.fore.L",
+      "world_z": 0.00599988317117095,
+      "world_position": [
+        0.6719999313354492,
+        -1.290000081062317,
+        0.00599988317117095
+      ]
+    },
+    "errors": [],
+    "whole_body_clipped_diagnostic": true,
+    "whole_body_required": false,
+    "label": "fps-180-2m-recover-0.00",
+    "min_z": 0.00599988317117095,
+    "screen_min": [
+      0.10006833076477051,
+      -0.04704323410987854
+    ],
+    "screen_max": [
+      0.899931788444519,
+      0.7745264768600464
+    ],
+    "state": "recover-0.00",
+    "recovery_time_seconds": 0,
+    "eye_height_m": 1.65,
+    "horizontal_distance_to_actor_m": 2,
+    "angle_degrees_from_front": 180,
+    "vertical_fov_degrees": 60,
+    "visible_tissue_samples": 602,
+    "sample_grid": [
+      32,
+      24
+    ],
+    "projected_tissue_bbox_px": [
+      167.7173137664795,
+      104.6242243051529
+    ],
+    "estimated_visible_tissue_area_px": 13754.519402249787,
+    "gameplay": "Recover gives whole-body vulnerability; tissue is state feedback, not separate hitbox",
+    "visual_approved": false,
+    "visible_tissue_bbox_px": [
+      162.476147711277,
+      100.26488162577152
+    ]
+  },
+  {
+    "lowest_vertex": {
+      "mesh": "Bulwark_Body",
+      "source_part": "HeelRubber_fore.L",
+      "source_vertex": 28,
+      "mesh_vertex": 2632,
+      "bone": "foot.fore.L",
+      "world_z": 0.005999962333589792,
+      "world_position": [
+        0.7599999308586121,
+        -0.5699999332427979,
+        0.005999962333589792
+      ]
+    },
+    "errors": [],
+    "whole_body_clipped_diagnostic": true,
+    "whole_body_required": false,
+    "label": "fps-180-2m-recover-1.00",
+    "min_z": 0.005999962333589792,
+    "screen_min": [
+      0.09449924528598785,
+      0.007325068581849337
+    ],
+    "screen_max": [
+      0.9055008292198181,
+      0.7835987210273743
+    ],
+    "state": "recover-1.00",
+    "recovery_time_seconds": 1,
+    "eye_height_m": 1.65,
+    "horizontal_distance_to_actor_m": 2,
+    "angle_degrees_from_front": 180,
+    "vertical_fov_degrees": 60,
+    "visible_tissue_samples": 604,
+    "sample_grid": [
+      32,
+      24
+    ],
+    "projected_tissue_bbox_px": [
+      169.34926986694336,
+      104.58886742591858
+    ],
+    "estimated_visible_tissue_area_px": 13929.788013298265,
+    "gameplay": "Recover gives whole-body vulnerability; tissue is state feedback, not separate hitbox",
+    "visual_approved": false,
+    "visible_tissue_bbox_px": [
+      164.05710518360138,
+      100.23099794983862
+    ]
+  },
+  {
+    "lowest_vertex": {
+      "mesh": "Bulwark_Body",
+      "source_part": "ToeShoe_fore.L_2",
+      "source_vertex": 33,
+      "mesh_vertex": 2837,
+      "bone": "foot.fore.L",
+      "world_z": 0.005999966058880091,
+      "world_position": [
+        0.8479999303817749,
+        -0.9150000214576721,
+        0.005999966058880091
+      ]
+    },
+    "errors": [],
+    "whole_body_clipped_diagnostic": false,
+    "whole_body_required": false,
+    "label": "fps-180-2m-recover-1.95",
+    "min_z": 0.005999966058880091,
+    "screen_min": [
+      0.0714942067861557,
+      0.14195652306079865
+    ],
+    "screen_max": [
+      0.9285059571266174,
+      0.8195432424545288
+    ],
+    "state": "recover-1.95",
+    "recovery_time_seconds": 1.95,
+    "eye_height_m": 1.65,
+    "horizontal_distance_to_actor_m": 2,
+    "angle_degrees_from_front": 180,
+    "vertical_fov_degrees": 60,
+    "visible_tissue_samples": 604,
+    "sample_grid": [
+      32,
+      24
+    ],
+    "projected_tissue_bbox_px": [
+      175.95022201538086,
+      104.24163937568665
+    ],
+    "estimated_visible_tissue_area_px": 14424.6993661526,
+    "gameplay": "Recover gives whole-body vulnerability; tissue is state feedback, not separate hitbox",
+    "visual_approved": false,
+    "visible_tissue_bbox_px": [
+      170.4517775774002,
+      99.89823773503302
+    ]
+  },
+  {
+    "lowest_vertex": {
+      "mesh": "Bulwark_Body",
+      "source_part": "ToeShoe_fore.L_2",
+      "source_vertex": 33,
+      "mesh_vertex": 2837,
+      "bone": "foot.fore.L",
+      "world_z": 0.005999961402267218,
+      "world_position": [
+        0.8479999303817749,
+        -0.9150000214576721,
+        0.005999961402267218
+      ]
+    },
+    "errors": [],
+    "whole_body_clipped_diagnostic": false,
+    "whole_body_required": false,
+    "label": "fps-180-4m-closed",
+    "min_z": 0.005999961402267218,
+    "screen_min": [
+      0.3751111328601837,
+      0.28970760107040405
+    ],
+    "screen_max": [
+      0.6248887181282043,
+      0.6100278496742249
+    ],
+    "state": "closed",
+    "recovery_time_seconds": null,
+    "eye_height_m": 1.65,
+    "horizontal_distance_to_actor_m": 4,
+    "angle_degrees_from_front": 180,
+    "vertical_fov_degrees": 60,
+    "visible_tissue_samples": 0,
+    "sample_grid": [
+      32,
+      24
+    ],
+    "projected_tissue_bbox_px": [
+      75.95017433166504,
+      32.070234417915344
+    ],
+    "estimated_visible_tissue_area_px": 0.0,
+    "gameplay": "Recover gives whole-body vulnerability; tissue is state feedback, not separate hitbox",
+    "visual_approved": false
+  },
+  {
+    "lowest_vertex": {
+      "mesh": "Bulwark_Body",
+      "source_part": "ToeShoe_fore.L_0",
+      "source_vertex": 33,
+      "mesh_vertex": 2765,
+      "bone": "foot.fore.L",
+      "world_z": 0.00599988317117095,
+      "world_position": [
+        0.6719999313354492,
+        -1.290000081062317,
+        0.00599988317117095
+      ]
+    },
+    "errors": [],
+    "whole_body_clipped_diagnostic": false,
+    "whole_body_required": false,
+    "label": "fps-180-4m-recover-0.00",
+    "min_z": 0.00599988317117095,
+    "screen_min": [
+      0.3563850224018097,
+      0.23956488072872162
+    ],
+    "screen_max": [
+      0.6436148881912231,
+      0.5834087133407593
+    ],
+    "state": "recover-0.00",
+    "recovery_time_seconds": 0,
+    "eye_height_m": 1.65,
+    "horizontal_distance_to_actor_m": 4,
+    "angle_degrees_from_front": 180,
+    "vertical_fov_degrees": 60,
+    "visible_tissue_samples": 620,
+    "sample_grid": [
+      32,
+      24
+    ],
+    "projected_tissue_bbox_px": [
+      75.24101257324219,
+      33.48703622817993
+    ],
+    "estimated_visible_tissue_area_px": 2034.0508836051608,
+    "gameplay": "Recover gives whole-body vulnerability; tissue is state feedback, not separate hitbox",
+    "visual_approved": false,
+    "visible_tissue_bbox_px": [
+      72.88973093032837,
+      32.09174305200577
+    ]
+  },
+  {
+    "lowest_vertex": {
+      "mesh": "Bulwark_Body",
+      "source_part": "HeelRubber_fore.L",
+      "source_vertex": 28,
+      "mesh_vertex": 2632,
+      "bone": "foot.fore.L",
+      "world_z": 0.005999962333589792,
+      "world_position": [
+        0.7599999308586121,
+        -0.5699999332427979,
+        0.005999962333589792
+      ]
+    },
+    "errors": [],
+    "whole_body_clipped_diagnostic": false,
+    "whole_body_required": false,
+    "label": "fps-180-4m-recover-1.00",
+    "min_z": 0.005999962333589792,
+    "screen_min": [
+      0.35607028007507324,
+      0.2617014944553375
+    ],
+    "screen_max": [
+      0.6439296007156372,
+      0.5888422727584839
+    ],
+    "state": "recover-1.00",
+    "recovery_time_seconds": 1,
+    "eye_height_m": 1.65,
+    "horizontal_distance_to_actor_m": 4,
+    "angle_degrees_from_front": 180,
+    "vertical_fov_degrees": 60,
+    "visible_tissue_samples": 620,
+    "sample_grid": [
+      32,
+      24
+    ],
+    "projected_tissue_bbox_px": [
+      75.38555145263672,
+      33.20091426372528
+    ],
+    "estimated_visible_tissue_area_px": 2020.5454725411955,
+    "gameplay": "Recover gives whole-body vulnerability; tissue is state feedback, not separate hitbox",
+    "visual_approved": false,
+    "visible_tissue_bbox_px": [
+      73.02975296974182,
+      31.81754283607005
+    ]
+  },
+  {
+    "lowest_vertex": {
+      "mesh": "Bulwark_Body",
+      "source_part": "ToeShoe_fore.L_2",
+      "source_vertex": 33,
+      "mesh_vertex": 2837,
+      "bone": "foot.fore.L",
+      "world_z": 0.005999966058880091,
+      "world_position": [
+        0.8479999303817749,
+        -0.9150000214576721,
+        0.005999966058880091
+      ]
+    },
+    "errors": [],
+    "whole_body_clipped_diagnostic": false,
+    "whole_body_required": false,
+    "label": "fps-180-4m-recover-1.95",
+    "min_z": 0.005999966058880091,
+    "screen_min": [
+      0.35484379529953003,
+      0.28970763087272644
+    ],
+    "screen_max": [
+      0.6451560854911804,
+      0.6099452972412109
+    ],
+    "state": "recover-1.95",
+    "recovery_time_seconds": 1.95,
+    "eye_height_m": 1.65,
+    "horizontal_distance_to_actor_m": 4,
+    "angle_degrees_from_front": 180,
+    "vertical_fov_degrees": 60,
+    "visible_tissue_samples": 622,
+    "sample_grid": [
+      32,
+      24
+    ],
+    "projected_tissue_bbox_px": [
+      75.94791412353516,
+      32.07466006278992
+    ],
+    "estimated_visible_tissue_area_px": 1972.909107304686,
+    "gameplay": "Recover gives whole-body vulnerability; tissue is state feedback, not separate hitbox",
+    "visual_approved": false,
+    "visible_tissue_bbox_px": [
+      73.57454180717468,
+      30.738215893507004
+    ]
+  },
+  {
+    "lowest_vertex": {
+      "mesh": "Bulwark_Body",
+      "source_part": "ToeShoe_fore.L_2",
+      "source_vertex": 33,
+      "mesh_vertex": 2837,
+      "bone": "foot.fore.L",
+      "world_z": 0.005999961402267218,
+      "world_position": [
+        0.8479999303817749,
+        -0.9150000214576721,
+        0.005999961402267218
+      ]
+    },
+    "errors": [],
+    "whole_body_clipped_diagnostic": false,
+    "whole_body_required": false,
+    "label": "fps-180-6m-closed",
+    "min_z": 0.005999961402267218,
+    "screen_min": [
+      0.4187459945678711,
+      0.3634369373321533
+    ],
+    "screen_max": [
+      0.5812538862228394,
+      0.5634021162986755
+    ],
+    "state": "closed",
+    "recovery_time_seconds": null,
+    "eye_height_m": 1.65,
+    "horizontal_distance_to_actor_m": 6,
+    "angle_degrees_from_front": 180,
+    "vertical_fov_degrees": 60,
+    "visible_tissue_samples": 0,
+    "sample_grid": [
+      32,
+      24
+    ],
+    "projected_tissue_bbox_px": [
+      47.56410598754883,
+      17.495153546333313
+    ],
+    "estimated_visible_tissue_area_px": 0.0,
+    "gameplay": "Recover gives whole-body vulnerability; tissue is state feedback, not separate hitbox",
+    "visual_approved": false
+  },
+  {
+    "lowest_vertex": {
+      "mesh": "Bulwark_Body",
+      "source_part": "ToeShoe_fore.L_0",
+      "source_vertex": 33,
+      "mesh_vertex": 2765,
+      "bone": "foot.fore.L",
+      "world_z": 0.00599988317117095,
+      "world_position": [
+        0.6719999313354492,
+        -1.290000081062317,
+        0.00599988317117095
+      ]
+    },
+    "errors": [],
+    "whole_body_clipped_diagnostic": false,
+    "whole_body_required": false,
+    "label": "fps-180-6m-recover-0.00",
+    "min_z": 0.00599988317117095,
+    "screen_min": [
+      0.41219010949134827,
+      0.34335288405418396
+    ],
+    "screen_max": [
+      0.5878098011016846,
+      0.5453435778617859
+    ],
+    "state": "recover-0.00",
+    "recovery_time_seconds": 0,
+    "eye_height_m": 1.65,
+    "horizontal_distance_to_actor_m": 6,
+    "angle_degrees_from_front": 180,
+    "vertical_fov_degrees": 60,
+    "visible_tissue_samples": 628,
+    "sample_grid": [
+      32,
+      24
+    ],
+    "projected_tissue_bbox_px": [
+      47.38780975341797,
+      18.16540539264679
+    ],
+    "estimated_visible_tissue_area_px": 703.8986856768336,
+    "gameplay": "Recover gives whole-body vulnerability; tissue is state feedback, not separate hitbox",
+    "visual_approved": false,
+    "visible_tissue_bbox_px": [
+      45.90694069862366,
+      17.408513501286507
+    ]
+  },
+  {
+    "lowest_vertex": {
+      "mesh": "Bulwark_Body",
+      "source_part": "HeelRubber_fore.L",
+      "source_vertex": 28,
+      "mesh_vertex": 2632,
+      "bone": "foot.fore.L",
+      "world_z": 0.005999962333589792,
+      "world_position": [
+        0.7599999308586121,
+        -0.5699999332427979,
+        0.005999962333589792
+      ]
+    },
+    "errors": [],
+    "whole_body_clipped_diagnostic": false,
+    "whole_body_required": false,
+    "label": "fps-180-6m-recover-1.00",
+    "min_z": 0.005999962333589792,
+    "screen_min": [
+      0.4121241867542267,
+      0.3553028106689453
+    ],
+    "screen_max": [
+      0.5878757238388062,
+      0.5490421056747437
+    ],
+    "state": "recover-1.00",
+    "recovery_time_seconds": 1,
+    "eye_height_m": 1.65,
+    "horizontal_distance_to_actor_m": 6,
+    "angle_degrees_from_front": 180,
+    "vertical_fov_degrees": 60,
+    "visible_tissue_samples": 628,
+    "sample_grid": [
+      32,
+      24
+    ],
+    "projected_tissue_bbox_px": [
+      47.42391586303711,
+      18.028628826141357
+    ],
+    "estimated_visible_tissue_area_px": 699.1309568883644,
+    "gameplay": "Recover gives whole-body vulnerability; tissue is state feedback, not separate hitbox",
+    "visual_approved": false,
+    "visible_tissue_bbox_px": [
+      45.9419184923172,
+      17.277435958385468
+    ]
+  },
+  {
+    "lowest_vertex": {
+      "mesh": "Bulwark_Body",
+      "source_part": "ToeShoe_fore.L_2",
+      "source_vertex": 33,
+      "mesh_vertex": 2837,
+      "bone": "foot.fore.L",
+      "world_z": 0.005999966058880091,
+      "world_position": [
+        0.8479999303817749,
+        -0.9150000214576721,
+        0.005999966058880091
+      ]
+    },
+    "errors": [],
+    "whole_body_clipped_diagnostic": false,
+    "whole_body_required": false,
+    "label": "fps-180-6m-recover-1.95",
+    "min_z": 0.005999966058880091,
+    "screen_min": [
+      0.4118691086769104,
+      0.3634369373321533
+    ],
+    "screen_max": [
+      0.5881307721138,
+      0.5633463859558105
+    ],
+    "state": "recover-1.95",
+    "recovery_time_seconds": 1.95,
+    "eye_height_m": 1.65,
+    "horizontal_distance_to_actor_m": 6,
+    "angle_degrees_from_front": 180,
+    "vertical_fov_degrees": 60,
+    "visible_tissue_samples": 630,
+    "sample_grid": [
+      32,
+      24
+    ],
+    "projected_tissue_bbox_px": [
+      47.56356239318848,
+      17.49724566936493
+    ],
+    "estimated_visible_tissue_area_px": 682.6897678976367,
+    "gameplay": "Recover gives whole-body vulnerability; tissue is state feedback, not separate hitbox",
+    "visual_approved": false,
+    "visible_tissue_bbox_px": [
+      46.07720106840134,
+      16.768193766474713
+    ]
+  },
+  {
+    "lowest_vertex": {
+      "mesh": "Bulwark_Body",
+      "source_part": "ToeShoe_fore.L_2",
+      "source_vertex": 33,
+      "mesh_vertex": 2837,
+      "bone": "foot.fore.L",
+      "world_z": 0.005999961402267218,
+      "world_position": [
+        0.8479999303817749,
+        -0.9150000214576721,
+        0.005999961402267218
+      ]
+    },
+    "errors": [],
+    "whole_body_clipped_diagnostic": true,
+    "whole_body_required": false,
+    "label": "fps-240-2m-closed",
+    "min_z": 0.005999961402267218,
+    "screen_min": [
+      0.39782941341400146,
+      -0.15743298828601837
+    ],
+    "screen_max": [
+      1.0903273820877075,
+      0.676397442817688
+    ],
+    "state": "closed",
+    "recovery_time_seconds": null,
+    "eye_height_m": 1.65,
+    "horizontal_distance_to_actor_m": 2,
+    "angle_degrees_from_front": 240,
+    "vertical_fov_degrees": 60,
+    "visible_tissue_samples": 0,
+    "sample_grid": [
+      32,
+      24
+    ],
+    "projected_tissue_bbox_px": [
+      92.60936737060547,
+      69.00064766407013
+    ],
+    "estimated_visible_tissue_area_px": 0.0,
+    "gameplay": "Recover gives whole-body vulnerability; tissue is state feedback, not separate hitbox",
+    "visual_approved": false
+  },
+  {
+    "lowest_vertex": {
+      "mesh": "Bulwark_Body",
+      "source_part": "ToeShoe_fore.L_0",
+      "source_vertex": 33,
+      "mesh_vertex": 2765,
+      "bone": "foot.fore.L",
+      "world_z": 0.00599988317117095,
+      "world_position": [
+        0.6719999313354492,
+        -1.290000081062317,
+        0.00599988317117095
+      ]
+    },
+    "errors": [],
+    "whole_body_clipped_diagnostic": true,
+    "whole_body_required": false,
+    "label": "fps-240-2m-recover-0.00",
+    "min_z": 0.00599988317117095,
+    "screen_min": [
+      0.37141209840774536,
+      -0.1233283206820488
+    ],
+    "screen_max": [
+      1.08806574344635,
+      0.6779018044471741
+    ],
+    "state": "recover-0.00",
+    "recovery_time_seconds": 0,
+    "eye_height_m": 1.65,
+    "horizontal_distance_to_actor_m": 2,
+    "angle_degrees_from_front": 240,
+    "vertical_fov_degrees": 60,
+    "visible_tissue_samples": 577,
+    "sample_grid": [
+      32,
+      24
+    ],
+    "projected_tissue_bbox_px": [
+      90.0204849243164,
+      73.02280247211456
+    ],
+    "estimated_visible_tissue_area_px": 4938.720374211891,
+    "gameplay": "Recover gives whole-body vulnerability; tissue is state feedback, not separate hitbox",
+    "visual_approved": false,
+    "visible_tissue_bbox_px": [
+      87.20734477043152,
+      69.98018570244312
+    ]
+  },
+  {
+    "lowest_vertex": {
+      "mesh": "Bulwark_Body",
+      "source_part": "HeelRubber_fore.L",
+      "source_vertex": 28,
+      "mesh_vertex": 2632,
+      "bone": "foot.fore.L",
+      "world_z": 0.005999962333589792,
+      "world_position": [
+        0.7599999308586121,
+        -0.5699999332427979,
+        0.005999962333589792
+      ]
+    },
+    "errors": [],
+    "whole_body_clipped_diagnostic": true,
+    "whole_body_required": false,
+    "label": "fps-240-2m-recover-1.00",
+    "min_z": 0.005999962333589792,
+    "screen_min": [
+      0.3700084686279297,
+      -0.15743298828601837
+    ],
+    "screen_max": [
+      1.074337124824524,
+      0.6876448392868042
+    ],
+    "state": "recover-1.00",
+    "recovery_time_seconds": 1,
+    "eye_height_m": 1.65,
+    "horizontal_distance_to_actor_m": 2,
+    "angle_degrees_from_front": 240,
+    "vertical_fov_degrees": 60,
+    "visible_tissue_samples": 577,
+    "sample_grid": [
+      32,
+      24
+    ],
+    "projected_tissue_bbox_px": [
+      90.54018974304199,
+      72.24297165870667
+    ],
+    "estimated_visible_tissue_area_px": 4914.186058114522,
+    "gameplay": "Recover gives whole-body vulnerability; tissue is state feedback, not separate hitbox",
+    "visual_approved": false,
+    "visible_tissue_bbox_px": [
+      87.71080881357193,
+      69.23284783959387
+    ]
+  },
+  {
+    "lowest_vertex": {
+      "mesh": "Bulwark_Body",
+      "source_part": "ToeShoe_fore.L_2",
+      "source_vertex": 33,
+      "mesh_vertex": 2837,
+      "bone": "foot.fore.L",
+      "world_z": 0.005999966058880091,
+      "world_position": [
+        0.8479999303817749,
+        -0.9150000214576721,
+        0.005999966058880091
+      ]
+    },
+    "errors": [],
+    "whole_body_clipped_diagnostic": true,
+    "whole_body_required": false,
+    "label": "fps-240-2m-recover-1.95",
+    "min_z": 0.005999966058880091,
+    "screen_min": [
+      0.3642975091934204,
+      -0.1574329435825348
+    ],
+    "screen_max": [
+      1.090264081954956,
+      0.7260814905166626
+    ],
+    "state": "recover-1.95",
+    "recovery_time_seconds": 1.95,
+    "eye_height_m": 1.65,
+    "horizontal_distance_to_actor_m": 2,
+    "angle_degrees_from_front": 240,
+    "vertical_fov_degrees": 60,
+    "visible_tissue_samples": 576,
+    "sample_grid": [
+      32,
+      24
+    ],
+    "projected_tissue_bbox_px": [
+      92.6012134552002,
+      69.01392459869385
+    ],
+    "estimated_visible_tissue_area_px": 4793.079872358556,
+    "gameplay": "Recover gives whole-body vulnerability; tissue is state feedback, not separate hitbox",
+    "visual_approved": false,
+    "visible_tissue_bbox_px": [
+      89.70742553472519,
+      66.13834440708159
+    ]
+  },
+  {
+    "lowest_vertex": {
+      "mesh": "Bulwark_Body",
+      "source_part": "ToeShoe_fore.L_2",
+      "source_vertex": 33,
+      "mesh_vertex": 2837,
+      "bone": "foot.fore.L",
+      "world_z": 0.005999961402267218,
+      "world_position": [
+        0.8479999303817749,
+        -0.9150000214576721,
+        0.005999961402267218
+      ]
+    },
+    "errors": [],
+    "whole_body_clipped_diagnostic": false,
+    "whole_body_required": false,
+    "label": "fps-240-4m-closed",
+    "min_z": 0.005999961402267218,
+    "screen_min": [
+      0.4477073848247528,
+      0.2250155210494995
+    ],
+    "screen_max": [
+      0.771522045135498,
+      0.5815882086753845
+    ],
+    "state": "closed",
+    "recovery_time_seconds": null,
+    "eye_height_m": 1.65,
+    "horizontal_distance_to_actor_m": 4,
+    "angle_degrees_from_front": 240,
+    "vertical_fov_degrees": 60,
+    "visible_tissue_samples": 0,
+    "sample_grid": [
+      32,
+      24
+    ],
+    "projected_tissue_bbox_px": [
+      48.93350601196289,
+      25.388250946998596
+    ],
+    "estimated_visible_tissue_area_px": 0.0,
+    "gameplay": "Recover gives whole-body vulnerability; tissue is state feedback, not separate hitbox",
+    "visual_approved": false
+  },
+  {
+    "lowest_vertex": {
+      "mesh": "Bulwark_Body",
+      "source_part": "ToeShoe_fore.L_0",
+      "source_vertex": 33,
+      "mesh_vertex": 2765,
+      "bone": "foot.fore.L",
+      "world_z": 0.00599988317117095,
+      "world_position": [
+        0.6719999313354492,
+        -1.290000081062317,
+        0.00599988317117095
+      ]
+    },
+    "errors": [],
+    "whole_body_clipped_diagnostic": false,
+    "whole_body_required": false,
+    "label": "fps-240-4m-recover-0.00",
+    "min_z": 0.00599988317117095,
+    "screen_min": [
+      0.42006540298461914,
+      0.24269744753837585
+    ],
+    "screen_max": [
+      0.7723698616027832,
+      0.5736058950424194
+    ],
+    "state": "recover-0.00",
+    "recovery_time_seconds": 0,
+    "eye_height_m": 1.65,
+    "horizontal_distance_to_actor_m": 4,
+    "angle_degrees_from_front": 240,
+    "vertical_fov_degrees": 60,
+    "visible_tissue_samples": 301,
+    "sample_grid": [
+      32,
+      24
+    ],
+    "projected_tissue_bbox_px": [
+      48.57550621032715,
+      26.772351264953613
+    ],
+    "estimated_visible_tissue_area_px": 509.6935352290105,
+    "gameplay": "Recover gives whole-body vulnerability; tissue is state feedback, not separate hitbox",
+    "visual_approved": false,
+    "visible_tissue_bbox_px": [
+      47.057521641254425,
+      25.65683662891389
+    ]
+  },
+  {
+    "lowest_vertex": {
+      "mesh": "Bulwark_Body",
+      "source_part": "HeelRubber_fore.L",
+      "source_vertex": 28,
+      "mesh_vertex": 2632,
+      "bone": "foot.fore.L",
+      "world_z": 0.005999962333589792,
+      "world_position": [
+        0.7599999308586121,
+        -0.5699999332427979,
+        0.005999962333589792
+      ]
+    },
+    "errors": [],
+    "whole_body_clipped_diagnostic": false,
+    "whole_body_required": false,
+    "label": "fps-240-4m-recover-1.00",
+    "min_z": 0.005999962333589792,
+    "screen_min": [
+      0.4262359142303467,
+      0.2250155359506607
+    ],
+    "screen_max": [
+      0.7694703340530396,
+      0.5790891647338867
+    ],
+    "state": "recover-1.00",
+    "recovery_time_seconds": 1,
+    "eye_height_m": 1.65,
+    "horizontal_distance_to_actor_m": 4,
+    "angle_degrees_from_front": 240,
+    "vertical_fov_degrees": 60,
+    "visible_tissue_samples": 292,
+    "sample_grid": [
+      32,
+      24
+    ],
+    "projected_tissue_bbox_px": [
+      48.6485481262207,
+      26.49150788784027
+    ],
+    "estimated_visible_tissue_area_px": 490.0023850963331,
+    "gameplay": "Recover gives whole-body vulnerability; tissue is state feedback, not separate hitbox",
+    "visual_approved": false,
+    "visible_tissue_bbox_px": [
+      47.128280997276306,
+      25.38769505918027
+    ]
+  },
+  {
+    "lowest_vertex": {
+      "mesh": "Bulwark_Body",
+      "source_part": "ToeShoe_fore.L_2",
+      "source_vertex": 33,
+      "mesh_vertex": 2837,
+      "bone": "foot.fore.L",
+      "world_z": 0.005999966058880091,
+      "world_position": [
+        0.8479999303817749,
+        -0.9150000214576721,
+        0.005999966058880091
+      ]
+    },
+    "errors": [],
+    "whole_body_clipped_diagnostic": false,
+    "whole_body_required": false,
+    "label": "fps-240-4m-recover-1.95",
+    "min_z": 0.005999966058880091,
+    "screen_min": [
+      0.42586633563041687,
+      0.2250155210494995
+    ],
+    "screen_max": [
+      0.7715141177177429,
+      0.6003686785697937
+    ],
+    "state": "recover-1.95",
+    "recovery_time_seconds": 1.95,
+    "eye_height_m": 1.65,
+    "horizontal_distance_to_actor_m": 4,
+    "angle_degrees_from_front": 240,
+    "vertical_fov_degrees": 60,
+    "visible_tissue_samples": 270,
+    "sample_grid": [
+      32,
+      24
+    ],
+    "projected_tissue_bbox_px": [
+      48.932390213012695,
+      25.392563939094543
+    ],
+    "estimated_visible_tissue_area_px": 436.82303221054065,
+    "gameplay": "Recover gives whole-body vulnerability; tissue is state feedback, not separate hitbox",
+    "visual_approved": false,
+    "visible_tissue_bbox_px": [
+      27.52446949481964,
+      21.160469949245464
+    ]
+  },
+  {
+    "lowest_vertex": {
+      "mesh": "Bulwark_Body",
+      "source_part": "ToeShoe_fore.L_2",
+      "source_vertex": 33,
+      "mesh_vertex": 2837,
+      "bone": "foot.fore.L",
+      "world_z": 0.005999961402267218,
+      "world_position": [
+        0.8479999303817749,
+        -0.9150000214576721,
+        0.005999961402267218
+      ]
+    },
+    "errors": [],
+    "whole_body_clipped_diagnostic": false,
+    "whole_body_required": false,
+    "label": "fps-240-6m-closed",
+    "min_z": 0.005999961402267218,
+    "screen_min": [
+      0.4657353460788727,
+      0.3376317322254181
+    ],
+    "screen_max": [
+      0.6789166927337646,
+      0.5523676872253418
+    ],
+    "state": "closed",
+    "recovery_time_seconds": null,
+    "eye_height_m": 1.65,
+    "horizontal_distance_to_actor_m": 6,
+    "angle_degrees_from_front": 240,
+    "vertical_fov_degrees": 60,
+    "visible_tissue_samples": 0,
+    "sample_grid": [
+      32,
+      24
+    ],
+    "projected_tissue_bbox_px": [
+      32.85080909729004,
+      14.778741002082825
+    ],
+    "estimated_visible_tissue_area_px": 0.0,
+    "gameplay": "Recover gives whole-body vulnerability; tissue is state feedback, not separate hitbox",
+    "visual_approved": false
+  },
+  {
+    "lowest_vertex": {
+      "mesh": "Bulwark_Body",
+      "source_part": "ToeShoe_fore.L_0",
+      "source_vertex": 33,
+      "mesh_vertex": 2765,
+      "bone": "foot.fore.L",
+      "world_z": 0.00599988317117095,
+      "world_position": [
+        0.6719999313354492,
+        -1.290000081062317,
+        0.00599988317117095
+      ]
+    },
+    "errors": [],
+    "whole_body_clipped_diagnostic": false,
+    "whole_body_required": false,
+    "label": "fps-240-6m-recover-0.00",
+    "min_z": 0.00599988317117095,
+    "screen_min": [
+      0.440181702375412,
+      0.34574583172798157
+    ],
+    "screen_max": [
+      0.6797409057617188,
+      0.5449989438056946
+    ],
+    "state": "recover-0.00",
+    "recovery_time_seconds": 0,
+    "eye_height_m": 1.65,
+    "horizontal_distance_to_actor_m": 6,
+    "angle_degrees_from_front": 240,
+    "vertical_fov_degrees": 60,
+    "visible_tissue_samples": 356,
+    "sample_grid": [
+      32,
+      24
+    ],
+    "projected_tissue_bbox_px": [
+      32.746267318725586,
+      15.372195839881897
+    ],
+    "estimated_visible_tissue_area_px": 233.3385471256411,
+    "gameplay": "Recover gives whole-body vulnerability; tissue is state feedback, not separate hitbox",
+    "visual_approved": false,
+    "visible_tissue_bbox_px": [
+      21.489737927913666,
+      14.091179519891728
+    ]
+  },
+  {
+    "lowest_vertex": {
+      "mesh": "Bulwark_Body",
+      "source_part": "HeelRubber_fore.L",
+      "source_vertex": 28,
+      "mesh_vertex": 2632,
+      "bone": "foot.fore.L",
+      "world_z": 0.005999962333589792,
+      "world_position": [
+        0.7599999308586121,
+        -0.5699999332427979,
+        0.005999962333589792
+      ]
+    },
+    "errors": [],
+    "whole_body_clipped_diagnostic": false,
+    "whole_body_required": false,
+    "label": "fps-240-6m-recover-1.00",
+    "min_z": 0.005999962333589792,
+    "screen_min": [
+      0.44511833786964417,
+      0.3376317322254181
+    ],
+    "screen_max": [
+      0.6781709790229797,
+      0.5487573146820068
+    ],
+    "state": "recover-1.00",
+    "recovery_time_seconds": 1,
+    "eye_height_m": 1.65,
+    "horizontal_distance_to_actor_m": 6,
+    "angle_degrees_from_front": 240,
+    "vertical_fov_degrees": 60,
+    "visible_tissue_samples": 361,
+    "sample_grid": [
+      32,
+      24
+    ],
+    "projected_tissue_bbox_px": [
+      32.76761054992676,
+      15.249323844909668
+    ],
+    "estimated_visible_tissue_area_px": 234.87746050624466,
+    "gameplay": "Recover gives whole-body vulnerability; tissue is state feedback, not separate hitbox",
+    "visual_approved": false,
+    "visible_tissue_bbox_px": [
+      22.527732253074646,
+      13.978546857833852
+    ]
+  },
+  {
+    "lowest_vertex": {
+      "mesh": "Bulwark_Body",
+      "source_part": "ToeShoe_fore.L_2",
+      "source_vertex": 33,
+      "mesh_vertex": 2837,
+      "bone": "foot.fore.L",
+      "world_z": 0.005999966058880091,
+      "world_position": [
+        0.8479999303817749,
+        -0.9150000214576721,
+        0.005999966058880091
+      ]
+    },
+    "errors": [],
+    "whole_body_clipped_diagnostic": false,
+    "whole_body_required": false,
+    "label": "fps-240-6m-recover-1.95",
+    "min_z": 0.005999966058880091,
+    "screen_min": [
+      0.44554200768470764,
+      0.3376317322254181
+    ],
+    "screen_max": [
+      0.6789138317108154,
+      0.5632902979850769
+    ],
+    "state": "recover-1.95",
+    "recovery_time_seconds": 1.95,
+    "eye_height_m": 1.65,
+    "horizontal_distance_to_actor_m": 6,
+    "angle_degrees_from_front": 240,
+    "vertical_fov_degrees": 60,
+    "visible_tissue_samples": 353,
+    "sample_grid": [
+      32,
+      24
+    ],
+    "projected_tissue_bbox_px": [
+      32.85046577453613,
+      14.780495166778564
+    ],
+    "estimated_visible_tissue_area_px": 223.1742072451243,
+    "gameplay": "Recover gives whole-body vulnerability; tissue is state feedback, not separate hitbox",
+    "visual_approved": false,
+    "visible_tissue_bbox_px": [
+      22.58469521999359,
+      13.548787236213695
+    ]
+  },
+  {
+    "lowest_vertex": {
+      "mesh": "Bulwark_Body",
+      "source_part": "ToeShoe_fore.L_2",
+      "source_vertex": 33,
+      "mesh_vertex": 2837,
+      "bone": "foot.fore.L",
+      "world_z": 0.005999961402267218,
+      "world_position": [
+        0.8479999303817749,
+        -0.9150000214576721,
+        0.005999961402267218
+      ]
+    },
+    "errors": [],
+    "whole_body_clipped_diagnostic": false,
+    "whole_body_required": false,
+    "label": "fps-090-4m-closed",
+    "min_z": 0.005999961402267218,
+    "screen_min": [
+      0.18950773775577545,
+      0.2147708386182785
+    ],
+    "screen_max": [
+      0.5474576950073242,
+      0.5612863898277283
+    ],
+    "state": "closed",
+    "recovery_time_seconds": null,
+    "eye_height_m": 1.65,
+    "horizontal_distance_to_actor_m": 4,
+    "angle_degrees_from_front": 90,
+    "vertical_fov_degrees": 60,
+    "visible_tissue_samples": 0,
+    "sample_grid": [
+      32,
+      24
+    ],
+    "projected_tissue_bbox_px": [
+      42.58669853210449,
+      19.3227356672287
+    ],
+    "estimated_visible_tissue_area_px": 0.0,
+    "gameplay": "Recover gives whole-body vulnerability; tissue is state feedback, not separate hitbox",
+    "visual_approved": false
+  },
+  {
+    "lowest_vertex": {
+      "mesh": "Bulwark_Body",
+      "source_part": "ToeShoe_fore.L_0",
+      "source_vertex": 33,
+      "mesh_vertex": 2765,
+      "bone": "foot.fore.L",
+      "world_z": 0.00599988317117095,
+      "world_position": [
+        0.6719999313354492,
+        -1.290000081062317,
+        0.00599988317117095
+      ]
+    },
+    "errors": [],
+    "whole_body_clipped_diagnostic": false,
+    "whole_body_required": false,
+    "label": "fps-090-4m-recover-0.00",
+    "min_z": 0.00599988317117095,
+    "screen_min": [
+      0.1871098279953003,
+      0.20484107732772827
+    ],
+    "screen_max": [
+      0.5872265100479126,
+      0.5707867741584778
+    ],
+    "state": "recover-0.00",
+    "recovery_time_seconds": 0,
+    "eye_height_m": 1.65,
+    "horizontal_distance_to_actor_m": 4,
+    "angle_degrees_from_front": 90,
+    "vertical_fov_degrees": 60,
+    "visible_tissue_samples": 275,
+    "sample_grid": [
+      32,
+      24
+    ],
+    "projected_tissue_bbox_px": [
+      42.33009338378906,
+      20.322319865226746
+    ],
+    "estimated_visible_tissue_area_px": 308.03068601474865,
+    "gameplay": "Recover gives whole-body vulnerability; tissue is state feedback, not separate hitbox",
+    "visual_approved": false,
+    "visible_tissue_bbox_px": [
+      37.03883171081543,
+      13.548213243484486
+    ]
+  },
+  {
+    "lowest_vertex": {
+      "mesh": "Bulwark_Body",
+      "source_part": "HeelRubber_fore.L",
+      "source_vertex": 28,
+      "mesh_vertex": 2632,
+      "bone": "foot.fore.L",
+      "world_z": 0.005999962333589792,
+      "world_position": [
+        0.7599999308586121,
+        -0.5699999332427979,
+        0.005999962333589792
+      ]
+    },
+    "errors": [],
+    "whole_body_clipped_diagnostic": false,
+    "whole_body_required": false,
+    "label": "fps-090-4m-recover-1.00",
+    "min_z": 0.005999962333589792,
+    "screen_min": [
+      0.19234175980091095,
+      0.21477088332176208
+    ],
+    "screen_max": [
+      0.5795696973800659,
+      0.575575053691864
+    ],
+    "state": "recover-1.00",
+    "recovery_time_seconds": 1,
+    "eye_height_m": 1.65,
+    "horizontal_distance_to_actor_m": 4,
+    "angle_degrees_from_front": 90,
+    "vertical_fov_degrees": 60,
+    "visible_tissue_samples": 254,
+    "sample_grid": [
+      32,
+      24
+    ],
+    "projected_tissue_bbox_px": [
+      42.38253593444824,
+      20.117307901382446
+    ],
+    "estimated_visible_tissue_area_px": 281.9871371859558,
+    "gameplay": "Recover gives whole-body vulnerability; tissue is state feedback, not separate hitbox",
+    "visual_approved": false,
+    "visible_tissue_bbox_px": [
+      35.760264694690704,
+      12.573317438364029
+    ]
+  },
+  {
+    "lowest_vertex": {
+      "mesh": "Bulwark_Body",
+      "source_part": "ToeShoe_fore.L_2",
+      "source_vertex": 33,
+      "mesh_vertex": 2837,
+      "bone": "foot.fore.L",
+      "world_z": 0.005999966058880091,
+      "world_position": [
+        0.8479999303817749,
+        -0.9150000214576721,
+        0.005999966058880091
+      ]
+    },
+    "errors": [],
+    "whole_body_clipped_diagnostic": false,
+    "whole_body_required": false,
+    "label": "fps-090-4m-recover-1.95",
+    "min_z": 0.005999966058880091,
+    "screen_min": [
+      0.18951869010925293,
+      0.2147708386182785
+    ],
+    "screen_max": [
+      0.5800443291664124,
+      0.594132125377655
+    ],
+    "state": "recover-1.95",
+    "recovery_time_seconds": 1.95,
+    "eye_height_m": 1.65,
+    "horizontal_distance_to_actor_m": 4,
+    "angle_degrees_from_front": 90,
+    "vertical_fov_degrees": 60,
+    "visible_tissue_samples": 165,
+    "sample_grid": [
+      32,
+      24
+    ],
+    "projected_tissue_bbox_px": [
+      42.5859260559082,
+      19.32542324066162
+    ],
+    "estimated_visible_tissue_area_px": 176.81448235127738,
+    "gameplay": "Recover gives whole-body vulnerability; tissue is state feedback, not separate hitbox",
+    "visual_approved": false,
+    "visible_tissue_bbox_px": [
+      30.60863435268402,
+      9.66271162033081
+    ]
+  },
+  {
+    "lowest_vertex": {
+      "mesh": "Bulwark_Body",
+      "source_part": "ToeShoe_fore.L_2",
+      "source_vertex": 33,
+      "mesh_vertex": 2837,
+      "bone": "foot.fore.L",
+      "world_z": 0.005999961402267218,
+      "world_position": [
+        0.8479999303817749,
+        -0.9150000214576721,
+        0.005999961402267218
+      ]
+    },
+    "errors": [],
+    "whole_body_clipped_diagnostic": false,
+    "whole_body_required": false,
+    "label": "fps-270-4m-closed",
+    "min_z": 0.005999961402267218,
+    "screen_min": [
+      0.4525422751903534,
+      0.2147708386182785
+    ],
+    "screen_max": [
+      0.8104922771453857,
+      0.5612863898277283
+    ],
+    "state": "closed",
+    "recovery_time_seconds": null,
+    "eye_height_m": 1.65,
+    "horizontal_distance_to_actor_m": 4,
+    "angle_degrees_from_front": 270,
+    "vertical_fov_degrees": 60,
+    "visible_tissue_samples": 0,
+    "sample_grid": [
+      32,
+      24
+    ],
+    "projected_tissue_bbox_px": [
+      42.58669853210449,
+      19.3227356672287
+    ],
+    "estimated_visible_tissue_area_px": 0.0,
+    "gameplay": "Recover gives whole-body vulnerability; tissue is state feedback, not separate hitbox",
+    "visual_approved": false
+  },
+  {
+    "lowest_vertex": {
+      "mesh": "Bulwark_Body",
+      "source_part": "ToeShoe_fore.L_0",
+      "source_vertex": 33,
+      "mesh_vertex": 2765,
+      "bone": "foot.fore.L",
+      "world_z": 0.00599988317117095,
+      "world_position": [
+        0.6719999313354492,
+        -1.290000081062317,
+        0.00599988317117095
+      ]
+    },
+    "errors": [],
+    "whole_body_clipped_diagnostic": false,
+    "whole_body_required": false,
+    "label": "fps-270-4m-recover-0.00",
+    "min_z": 0.00599988317117095,
+    "screen_min": [
+      0.42055249214172363,
+      0.22428584098815918
+    ],
+    "screen_max": [
+      0.8128901720046997,
+      0.5707867741584778
+    ],
+    "state": "recover-0.00",
+    "recovery_time_seconds": 0,
+    "eye_height_m": 1.65,
+    "horizontal_distance_to_actor_m": 4,
+    "angle_degrees_from_front": 270,
+    "vertical_fov_degrees": 60,
+    "visible_tissue_samples": 275,
+    "sample_grid": [
+      32,
+      24
+    ],
+    "projected_tissue_bbox_px": [
+      42.330121994018555,
+      20.322319865226746
+    ],
+    "estimated_visible_tissue_area_px": 308.0308942077365,
+    "gameplay": "Recover gives whole-body vulnerability; tissue is state feedback, not separate hitbox",
+    "visual_approved": false,
+    "visible_tissue_bbox_px": [
+      37.038856744766235,
+      13.548213243484486
+    ]
+  },
+  {
+    "lowest_vertex": {
+      "mesh": "Bulwark_Body",
+      "source_part": "HeelRubber_fore.L",
+      "source_vertex": 28,
+      "mesh_vertex": 2632,
+      "bone": "foot.fore.L",
+      "world_z": 0.005999962333589792,
+      "world_position": [
+        0.7599999308586121,
+        -0.5699999332427979,
+        0.005999962333589792
+      ]
+    },
+    "errors": [],
+    "whole_body_clipped_diagnostic": false,
+    "whole_body_required": false,
+    "label": "fps-270-4m-recover-1.00",
+    "min_z": 0.005999962333589792,
+    "screen_min": [
+      0.4204303026199341,
+      0.23456783592700958
+    ],
+    "screen_max": [
+      0.8076582551002502,
+      0.575575053691864
+    ],
+    "state": "recover-1.00",
+    "recovery_time_seconds": 1,
+    "eye_height_m": 1.65,
+    "horizontal_distance_to_actor_m": 4,
+    "angle_degrees_from_front": 270,
+    "vertical_fov_degrees": 60,
+    "visible_tissue_samples": 254,
+    "sample_grid": [
+      32,
+      24
+    ],
+    "projected_tissue_bbox_px": [
+      42.382564544677734,
+      20.117307901382446
+    ],
+    "estimated_visible_tissue_area_px": 281.98732754069823,
+    "gameplay": "Recover gives whole-body vulnerability; tissue is state feedback, not separate hitbox",
+    "visual_approved": false,
+    "visible_tissue_bbox_px": [
+      35.76028883457184,
+      12.573317438364029
+    ]
+  },
+  {
+    "lowest_vertex": {
+      "mesh": "Bulwark_Body",
+      "source_part": "ToeShoe_fore.L_2",
+      "source_vertex": 33,
+      "mesh_vertex": 2837,
+      "bone": "foot.fore.L",
+      "world_z": 0.005999966058880091,
+      "world_position": [
+        0.8479999303817749,
+        -0.9150000214576721,
+        0.005999966058880091
+      ]
+    },
+    "errors": [],
+    "whole_body_clipped_diagnostic": false,
+    "whole_body_required": false,
+    "label": "fps-270-4m-recover-1.95",
+    "min_z": 0.005999966058880091,
+    "screen_min": [
+      0.41995564103126526,
+      0.2147708386182785
+    ],
+    "screen_max": [
+      0.8104813098907471,
+      0.594132125377655
+    ],
+    "state": "recover-1.95",
+    "recovery_time_seconds": 1.95,
+    "eye_height_m": 1.65,
+    "horizontal_distance_to_actor_m": 4,
+    "angle_degrees_from_front": 270,
+    "vertical_fov_degrees": 60,
+    "visible_tissue_samples": 165,
+    "sample_grid": [
+      32,
+      24
+    ],
+    "projected_tissue_bbox_px": [
+      42.58589744567871,
+      19.32542324066162
+    ],
+    "estimated_visible_tissue_area_px": 176.81436356313807,
+    "gameplay": "Recover gives whole-body vulnerability; tissue is state feedback, not separate hitbox",
+    "visual_approved": false,
+    "visible_tissue_bbox_px": [
+      30.608613789081573,
+      9.66271162033081
+    ]
+  },
+  {
+    "lowest_vertex": {
+      "mesh": "Bulwark_Body",
+      "source_part": "ToeShoe_fore.L_2",
+      "source_vertex": 33,
+      "mesh_vertex": 2837,
+      "bone": "foot.fore.L",
+      "world_z": 0.005999961402267218,
+      "world_position": [
+        0.8479999303817749,
+        -0.9150000214576721,
+        0.005999961402267218
+      ]
+    },
+    "errors": [],
+    "whole_body_clipped_diagnostic": false,
+    "whole_body_required": false,
+    "label": "fps-000-4m-closed",
+    "min_z": 0.005999961402267218,
+    "screen_min": [
+      0.3713863492012024,
+      0.2103477269411087
+    ],
+    "screen_max": [
+      0.6286136507987976,
+      0.5388636589050293
+    ],
+    "state": "closed",
+    "recovery_time_seconds": null,
+    "eye_height_m": 1.65,
+    "horizontal_distance_to_actor_m": 4,
+    "angle_degrees_from_front": 0,
+    "vertical_fov_degrees": 60,
+    "visible_tissue_samples": 0,
+    "sample_grid": [
+      32,
+      24
+    ],
+    "projected_tissue_bbox_px": [
+      51.85993194580078,
+      9.213130474090576
+    ],
+    "estimated_visible_tissue_area_px": 0.0,
+    "gameplay": "Recover gives whole-body vulnerability; tissue is state feedback, not separate hitbox",
+    "visual_approved": false
+  },
+  {
+    "lowest_vertex": {
+      "mesh": "Bulwark_Body",
+      "source_part": "ToeShoe_fore.L_2",
+      "source_vertex": 33,
+      "mesh_vertex": 2837,
+      "bone": "foot.fore.L",
+      "world_z": 0.005999961402267218,
+      "world_position": [
+        0.8479999303817749,
+        -0.9150000214576721,
+        0.005999961402267218
+      ]
+    },
+    "errors": [],
+    "whole_body_clipped_diagnostic": false,
+    "whole_body_required": false,
+    "label": "fps-045-4m-closed",
+    "min_z": 0.005999961402267218,
+    "screen_min": [
+      0.23257222771644592,
+      0.16529260575771332
+    ],
+    "screen_max": [
+      0.5841528177261353,
+      0.543323278427124
+    ],
+    "state": "closed",
+    "recovery_time_seconds": null,
+    "eye_height_m": 1.65,
+    "horizontal_distance_to_actor_m": 4,
+    "angle_degrees_from_front": 45,
+    "vertical_fov_degrees": 60,
+    "visible_tissue_samples": 0,
+    "sample_grid": [
+      32,
+      24
+    ],
+    "projected_tissue_bbox_px": [
+      48.27578544616699,
+      12.216614484786987
+    ],
+    "estimated_visible_tissue_area_px": 0.0,
+    "gameplay": "Recover gives whole-body vulnerability; tissue is state feedback, not separate hitbox",
+    "visual_approved": false
+  },
+  {
+    "lowest_vertex": {
+      "mesh": "Bulwark_Body",
+      "source_part": "ToeShoe_fore.L_2",
+      "source_vertex": 33,
+      "mesh_vertex": 2837,
+      "bone": "foot.fore.L",
+      "world_z": 0.005999961402267218,
+      "world_position": [
+        0.8479999303817749,
+        -0.9150000214576721,
+        0.005999961402267218
+      ]
+    },
+    "errors": [],
+    "whole_body_clipped_diagnostic": false,
+    "whole_body_required": false,
+    "label": "fps-315-4m-closed",
+    "min_z": 0.005999961402267218,
+    "screen_min": [
+      0.41584715247154236,
+      0.16529260575771332
+    ],
+    "screen_max": [
+      0.7674277424812317,
+      0.543323278427124
+    ],
+    "state": "closed",
+    "recovery_time_seconds": null,
+    "eye_height_m": 1.65,
+    "horizontal_distance_to_actor_m": 4,
+    "angle_degrees_from_front": 315,
+    "vertical_fov_degrees": 60,
+    "visible_tissue_samples": 0,
+    "sample_grid": [
+      32,
+      24
+    ],
+    "projected_tissue_bbox_px": [
+      48.27578544616699,
+      12.216614484786987
+    ],
+    "estimated_visible_tissue_area_px": 0.0,
+    "gameplay": "Recover gives whole-body vulnerability; tissue is state feedback, not separate hitbox",
+    "visual_approved": false
+  }
+]

@@ -1,0 +1,10 @@
+{
+  "status": "COMPLETE_TECHNICAL_EVIDENCE_NOT_VISUAL_APPROVAL",
+  "phase": "static",
+  "errors": [],
+  "visual_approved": false,
+  "unity_verified": false,
+  "run_id": "37951527844",
+  "run_attempt": "1",
+  "source_commit": "4137776d60283ff6b38f46664758b497a275a84e"
+}

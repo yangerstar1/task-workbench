@@ -1,0 +1,13 @@
+{
+  "sha256": {
+    "README.md": "d86719fbf33e0fc0f44ca6bf090a4910218ab6d5f2a267e37c577a73e1786039",
+    "art-lock.json": "e7382c6fb61ec8e173db0b703451cbe496c458e142616c3b519a8426402a9134",
+    "package_technical.py": "436228b91d1151e02c9139d1bc396f928c53e8118cd3da1e813176bb412739b6",
+    "plan.py": "622ecb5b834663caef5bea5f0df5f00c6de88bb793480ee7cf09eed4f92834db",
+    "staged.py": "bf1ce470fb48e04595519da6a34017490c453838380e6039d004d6a94b33fb09",
+    "static-prerequisite/STATUS.json": "3cbe78aef69b35215989279d0daaf7165000a6a93268d84f061a0bbd30e4136f",
+    "static-prerequisite/provenance.json": "a254d07a08a224a8fbaa013581e53956885939247f24197442461c1382fed1a0",
+    "static-prerequisite/static-checks.json": "aac9f624fd47889536e0f424807a5b2bbf5902de328c08b9e665c1f1c2628b65",
+    "test_technical.py": "a8f698f86108216fee9714abe3ffa880781f1b6e21adae59022254e10cb5c42e"
+  }
+}

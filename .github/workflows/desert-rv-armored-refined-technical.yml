@@ -1,0 +1,182 @@
+name: Desert RV refined armored r1 technical source export
+on:
+  push:
+    branches: [main]
+    paths: [.github/dispatch/desert-rv-armored-v004-r1-technical-20261009.json]
+  workflow_dispatch:
+    inputs:
+      phase:
+        description: 'Export full source assets only; no diagnostic movies or Unity approval'
+        type: choice
+        options: [technical]
+        default: technical
+permissions:
+  contents: read
+concurrency:
+  group: desert-rv-armored-refined-r1-technical
+  cancel-in-progress: false
+jobs:
+  candidate:
+    if: github.repository == 'yangerstar1/task-workbench' && github.actor == github.repository_owner && (github.event_name == 'workflow_dispatch' || github.event_name == 'push') && github.event.repository.private == false && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      ART_SOURCE: tasks/desert-rv/art/armored-refined-v004
+      REQUESTED_PHASE: technical
+      EXECUTOR: tasks/desert-rv/art/armored-refined-staged-v004
+    steps:
+      - name: Bind isolated runner output path
+        shell: bash
+        run: printf 'ART_ROOT=%s/bulwark-%s-%s\n' "$RUNNER_TEMP" "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" >> "$GITHUB_ENV"
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+          lfs: false
+          fetch-depth: 2
+      - name: Validate fixed single-commit static request
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PYGUARD'
+          import hashlib, json, os, pathlib, re, stat, subprocess
+          
+          EXPECTED_PARENT = '4137776d60283ff6b38f46664758b497a275a84e'
+          EXPECTED_SOURCE = 'e7cc6db0032ed5265e4696eb2069d25c5bde20612e7eff67fb038b2137cf7264'
+          EXPECTED_REQUEST = 'desert-rv-armored-v004-r1-technical-20261009-d547a90c'
+          REQUEST_PATH = '.github/dispatch/desert-rv-armored-v004-r1-technical-20261009.json'
+          def require(condition, reason):
+              if not condition:
+                  raise SystemExit('STATIC_REQUEST_REJECTED: ' + reason)
+          def unique_object(pairs):
+              result = {}
+              for key, value in pairs:
+                  require(key not in result, 'duplicate JSON key')
+                  result[key] = value
+              return result
+          require(os.environ.get('GITHUB_WORKFLOW_REF') == 'yangerstar1/task-workbench/.github/workflows/desert-rv-armored-refined-technical.yml@refs/heads/main', 'workflow identity')
+          event = json.loads(pathlib.Path(os.environ['GITHUB_EVENT_PATH']).read_text(), object_pairs_hook=unique_object)
+          require(re.fullmatch(r'[0-9a-f]{40}', EXPECTED_PARENT) is not None, 'unresolved parent pin')
+          require(os.environ.get('GITHUB_REPOSITORY') == 'yangerstar1/task-workbench', 'repository')
+          require(os.environ.get('GITHUB_REPOSITORY_OWNER') == 'yangerstar1', 'owner')
+          require(os.environ.get('GITHUB_ACTOR') == 'yangerstar1', 'actor')
+          require(os.environ.get('GITHUB_TRIGGERING_ACTOR') == 'yangerstar1', 'triggering actor')
+          require(os.environ.get('GITHUB_REF') == 'refs/heads/main', 'branch')
+          require(os.environ.get('GITHUB_RUN_ATTEMPT') == '1', 'run attempt')
+          repo = event.get('repository', {})
+          require(repo.get('full_name') == 'yangerstar1/task-workbench' and repo.get('private') is False, 'public repository')
+          require(repo.get('owner', {}).get('login') == 'yangerstar1', 'event owner')
+          require(event.get('sender', {}).get('login') == 'yangerstar1', 'event actor')
+          head = subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip()
+          require(os.environ.get('GITHUB_SHA') == head, 'head SHA')
+          parents = subprocess.check_output(['git', 'rev-list', '--parents', '-n', '1', 'HEAD'], text=True).split()
+          require(parents == [head, EXPECTED_PARENT], 'unique parent')
+          kind = os.environ.get('GITHUB_EVENT_NAME')
+          if kind == 'push':
+              require(event.get('ref') == 'refs/heads/main', 'event branch')
+              require(event.get('before') == EXPECTED_PARENT, 'push before')
+              require(event.get('after') == head, 'push after')
+              require(event.get('created') is False and event.get('deleted') is False and event.get('forced') is False, 'push mode')
+              require([c.get('id') for c in event.get('commits', [])] == [head], 'single push commit')
+          elif kind == 'workflow_dispatch':
+              require(event.get('inputs') == {'phase': 'technical'}, 'manual static only')
+          else:
+              require(False, 'event kind')
+          request_file = pathlib.Path(REQUEST_PATH)
+          request_stat = request_file.lstat()
+          require(stat.S_ISREG(request_stat.st_mode) and not request_file.is_symlink(), 'request regular non-symlink file')
+          require(0 < request_stat.st_size <= 4096, 'request byte limit')
+          request_bytes = request_file.read_bytes()
+          require(len(request_bytes) == request_stat.st_size, 'request stable length')
+          tracked = subprocess.check_output(['git', 'show', 'HEAD:' + REQUEST_PATH])
+          require(request_bytes == tracked, 'request committed bytes')
+          prior_entry = subprocess.check_output(['git', 'ls-tree', EXPECTED_PARENT, '--', REQUEST_PATH], text=True)
+          require(prior_entry == '', 'request must be newly added')
+          request = json.loads(request_bytes, object_pairs_hook=unique_object)
+          require(set(request) == {'schemaVersion', 'requestId', 'parentCommit', 'sourceManifestSha256', 'executionManifestSha256'}, 'request exact keys')
+          require(type(request['schemaVersion']) is int and request['schemaVersion'] == 1, 'schema version')
+          require(request['requestId'] == EXPECTED_REQUEST, 'request nonce')
+          require(request['parentCommit'] == EXPECTED_PARENT, 'request parent')
+          require(request['sourceManifestSha256'] == EXPECTED_SOURCE, 'request manifest')
+          manifest = pathlib.Path('tasks/desert-rv/art/armored-refined-v004/source-manifest.json')
+          require(hashlib.sha256(manifest.read_bytes()).hexdigest() == EXPECTED_SOURCE, 'actual source manifest')
+          
+          
+          require(request['executionManifestSha256'] == 'a80e25b084e03aa855f18de6c312aafe11ad6a989ea2cb5709bbe68ef60008df', 'request executor manifest')
+          require(hashlib.sha256(pathlib.Path('tasks/desert-rv/art/armored-refined-staged-v004/execution-manifest.json').read_bytes()).hexdigest() == 'a80e25b084e03aa855f18de6c312aafe11ad6a989ea2cb5709bbe68ef60008df', 'actual executor manifest')
+          print('TECHNICAL_REQUEST_ACCEPTED: export-first only; pinned single commit; first attempt')
+          PYGUARD
+      - name: Validate source and explicit phase gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$REQUESTED_PHASE" == technical ]]
+          python3 "$ART_SOURCE/test_static.py"
+          python3 "$ART_SOURCE/test_refinement.py"
+          python3 "$ART_SOURCE/validate_runtime_contract.py" --actor tasks/desert-rv/unity/Assets/DesertRV/Runtime/BeastActor.cs
+          python3 "$EXECUTOR/package_technical.py" --verify-static
+          python3 "$EXECUTOR/test_technical.py"
+          test ! -e "$ART_ROOT"
+          mkdir -p "$ART_ROOT"
+      - name: Install official checksum-verified Blender 4.2.3 and evidence tools
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends libxkbcommon0 libsm6 libxi6 libxrender1 libxxf86vm1 libgl1 ffmpeg
+          mkdir -p "$RUNNER_TEMP/bulwark-blender"
+          cd "$RUNNER_TEMP/bulwark-blender"
+          base=https://download.blender.org/release/Blender4.2
+          curl --fail --location --retry 3 --max-time 180 "$base/blender-4.2.3-linux-x64.tar.xz" -o blender-4.2.3-linux-x64.tar.xz
+          curl --fail --location --retry 3 --max-time 60 "$base/blender-4.2.3.sha256" -o upstream.sha256
+          grep -E '[ *]blender-4\.2\.3-linux-x64\.tar\.xz$' upstream.sha256 > selected.sha256
+          test "$(wc -l < selected.sha256)" -eq 1
+          sha256sum --check selected.sha256
+          tar -xf blender-4.2.3-linux-x64.tar.xz
+          cp selected.sha256 "$ART_ROOT/blender-upstream.sha256"
+          echo "$RUNNER_TEMP/bulwark-blender/blender-4.2.3-linux-x64" >> "$GITHUB_PATH"
+      - name: Bind run provenance to complete source and official binary
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 "$ART_SOURCE/write_provenance.py" --root "$ART_ROOT" --workflow .github/workflows/desert-rv-armored-refined-technical.yml
+      - name: Evaluate and export complete source assets without videos
+        id: technical
+        shell: bash
+        run: |
+          set -uo pipefail
+          set +e
+          timeout --signal=TERM --kill-after=30s 20m blender --background --factory-startup --threads 4 --python-exit-code 1 --python "$EXECUTOR/staged.py" -- --stage technical --output "$ART_ROOT/technical" 2>&1 | tee "$ART_ROOT/technical.log"
+          statuses=("${PIPESTATUS[@]}")
+          code=${statuses[0]}
+          if [[ "${statuses[1]}" != 0 ]]; then code=${statuses[1]}; fi
+          printf '%s\n' "$code" > "$ART_ROOT/technical.exit"
+          exit "$code"
+      - name: Package explicit technical FULL source contract
+        if: always() && (steps.technical.outcome == 'success' || steps.technical.outcome == 'failure' || steps.technical.outcome == 'cancelled')
+        shell: bash
+        run: |
+          set -euo pipefail
+          code=1
+          if [[ -f "$ART_ROOT/technical.exit" ]]; then code=$(cat "$ART_ROOT/technical.exit"); fi
+          python3 "$EXECUTOR/package_technical.py" --source "$ART_ROOT/technical" --output "$ART_ROOT/technical-package" --exit-code "$code"
+      - name: Upload bounded technical assets and partial failures
+        if: always() && (steps.technical.outcome == 'success' || steps.technical.outcome == 'failure' || steps.technical.outcome == 'cancelled')
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: armored-v004-r1-technical-source-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ env.ART_ROOT }}/technical-package/
+          if-no-files-found: error
+          retention-days: 14
+          compression-level: 6
+      - name: Upload allowlisted diagnostics
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: armored-v004-r1-technical-diagnostics-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            ${{ env.ART_ROOT }}/*.log
+            ${{ env.ART_ROOT }}/*.exit
+            ${{ env.ART_ROOT }}/provenance.json
+            ${{ env.ART_ROOT }}/blender-upstream.sha256
+          if-no-files-found: warn
+          retention-days: 14
