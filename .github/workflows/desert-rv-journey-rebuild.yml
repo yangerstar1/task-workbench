@@ -2,7 +2,7 @@ name: Desert RV restore verified Journey and rebuild candidate Linux
 on:
   push:
     branches: [journey-linux-export-recovery-938]
-    paths: [.github/dispatch/desert-rv-rebuild-linux-symbol-20261009.json]
+    paths: [.github/dispatch/desert-rv-rebuild-python-cache-20261009.json]
   workflow_dispatch:
     inputs:
       transition_sha256:
@@ -39,6 +39,57 @@ jobs:
         run: |
           /usr/bin/python3 tasks/desert-rv/scripts/test_journey_rebuild_dispatch.py
           /usr/bin/python3 tasks/desert-rv/scripts/journey_rebuild_dispatch.py
+      - name: Observe fixed official image availability before any pull or license
+        id: image_precheck
+        run: |
+          /usr/bin/python3 tasks/desert-rv/scripts/test_environment_image_precheck.py
+          test ! -e tasks/desert-rv/journey-image-precheck.json
+          test ! -L tasks/desert-rv/journey-image-precheck.json
+          set -o noclobber
+          exec 3> tasks/desert-rv/journey-image-precheck.json
+          set +e
+          /usr/bin/python3 tasks/desert-rv/scripts/environment_image_precheck.py >&3
+          precheck_exit=$?
+          set -e
+          exec 3>&-
+          echo 'report_written=true' >> "$GITHUB_OUTPUT"
+          PRECHECK_EXIT="$precheck_exit" /usr/bin/python3 - <<'PYCODE'
+          import json, os, pathlib, sys
+          sys.path.insert(0, 'tasks/desert-rv/scripts')
+          import environment_image_precheck as check
+          path=pathlib.Path('tasks/desert-rv/journey-image-precheck.json')
+          assert path.is_file() and not path.is_symlink() and 0 < path.stat().st_size <= 16384
+          value=json.loads(path.read_text(), object_pairs_hook=check.unique_object)
+          assert check.validate_report(value)
+          assert os.environ['PRECHECK_EXIT'] == ('0' if value['status']=='PASS' else '2')
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as output: output.write('report_valid=true\n')
+          PYCODE
+          exit "$precheck_exit"
+      - name: Validate bounded image observation and actual step outcome
+        id: image_report
+        if: always() && steps.image_precheck.outputs.report_written == 'true' && steps.image_precheck.outputs.report_valid == 'true'
+        env:
+          PRECHECK_OUTCOME: ${{ steps.image_precheck.outcome }}
+        run: |
+          /usr/bin/python3 - <<'PYCODE'
+          import json, os, pathlib, sys
+          sys.path.insert(0, 'tasks/desert-rv/scripts')
+          import environment_image_precheck as check
+          path=pathlib.Path('tasks/desert-rv/journey-image-precheck.json')
+          assert path.is_file() and not path.is_symlink() and 0 < path.stat().st_size <= 16384
+          value=json.loads(path.read_text(), object_pairs_hook=check.unique_object)
+          assert check.validate_report(value)
+          assert os.environ['PRECHECK_OUTCOME'] == ('success' if value['status']=='PASS' else 'failure')
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as output: output.write('export_ready=true\n')
+          PYCODE
+      - name: Upload only validated fixed image availability observation
+        if: always() && steps.image_precheck.outputs.report_written == 'true' && steps.image_report.outputs.export_ready == 'true'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: journey-image-precheck-${{ github.run_id }}-${{ github.run_attempt }}
+          path: tasks/desert-rv/journey-image-precheck.json
+          if-no-files-found: error
+          retention-days: 7
       - name: Verify fresh source and restore exact original font
         run: |
           python3 tasks/desert-rv/scripts/verify_evidence.py guard
@@ -54,6 +105,11 @@ jobs:
           /usr/bin/python3 tasks/desert-rv/art/journey-preparation/test_linux_build_input.py
           /usr/bin/python3 tasks/desert-rv/scripts/player/test_journey_linux_export.py
           python3 tasks/desert-rv/art/journey-preparation/restore_preparation.py stage --policy-sha256 "$TRANSITION_SHA"
+      - name: Verify non-root host union across real root-owned bytecode caches
+        env:
+          JOURNEY_HOSTED_ROOT_CACHE_TEST: '1'
+          MANUAL_TRANSITION_SHA: ${{ inputs.transition_sha256 }}
+        run: /usr/bin/python3 tasks/desert-rv/scripts/rendered/test_prepared_source.py
       - name: Prepare existing licensed runner after input validation
         env:
           UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}

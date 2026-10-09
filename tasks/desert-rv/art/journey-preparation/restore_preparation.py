@@ -27,6 +27,8 @@ _ALLOWED=(
  'tasks/desert-rv/scripts/player/journey_linux_container.sh',
  'tasks/desert-rv/scripts/journey_rebuild_dispatch.py','tasks/desert-rv/scripts/test_journey_rebuild_dispatch.py',
  'tasks/desert-rv/scripts/prepare_runner.sh',
+ 'tasks/desert-rv/scripts/rendered/prepared_source.py','tasks/desert-rv/scripts/rendered/test_prepared_source.py',
+ 'tasks/desert-rv/scripts/environment_image_precheck.py','tasks/desert-rv/scripts/test_environment_image_precheck.py',
  'tasks/desert-rv/art/journey-preparation/pipeline.py','tasks/desert-rv/scripts/rendered/Rendered.Dockerfile',
  'tasks/desert-rv/scripts/player/TemplateProbe.Dockerfile','tasks/desert-rv/scripts/player/journey_linux_template_probe.py',
  'tasks/desert-rv/scripts/player/test_journey_linux_template_probe.py',

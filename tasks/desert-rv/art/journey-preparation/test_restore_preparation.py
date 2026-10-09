@@ -24,6 +24,12 @@ class SourceTransitionTests(unittest.TestCase):
   self.assertEqual(self.policy['changes'],self.check())
   self.after['files'][-1]['sha256']='a'*64;self.rejects('EXACT_SOURCE_DIFF')
   self.after['files'][-1]['sha256']='f'*64;self.after['files'][-1]['path']='tasks/desert-rv/scripts/player/unreviewed_container.sh';self.rejects('UNREVIEWED_SOURCE')
+ def test_four_exact_cache_and_image_host_paths_need_individual_byte_pins(self):
+  for name in ('tasks/desert-rv/scripts/rendered/prepared_source.py','tasks/desert-rv/scripts/rendered/test_prepared_source.py','tasks/desert-rv/scripts/environment_image_precheck.py','tasks/desert-rv/scripts/test_environment_image_precheck.py'):
+   self.after['files'].append(dict(path=name,sha256='e'*64,size=9))
+   self.policy['changes'].append(dict(path=name,beforeSha256='',beforeBytes=0,afterSha256='e'*64,afterBytes=9))
+  self.policy['changes'].sort(key=lambda row:row['path']);self.assertEqual(self.policy['changes'],self.check())
+  self.after['files'][-1]['sha256']='f'*64;self.rejects('EXACT_SOURCE_DIFF')
  def test_unlisted_runtime_change_rejected(self):self.after['files'].append(dict(path='tasks/desert-rv/unity/Assets/DesertRV/Runtime/JourneyActions.cs',sha256='e'*64,size=9));self.rejects('UNREVIEWED_SOURCE')
  def test_unlisted_asset_change_rejected(self):self.after['files'].append(dict(path='tasks/desert-rv/unity/Assets/Original.asset',sha256='e'*64,size=9));self.rejects('UNREVIEWED_SOURCE')
  def test_contract_change_rejected(self):self.after['files'].append(dict(path='tasks/desert-rv/art/import-candidate/contracts/weapon.json',sha256='e'*64,size=9));self.rejects('UNREVIEWED_SOURCE')

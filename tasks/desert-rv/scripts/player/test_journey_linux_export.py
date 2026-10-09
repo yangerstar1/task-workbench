@@ -351,6 +351,17 @@ class JourneyLinuxExportTests(unittest.TestCase):
   with patch.object(x,'TASK',self.root),patch.object(x,'CONTROL',control),patch.object(x,'PUBLIC',output):
    self.assertEqual(x.export(),1)
   status=json.loads((output/'status.json').read_text());self.assertIsNone(status['control']);self.assertNotIn('PRIVATE',(output/'status.json').read_text());self.assertFalse(status['playerExported'])
+ def test_container_disables_bytecode_before_every_python_child(self):
+  import subprocess,sys
+  shell=pathlib.Path(__file__).with_name('journey_linux_container.sh').read_text();assignment='export PYTHONDONTWRITEBYTECODE=1'
+  self.assertEqual(shell.count(assignment),1);self.assertLess(shell.index(assignment),shell.index('python3 '))
+  env={k:v for k,v in os.environ.items() if k not in {'PYTHONDONTWRITEBYTECODE','PYTHONPYCACHEPREFIX'}}
+  for disabled in (False,True):
+   folder=self.root/('no-cache' if disabled else 'cache-control');folder.mkdir();(folder/'fixture_module.py').write_text('VALUE=1\n')
+   # Execute the exact source assignment through Bash, then an actual separate Python import.
+   command=('set -euo pipefail\numask 077\n'+(assignment+'\n' if disabled else '')+'exec "$1" -c "import fixture_module"')
+   subprocess.run(['bash','-c',command,'fixture',sys.executable],cwd=folder,env=env,check=True,capture_output=True)
+   self.assertEqual((folder/'__pycache__').exists(),not disabled)
  def test_no_player_launch_and_pinned_batch_workflow(self):
   root=pathlib.Path(__file__).resolve().parents[4];shell=(root/'tasks/desert-rv/scripts/player/journey_linux_container.sh').read_text();flow=(root/'.github/workflows/desert-rv-journey-prepare.yml').read_text()
   self.assertIn('65m unity-editor',shell);self.assertIn('else\n  build_exit=$?',shell);self.assertIn('JourneyCandidateLinuxBuild.BuildPreparedLinuxDiagnostic',shell)

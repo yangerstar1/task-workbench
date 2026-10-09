@@ -25,7 +25,7 @@ class PushIdentityTests(unittest.TestCase):
  def test_nonfinite_json_rejected(self):self.reject('JSON_CONSTANT',raw=b'{"schema":NaN}')
  def test_boolean_schema_rejected(self):self.request['schema']=True;self.reject('REQUEST_IDENTITY')
  def test_consumed_first_request_cannot_authorize_new_run(self):
-  for nonce,parent in [('desert-rv-rebuild-performance-20261009-once','9abf31160845852d6b1eaffcf432522f60258a0a'),('desert-rv-rebuild-performance350-20261009-once','be129aef52363202d7d3cbb51c28281075bef0b5'),('desert-rv-rebuild-export-recovery938-20261009-once','93886445d69597efa0dbf190340b61a6f9ea447c'),('desert-rv-linux-template-probe-20261009-once','dac4109a2a643f25760b9761ea71454e23981e8f'),('desert-rv-rebuild-linux-layout-20261009-once','4ac351190f97783a9b99621a1a8e6bed954f0f9e')]:
+  for nonce,parent in [('desert-rv-rebuild-performance-20261009-once','9abf31160845852d6b1eaffcf432522f60258a0a'),('desert-rv-rebuild-performance350-20261009-once','be129aef52363202d7d3cbb51c28281075bef0b5'),('desert-rv-rebuild-export-recovery938-20261009-once','93886445d69597efa0dbf190340b61a6f9ea447c'),('desert-rv-linux-template-probe-20261009-once','dac4109a2a643f25760b9761ea71454e23981e8f'),('desert-rv-rebuild-linux-layout-20261009-once','4ac351190f97783a9b99621a1a8e6bed954f0f9e'),('desert-rv-rebuild-linux-symbol-20261009-once','4bcc86731f7a030ee31b78017ad9ad27f1997383')]:
    self.request['requestId']=nonce;self.request['baseCommit']=parent;self.reject('REQUEST_IDENTITY')
  def test_wrong_nonce_rejected(self):self.request['requestId']='other';self.reject('REQUEST_IDENTITY')
  def test_wrong_request_base_rejected(self):self.request['baseCommit']='c'*40;self.reject('REQUEST_IDENTITY')
@@ -58,6 +58,59 @@ class PushIdentityTests(unittest.TestCase):
   self.env.update(GITHUB_EVENT_NAME='workflow_dispatch',GITHUB_REF='refs/heads/main',MANUAL_TRANSITION_SHA=self.sha,GITHUB_RUN_ATTEMPT='2');self.assertEqual(self.sha,self.check(raw=b''))
  def test_manual_wrong_policy_rejected(self):self.env.update(GITHUB_EVENT_NAME='workflow_dispatch',GITHUB_REF='refs/heads/main',MANUAL_TRANSITION_SHA='c'*64);self.reject('MANUAL_POLICY')
  def test_oversized_request_rejected(self):self.reject('REQUEST_SIZE',raw=b' '*2049)
+
+class WorkflowEarlyBoundaryTests(unittest.TestCase):
+ def test_fixed_image_and_root_cache_checks_precede_first_pull_or_license(self):
+  workflow=(Path(__file__).resolve().parents[3]/'.github/workflows/desert-rv-journey-rebuild.yml').read_text()
+  identity=workflow.index('id: dispatch_identity');image=workflow.index('id: image_precheck')
+  root=workflow.index('JOURNEY_HOSTED_ROOT_CACHE_TEST:');license=workflow.index('UNITY_LICENSE:')
+  pull=workflow.index('docker build');native=workflow.index('game-ci/unity-test-runner@')
+  self.assertTrue(identity<image<root<license<pull<native)
+  self.assertIn("JOURNEY_HOSTED_ROOT_CACHE_TEST: '1'",workflow)
+  block=workflow.split('      - name: Verify non-root host union across real root-owned bytecode caches',1)[1].split('      - name:',1)[0]
+  self.assertIn('MANUAL_TRANSITION_SHA: ${{ inputs.transition_sha256 }}',block)
+  self.assertIn('/usr/bin/python3 tasks/desert-rv/scripts/rendered/test_prepared_source.py',block)
+  import environment_image_precheck as check
+  self.assertIn('--build-arg BASE_IMAGE='+check.IMAGE,workflow)
+  self.assertIn("if: always() && steps.image_precheck.outputs.report_written == 'true' && steps.image_report.outputs.export_ready == 'true'",workflow)
+ def test_actual_image_report_shell_fragments_reject_status_outcome_or_schema_drift(self):
+  import textwrap,shutil
+  import environment_image_precheck as check
+  source=Path(__file__).resolve().parents[3]
+  workflow=(source/'.github/workflows/desert-rv-journey-rebuild.yml').read_text()
+  pre=workflow.split('        id: image_precheck',1)[1].split('      - name:',1)[0]
+  post=workflow.split('        id: image_report',1)[1].split('      - name:',1)[0]
+  fragments=[textwrap.dedent(part.split("<<'PYCODE'\n",1)[1].split('          PYCODE',1)[0]) for part in (pre,post)]
+  good=check.blank_result();good.update(status='PASS',cacheHit=True)
+  with tempfile.TemporaryDirectory() as temp:
+   root=Path(temp);scripts=root/'tasks/desert-rv/scripts';scripts.mkdir(parents=True)
+   shutil.copyfile(source/'tasks/desert-rv/scripts/environment_image_precheck.py',scripts/'environment_image_precheck.py')
+   report=root/'tasks/desert-rv/journey-image-precheck.json';output=root/'output'
+   env=dict(os.environ,PYTHONDONTWRITEBYTECODE='1',GITHUB_OUTPUT=str(output),PRECHECK_EXIT='0',PRECHECK_OUTCOME='success')
+   def run(fragment):return subprocess.run(['/usr/bin/python3','-c',fragment],cwd=root,env=env,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL).returncode
+   report.write_text(json.dumps(good));self.assertEqual(run(fragments[0]),0);self.assertEqual(run(fragments[1]),0)
+   env['PRECHECK_OUTCOME']='failure';self.assertNotEqual(run(fragments[1]),0)
+   env['PRECHECK_EXIT']='2';self.assertNotEqual(run(fragments[0]),0)
+   unknown=check.blank_result();report.write_text(json.dumps(unknown));self.assertEqual(run(fragments[0]),0);self.assertEqual(run(fragments[1]),0)
+   report.write_text(json.dumps(dict(unknown,privateLog='NEVER_PUBLIC')));self.assertNotEqual(run(fragments[1]),0)
+   report.unlink();target=root/'outside';target.write_text(json.dumps(good));report.symlink_to(target);self.assertNotEqual(run(fragments[0]),0)
+   # Execute the actual first shell block with a fixture-only helper CLI. The
+   # validation functions remain exact; the fixture never contacts a registry.
+   report.unlink();output.unlink(missing_ok=True)
+   code=(source/'tasks/desert-rv/scripts/environment_image_precheck.py').read_text().rsplit('if __name__ == "__main__":',1)[0]
+   code+='if __name__ == "__main__":\n    print(os.environ["FIXTURE_REPORT"])\n    sys.exit(int(os.environ["FIXTURE_EXIT"]))\n'
+   (scripts/'environment_image_precheck.py').write_text(code)
+   (scripts/'test_environment_image_precheck.py').write_text('# fixture test command; full helper suite runs separately\n')
+   shell=textwrap.dedent(pre.split('        run: |\n',1)[1]);env.update(FIXTURE_REPORT=json.dumps(unknown),FIXTURE_EXIT='2')
+   def shell_run():return subprocess.run(['bash','-e','-c',shell],cwd=root,env=env,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL).returncode
+   self.assertEqual(shell_run(),2);self.assertEqual(json.loads(report.read_text()),unknown)
+   self.assertIn('report_written=true',output.read_text());self.assertIn('report_valid=true',output.read_text())
+   for old in (good,unknown):
+    report.write_text(json.dumps(old));output.unlink(missing_ok=True);before=report.read_bytes()
+    self.assertNotEqual(shell_run(),0);self.assertEqual(report.read_bytes(),before);self.assertFalse(output.exists())
+   report.unlink();report.symlink_to(target);self.assertNotEqual(shell_run(),0);self.assertTrue(report.is_symlink());self.assertFalse(output.exists())
+   self.assertEqual(json.loads(target.read_text()),good)
+
 
 class RealGitInputTests(unittest.TestCase):
  def test_actual_git_parent_and_tracked_request_bytes(self):

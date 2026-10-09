@@ -3,6 +3,8 @@
 set +x
 set -euo pipefail
 umask 077
+# Container imports must not create root-owned bytecode in the shared host checkout.
+export PYTHONDONTWRITEBYTECODE=1
 [[ "${GITHUB_ACTIONS:-}" == true && "${GITHUB_REPOSITORY_VISIBILITY:-}" == public ]] || exit 2
 [[ "${UNITY_PATH:-}" == /opt/unity && "$(cat /opt/unity/version)" == 6000.3.19f1 ]] || exit 2
 : "${UNITY_LICENSE:?}"; : "${UNITY_EMAIL:?}"; : "${UNITY_PASSWORD:?}"

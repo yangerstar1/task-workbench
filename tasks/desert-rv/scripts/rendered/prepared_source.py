@@ -1,5 +1,5 @@
 """Dedicated same-job prepared Journey proof. The original fresh-source guard is never weakened."""
-import json,os,pathlib,re,sys
+import json,os,pathlib,re,stat,sys
 ROOT=pathlib.Path(__file__).resolve().parents[4]
 TASK=ROOT/'tasks/desert-rv';PROJECT=TASK/'unity'
 sys.path.insert(0,str(TASK/'scripts'));import verify_evidence as original
@@ -14,14 +14,28 @@ def require(ok,code):
     if not ok:raise ValueError(code)
 def sha(path):return original.sha(path)
 def read(path):return original.read_json(path)
+# Same three roots as verify_evidence.source_inventory; never a global cache exemption.
+PYTHON_SOURCE_ROOTS=('tasks/desert-rv/scripts','tasks/desert-rv/art/import-candidate','tasks/desert-rv/art/journey-preparation')
 def walk(folder):
     files={};dirs=set()
     require(folder.is_dir() and not folder.is_symlink(),'PREPARED_ROOT')
-    for path in folder.rglob('*'):
-        require(not path.is_symlink(),'PREPARED_SYMLINK')
-        rel=path.relative_to(folder).as_posix()
-        if path.is_file():files[rel]=sha(path)
-        else:require(path.is_dir(),'PREPARED_FILE_TYPE');dirs.add(rel)
+    prune_bytecode=folder in {ROOT/name for name in PYTHON_SOURCE_ROOTS}
+    pending=[folder]
+    while pending:
+        with os.scandir(pending.pop()) as entries:
+            for entry in entries:
+                # Inspect only the entry itself. Ignored cache contents may be root-owned
+                # and inaccessible after a container exits; do not recurse or hash them.
+                mode=entry.stat(follow_symlinks=False).st_mode
+                require(not stat.S_ISLNK(mode),'PREPARED_SYMLINK')
+                if prune_bytecode and entry.name=='__pycache__':
+                    require(stat.S_ISDIR(mode),'PREPARED_CACHE_DIRECTORY')
+                    continue
+                path=pathlib.Path(entry.path);rel=path.relative_to(folder).as_posix()
+                if stat.S_ISREG(mode):files[rel]=sha(path)
+                else:
+                    require(stat.S_ISDIR(mode),'PREPARED_FILE_TYPE')
+                    dirs.add(rel);pending.append(path)
     return files,dirs
 
 def verify_original(identity):
@@ -68,8 +82,7 @@ def verify_asset_union(source,initial_dirs,added,package_snapshot=None):
     for directory in original.SOURCE_ROOTS:
         if directory=='tasks/desert-rv/unity':continue
         files,_=walk(ROOT/directory)
-        python_roots={'tasks/desert-rv/scripts','tasks/desert-rv/art/import-candidate','tasks/desert-rv/art/journey-preparation'}
-        names={directory+'/'+name for name in files if not (directory in python_roots and '__pycache__' in pathlib.Path(name).parts)}
+        names={directory+'/'+name for name in files}
         want={row['path'] for row in source['files'] if row['path'].startswith(directory+'/')}
         require(names==want,'PREPARED_OTHER_SOURCE_INVENTORY')
 

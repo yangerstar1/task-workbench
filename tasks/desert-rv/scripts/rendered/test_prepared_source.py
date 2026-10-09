@@ -1,5 +1,5 @@
 """Filesystem-only prepared-source counterexamples; no synthetic fixture is native acceptance."""
-import copy,json,tempfile,unittest,os
+import copy,json,tempfile,unittest,os,stat,subprocess
 from pathlib import Path
 from unittest import mock
 import prepared_source as p
@@ -98,6 +98,118 @@ class PreparedSourceTests(unittest.TestCase):
         name='tasks/desert-rv/backup-assets';(p.ROOT/name/'__pycache__').mkdir(parents=True);(p.ROOT/name/'__pycache__/hidden.asset').write_bytes(b'unknown')
         with mock.patch.object(p.original,'SOURCE_ROOTS',('tasks/desert-rv/unity',name)):
             with self.assertRaisesRegex(ValueError,'OTHER_SOURCE_INVENTORY'):self.verify()
+    def python_sources(self):
+        for name in p.PYTHON_SOURCE_ROOTS:
+            path=p.ROOT/name/'declared.py';path.parent.mkdir(parents=True,exist_ok=True);path.write_bytes(b'declared source')
+            self.source['files'].append(dict(path=str(path.relative_to(p.ROOT)),sha256=p.sha(path),size=path.stat().st_size))
+        return mock.patch.object(p.original,'SOURCE_ROOTS',('tasks/desert-rv/unity',)+p.PYTHON_SOURCE_ROOTS)
+    def test_inaccessible_python_cache_is_pruned_before_hash_or_recursion(self):
+        self.assertNotEqual(os.geteuid(),0,'Run permission regression as the real non-root host user')
+        with self.python_sources():
+            for name in p.PYTHON_SOURCE_ROOTS:
+                for suffix in ('__pycache__','nested/__pycache__'):
+                    with self.subTest(root=name,cache=suffix):
+                        cache=p.ROOT/name/suffix;cache.mkdir(parents=True)
+                        pyc=cache/'prepare_safe_diagnostic_export.cpython-310.pyc';pyc.write_bytes(b'unreadable bytecode')
+                        pyc.chmod(0)
+                        try:
+                            with self.assertRaises(PermissionError):p.sha(pyc)
+                            self.verify() # Actual original outer asset/source union path.
+                            cache.chmod(0)
+                            with self.assertRaises(PermissionError):list(cache.iterdir())
+                            self.verify() # Must not even enter the excluded cache directory.
+                        finally:cache.chmod(0o700);pyc.chmod(0o600)
+    def test_cache_entry_file_or_symlink_is_rejected_in_every_python_root(self):
+        with self.python_sources():
+            for name in p.PYTHON_SOURCE_ROOTS:
+                cache=p.ROOT/name/'__pycache__';cache.write_bytes(b'not a directory')
+                with self.assertRaisesRegex(ValueError,'CACHE_DIRECTORY'):self.verify()
+                cache.unlink();outside=p.ROOT/'outside';outside.mkdir(exist_ok=True);cache.symlink_to(outside,target_is_directory=True)
+                with self.assertRaisesRegex(ValueError,'SYMLINK'):self.verify()
+                cache.unlink()
+    def test_python_source_and_unknown_files_remain_checked(self):
+        with self.python_sources():
+            for name in p.PYTHON_SOURCE_ROOTS:
+                added=p.ROOT/name/'unlisted.py';added.write_bytes(b'unknown')
+                with self.assertRaisesRegex(ValueError,'OTHER_SOURCE_INVENTORY'):self.verify()
+                added.unlink();declared=p.ROOT/name/'declared.py';declared.chmod(0)
+                try:
+                    with self.assertRaises(PermissionError):self.verify()
+                finally:declared.chmod(0o600)
+    def test_unity_cache_names_are_not_exempt(self):
+        for name in ('Assets','Packages','ProjectSettings'):
+            cache=p.PROJECT/name/'__pycache__';cache.mkdir();file=cache/'unknown.pyc';file.write_bytes(b'unknown')
+            with self.assertRaisesRegex(ValueError,'FILE_UNION'):self.verify()
+            file.unlink();cache.rmdir()
+    def test_python_subdirectory_walk_does_not_inherit_root_exemption(self):
+        with self.python_sources():
+            cache=p.ROOT/p.PYTHON_SOURCE_ROOTS[0]/'nested/__pycache__';cache.mkdir(parents=True);file=cache/'entry.pyc';file.write_bytes(b'cache')
+            self.assertEqual(p.walk(cache.parent)[0],{'__pycache__/entry.pyc':p.sha(file)})
+    def exercise_public_host_chain(self):
+        # Real filesystem/exporter/archive/consumer operations with explicitly synthetic
+        # native receipt/runtime bytes. This does not claim a Unity or playable build.
+        import sys
+        sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'player'))
+        import test_journey_linux_export as fixture
+        import journey_linux_export as export
+        import observe_journey_player as observer
+        import pipeline
+        case=fixture.JourneyLinuxExportTests();case.setUp()
+        try:
+            task,raw=case.success_fixture();logs=case.root/'preflight';logs.mkdir()
+            with mock.patch.object(export,'verify_union',side_effect=self.verify),mock.patch.object(pipeline,'guard'):
+                export.preflight(logs)
+                export.stage()
+                self.verify() # Actual host union after the container's stage.
+                export.save_native_receipt_observation()
+                control=case.control();control['hostDiagnostic']=export.host_state()
+                (task/'control.json').write_text(json.dumps(control))
+                self.assertEqual(export.export(),0)
+                pins=dict(PRODUCER_RUN_ID='123',PRODUCER_COMMIT='a'*40,PRODUCER_ARTIFACT_ID='456',PRODUCER_ZIP_SHA256='c'*64)
+                manifest=observer.validate_package(task/'public',pins)
+                observer.extract_runtime(task/'public',task/'extracted',manifest)
+                self.assertEqual(export.inventory(task/'extracted'),manifest['files'])
+                self.assertEqual((task/'public/native-build-receipt.json').read_bytes(),raw)
+                self.assertFalse(manifest['playerExecuted'])
+        finally:case.doCleanups();case.tearDown()
+    def test_nonroot_inaccessible_cache_survives_stage_outer_union_export_and_consumer(self):
+        with self.python_sources():
+            cache=p.ROOT/p.PYTHON_SOURCE_ROOTS[0]/'__pycache__';cache.mkdir()
+            file=cache/'prepare_safe_diagnostic_export.cpython-310.pyc';file.write_bytes(b'private bytecode');file.chmod(0);cache.chmod(0)
+            try:self.exercise_public_host_chain()
+            finally:cache.chmod(0o700);file.chmod(0o600)
+    @unittest.skipUnless(os.environ.get('JOURNEY_HOSTED_ROOT_CACHE_TEST')=='1','Only the verified hosted Actions pre-license fixture creates root-owned cache files')
+    def test_hosted_root_owned_cache_crosses_actual_host_union(self):
+        # This opt-in must pass the real tracked Git/event/owner/public/branch/attempt
+        # guard before sudo. The local fixture never substitutes a synthetic identity.
+        import journey_rebuild_dispatch as dispatch
+        dispatch.verify(dispatch.ROOT,os.environ)
+        uid,gid=os.getuid(),os.getgid();self.assertNotEqual(uid,0)
+        fixture=Path(self.tmp.name)
+        self.assertEqual(fixture.parent.resolve(),Path(tempfile.gettempdir()).resolve())
+        self.assertEqual(fixture.resolve(),fixture);self.assertEqual(fixture.lstat().st_uid,uid)
+        self.assertTrue(stat.S_ISDIR(fixture.lstat().st_mode));self.assertEqual(stat.S_IMODE(fixture.lstat().st_mode),0o700)
+        with self.python_sources():
+            for name in p.PYTHON_SOURCE_ROOTS:
+                cache=p.ROOT/name/'__pycache__';cache.mkdir()
+                pyc=cache/'prepare_safe_diagnostic_export.cpython-310.pyc';pyc.write_bytes(b'hosted root bytecode permission fixture')
+                self.assertTrue(cache.is_relative_to(fixture) and pyc.is_relative_to(fixture))
+                self.assertFalse(cache.is_symlink() or pyc.is_symlink())
+                def sudo(*args):subprocess.run(['sudo','-n','--',*args],check=True,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
+                try:
+                    sudo('/usr/bin/chmod','0600',str(pyc));sudo('/usr/bin/chmod','0700',str(cache))
+                    sudo('/usr/bin/chown','0:0',str(pyc),str(cache))
+                    self.assertEqual(cache.lstat().st_uid,0);self.assertEqual(stat.S_IMODE(cache.lstat().st_mode),0o700)
+                    with self.assertRaises(PermissionError):p.sha(pyc)
+                    with self.assertRaises(PermissionError):list(cache.iterdir())
+                    self.verify()
+                    self.exercise_public_host_chain()
+                finally:
+                    # Only these two freshly created fixed descendants; never recursive
+                    # ownership changes, project directories, or caller-supplied paths.
+                    sudo('/usr/bin/chown',str(uid)+':'+str(gid),str(cache),str(pyc))
+                self.assertEqual(pyc.lstat().st_uid,uid);self.assertEqual(stat.S_IMODE(pyc.lstat().st_mode),0o600)
+        print('JOURNEY_HOSTED_ROOT_CACHE_UNION: passed; root0700/file0600; non-root reader; 3 exact Python roots')
     def package_fixture(self):
         import sys
         sys.path.insert(0,str(Path(__file__).resolve().parents[2]/'art/import-candidate'))
