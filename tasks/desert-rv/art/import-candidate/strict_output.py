@@ -1,4 +1,5 @@
 """Bounded, independently checked Armored strict-candidate export. Never approval."""
+from candidate_native_cases import NATIVE_NAMES as CURRENT_NATIVE_NAMES, NATIVE_COUNT
 import hashlib,json,math,re,shutil,tempfile
 from pathlib import Path
 import xml.etree.ElementTree as ET
@@ -91,7 +92,9 @@ def contract_shape(c):
   keys(m['baseColor'],('r','g','b','a'));require(all(finite(v,0,1) for v in m['baseColor'].values()) and finite(m['metallic'],0,1) and finite(m['smoothness'],0,1),'STRICT_MATERIAL_VALUES')
   for key in textures:require(not m.get(key) or (m[key] in files and not m[key].endswith('.fbx')),'STRICT_TEXTURE_SOURCE')
   require(not m.get('ormFile') or not(m.get('metallicSmoothnessFile') or m.get('occlusionFile')),'STRICT_TEXTURE_ROLE_CONFLICT')
- b=c['bindings'];keys(b,('animatorPath','body','weakPointRoot','core','plates','plateRenderers','openEuler','openEmission','openBaseColor','colliderCenter','colliderRadius','colliderHeight','neutralBaseline'))
+ b=c['bindings'];keys(b,('animatorPath','body','weakPointRoot','core','plates','plateRenderers','openEuler','openEmission','openBaseColor','colliderCenter','colliderRadius','colliderHeight','neutralBaseline','footGroundLayer','footChains'))
+ from foot_contact_output import contract as foot_contract
+ foot_contract(b)
  for k in ('animatorPath','body','weakPointRoot','core'):require(rel(b[k],empty=k=='animatorPath'),'STRICT_BINDING_PATH')
  for k in ('plates','plateRenderers'):require(isinstance(b[k],list) and len(b[k])==2 and len(set(b[k]))==2 and all(rel(p) for p in b[k]),'STRICT_PLATE_BINDINGS')
  require(len(b['openEuler'])==2,'STRICT_OPEN_ANGLES')
@@ -109,7 +112,7 @@ def native_report(root):
   require(safe(p).stat().st_size<=10*1024**2,'STRICT_NATIVE_OVERSIZE');r=ET.parse(p).getroot()
   if r.tag=='test-run':reports.append((p,r))
  require(len(reports)==1,'STRICT_NATIVE_COUNT');p,r=reports[0];cases=list(r.iter('test-case'))
- require(r.get('result')=='Passed' and len(cases)==10 and {c.get('fullname') for c in cases}=={NATIVE,'DesertRV.Tests.CandidateAnimationPolicyTests.OnlyArmoredAttackGetsTheSourceLoopException','DesertRV.Tests.CandidateAnimationPolicyTests.EqualKeyValuesDoNotExcuseUnsafeTangents','DesertRV.Tests.CandidateAnimationPolicyTests.MissingNativeAnimatorGetsCreatedAndReused','DesertRV.Tests.CandidateAnimationPolicyTests.OpenCoreEmissionSurvivesRealSaveReimportAndReload','DesertRV.Tests.CandidateAnimationPolicyTests.RenderTargetCleanupDetachesCameraBeforeDestroy','DesertRV.Tests.CandidateMaterialIdentityTests.PersistedWeaponMaterialIdentitySurvivesNeutralSamplingAndRejectsImpostors','DesertRV.Tests.CandidateMeshMeasurementTests.ScaledTranslatedRotatedHierarchyMatchesIndependentSkinning','DesertRV.Tests.CandidateMeshMeasurementTests.RejectsBlendShapesAndTruncatedSkinQuality','DesertRV.Tests.CandidateMeshMeasurementTests.StaticMeshesAndFourMillimetreGateUseWorldVertices'} and all(c.get('result')=='Passed' for c in cases),'STRICT_NATIVE_FAILED')
+ require(r.get('result')=='Passed' and len(cases)==NATIVE_COUNT and {c.get('fullname') for c in cases}==CURRENT_NATIVE_NAMES and all(c.get('result')=='Passed' for c in cases),'STRICT_NATIVE_FAILED')
  return sha(p)
 
 def inspect_png(path,size=(960,540)):
@@ -486,7 +489,10 @@ def export_strict(root,output,c,summary,native,protected):
  dependency_frozen=dependency_snapshot(project,imp['dependencies'])
  prefix=validate_import(project,c,contract_path,imp);frames=validate_capture(evidence,prefix,imp,capture,c['bindings']['neutralBaseline']);validate_weakpoint(weak,prefix,frames,c['bindings']['openEuler'])
  payload=generated_files(project,c,prefix,imp,files)
- require({p.name for p in evidence.iterdir()}=={'import-report.json','capture-report.json','weakpoint-fixture-report.json'}|{f['image'] for f in capture['frames']},'STRICT_EVIDENCE_ALLOWLIST')
+ from foot_contact_output import validate as validate_foot_contact
+ foot_contact=read(evidence/'foot-contact-report.json')
+ payload.extend(validate_foot_contact(project,prefix,imp,frames,foot_contact))
+ require({p.name for p in evidence.iterdir()}=={'import-report.json','capture-report.json','weakpoint-fixture-report.json','foot-contact-report.json'}|{f['image'] for f in capture['frames']},'STRICT_EVIDENCE_ALLOWLIST')
  payload.extend((evidence/f['image'],Path('frames')/f['image']) for f in capture['frames'])
  # Armored has no muzzle observation. Exclude the nullable weapon-only field rather than export unrelated default text.
  imp.pop('muzzle',None)
@@ -500,9 +506,9 @@ def export_strict(root,output,c,summary,native,protected):
   records=[]
   for p,dest in payload:
    d=staged/dest;d.parent.mkdir(parents=True,exist_ok=True);shutil.copyfile(p,d);records.append({'path':dest.as_posix(),'sha256':sha(d),'bytes':d.stat().st_size})
-  for name,obj in [('import-report.json',imp),('capture-report.json',capture),('weakpoint-fixture-report.json',weak)]:
+  for name,obj in [('import-report.json',imp),('capture-report.json',capture),('weakpoint-fixture-report.json',weak),('foot-contact-report.json',foot_contact)]:
    d=staged/name;d.write_text(json.dumps(obj,indent=2)+'\n');records.append({'path':name,'sha256':sha(d),'bytes':d.stat().st_size})
-  result=dict(summary,status='STRICT_CANDIDATE_CAPTURED_NOT_ACCEPTED',approved=False,errorCode=None,files=records,nativeXmlSha256=native_hash,nativeCases=10,images=202,weakpointImages=9,protectedSource='UNCHANGED',rawReportSha256={n:sha(evidence/n) for n in ('import-report.json','capture-report.json','weakpoint-fixture-report.json')})
+  result=dict(summary,status='STRICT_CANDIDATE_CAPTURED_NOT_ACCEPTED',approved=False,errorCode=None,files=records,nativeXmlSha256=native_hash,nativeCases=NATIVE_COUNT,images=202,weakpointImages=9,protectedSource='UNCHANGED',rawReportSha256={n:sha(evidence/n) for n in ('import-report.json','capture-report.json','weakpoint-fixture-report.json','foot-contact-report.json')})
   receipt_bytes=(json.dumps(result,indent=2)+'\n').encode()
   (staged/'receipt.json').write_bytes(receipt_bytes)
   verify_staged_inventory(staged,records,hashlib.sha256(receipt_bytes).hexdigest())

@@ -236,6 +236,33 @@
           }
         }
       ]
-    }
+    },
+    "footGroundLayer": 0,
+    "footChains": [
+      {
+        "id": "fore.L",
+        "upper": "Bulwark_Rig/root/body/upper.fore.L",
+        "lower": "Bulwark_Rig/root/body/upper.fore.L/lower.fore.L",
+        "foot": "Bulwark_Rig/root/body/upper.fore.L/lower.fore.L/foot.fore.L"
+      },
+      {
+        "id": "fore.R",
+        "upper": "Bulwark_Rig/root/body/upper.fore.R",
+        "lower": "Bulwark_Rig/root/body/upper.fore.R/lower.fore.R",
+        "foot": "Bulwark_Rig/root/body/upper.fore.R/lower.fore.R/foot.fore.R"
+      },
+      {
+        "id": "hind.L",
+        "upper": "Bulwark_Rig/root/body/upper.hind.L",
+        "lower": "Bulwark_Rig/root/body/upper.hind.L/lower.hind.L",
+        "foot": "Bulwark_Rig/root/body/upper.hind.L/lower.hind.L/foot.hind.L"
+      },
+      {
+        "id": "hind.R",
+        "upper": "Bulwark_Rig/root/body/upper.hind.R",
+        "lower": "Bulwark_Rig/root/body/upper.hind.R/lower.hind.R",
+        "foot": "Bulwark_Rig/root/body/upper.hind.R/lower.hind.R/foot.hind.R"
+      }
+    ]
   }
 }

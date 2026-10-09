@@ -21,18 +21,7 @@ import zlib
 
 import strict_output as strict
 
-NATIVE_NAMES = frozenset((
-    'DesertRV.Tests.CandidateMeshMeasurementTests.ScaledTranslatedRotatedHierarchyMatchesIndependentSkinning',
-    'DesertRV.Tests.CandidateMeshMeasurementTests.RejectsBlendShapesAndTruncatedSkinQuality',
-    'DesertRV.Tests.CandidateMeshMeasurementTests.StaticMeshesAndFourMillimetreGateUseWorldVertices',
-    'DesertRV.Tests.CandidateMaterialIdentityTests.PersistedWeaponMaterialIdentitySurvivesNeutralSamplingAndRejectsImpostors',
-    'DesertRV.Tests.CandidateArtImportTests.ExecutePinnedDiscoveryOrBindingDiagnostics',
-    'DesertRV.Tests.CandidateAnimationPolicyTests.OnlyArmoredAttackGetsTheSourceLoopException',
-    'DesertRV.Tests.CandidateAnimationPolicyTests.EqualKeyValuesDoNotExcuseUnsafeTangents',
-    'DesertRV.Tests.CandidateAnimationPolicyTests.MissingNativeAnimatorGetsCreatedAndReused',
-    'DesertRV.Tests.CandidateAnimationPolicyTests.OpenCoreEmissionSurvivesRealSaveReimportAndReload',
-    'DesertRV.Tests.CandidateAnimationPolicyTests.RenderTargetCleanupDetachesCameraBeforeDestroy',
-))
+from candidate_native_cases import NATIVE_NAMES, NATIVE_COUNT
 ENTRY = 'DesertRV.Tests.CandidateArtImportTests.ExecutePinnedDiscoveryOrBindingDiagnostics'
 FAILURE_CODES = frozenset((
     'STRICT_NATIVE_FAILED', 'NATIVE_FAILED', 'NATIVE_CASE_MISSING_OR_FAILED',
@@ -171,6 +160,8 @@ def freeze(root):
     contract = decode(snap.add(project / 'CandidateImportInput/contract.json', 8 * 1024**2))
     imp = decode(snap.add(evidence / 'import-report.json', 8 * 1024**2))
     capture = decode(snap.add(evidence / 'capture-report.json', 32 * 1024**2))
+    if contract.get('kind')=='armored':snap.add(evidence/'foot-contact-report.json',8*1024**2,missing=True)
+    if contract.get('kind')=='pouncer':snap.add(evidence/'paw-contact-report.json',8*1024**2,missing=True)
     base = safe_node(project / 'Assets/DesertRV/CandidateArtImports', True)
     snap.add(Path(str(base) + '.meta'), 1024**2)
     for path in base.rglob('*'):
@@ -230,8 +221,8 @@ def validate_native(snap, paths):
     require(len(reports) == 1)
     data, root = reports[0]
     cases = list(root.iter('test-case'))
-    require(root.get('result') in ('Passed', 'Failed', 'Failed(Child)') and len(cases) == len(NATIVE_NAMES)
-            and {c.get('fullname') for c in cases} == NATIVE_NAMES)
+    require(root.get('result') in ('Passed', 'Failed', 'Failed(Child)') and len(cases)==NATIVE_COUNT
+            and {c.get('fullname') for c in cases}==NATIVE_NAMES)
     results = {}
     for case in cases:
         require(case.get('result') in ('Passed', 'Failed')
@@ -245,9 +236,9 @@ def validate_native(snap, paths):
                 and math.isfinite(duration) and 0 <= duration <= 86400)
         results[case.attrib['fullname']] = case.attrib['result']
     validate_native_aggregate(root, results)
-    return dict(sha256=digest(data), cases=len(NATIVE_NAMES), passed=sum(v == 'Passed' for v in results.values()),
+    return dict(sha256=digest(data), cases=len(cases), passed=sum(v == 'Passed' for v in results.values()),
                 failed=sum(v == 'Failed' for v in results.values()), entryResult=results[ENTRY],
-                caseResults=[dict(fullname=name, result=results[name]) for name in sorted(NATIVE_NAMES)])
+                caseResults=[dict(fullname=name, result=results[name]) for name in sorted(results)])
 
 
 def image_state(data, expected):
@@ -721,6 +712,14 @@ def _export(root, output, c, summary, native, protected):
         validator.generated_files(project, c, prefix, imp, files)
         collection_stage('CAPTURE')
         safe_capture = sanitize_capture(c, imp, capture, snap)
+        paw_path=snap.root/'unity/JourneyEvidence/CandidateArt/paw-contact-report.json'
+        if c['kind']=='pouncer' and paw_path in snap.data:
+            from paw_contact_output import sanitize_failed as sanitize_failed_paw
+            safe_capture['pawContact']=sanitize_failed_paw(decode(snap.data[paw_path]))
+        foot_path=snap.root/'unity/JourneyEvidence/CandidateArt/foot-contact-report.json'
+        if foot_path in snap.data:
+            from foot_contact_output import sanitize_failed
+            safe_capture['footContact']=sanitize_failed(decode(snap.data[foot_path]))
         source_identity = {key: c[key] for key in ('sourceCommit', 'runUrl', 'artifactId', 'artifactName',
                                                    'artifactSha256', 'mode', 'scope', 'kind')}
         source_identity.update(importCommit=summary['importCommit'], importRunUrl=summary['importRunUrl'],
@@ -732,6 +731,8 @@ def _export(root, output, c, summary, native, protected):
             native=native_info, normalizedAwayFields=normalized_away, **safe_capture)
         document['rawReportSha256'] = {name: digest(snap.data[snap.root / 'unity/JourneyEvidence/CandidateArt' / name])
             for name in ('import-report.json', 'capture-report.json')}
+        if foot_path in snap.data:document['rawReportSha256']['foot-contact-report.json']=digest(snap.data[foot_path])
+        if c['kind']=='pouncer' and paw_path in snap.data:document['rawReportSha256']['paw-contact-report.json']=digest(snap.data[paw_path])
         require(len(json.dumps(document, allow_nan=False)) <= 16 * 1024**2)
         collection_stage('SNAPSHOT')
         snap.verify()
@@ -755,7 +756,7 @@ def _export(root, output, c, summary, native, protected):
         records.append(dict(path='failed-diagnostics.json', sha256=digest(data), bytes=len(data)))
         result = dict(source_identity, status='FAILED_DIAGNOSTICS', approved=False,
             errorCode=code, visualApproved=False, gameplayAccepted=False, calibratedForScene=False,
-            protectedSource='UNCHANGED', nativeXmlSha256=native_info['sha256'], nativeCases=len(NATIVE_NAMES),
+            protectedSource='UNCHANGED', nativeXmlSha256=native_info['sha256'], nativeCases=native_info['cases'],
             nativeFailedCases=native_info['failed'], images=len(records)-1,
             observedFrames=len(document['frames']), weaponSamples=len(document['weaponSamples']), files=records)
         result['normalizedAwayFields'] = normalized_away

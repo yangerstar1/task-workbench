@@ -18,6 +18,7 @@ from PIL import Image, ImageDraw
 import yaml
 from test_urp_material_metadata import ASSET_VERSION_YAML
 import pouncer_output as p
+import paw_contact_output as paw
 
 LOCAL_CONTRACT = Path(__file__).parent/'contracts/pouncer-full-strict-37856618820.json'
 LOCAL_SOURCE = Path(__file__).parents[2]/'unity/CandidateImportInput/payload'
@@ -60,6 +61,10 @@ class PouncerExportTests(unittest.TestCase):
             self.meta(path)
         script = self.write(p.ACTOR_SCRIPT, '// Synthetic protected-script fixture, not native evidence.\n')
         self.meta(script)
+        for filename,guid in ((paw.SCRIPT,paw.GUID),(paw.SOLVER,paw.SOLVER_GUID)):
+            source=Path(__file__).parents[2]/'unity'/filename
+            path=self.write(filename,source.read_bytes());Path(str(path)+'.meta').write_text('fileFormatVersion: 2\nguid: '+guid+'\n')
+        self.write(self.prefix+'/Candidate.prefab','%YAML 1.1\n--- !u!114 &1\nMonoBehaviour:\n  m_Script: {fileID: 11500000, guid: '+paw.GUID+', type: 3}\n')
         for i, spec in enumerate(self.c['materials']):
             texture = {'fileID': 0}
             if spec['baseColorFile']:
@@ -113,6 +118,22 @@ class PouncerExportTests(unittest.TestCase):
         install_package_snapshot(self.project)
         self.rehash(); self.flush()
 
+    def paw_report(self):
+        samples=[]
+        for frame in self.cap['frames']:
+            label=frame['requestedState'];state=label.split('-')[0] if label.split('-')[0] in p.STATES else 'Idle'
+            legs=[]
+            for id in paw.IDS:
+                legs.append(dict(id=id,reason=None,sourceState=state,destinationState=state,corrected=False,valid=True,
+                    lowestRendererPath='pouncer-candidate/Pouncer_Skin_LOD0',lowestSourceVertex=0,selectedVertices=8,excludedMixedVertices=0,
+                    groundSceneHandle=1,preMinDistance=0.,postMinDistance=0.,attemptedPostMinDistance=0.,correctionMeters=0.,targetClearance=0.,
+                    prePawWorld=dict(x=0,y=0,z=0),postPawWorld=dict(x=0,y=0,z=0),groundPoint=dict(x=0,y=0,z=0),groundNormal=dict(x=0,y=1,z=0)))
+            solve=dict(valid=True,paused=False,fullMeshValidated=False,slipValidated=False,swingArcValidated=False,frame=0,
+                actorSceneHandle=1,physicsSceneHash=1,reason=None,transitionNormalizedTime=0.,currentNormalizedTime=0.,nextNormalizedTime=0.,
+                currentLength=1.,nextLength=1.,animatorSpeed=1.,legs=legs)
+            samples.append(dict(label=label,preMeshPoseSha256=frame['meshPoseSha256'],postMeshPoseSha256=frame['meshPoseSha256'],preWorldMinY=frame['worldMinY'],postWorldMinY=frame['worldMinY'],solve=solve))
+        return dict(status='captured-unreviewed',scope='same-runtime-ApplyPawContact-real-Animator-not-locomotion-QA',gameplayAccepted=False,slipAccepted=False,groundLayer=0,groundObject='CandidatePawContactGround',samples=samples)
+
     def tearDown(self): self.tmp.cleanup()
 
     def write(self, relative, data):
@@ -128,6 +149,7 @@ class PouncerExportTests(unittest.TestCase):
         self.cap['dependencySha256'] = self.imp['dependencySha256']
 
     def flush(self):
+        (self.ev/'paw-contact-report.json').write_text(json.dumps(self.paw_report()))
         for name, value in [('import-report.json', self.imp), ('capture-report.json', self.cap)]:
             (self.ev/name).write_text(json.dumps(value))
 
@@ -152,7 +174,7 @@ class PouncerExportTests(unittest.TestCase):
 
     def test_valid_unreviewed_export_rehashes_every_file(self):
         result = self.run_export()
-        self.assertEqual((result['images'], result['nativeCases'], result['weakpointImages']), (184, 10, 0))
+        self.assertEqual((result['images'], result['nativeCases'], result['weakpointImages']), (184, len(p.NATIVE_NAMES), 0))
         self.assertEqual([result[k] for k in ('directImages','attackRecoverImages','deathTransitionImages','resetImages')], [35,21,126,2])
         self.assertTrue(all(result[k] is False for k in ('approved','calibratedForScene','visualApproved','gameplayAccepted')))
         self.assertEqual(len(list((self.out/'frames').glob('*.png'))), 184)

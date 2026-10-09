@@ -21,6 +21,30 @@ namespace DesertRV.Editor
             public bool transitioning, groundDiagnosticApplicable;
             public Vector3 rootLocalPosition,rootLocalScale,meshWorldMin,meshWorldMax,meshWorldSize,meshSizeRatioToNeutral;public Quaternion rootLocalRotation;
         }
+        [Serializable] sealed class FootContactSample
+        {
+            public string label,preMeshPoseSha256,postMeshPoseSha256;public float preWorldMinY,postWorldMinY;
+            public ArmoredFootContactConstraint.Report solve;
+        }
+        [Serializable] sealed class FootContactEvidence
+        {
+            public string status="not-complete",scope="same-runtime-ApplyFootContact-real-Animator-not-locomotion-QA";
+            public bool gameplayAccepted=false,slipAccepted=false;
+            public int groundLayer;public string groundObject="CandidateFootContactGround";
+            public List<FootContactSample> samples=new List<FootContactSample>();
+        }
+        [Serializable] sealed class PawContactSample
+        {
+            public string label,preMeshPoseSha256,postMeshPoseSha256;public float preWorldMinY,postWorldMinY;
+            public PouncerPawContactConstraint.Report solve;
+        }
+        [Serializable] sealed class PawContactEvidence
+        {
+            public string status="not-complete",scope="same-runtime-ApplyPawContact-real-Animator-not-locomotion-QA";
+            public bool gameplayAccepted=false,slipAccepted=false;
+            public int groundLayer;public string groundObject="CandidatePawContactGround";
+            public List<PawContactSample> samples=new List<PawContactSample>();
+        }
         [Serializable] sealed class Evidence
         {
             public string graphicsDeviceType,graphicsDeviceName;
@@ -48,11 +72,38 @@ namespace DesertRV.Editor
             var scene=EditorSceneManager.NewPreviewScene();
             GameObject subject=null; RenderTexture target=null; Texture2D pixels=null; Camera camera=null;
             var totalMeasurement=new MeshMeasurementSummary();
+            var footEvidence=new FootContactEvidence();ArmoredFootContactConstraint footContact=null;
+            var pawEvidence=new PawContactEvidence();PouncerPawContactConstraint pawContact=null;
             try
             {
                 subject=(GameObject)PrefabUtility.InstantiatePrefab(AssetDatabase.LoadAssetAtPath<GameObject>(import.prefab),scene);
-                // Runtime presenters need real gameplay references. This diagnostic exercises Animator only.
+                // Disable automatic gameplay updates. The actual bound foot constraint is replayed explicitly
+                // below through its runtime method; no fake session or combat clock is introduced.
                 foreach(var script in subject.GetComponentsInChildren<MonoBehaviour>(true))script.enabled=false;
+                if(contract.kind=="armored" || contract.kind=="pouncer")
+                {
+                    int groundLayer;string groundName;
+                    if(contract.kind=="armored")
+                    {
+                        footContact=subject.GetComponent<ArmoredFootContactConstraint>();
+                        if(!footContact)throw new InvalidOperationException("Actual imported prefab lacks runtime foot contact component.");
+                        if(!footContact.ValidateBindings(out var bindingReason))throw new InvalidOperationException("Foot contact binding: "+bindingReason);
+                        groundLayer=contract.bindings.footGroundLayer;groundName=footEvidence.groundObject;footEvidence.groundLayer=groundLayer;
+                    }
+                    else
+                    {
+                        pawContact=subject.GetComponent<PouncerPawContactConstraint>();
+                        if(!pawContact)throw new InvalidOperationException("Actual imported prefab lacks runtime paw contact component.");
+                        if(!pawContact.ValidateBindings(out var bindingReason))throw new InvalidOperationException("Paw contact binding: "+bindingReason);
+                        groundLayer=contract.bindings.pawGroundLayer;groundName=pawEvidence.groundObject;pawEvidence.groundLayer=groundLayer;
+                    }
+                    // One shared collider-only support path, always owned by the actual preview scene.
+                    var groundObject=new GameObject(groundName);UnityEngine.SceneManagement.SceneManager.MoveGameObjectToScene(groundObject,scene);
+                    groundObject.layer=groundLayer;groundObject.transform.position=subject.transform.position-Vector3.up*.10f;
+                    var ground=groundObject.AddComponent<BoxCollider>();ground.size=new Vector3(50,.20f,50);
+                    Physics.SyncTransforms(); // No rendered floor, default-scene query or guessed support plane.
+                }
+
                 var animator=subject.GetComponentInChildren<Animator>();
                 // Lock and compare the genuine imported neutral before any Rebind/Update can overwrite it.
                 var rootPosition=animator.transform.localPosition;var rootRotation=animator.transform.localRotation;var rootScale=animator.transform.localScale;
@@ -126,7 +177,7 @@ namespace DesertRV.Editor
                 string finalDependencySha=JourneyContentChecks.DependencySha256(import.prefab);
                 if(finalDependencySha!=import.dependencySha256)throw new InvalidOperationException("Prefab dependency changed during capture.");
                 evidence.dependencySha256=finalDependencySha;
-                evidence.status="captured-unreviewed";
+                evidence.status="captured-unreviewed";if(footContact)footEvidence.status="captured-unreviewed";if(pawContact)pawEvidence.status="captured-unreviewed";
                 LogMeshMeasurement("completed",totalMeasurement);
                 void RequireRootUnchanged()
                 {
@@ -140,6 +191,28 @@ namespace DesertRV.Editor
                 {
                     var renderers=subject.GetComponentsInChildren<Renderer>(true).Where(r=>r.enabled && !(r is ParticleSystemRenderer)).ToArray();
                     if(renderers.Length==0)throw new InvalidOperationException("No actual visible geometry.");
+                    FootContactSample footSample=null;
+                    if(footContact)
+                    {
+                        var pre=new Frame();MeasureMeshes(renderers,camera,pre);
+                        footSample=new FootContactSample{label=label,preWorldMinY=pre.worldMinY,preMeshPoseSha256=pre.meshPoseSha256};
+                        footEvidence.samples.Add(footSample);
+                        bool solved=footContact.ApplyFootContact(out var footReport);footSample.solve=footReport;
+                        var post=new Frame();MeasureMeshes(renderers,camera,post);
+                        footSample.postWorldMinY=post.worldMinY;footSample.postMeshPoseSha256=post.meshPoseSha256;
+                        Debug.Log("CANDIDATE_FOOT_CONTACT "+JsonUtility.ToJson(footSample));
+                        if(!solved)throw new InvalidOperationException("Runtime foot contact rejected actual pose: "+label+" "+footReport.reason);
+                    }
+
+                    if(pawContact)
+                    {
+                        var pre=new Frame();MeasureMeshes(renderers,camera,pre);
+                        var sample=new PawContactSample{label=label,preWorldMinY=pre.worldMinY,preMeshPoseSha256=pre.meshPoseSha256};pawEvidence.samples.Add(sample);
+                        bool solved=pawContact.ApplyPawContact(out var pawReport);sample.solve=pawReport;
+                        var post=new Frame();MeasureMeshes(renderers,camera,post);sample.postWorldMinY=post.worldMinY;sample.postMeshPoseSha256=post.meshPoseSha256;
+                        Debug.Log("CANDIDATE_PAW_CONTACT "+JsonUtility.ToJson(sample));
+                        if(!solved)throw new InvalidOperationException("Runtime paw contact rejected actual pose: "+label+" "+pawReport.reason);
+                    }
                     var bounds=renderers[0].bounds; foreach(var renderer in renderers)bounds.Encapsulate(renderer.bounds);
                     float radius=bounds.extents.magnitude;
                     if(float.IsNaN(radius)||float.IsInfinity(radius)||radius<.01f||radius>20)throw new InvalidOperationException("Invalid imported pose bounds.");
@@ -175,7 +248,7 @@ namespace DesertRV.Editor
             }
             finally
             {
-                try { File.WriteAllText("JourneyEvidence/CandidateArt/capture-report.json",JsonUtility.ToJson(evidence,true)); }
+                try { File.WriteAllText("JourneyEvidence/CandidateArt/capture-report.json",JsonUtility.ToJson(evidence,true));if(contract.kind=="armored")File.WriteAllText("JourneyEvidence/CandidateArt/foot-contact-report.json",JsonUtility.ToJson(footEvidence,true));if(contract.kind=="pouncer")File.WriteAllText("JourneyEvidence/CandidateArt/paw-contact-report.json",JsonUtility.ToJson(pawEvidence,true)); }
                 finally
                 {
                     try { ReleaseCandidateRenderTarget(camera,target); }

@@ -36,6 +36,7 @@ export UNITY_SERIAL="$(python3 /github/workspace/tasks/desert-rv/scripts/rendere
 # Exact personal-license machine identity preparation from pinned official entrypoint.sh.
 if [[ "$UNITY_SERIAL" = F* ]]; then dbus-uuidgen > /etc/machine-id; mkdir -p /var/lib/dbus; ln -sf /etc/machine-id /var/lib/dbus/machine-id; fi
 cp -a /gameci/BlankProject /BlankProject
+timeout --signal=TERM --kill-after=1s 3s python3 /github/workspace/tasks/desert-rv/scripts/rendered/launcher_context.py before "$private" >/dev/null 2>&1 || :
 attempted=1
 if timeout --signal=TERM --kill-after=15s 12m bash -c 'source /gameci/platforms/ubuntu/activate.sh' >"$private/activation.log" 2>&1; then activation=SUCCEEDED; else activation=FAILED; exit 1; fi
 export UNITY_EDITOR=/opt/unity/Editor/Unity

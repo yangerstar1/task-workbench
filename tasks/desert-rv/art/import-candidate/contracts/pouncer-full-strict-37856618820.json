@@ -623,6 +623,62 @@
         "y": 100.0,
         "z": 100.0
       }
-    }
+    },
+    "pawGroundLayer": 0,
+    "pawChains": [
+      {
+        "id": "fore.L",
+        "upper": "Pouncer_Rig/root/visual_body/pelvis/spine/chest/fore_upper.L",
+        "lower": "Pouncer_Rig/root/visual_body/pelvis/spine/chest/fore_upper.L/fore_lower.L",
+        "paw": "Pouncer_Rig/root/visual_body/pelvis/spine/chest/fore_upper.L/fore_lower.L/fore_paw.L"
+      },
+      {
+        "id": "fore.R",
+        "upper": "Pouncer_Rig/root/visual_body/pelvis/spine/chest/fore_upper.R",
+        "lower": "Pouncer_Rig/root/visual_body/pelvis/spine/chest/fore_upper.R/fore_lower.R",
+        "paw": "Pouncer_Rig/root/visual_body/pelvis/spine/chest/fore_upper.R/fore_lower.R/fore_paw.R"
+      },
+      {
+        "id": "hind.L",
+        "upper": "Pouncer_Rig/root/visual_body/pelvis/hind_upper.L",
+        "lower": "Pouncer_Rig/root/visual_body/pelvis/hind_upper.L/hind_lower.L",
+        "paw": "Pouncer_Rig/root/visual_body/pelvis/hind_upper.L/hind_lower.L/hind_paw.L"
+      },
+      {
+        "id": "hind.R",
+        "upper": "Pouncer_Rig/root/visual_body/pelvis/hind_upper.R",
+        "lower": "Pouncer_Rig/root/visual_body/pelvis/hind_upper.R/hind_lower.R",
+        "paw": "Pouncer_Rig/root/visual_body/pelvis/hind_upper.R/hind_lower.R/hind_paw.R"
+      }
+    ],
+    "pawRenderers": [
+      "AmberEye",
+      "AmberEye.001",
+      "ArticulatedLowerJaw",
+      "Claw",
+      "Claw.001",
+      "Claw.002",
+      "Claw.003",
+      "Claw.004",
+      "Claw.005",
+      "Claw.006",
+      "Claw.007",
+      "Claw.008",
+      "Claw.009",
+      "Claw.010",
+      "Claw.011",
+      "DeepEyeSocket",
+      "DeepEyeSocket.001",
+      "Fang",
+      "Fang.001",
+      "Fang.002",
+      "Fang.003",
+      "MouthCavity",
+      "Nostril",
+      "Nostril.001",
+      "Pouncer_Skin_LOD0",
+      "SlitPupil",
+      "SlitPupil.001"
+    ]
   }
 }

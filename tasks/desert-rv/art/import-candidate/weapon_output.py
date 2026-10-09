@@ -44,7 +44,7 @@ LOOP_INTENT = ('Only source-authored Armored Attack loops to cover attackClock>1
 ORIGINAL_SCRIPTS = {'Assets/DesertRV/Runtime/WeaponPresentation.cs', 'Assets/DesertRV/Runtime/WeaponArmReach.cs'}
 # Matched to the pinned official Lit.shader.meta by the shared resolver.
 URP_LIT_GUID = '933532a4fcc9baf4fa0491de14d08ed7'
-NATIVE_CASES = 10
+from candidate_native_cases import NATIVE_COUNT as NATIVE_CASES
 EMISSION_CASE = 'DesertRV.Tests.CandidateAnimationPolicyTests.OpenCoreEmissionSurvivesRealSaveReimportAndReload'
 MATERIAL_IDENTITY_CASE = 'DesertRV.Tests.CandidateMaterialIdentityTests.PersistedWeaponMaterialIdentitySurvivesNeutralSamplingAndRejectsImpostors'
 ZERO = dict(x=0, y=0, z=0)

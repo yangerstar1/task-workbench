@@ -40,7 +40,7 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y --no-install-recommends python3-pil python3-yaml
       - name: Test offline stager
         working-directory: tasks/desert-rv/art/import-candidate
-        run: /usr/bin/python3 -m unittest -v test_stage_artifact test_capture_source test_verify_output test_strict_output test_weapon_output test_failed_capture_output test_failed_capture_dispatch test_package_snapshot.PackageSnapshotTests test_package_snapshot.WeaponPackageScopeTests test_package_snapshot.PackageExporterIntegrationTests test_package_snapshot_source test_urp_material_metadata test_material_metadata_integration
+        run: /usr/bin/python3 -m unittest -v test_stage_artifact test_capture_source test_verify_output test_strict_output test_weapon_output test_failed_capture_output test_failed_capture_dispatch test_package_snapshot.PackageSnapshotTests test_package_snapshot.WeaponPackageScopeTests test_package_snapshot.PackageExporterIntegrationTests test_package_snapshot_source test_urp_material_metadata test_material_metadata_integration test_dual_contact_integration test_paw_contact_output
       - name: Fetch and verify pinned candidate input
         env:
           GH_TOKEN: ${{ github.token }}

@@ -44,6 +44,7 @@ openbox --sm-disable >"$private_logs/openbox.log" 2>&1 & wm_pid=$!
 for i in $(seq 1 100); do xprop -root _NET_SUPPORTING_WM_CHECK 2>/dev/null | grep -q 'window id' && break; sleep .1; done
 xprop -root _NET_SUPPORTING_WM_CHECK | grep -q 'window id'
 # No batchmode/nographics/quit and no screen capture before the dedicated-window handshake.
+timeout --signal=TERM --kill-after=1s 3s python3 "$script_dir/rendered/launcher_context.py" after "$private_logs" >/dev/null 2>&1 || :
 timeout --signal=TERM --kill-after=30s 15m "$UNITY_EDITOR" -projectPath "$DESERTRV_UNITY_PROJECT" \
   -executeMethod "$entry" -force-glcore -job-worker-count 2 -logFile "$private_logs/editor.log" & unity_pid=$!
 printf 1 > "$DESERTRV_PROGRESS_DIR/editor-spawn"

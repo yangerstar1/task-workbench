@@ -16,7 +16,7 @@ def unique_object(pairs):
     return out
 def read_control(p):
     p=safe(p)
-    if not p.is_file() or p.stat().st_size>4096:raise ValueError()
+    if not p.is_file() or p.stat().st_size>8192:raise ValueError()
     value=json.loads(p.read_text(),object_pairs_hook=unique_object)
     if not isinstance(value,dict) or set(value) not in (CONTROL_FIELDS,CONTROL_FIELDS|{'startupDiagnostics'}):raise ValueError()
     if type(value['schema']) is not int or value['schema']!=1 or value['mode']!='RENDERED_CONTROL_ONLY_NOT_ACCEPTANCE':raise ValueError()

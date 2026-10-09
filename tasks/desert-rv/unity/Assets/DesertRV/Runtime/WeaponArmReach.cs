@@ -15,6 +15,7 @@ namespace DesertRV
         public Quaternion upperBindRotation,foreBindRotation;
         public string neutralPoseEvidence;
     }
+    [Serializable]
     public struct ArmReachDiagnostics
     {
         public bool solved,measured,measurementsFinite;

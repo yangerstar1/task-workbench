@@ -20,8 +20,8 @@ from strict_output import (StrictError, require, safe, sha, read, keys, finite,
     angle, mesh_dimensions, ROOT_PROPERTIES, PACKAGE_SHADER, PACKAGE_ASSET_VERSION, PACKAGE_ASSET_VERSION_GUID,
     DEPENDENCY_HASH_SCOPE, dependency_meta_guid, dependency_input_paths)
 
-CONTRACT_SHA = '863d2d87052f02bb9315db1e5f1129d5ca43dbf8978f1bf680cf8e344c4eb735'
-CONTRACT_CANONICAL_SHA = 'f9eeb203052101001ac3e8336f5c995c3ed70b8927f5b7dfe532b52af84f156d'
+CONTRACT_SHA = '0e2dd6db31f8579504ed1004b7fe7fc5d48c7b3c20b075a46f66bab396b8766f'
+CONTRACT_CANONICAL_SHA = 'c01fa8580a6268291dcf111b7921e59fea8529eb9ec4034d7cf49d7a3343fe41'
 DISCOVERY_SHA = 'de5b5d9dda1d1c426af4724f62e85b0f37567853c8b5303a1f666271c1c4b2ce'
 STATES = {'Idle': 2., 'Walk': .4, 'Windup': .78, 'Attack': .8,
           'Recover': 1.3, 'Hit': .28, 'Death': 1.8}
@@ -33,16 +33,8 @@ ACTOR_SCRIPT = 'Assets/DesertRV/Runtime/BeastActor.cs'
 BUILTINS = {'Resources/unity_builtin_extra', 'Library/unity default resources'}
 BUILTIN_GUIDS = {'00000000000000000000000000000000',
     '0000000000000000e000000000000000', '0000000000000000f000000000000000'}
-NATIVE_NAMES = {
-    'DesertRV.Tests.CandidateMeshMeasurementTests.ScaledTranslatedRotatedHierarchyMatchesIndependentSkinning',
-    'DesertRV.Tests.CandidateMeshMeasurementTests.RejectsBlendShapesAndTruncatedSkinQuality',
-    'DesertRV.Tests.CandidateMeshMeasurementTests.StaticMeshesAndFourMillimetreGateUseWorldVertices',
-    'DesertRV.Tests.CandidateMaterialIdentityTests.PersistedWeaponMaterialIdentitySurvivesNeutralSamplingAndRejectsImpostors',
-    'DesertRV.Tests.CandidateArtImportTests.ExecutePinnedDiscoveryOrBindingDiagnostics',
-    *('DesertRV.Tests.CandidateAnimationPolicyTests.' + name for name in (
-        'OnlyArmoredAttackGetsTheSourceLoopException', 'EqualKeyValuesDoNotExcuseUnsafeTangents',
-        'MissingNativeAnimatorGetsCreatedAndReused', 'OpenCoreEmissionSurvivesRealSaveReimportAndReload',
-        'RenderTargetCleanupDetachesCameraBeforeDestroy'))}
+from candidate_native_cases import NATIVE_NAMES, NATIVE_COUNT
+
 IMPORT_LIMITS = ['Actual Unity camera rendering and human visual review',
     'Interrupted/repeated runtime flows', 'Full three-region playthrough',
     'Android device acceptance', 'Explicit production review and unchanged production gate']
@@ -81,6 +73,8 @@ def contract_shape(c):
     # The pin covers source identity, all nine material values, all 27 bounds,
     # all seven exact take names, bindings and the independent rig anchor TRS.
     baseline_shape(c['bindings']['neutralBaseline'])
+    from paw_contact_output import contract as paw_contract
+    paw_contract(c['bindings'])
     return {row['file']: row['sha256'] for row in c['files']}
 
 
@@ -193,8 +187,11 @@ def material_file(project, prefix, spec, index):
     require(not spec['baseColorFile'] or '_BaseMap' in textures, 'POUNCER_MATERIAL_TEXTURE_BINDING')
 
 
+from paw_contact_output import SCRIPT as PAW_SCRIPT
+
+
 def required_dependencies(c, prefix):
-    return {prefix+'/Candidate.prefab', prefix+'/Candidate.controller', PACKAGE_SHADER, PACKAGE_ASSET_VERSION, ACTOR_SCRIPT,
+    return {prefix+'/Candidate.prefab', prefix+'/Candidate.controller', PACKAGE_SHADER, PACKAGE_ASSET_VERSION, ACTOR_SCRIPT, PAW_SCRIPT,
         *(prefix+'/Source/'+f['file'] for f in c['files']),
         *(prefix+f'/Materials/Material_{i:02}.mat' for i in range(9))}
 
@@ -415,7 +412,7 @@ def pouncer_native_report(root):
     matching = [p for p in (root/'artifacts/candidate-art').rglob('*.xml') if sha(p) == result]
     require(len(matching) == 1, 'POUNCER_NATIVE_VERSION')
     cases = list(ET.parse(safe(matching[0])).getroot().iter('test-case'))
-    require(len(cases) == 10 and {c.get('fullname') for c in cases} == NATIVE_NAMES
+    require(len(cases) == len(NATIVE_NAMES) and {c.get('fullname') for c in cases} == NATIVE_NAMES
         and all(c.get('result') == 'Passed' for c in cases), 'POUNCER_NATIVE_VERSION')
     return result
 
@@ -430,7 +427,8 @@ def snapshot_paths(root, c, deps):
     project = root/'unity'; base = project/'Assets/DesertRV/CandidateArtImports'
     evidence = project/'JourneyEvidence/CandidateArt'; prefix = base.relative_to(project).as_posix()+'/'+c['id']
     dependency_shape(c, prefix, deps)
-    paths = {project/'CandidateImportInput/contract.json', Path(str(base)+'.meta')}
+    from paw_contact_output import SOLVER
+    paths = {project/'CandidateImportInput/contract.json', Path(str(base)+'.meta'), project/SOLVER, project/(SOLVER+'.meta')}
     for folder in (base, evidence, root/'artifacts/candidate-art'):
         require(folder.is_dir() and not folder.is_symlink(), 'POUNCER_UNSAFE_INPUT_DIRECTORY')
         nodes = list(folder.rglob('*'))
@@ -495,7 +493,8 @@ def export_pouncer(root, output, c, summary, native, protected):
     require('importCommit' in summary, 'POUNCER_CURRENT_RUN_IDENTITY'); _empty_output(output)
     evidence = project/'JourneyEvidence/CandidateArt'
     imp, ih = frozen_read(evidence/'import-report.json'); capture, ch = frozen_read(evidence/'capture-report.json')
-    raw_hashes = {'import-report.json': ih, 'capture-report.json': ch}
+    paw_contact, ph = frozen_read(evidence/'paw-contact-report.json')
+    raw_hashes = {'import-report.json': ih, 'capture-report.json': ch, 'paw-contact-report.json': ph}
     snapshot = {p: sha(p) for p in snapshot_paths(root, c, imp['dependencies'])}
     require(snapshot[contract_path] == contract_hash and all(snapshot[evidence/k] == v for k, v in raw_hashes.items()),
         'POUNCER_INPUT_CHANGED_DURING_VALIDATION')
@@ -503,6 +502,8 @@ def export_pouncer(root, output, c, summary, native, protected):
     prefix = validate_import(project, c, contract_path, imp)
     frames = validate_capture(evidence, prefix, imp, capture, c['bindings']['neutralBaseline'])
     payload = generated_files(project, c, prefix, imp, files)
+    from paw_contact_output import validate as validate_paw_contact
+    payload.extend(validate_paw_contact(project,prefix,imp,{f['requestedState']:f for f in frames},paw_contact))
     require({p.name for p in evidence.iterdir()} == set(raw_hashes) | {f['image'] for f in frames}, 'POUNCER_EVIDENCE_ALLOWLIST')
     require(all(p.is_file() and not p.is_symlink() for p in evidence.iterdir()), 'POUNCER_UNSAFE_EVIDENCE_NODE')
     payload.extend((evidence/f['image'], Path('frames')/f['image']) for f in frames)
@@ -521,7 +522,7 @@ def export_pouncer(root, output, c, summary, native, protected):
         # never used as Pouncer evidence; all other fields have strict schemas.
         safe_import = {k: v for k, v in imp.items() if k not in ('muzzle', 'weaponCalibration')}
         safe_capture = {k: v for k, v in capture.items() if k != 'weapon'}
-        for name, obj in (('import-report.json', safe_import), ('capture-report.json', safe_capture)):
+        for name, obj in (('import-report.json', safe_import), ('capture-report.json', safe_capture), ('paw-contact-report.json', paw_contact)):
             require(sha(evidence/name) == raw_hashes[name], 'POUNCER_REPORT_CHANGED_DURING_EXPORT')
             path = staged/name; path.write_text(json.dumps(obj, indent=2, allow_nan=False)+'\n')
             records.append(dict(path=name, sha256=sha(path), bytes=path.stat().st_size))
@@ -535,7 +536,7 @@ def export_pouncer(root, output, c, summary, native, protected):
         require(pouncer_native_report(root) == native_hash, 'POUNCER_NATIVE_CHANGED_DURING_EXPORT')
         verify_snapshot(root, c, imp['dependencies'], snapshot)
         result = dict(summary, status='STRICT_CANDIDATE_CAPTURED_NOT_ACCEPTED', approved=False, errorCode=None,
-            files=records, nativeXmlSha256=native_hash, nativeCases=10, images=184, weakpointImages=0,
+            files=records, nativeXmlSha256=native_hash, nativeCases=len(NATIVE_NAMES), images=184, weakpointImages=0,
             directImages=35, attackRecoverImages=21, deathTransitionImages=126, resetImages=2,
             protectedSource='UNCHANGED', calibratedForScene=False, visualApproved=False, gameplayAccepted=False,
             rawReportSha256=raw_hashes, discoverySha256=DISCOVERY_SHA,
@@ -563,7 +564,7 @@ def export(root, output, native='success', protected='success'):
         return export_pouncer(root, output, read(root/'unity/CandidateImportInput/contract.json'), summary, native, protected)
     except StrictError as error:
         code = str(error)
-        summary['errorCode'] = code if re.fullmatch(r'(?:STRICT|POUNCER|URP)_[A-Z0-9_]{1,100}', code) else 'INVALID_EVIDENCE'
+        summary['errorCode'] = code if re.fullmatch(r'(?:STRICT|POUNCER|URP|PAW)_[A-Z0-9_]{1,100}', code) else 'INVALID_EVIDENCE'
         raise StrictError(summary['errorCode']) from None
     except Exception:
         summary['errorCode'] = 'INVALID_EVIDENCE'

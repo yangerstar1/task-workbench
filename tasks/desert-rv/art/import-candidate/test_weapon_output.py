@@ -97,9 +97,7 @@ class WeaponExportTests(unittest.TestCase):
         install_package_snapshot(self.project)
         self.rehash_dependencies()
         self.native=self.root/'artifacts/candidate-art/results.xml';self.native.parent.mkdir(parents=True)
-        self.names=[strict.NATIVE,'DesertRV.Tests.CandidateAnimationPolicyTests.OnlyArmoredAttackGetsTheSourceLoopException',
-            'DesertRV.Tests.CandidateAnimationPolicyTests.EqualKeyValuesDoNotExcuseUnsafeTangents',
-            'DesertRV.Tests.CandidateAnimationPolicyTests.MissingNativeAnimatorGetsCreatedAndReused',w.EMISSION_CASE,'DesertRV.Tests.CandidateAnimationPolicyTests.RenderTargetCleanupDetachesCameraBeforeDestroy',w.MATERIAL_IDENTITY_CASE,'DesertRV.Tests.CandidateMeshMeasurementTests.ScaledTranslatedRotatedHierarchyMatchesIndependentSkinning','DesertRV.Tests.CandidateMeshMeasurementTests.RejectsBlendShapesAndTruncatedSkinQuality','DesertRV.Tests.CandidateMeshMeasurementTests.StaticMeshesAndFourMillimetreGateUseWorldVertices']
+        self.names=sorted(__import__('candidate_native_cases').NATIVE_NAMES)
         self.native.write_text('<test-run result="Passed">'+''.join('<test-case fullname="'+name+'" result="Passed"/>' for name in self.names)+'</test-run>')
         self.flush()
 
@@ -193,7 +191,7 @@ class WeaponExportTests(unittest.TestCase):
             return result
         with patch.object(w.shutil,'copyfile',inject):self.rejected('STRICT_STAGING_ALLOWLIST')
     def test_full_synthetic_export_is_explicitly_unaccepted(self):
-        result=self.run_export();self.assertEqual((result['images'],result['weaponSamples'],result['nativeCases']),(25,4463,10))
+        result=self.run_export();self.assertEqual((result['images'],result['weaponSamples'],result['nativeCases']),(25,4463,w.NATIVE_CASES))
         for key in ('approved','calibratedForScene','visualApproved','gameplayAccepted'):self.assertIs(result[key],False)
         self.assertEqual((result['denseSamples'],result['worldSamples'],result['imageSamples']),(4303,135,25))
         for row in result['files']:self.assertEqual(w.sha(self.out/row['path']),row['sha256'])

@@ -24,6 +24,8 @@ namespace DesertRV.Editor
         }
         [Serializable] public sealed class RendererNeutralBaseline { public string path; public Vector3 worldCenter,worldExtents; }
         [Serializable] public sealed class RootNeutralBaseline { public Vector3 position,scale;public Quaternion rotation;public RendererNeutralBaseline[] renderers; }
+        [Serializable] public sealed class FootChainBinding { public string id,upper,lower,foot; }
+        [Serializable] public sealed class PawChainBinding { public string id,upper,lower,paw; }
         [Serializable] public sealed class Bindings
         {
             public string animatorPath, body, leftHand, rightHand, muzzle, incomingOffset, leftReloadOffset;
@@ -32,6 +34,8 @@ namespace DesertRV.Editor
             public string weakPointRoot, core; public string[] plates, plateRenderers;
             public Vector3[] openEuler; public Color openEmission, openBaseColor;
             public Vector3 colliderCenter; public float colliderRadius, colliderHeight;
+            public int footGroundLayer; public FootChainBinding[] footChains;
+            public int pawGroundLayer; public PawChainBinding[] pawChains; public string[] pawRenderers;
         }
         [Serializable] public sealed class Contract
         {
@@ -112,6 +116,7 @@ namespace DesertRV.Editor
                     var actor=instance.AddComponent<BeastActor>(); actor.armored=c.kind=="armored"; actor.animator=animator;
                     var capsule=instance.AddComponent<CapsuleCollider>(); capsule.center=c.bindings.colliderCenter; capsule.radius=c.bindings.colliderRadius; capsule.height=c.bindings.colliderHeight;
                     if(actor.armored) BindArmored(c,destination,visual,instance,actor,clips.Values);
+                    else BindPouncerPaws(c,visual,instance,actor);
                 }
                 instance.SetActive(true);
                 report.prefab=destination+"/Candidate.prefab";
@@ -355,6 +360,26 @@ namespace DesertRV.Editor
             var filter=renderer.GetComponent<MeshFilter>(); Check(filter && filter.sharedMesh && filter.sharedMesh.vertexCount>0,"Nail requires actual geometry.");
             return renderer.transform.TransformPoint(filter.sharedMesh.bounds.center);
         }
+        static void BindPouncerPaws(Contract c,GameObject visual,GameObject instance,BeastActor actor)
+        {
+            var b=c.bindings;
+            Check(c.kind=="pouncer" && !actor.armored && b.pawGroundLayer==0 && LayerMask.LayerToName(b.pawGroundLayer)=="Default","Exact Pouncer ground binding required.");
+            string[] rendererPaths={"AmberEye","AmberEye.001","ArticulatedLowerJaw","Claw","Claw.001","Claw.002","Claw.003","Claw.004","Claw.005","Claw.006","Claw.007","Claw.008","Claw.009","Claw.010","Claw.011","DeepEyeSocket","DeepEyeSocket.001","Fang","Fang.001","Fang.002","Fang.003","MouthCavity","Nostril","Nostril.001","Pouncer_Skin_LOD0","SlitPupil","SlitPupil.001"};
+            Check(b.pawRenderers!=null && b.pawRenderers.SequenceEqual(rendererPaths),"Exact complete Pouncer skin/claw paths required.");
+            Check(b.pawChains!=null && b.pawChains.Length==4,"Four explicit Pouncer paw chains required.");
+            var contact=instance.AddComponent<PouncerPawContactConstraint>();contact.actor=actor;contact.animator=actor.animator;
+            contact.groundMask=1<<b.pawGroundLayer;contact.sourceRenderers=b.pawRenderers.Select(path=>RendererAt(visual,path) as SkinnedMeshRenderer).ToArray();
+            string[] ids={"fore.L","fore.R","hind.L","hind.R"};contact.legs=new PouncerPawContactConstraint.Leg[4];
+            for(int i=0;i<4;i++)
+            {
+                string kind=i<2?"fore":"hind",side=i%2==0?"L":"R";
+                string upper="Pouncer_Rig/root/visual_body/pelvis/"+(i<2?"spine/chest/":"")+kind+"_upper."+side;
+                string lower=upper+"/"+kind+"_lower."+side,paw=lower+"/"+kind+"_paw."+side;var chain=b.pawChains[i];
+                Check(chain!=null && chain.id==ids[i] && chain.upper==upper && chain.lower==lower && chain.paw==paw,"Unexpected Pouncer chain path or order.");
+                contact.legs[i]=new PouncerPawContactConstraint.Leg{id=chain.id,upper=At(visual.transform,upper),lower=At(visual.transform,lower),paw=At(visual.transform,paw)};
+            }
+            Check(contact.ValidateBindings(out var reason),"Pouncer paw binding failed: "+reason);
+        }
         static void BindArmored(Contract c,string destination,GameObject visual,GameObject instance,BeastActor actor,IEnumerable<AnimationClip> clips)
         {
             var b=c.bindings; Check(b.plates!=null && b.plates.Length==2 && b.plateRenderers!=null && b.plateRenderers.Length==2 && b.openEuler!=null && b.openEuler.Length==2,"Exactly two authored plates required.");
@@ -375,6 +400,19 @@ namespace DesertRV.Editor
             so.ApplyModifiedPropertiesWithoutUndo();
             Check(presenter.ValidateBindings(out string reason),"Weakpoint candidate bindings failed: "+reason);
             var errors=new List<string>(); WeakPointContractChecks.Validate(presenter,"Imported candidate",errors); Check(errors.Count==0,string.Join("; ",errors));
+            Check(b.footGroundLayer==0 && LayerMask.LayerToName(b.footGroundLayer)=="Default","Explicit existing Default ground layer required for this candidate.");
+            Check(b.footChains!=null && b.footChains.Length==4,"Four exact authored foot chains required.");
+            var contact=instance.AddComponent<ArmoredFootContactConstraint>();contact.actor=actor;contact.animator=actor.animator;
+            contact.bodyRenderer=body as SkinnedMeshRenderer;contact.groundMask=1<<b.footGroundLayer;
+            string[] ids={"fore.L","fore.R","hind.L","hind.R"};contact.legs=new ArmoredFootContactConstraint.Leg[4];
+            for(int i=0;i<4;i++)
+            {
+                var chain=b.footChains[i];string upper="Bulwark_Rig/root/body/upper."+ids[i];
+                Check(chain!=null && chain.id==ids[i] && chain.upper==upper && chain.lower==upper+"/lower."+ids[i] && chain.foot==chain.lower+"/foot."+ids[i],"Unexpected foot chain path or order.");
+                contact.legs[i]=new ArmoredFootContactConstraint.Leg{id=chain.id,upper=At(visual.transform,chain.upper),lower=At(visual.transform,chain.lower),foot=At(visual.transform,chain.foot)};
+            }
+            Check(contact.ValidateBindings(out string footReason),"Foot contact bindings failed: "+footReason);
+
         }
         // URP 17.3 rebuilds _EMISSION from AnyEmissive during material asset import.
         // A keyword alone (or clearing EmissiveIsBlack to None) does not survive that pass.

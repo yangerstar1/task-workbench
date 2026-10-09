@@ -1,13 +1,15 @@
 #!/usr/bin/env python3
 """Classify private Editor/stdout logs before deletion. Never export text, paths or credentials."""
 import argparse,json,os,pathlib,re
+import license_observation as licensing
+import launcher_context
 SCANS={'COMPLETE','BOUNDED','NO_LOGS','UNREADABLE','UNAVAILABLE'}
-LICENSE={'NONE_OBSERVED','NO_VALID_LICENSE','VALIDATION_FAILURE','CLIENT_UNAVAILABLE','CLIENT_ERROR_REPORTED'}
+LICENSE={'NONE_OBSERVED','NO_VALID_LICENSE','VALIDATION_FAILURE','CLIENT_UNAVAILABLE','CLIENT_ERROR_REPORTED','ERROR_THEN_SUCCESS_REPORTED','LATER_ERROR_AFTER_SUCCESS','SUCCESS_EVENT_REPORTED','PROGRESS_EVENTS_ONLY','MULTIPLE_STREAM_HISTORIES','BOUNDED_EVENT_HISTORY'}
 GRAPHICS={'NONE_OBSERVED','DISPLAY_FAILURE','DEVICE_INIT_FAILURE','OPENGL_ERROR','NULL_BACKEND'}
 PROGRESS=('engine-version-reported','mono-runtime-configured','asset-refresh-observed','asset-import-observed','package-manager-observed','compiler-command-observed','script-compilation-started','script-compilation-finished','assembly-reload-started','assembly-reload-finished','shader-compilation-observed','project-load-complete')
 CODES={'CS0006','CS0012','CS0016','CS0029','CS0030','CS0101','CS0103','CS0104','CS0106','CS0111','CS0117','CS0118','CS0120','CS0121','CS0122','CS0136','CS0161','CS0200','CS0234','CS0246','CS0266','CS0535','CS0619','CS1001','CS1002','CS1003','CS1022','CS1026','CS1061','CS1068','CS1069','CS1501','CS1502','CS1503','CS1513','CS1519','CS1525','CS1617','CS1705','UNKNOWN_CSHARP_ERROR'}
 UNKNOWN_SOURCE='UNKNOWN_PROJECT_SOURCE'
-FIELDS={'schema','mode','scanStatus','compileErrors','compilerDiagnostics','diagnosticsTruncated','executeMethodNotFound','licenseStatus','graphicsStatus','nativeLibraryFailure','startupProgress','editorWaitExitCode','captureExitCode','terminationRequest','rawLogsExported'}
+FIELDS={'schema','mode','scanStatus','compileErrors','compilerDiagnostics','diagnosticsTruncated','executeMethodNotFound','licenseStatus','graphicsStatus','nativeLibraryFailure','startupProgress','editorWaitExitCode','captureExitCode','terminationRequest','rawLogsExported','licenseObservations','launcherContext'}
 MAX_BYTES=64*1024*1024;MAX_LINE=16384;MAX_DIAGNOSTICS=8
 
 def safe(path):
@@ -28,7 +30,7 @@ def source_map(project):
     return result
 
 def empty_report(editor=None,capture=None,termination='NONE'):
-    return dict(schema=1,mode='EDITOR_STARTUP_FIXED_DIAGNOSTIC',scanStatus='UNAVAILABLE',compileErrors=False,compilerDiagnostics=[],diagnosticsTruncated=False,executeMethodNotFound=False,licenseStatus='NONE_OBSERVED',graphicsStatus='NONE_OBSERVED',nativeLibraryFailure=False,startupProgress=[],editorWaitExitCode=editor,captureExitCode=capture,terminationRequest=termination,rawLogsExported=False)
+    return dict(schema=1,mode='EDITOR_STARTUP_FIXED_DIAGNOSTIC',scanStatus='UNAVAILABLE',compileErrors=False,compilerDiagnostics=[],diagnosticsTruncated=False,executeMethodNotFound=False,licenseStatus='NONE_OBSERVED',graphicsStatus='NONE_OBSERVED',nativeLibraryFailure=False,startupProgress=[],editorWaitExitCode=editor,captureExitCode=capture,terminationRequest=termination,rawLogsExported=False,licenseObservations=licensing.empty(),launcherContext=launcher_context.empty())
 
 def validate(report,known_basenames):
     if not isinstance(report,dict) or set(report)!=FIELDS:raise ValueError()
@@ -50,6 +52,8 @@ def validate(report,known_basenames):
         if item['code'] not in CODES or item['sourceBasename'] not in set(known_basenames)|{UNKNOWN_SOURCE}:raise ValueError()
         pairs.append((item['code'],item['sourceBasename']))
     if pairs!=sorted(set(pairs)) or (pairs and not report['compileErrors']):raise ValueError()
+    licensing.validate_streams(report['licenseObservations'])
+    launcher_context.validate(report['launcherContext'])
     return report
 
 def classify(log_directory,project,editor=None,capture=None,termination='NONE'):
@@ -71,6 +75,8 @@ def classify(log_directory,project,editor=None,capture=None,termination='NONE'):
                             data=stream.readline(MAX_LINE+1);bytes_read+=len(data)
                         continue
                     line=data.decode('utf-8','replace');low=line.lower()
+                    stream_name='editor' if filename=='editor.log' else 'stdout'
+                    r['licenseObservations'][stream_name]=licensing.add(r['licenseObservations'][stream_name],licensing.event(line))
                     codes=re.findall(r'\berror\s+(CS[0-9]{4})\b',line)
                     if codes or 'scripts have compiler errors' in low or 'scripts have compilation errors' in low:r['compileErrors']=True
                     location=re.search(r'(?P<source>Assets/DesertRV/[A-Za-z0-9_./-]+\.cs)\([0-9]+(?:,[0-9]+)?\)',line.replace('\\','/'))
@@ -103,6 +109,8 @@ def classify(log_directory,project,editor=None,capture=None,termination='NONE'):
     except Exception:r['scanStatus']='UNREADABLE'
     r['compilerDiagnostics']=[dict(code=c,sourceBasename=n) for c,n in sorted(diagnostics)[:MAX_DIAGNOSTICS]]
     r['diagnosticsTruncated']=len(diagnostics)>MAX_DIAGNOSTICS;r['startupProgress']=[p for p in PROGRESS if p in seen]
+    r['launcherContext']=launcher_context.load(pathlib.Path(log_directory)/'launcher-context.json')
+    r['licenseStatus']=licensing.status(r['licenseObservations'],r['licenseStatus'])
     return validate(r,set(names.values()))
 
 def load_report(path,project):

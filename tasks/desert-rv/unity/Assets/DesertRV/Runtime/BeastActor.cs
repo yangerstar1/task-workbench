@@ -36,9 +36,11 @@ namespace DesertRV
         public void ResetActor()
         {
             EnsureInitialized();
+            var pawContact=GetComponent<PouncerPawContactConstraint>();if(pawContact)pawContact.ResetContactState();
             transform.position = home; Health = armored ? 160 : 65;
             KilledByRam = false; combat = null; chargeId = 0; lastHit = 0; attackClock = 0;
             EnsureCombat(); if (hurtbox) hurtbox.enabled = true;
+            var footContact=GetComponent<ArmoredFootContactConstraint>();if(footContact)footContact.ResetContactState();
             SetPhase(BeastPhase.Idle);
         }
         bool EnsureCombat()

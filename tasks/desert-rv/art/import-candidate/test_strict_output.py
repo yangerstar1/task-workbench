@@ -34,6 +34,13 @@ class StrictExportTests(unittest.TestCase):
   self.imp['dependencies']=[self.prefix+'/'+n for n in ['Candidate.prefab','Candidate.controller','Materials/Material_00.mat','Materials/Material_01.mat','Materials/Core_Open.mat','Derived/ORM_00.png','Source/bulwark-candidate.fbx','Source/bulwark-animations.fbx','Source/bulwark-basecolor.png']]
   self.imp['dependencySha256']=s.dependency_digest(self.project,self.imp['dependencies'])
   self.imp['clips']=[dict(x,frameRate=60,floatBindings=160,objectBindings=0) for x in self.c['clips']]
+  # Exact own script fixture, not a broad Runtime wildcard.
+  from foot_contact_output import SCRIPT,GUID
+  write(SCRIPT,'// synthetic foot component fixture')
+  write(SCRIPT+'.meta','fileFormatVersion: 2\nguid: '+GUID+'\n')
+  write(self.prefix+'/Candidate.prefab','%YAML 1.1\n--- !u!1 &1\nCandidate: {script: {guid: '+GUID+'}}\n')
+  self.imp['dependencies'].append(SCRIPT)
+  self.imp['dependencySha256']=s.dependency_digest(self.project,self.imp['dependencies'])
   self.imp['rootCurves']=[dict(state=st,property=p,keys=2,minimum=0,maximum=0,constant=True,tangentsSafe=True) for st in s.STATES for p in sorted(s.ROOT_PROPERTIES)]
   for row in self.imp['rootCurves']:
    group,axis=row['property'].split('.');key={'m_LocalPosition':'position','m_LocalRotation':'rotation','m_LocalScale':'scale'}[group];row['minimum']=row['maximum']=self.c['bindings']['neutralBaseline'][key][axis]
@@ -52,13 +59,40 @@ class StrictExportTests(unittest.TestCase):
     q=dict(x=0,y=1 if state=='open' else 0,z=0,w=0 if state=='open' else 1)
     self.weak['samples'].append(dict(state=state,view=view,coreMaterial=self.prefix+'/Materials/'+('Core_Open' if state=='open' else 'Material_01')+'.mat',imageLabel='weakpoint-'+state+'-'+view,fieldOfView=60,distance=3,weakPointExposed=state=='open',bodyUnchanged=True,localPlateRotations=([s.unity_euler(v) for v in self.c['bindings']['openEuler']] if state=='open' else [q,q.copy()]),cameraPosition=dict(x=0,y=1.65,z=3)))
   native=self.root/'artifacts/candidate-art/results.xml';native.parent.mkdir(parents=True)
-  names=[s.NATIVE,'DesertRV.Tests.CandidateAnimationPolicyTests.OnlyArmoredAttackGetsTheSourceLoopException','DesertRV.Tests.CandidateAnimationPolicyTests.EqualKeyValuesDoNotExcuseUnsafeTangents','DesertRV.Tests.CandidateAnimationPolicyTests.MissingNativeAnimatorGetsCreatedAndReused','DesertRV.Tests.CandidateAnimationPolicyTests.OpenCoreEmissionSurvivesRealSaveReimportAndReload','DesertRV.Tests.CandidateAnimationPolicyTests.RenderTargetCleanupDetachesCameraBeforeDestroy','DesertRV.Tests.CandidateMaterialIdentityTests.PersistedWeaponMaterialIdentitySurvivesNeutralSamplingAndRejectsImpostors','DesertRV.Tests.CandidateMeshMeasurementTests.ScaledTranslatedRotatedHierarchyMatchesIndependentSkinning','DesertRV.Tests.CandidateMeshMeasurementTests.RejectsBlendShapesAndTruncatedSkinQuality','DesertRV.Tests.CandidateMeshMeasurementTests.StaticMeshesAndFourMillimetreGateUseWorldVertices']
+  names=sorted(__import__('candidate_native_cases').NATIVE_NAMES)
   native.write_text('<test-run result="Passed">'+''.join('<test-case fullname="'+n+'" result="Passed"/>' for n in names)+'</test-run>')
   self.flush()
  def meta(self,p,texture=False):
   self.guid+=1;Path(str(p)+'.meta').parent.mkdir(parents=True,exist_ok=True);Path(str(p)+'.meta').write_text('fileFormatVersion: 2\nguid: '+f'{self.guid:032x}'+'\n'+('TextureImporter:\n  sRGBTexture: 0\n  isReadable: 1\n  textureType: 0\n' if texture else 'DefaultImporter: {}\n'))
+ def foot_report(self):
+  from foot_contact_output import IDS
+  zero=dict(x=0.,y=0.,z=0.);up=dict(x=0.,y=1.,z=0.)
+  rows=[]
+  for f in self.cap['frames']:
+   legs=[dict(id=id,reason=None,sourceState='Idle',destinationState='Idle',corrected=False,valid=True,sourceAirborne=False,destinationAirborne=False,lowestSourceVertex=1,groundSceneHandle=1,preMinDistance=.005,postMinDistance=.005,attemptedPostMinDistance=.005,correctionMeters=0.,targetClearance=0.,preFootWorld=zero.copy(),postFootWorld=zero.copy(),groundPoint=zero.copy(),groundNormal=up.copy()) for id in IDS]
+   solve=dict(valid=True,paused=False,fullMeshValidated=False,slipValidated=False,swingArcValidated=False,frame=1,actorSceneHandle=1,physicsSceneHash=1,reason=None,transitionNormalizedTime=0.,currentNormalizedTime=0.,nextNormalizedTime=0.,currentLength=2.,nextLength=2.,animatorSpeed=1.,legs=legs)
+   rows.append(dict(label=f['requestedState'],preMeshPoseSha256=f['meshPoseSha256'],postMeshPoseSha256=f['meshPoseSha256'],preWorldMinY=f['worldMinY'],postWorldMinY=f['worldMinY'],solve=solve))
+  return dict(status='captured-unreviewed',scope='same-runtime-ApplyFootContact-real-Animator-not-locomotion-QA',gameplayAccepted=False,slipAccepted=False,groundLayer=0,groundObject='CandidateFootContactGround',samples=rows)
  def flush(self):
+  (self.ev/'foot-contact-report.json').write_text(json.dumps(self.foot_report()))
   for n,obj in [('import-report.json',self.imp),('capture-report.json',self.cap),('weakpoint-fixture-report.json',self.weak)]:(self.ev/n).write_text(json.dumps(obj))
+ def test_foot_report_rejects_invented_acceptance(self):
+  from foot_contact_output import validate
+  report=self.foot_report();report['slipAccepted']=True
+  with self.assertRaisesRegex(s.StrictError,'FOOT_SCOPE'):validate(self.project,self.prefix,self.imp,{f['requestedState']:f for f in self.cap['frames']},report)
+ def test_foot_report_requires_persisted_component_dependency(self):
+  from foot_contact_output import validate,SCRIPT
+  self.imp['dependencies'].remove(SCRIPT)
+  with self.assertRaisesRegex(s.StrictError,'FOOT_PERSISTED_DEPENDENCY'):validate(self.project,self.prefix,self.imp,{f['requestedState']:f for f in self.cap['frames']},self.foot_report())
+ def test_foot_report_rejects_false_healthy_sole(self):
+  from foot_contact_output import validate
+  report=self.foot_report();report['samples'][0]['solve']['legs'][0]['postMinDistance']=-.04159
+  with self.assertRaises(s.StrictError):validate(self.project,self.prefix,self.imp,{f['requestedState']:f for f in self.cap['frames']},report)
+ def test_foot_report_rejects_hidden_tangent_translation(self):
+  from foot_contact_output import validate
+  report=self.foot_report();row=report['samples'][0];row['preWorldMinY']=-.0415903
+  leg=row['solve']['legs'][0];leg.update(corrected=True,preMinDistance=-.0415903,postMinDistance=.005,attemptedPostMinDistance=.005,targetClearance=.005,correctionMeters=.0465903,postFootWorld=dict(x=.1,y=.0465903,z=0))
+  with self.assertRaisesRegex(s.StrictError,'FOOT_TANGENT_POSITION_CHANGED'):validate(self.project,self.prefix,self.imp,{f['requestedState']:f for f in self.cap['frames']},report)
  def tearDown(self):self.tmp.cleanup()
  def run_export(self,**kwargs):
   self.flush()
@@ -78,7 +112,7 @@ class StrictExportTests(unittest.TestCase):
   self.assertIn('if(c.kind=="armored")RequireNeutralRootCurves',source)
   self.assertIn('Quaternion.Angle(rotation.normalized,root.localRotation.normalized)<=.001f',source)
  def test_valid_unreviewed_bounded_export(self):
-  r=self.run_export();self.assertEqual(r['images'],202);self.assertEqual(r['weakpointImages'],9);self.assertEqual(r['nativeCases'],10);self.assertFalse(r['approved']);self.assertNotIn('muzzle',json.loads((self.out/'import-report.json').read_text()))
+  r=self.run_export();self.assertEqual(r['images'],202);self.assertEqual(r['weakpointImages'],9);self.assertEqual(r['nativeCases'],__import__('candidate_native_cases').NATIVE_COUNT);self.assertFalse(r['approved']);self.assertNotIn('muzzle',json.loads((self.out/'import-report.json').read_text()))
   for f in r['files']:self.assertEqual(s.sha(self.out/f['path']),f['sha256'])
  def test_optional_dependency_trace_failure_does_not_mask_original_gate(self):
   import io
