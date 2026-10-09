@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
+using System.Xml;
 using UnityEditor;
 using UnityEditor.Build;
 using UnityEditor.Build.Reporting;
@@ -25,6 +26,8 @@ namespace DesertRV.Editor
         {
             public int schema; public string label, sourceCommit, producerRunUrl, generatedReceiptSha256, define, target, boundaryNativeXmlSha256;
             public int boundaryNativeCases;
+            public JourneyCandidateAssetIntegration.FilePin restorationProof;
+            public string assetProducerSourceCommit, assetProducerRunUrl, restorationNativeXmlSha256;
             public bool development, approved;
             public JourneyCandidateAssetIntegration.FilePin[] files;
             public string[] directories;
@@ -36,6 +39,8 @@ namespace DesertRV.Editor
             public int schema = 1;
             public string label = "CANDIDATE_LINUX_DEVELOPMENT_BUILT_UNREVIEWED", sourceCommit, producerRunUrl, generatedReceiptSha256, executableSha256, requestSha256, boundaryNativeXmlSha256;
             public int boundaryNativeCases;
+            public JourneyCandidateAssetIntegration.FilePin restorationProof;
+            public string assetProducerSourceCommit, assetProducerRunUrl, restorationNativeXmlSha256;
             public string unityVersion = "6000.3.19f1", target = "StandaloneLinux64", backend = "Mono2x", define = "DESERTRV_CANDIDATE_LINUX", executable = "DesertRV.x86_64";
             public string[] scenes;
             public string[] temporarySettingsFiles = { "ProjectSettings/ProjectSettings.asset" };
@@ -44,12 +49,103 @@ namespace DesertRV.Editor
             public bool candidateOnly = true, development = true, approved = false, settingsRestored, sourceBytesUnchanged;
             public bool visualReviewed = false, gameplayReviewed = false, audioAuditioned = false;
         }
+        [Serializable] sealed class RootObservation
+        {
+            public bool observed, rootBytesMatch, rootDependencyBytesMatch;
+            public string slot="NONE", expectedImportHash="", observedImportHash="";
+        }
+        [Serializable] sealed class SafeBuildMessage
+        {
+            public string category="UNCLASSIFIED_BUILD_ERROR", code="NONE", source="", text="";
+            public int line;
+        }
         [Serializable] sealed class Diagnostic
         {
             public int schema = 1;
             public string label = "CANDIDATE_LINUX_BUILD_DIAGNOSTIC", stage = "ENTRY", exceptionKind = "NONE", buildResult = "UNAVAILABLE";
             public bool settingsRestored, sourceBytesUnchanged, receiptWritten;
+            public bool buildReportAvailable, leaseActiveAtBuildReturn, assemblyReloadObserved;
+            public string activeTargetAtEntry="NOT_OBSERVED",activeTargetBeforeBuild="NOT_OBSERVED",activeTargetAfterBuild="NOT_OBSERVED",reportTarget="NOT_OBSERVED";
+            public long totalErrors, totalWarnings;
+            public string primaryFailureCode = "NONE", primaryExceptionKind = "NONE", restorationFailureCode = "NONE", restorationExceptionKind = "NONE", verificationFailureCode = "NONE", verificationExceptionKind = "NONE", leaseClosedReason = "NONE";
+            public string[] buildErrorKinds = Array.Empty<string>();
+            public string primaryCallbackGate="NONE", primarySceneRole="NONE", verificationCallbackGate="NONE", verificationSceneRole="NONE";
+            public RootObservation primaryRootMismatch=new RootObservation(), verificationRootMismatch=new RootObservation();
+            public SafeBuildMessage[] buildMessages=Array.Empty<SafeBuildMessage>();
+            public bool buildMessagesTruncated;
         }
+        static Diagnostic currentDiagnostic;
+        static string diagnosticContext = "PRIMARY", currentSceneRole="NONE";
+        static string SceneRole(string path) => path==JourneySceneAuthoring.ManifestPath ? "CONTENT" : Array.IndexOf(Paths,path)==0 ? "BOOTSTRAP" : Array.IndexOf(Paths,path)==1 ? "FIRST_STATION" : Array.IndexOf(Paths,path)==2 ? "SCRAPYARD" : Array.IndexOf(Paths,path)==3 ? "NIGHT_BEACON" : "NONE";
+        static string CallbackGate()
+        {
+            string trace=Environment.StackTrace;
+            if(trace.Contains("JourneyProductionBuildGate.OnPreprocessBuild")) return "PRODUCTION_PREPROCESS";
+            if(trace.Contains("JourneyProductionBuildGate.OnProcessScene")) return "PRODUCTION_SCENE";
+            if(trace.Contains("JourneyCandidateLinuxBuild.ProcessCandidateScene")) return "CANDIDATE_SCENE";
+            return "NONE";
+        }
+        static string TargetKind(BuildTarget target) => target==BuildTarget.StandaloneLinux64 ? "LINUX64" : target==BuildTarget.Android ? "ANDROID" : "OTHER";
+        static string ExceptionKind(Exception error) => error is BuildFailedException ? "BUILD_FAILED" : error is UnauthorizedAccessException ? "UNAUTHORIZED_ACCESS" : error is IOException ? "IO" : "OTHER";
+        static void RememberFailure(Diagnostic diagnostic, string context, string code, string kind)
+        {
+            if (diagnostic == null) return;
+            if (context == "RESTORATION") { if (diagnostic.restorationFailureCode == "NONE") { diagnostic.restorationFailureCode=code; diagnostic.restorationExceptionKind=kind; } }
+            else if (context == "VERIFICATION") { if (diagnostic.verificationFailureCode == "NONE") { diagnostic.verificationFailureCode=code; diagnostic.verificationExceptionKind=kind; diagnostic.verificationCallbackGate=CallbackGate();diagnostic.verificationSceneRole=diagnostic.verificationCallbackGate.StartsWith("PRODUCTION_",StringComparison.Ordinal) ? "NONE" : currentSceneRole; } }
+            else if (diagnostic.primaryFailureCode == "NONE") { diagnostic.primaryFailureCode=code; diagnostic.primaryExceptionKind=kind;diagnostic.primaryCallbackGate=CallbackGate();diagnostic.primarySceneRole=diagnostic.primaryCallbackGate.StartsWith("PRODUCTION_",StringComparison.Ordinal) ? "NONE" : currentSceneRole; }
+        }
+        static void RecordUnhandled(Diagnostic diagnostic, Exception error)
+        {
+            diagnostic.exceptionKind=ExceptionKind(error);
+            // An earlier primary exception can resume after a successful finally. Do not relabel it as verification failure.
+            if(diagnostic.primaryFailureCode=="NONE" && diagnostic.restorationFailureCode=="NONE" && diagnostic.verificationFailureCode=="NONE")
+                RememberFailure(diagnostic,"PRIMARY","UNCLASSIFIED_EXCEPTION",diagnostic.exceptionKind);
+        }
+        static void Report(BuildReport report, Diagnostic diagnostic)
+        {
+            diagnostic.buildReportAvailable = report != null;
+            if (report == null) return;
+            diagnostic.buildResult = report.summary.result == BuildResult.Succeeded ? "SUCCEEDED" : report.summary.result == BuildResult.Cancelled ? "CANCELLED" : report.summary.result == BuildResult.Failed ? "FAILED" : "UNKNOWN";
+            diagnostic.reportTarget=TargetKind(report.summary.platform);
+            diagnostic.totalErrors=report.summary.totalErrors; diagnostic.totalWarnings=report.summary.totalWarnings;
+            var kinds = new HashSet<string>(StringComparer.Ordinal);var messages=new List<SafeBuildMessage>();int observed=0;
+            foreach (var step in report.steps)
+                foreach (var message in step.messages)
+                    if (message.type == LogType.Error || message.type == LogType.Exception || message.type == LogType.Assert)
+                    {
+                        observed++;
+                        if(messages.Count<32) {var safe=ClassifyBuildMessage(message.content ?? "");kinds.Add(safe.category);messages.Add(safe);}
+                    }
+            diagnostic.buildErrorKinds=kinds.OrderBy(x=>x,StringComparer.Ordinal).Take(64).ToArray();diagnostic.buildMessages=messages.ToArray();diagnostic.buildMessagesTruncated=observed>messages.Count;
+        }
+        static SafeBuildMessage ClassifyBuildMessage(string text)
+        {
+            text=text ?? "";if(text.Length>16384) text=text.Substring(0,16384);
+            var result=new SafeBuildMessage();
+            // Only reconstruct known public diagnostics. Never publish arbitrary report text or stack frames.
+            var known=Regex.Match(text,@"DESERTRV_CANDIDATE_([A-Z_]+)");
+            if(known.Success && FailureCodes.Contains(known.Groups[1].Value))
+            {result.category="CANDIDATE_GATE";result.code=known.Groups[1].Value;result.text="Candidate build gate rejected: "+result.code;return result;}
+            if(text.Contains("Formal journey scenes require current production content preflight") || text.Contains("Run formal content preflight before entering BuildPipeline"))
+            {result.category="PRODUCTION_GATE";result.text="Formal journey scenes require current production content preflight.";return result;}
+            var compiler=Regex.Match(text,@"\berror (CS[0-9]{4})\b");
+            if(compiler.Success)
+            {
+                result.category="CS_COMPILATION";result.code=CompilerCodes.Contains(compiler.Groups[1].Value) ? compiler.Groups[1].Value : "UNKNOWN_CSHARP_ERROR";result.text="C# compiler diagnostic: "+result.code;
+                if(active != null)
+                    foreach(var pin in active.request.files.Where(p=>p.path.StartsWith("tasks/desert-rv/unity/Assets/DesertRV/",StringComparison.Ordinal) && p.path.EndsWith(".cs",StringComparison.Ordinal)))
+                    {
+                        string relative=pin.path.Substring("tasks/desert-rv/unity/".Length);
+                        var location=Regex.Match(text,Regex.Escape(relative)+@"\(([0-9]{1,7}),[0-9]{1,7}\)");
+                        if(location.Success) {result.source=relative;result.line=int.Parse(location.Groups[1].Value);result.text+=" at "+relative+":"+result.line;break;}
+                    }
+                return result;
+            }
+            if(text.Contains("Error building Player because scripts had compiler errors")) {result.category="CS_COMPILATION";result.text="Error building Player because scripts had compiler errors.";return result;}
+            if(text.IndexOf("shader",StringComparison.OrdinalIgnoreCase)>=0) {result.category="SHADER_ERROR";result.text="Build report contains a shader error.";}
+            return result;
+        }
+
         static void PersistJson(string path, string json)
         {
             string temporary = path + ".tmp";
@@ -63,21 +159,40 @@ namespace DesertRV.Editor
             public readonly Dictionary<string,string> temporarySettings = new Dictionary<string,string>();
             public readonly HashSet<string> processed = new HashSet<string>(StringComparer.Ordinal);
         }
+        static readonly HashSet<string> CompilerCodes = new HashSet<string>(new[] { "CS0006","CS0012","CS0016","CS0029","CS0030","CS0101","CS0103","CS0104","CS0106","CS0111","CS0117","CS0118","CS0120","CS0121","CS0122","CS0136","CS0161","CS0200","CS0234","CS0246","CS0266","CS0535","CS0619","CS1001","CS1002","CS1003","CS1022","CS1026","CS1061","CS1068","CS1069","CS1501","CS1502","CS1503","CS1513","CS1519","CS1525","CS1617","CS1705","UNKNOWN_CSHARP_ERROR" },StringComparer.Ordinal);
+        static readonly HashSet<string> FailureCodes = new HashSet<string>(new[] { "BOOTSTRAP_BINDING","BOOTSTRAP_OWNER","BUILD_OR_SCENE_FAILED","BUILD_PROFILE","BUILTIN_DEPENDENCY","DEPENDENCY_BYTES","DEPENDENCY_KIND","DEPENDENCY_PATH","DIRTY_SCENE","ENTRY_PROFILE","IMPORT_FINGERPRINT","INVENTORY_DIRECTORY","INVENTORY_LINK","INVENTORY_NONREGULAR","INVENTORY_SET","LEASE_PROFILE","PACKAGE_IDENTITY","PIN_BYTES","PIN_LINK","PIN_MISSING","PIN_PATH","REGION_BINDING","REGION_IDENTITY","REGION_OWNER","REQUEST_HASH","REQUEST_IDENTITY","REQUEST_RECEIPT_HASH","RESTORATION_PROOF","RESTORATION_XML","ROOT_BYTES","ROOT_DEPENDENCY","ROOT_DEPENDENCY_BYTES","ROOT_IMPORT_HASH","SAVED_RUNTIME_IDENTITY","SCENE_COMPONENT","SCENE_SEQUENCE","TARGET_OUTPUT","UNCLASSIFIED_EXCEPTION" },StringComparer.Ordinal);
         static Lease active;
-        static JourneyCandidateLinuxBuild() { AssemblyReloadEvents.beforeAssemblyReload += Close; EditorApplication.quitting += Close; }
-        static void Close() { active = null; }
-        static void Check(bool valid, string message) { if (!valid) throw new BuildFailedException(message); }
+        static JourneyCandidateLinuxBuild() { AssemblyReloadEvents.beforeAssemblyReload += () => Close("ASSEMBLY_RELOAD"); EditorApplication.quitting += () => Close("EDITOR_QUIT"); }
+        static void Close(string reason = "EXPLICIT")
+        {
+            bool wasActive=active!=null;active=null;
+            if (currentDiagnostic != null && wasActive)
+            {
+                currentDiagnostic.leaseClosedReason=reason;
+                if (reason == "ASSEMBLY_RELOAD") currentDiagnostic.assemblyReloadObserved=true;
+                try { Persist(currentDiagnostic); } catch { } // Observation cannot keep a lease open or skip restoration.
+            }
+        }
+        static void Check(bool valid, string code)
+        {
+            if (valid) return;
+            if (!FailureCodes.Contains(code)) code="UNCLASSIFIED_EXCEPTION";
+            RememberFailure(currentDiagnostic,diagnosticContext,code,"BUILD_FAILED");
+            if(currentDiagnostic!=null) {try {Persist(currentDiagnostic);} catch { }}
+            throw new BuildFailedException("DESERTRV_CANDIDATE_"+code);
+        }
         static string Hash(string path) => JourneyDiagnosticScope.HashFile(path);
+        static string HashBytes(byte[] bytes) { using(var sha=System.Security.Cryptography.SHA256.Create()) return BitConverter.ToString(sha.ComputeHash(bytes)).Replace("-","").ToLowerInvariant(); }
         public static bool ValidBuildProfile(BuildTarget target, BuildOptions options, string[] defines) =>
             target == BuildTarget.StandaloneLinux64 && options == BuildOptions.Development && defines != null && defines.SequenceEqual(new[] { JourneyCandidateLinuxIdentity.Define });
         static string RepoFile(string name)
         {
             Check(!string.IsNullOrEmpty(name) && !Path.IsPathRooted(name) && !name.Contains("..") && !name.Contains("\\") &&
-                (name.StartsWith("tasks/desert-rv/",StringComparison.Ordinal) || name.StartsWith(".github/",StringComparison.Ordinal)), "Invalid pinned repository path.");
+                (name.StartsWith("tasks/desert-rv/",StringComparison.Ordinal) || name.StartsWith(".github/",StringComparison.Ordinal)), "PIN_PATH");
             string root = Path.GetFullPath("../../.."), full = Path.GetFullPath(Path.Combine(root,name));
-            Check(full.StartsWith(root + Path.DirectorySeparatorChar,StringComparison.Ordinal) && File.Exists(full), "Missing pinned repository file.");
+            Check(full.StartsWith(root + Path.DirectorySeparatorChar,StringComparison.Ordinal) && File.Exists(full), "PIN_MISSING");
             for (string path = full; path != root; path = Path.GetDirectoryName(path))
-                Check((File.GetAttributes(path) & FileAttributes.ReparsePoint) == 0, "Linked repository input rejected.");
+                Check((File.GetAttributes(path) & FileAttributes.ReparsePoint) == 0, "PIN_LINK");
             return full;
         }
         static void VerifyInventory(Request request, string projectRoot = ".")
@@ -91,87 +206,142 @@ namespace DesertRV.Editor
             while (pending.Count > 0)
             {
                 string folder = pending.Pop();
-                Check(Directory.Exists(folder) && (File.GetAttributes(folder) & FileAttributes.ReparsePoint) == 0,"Linked or missing protected directory.");
+                Check(Directory.Exists(folder) && (File.GetAttributes(folder) & FileAttributes.ReparsePoint) == 0,"INVENTORY_DIRECTORY");
                 foreach (string child in Directory.GetFileSystemEntries(folder))
                 {
                     string path = child.Substring(root.Length+1).Replace('\\','/'); var attributes = File.GetAttributes(child);
-                    Check((attributes & FileAttributes.ReparsePoint) == 0,"Linked protected input rejected.");
+                    Check((attributes & FileAttributes.ReparsePoint) == 0,"INVENTORY_LINK");
                     if ((attributes & FileAttributes.Directory) != 0) { directories.Add(path);pending.Push(child); }
-                    else { Check(File.Exists(child),"Nonregular protected input rejected.");actual.Add(path); }
+                    else { Check(File.Exists(child),"INVENTORY_NONREGULAR");actual.Add(path); }
                 }
             }
-            Check(actual.SetEquals(expected) && request.directories != null && directories.SetEquals(request.directories),"Actual protected file/directory inventory changed.");
+            Check(actual.SetEquals(expected) && request.directories != null && directories.SetEquals(request.directories),"INVENTORY_SET");
+        }
+        [Serializable] sealed class RestorationReport
+        {
+            public int schema; public string label,sourceCommit,producerRunUrl,assetProducerSourceCommit,assetProducerRunUrl,generatedReceiptSha256,requestSha256,unityVersion;
+            public JourneyCandidateAssetIntegration.FilePin sourceTransitionProof;
+            public bool sourceBytesUnchanged,originalAssetsUnchanged,structureValidated,productionApprovalRejected,approved,scopeReused;
+            public JourneyCandidateAssetIntegration.OutputFile[] scenes;
+            public Dependency[] dependencies;
+            public JourneyCandidateAssetIntegration.SpawnGroundingReport grounding;
+        }
+        static bool Pinned(Request request,string path,string hash) => request.files.Count(p=>p.path==path && p.sha256==hash)==1 && Hash(RepoFile(path))==hash;
+        static string DependencyKey(Dependency d) => string.Join("|",new[]{d.path,d.sha256,d.bytes.ToString(System.Globalization.CultureInfo.InvariantCulture),d.kind,d.packageName ?? "",d.packageVersion ?? ""});
+        static void VerifyRestoration(Request request)
+        {
+            bool restored=request.restorationProof!=null && !string.IsNullOrEmpty(request.restorationProof.path);
+            if(!restored)
+            {
+                Check((request.restorationProof==null || string.IsNullOrEmpty(request.restorationProof.sha256)) && string.IsNullOrEmpty(request.assetProducerSourceCommit) && string.IsNullOrEmpty(request.assetProducerRunUrl) && string.IsNullOrEmpty(request.restorationNativeXmlSha256),"RESTORATION_PROOF");return;
+            }
+            const string proofPath="tasks/desert-rv/unity/JourneyEvidence/JourneyPreparation/restoration-revalidated.json";
+            const string inputPath="tasks/desert-rv/unity/JourneyEvidence/JourneyPreparation/restoration-input.json";
+            const string transitionPath="tasks/desert-rv/unity/JourneyEvidence/JourneyPreparation/restoration-source-proof.json";
+            Check(request.restorationProof.path==proofPath && Regex.IsMatch(request.restorationProof.sha256 ?? "","^[a-f0-9]{64}$") && Pinned(request,proofPath,request.restorationProof.sha256) && new FileInfo(RepoFile(proofPath)).Length<=16*1024*1024,"RESTORATION_PROOF");
+            var proof=JsonUtility.FromJson<RestorationReport>(File.ReadAllText(RepoFile(proofPath)));
+            Check(proof!=null && proof.schema==1 && proof.label=="RESTORED_JOURNEY_NATIVE_REVALIDATED_UNREVIEWED" && proof.unityVersion=="6000.3.19f1" &&
+                proof.sourceCommit==request.sourceCommit && proof.producerRunUrl==request.producerRunUrl && proof.assetProducerSourceCommit==request.assetProducerSourceCommit && proof.assetProducerRunUrl==request.assetProducerRunUrl &&
+                Regex.IsMatch(proof.assetProducerSourceCommit ?? "","^[a-f0-9]{40}$") && Regex.IsMatch(proof.assetProducerRunUrl ?? "",@"^https://github\.com/yangerstar1/task-workbench/actions/runs/[1-9][0-9]*$") &&
+                proof.generatedReceiptSha256==request.generatedReceiptSha256 && proof.sourceBytesUnchanged && proof.originalAssetsUnchanged && proof.structureValidated && proof.productionApprovalRejected && !proof.approved && !proof.scopeReused &&
+                proof.sourceTransitionProof!=null && proof.sourceTransitionProof.path==transitionPath && Regex.IsMatch(proof.sourceTransitionProof.sha256 ?? "","^[a-f0-9]{64}$") && Pinned(request,transitionPath,proof.sourceTransitionProof.sha256) &&
+                Regex.IsMatch(proof.requestSha256 ?? "","^[a-f0-9]{64}$") && Pinned(request,inputPath,proof.requestSha256),"RESTORATION_PROOF");
+            Check(proof.scenes!=null && proof.scenes.Length==5 && proof.scenes.Select(p=>p.path).Distinct().Count()==5 &&
+                proof.scenes.All(p=>request.scenes.Any(q=>p.path==q.path && p.sha256==q.sha256 && p.dependencyHash==q.dependencyHash && p.dependencySha256==q.dependencySha256)) &&
+                proof.dependencies!=null && proof.dependencies.Select(DependencyKey).OrderBy(x=>x,StringComparer.Ordinal).SequenceEqual(request.dependencies.Select(DependencyKey).OrderBy(x=>x,StringComparer.Ordinal)) &&
+                proof.grounding!=null && proof.grounding.rows!=null && proof.grounding.rows.Length==9 && !proof.grounding.approved,"RESTORATION_PROOF");
+            var xmlPins=request.files.Where(p=>p.path.StartsWith("tasks/desert-rv/artifacts/journey-restoration/",StringComparison.Ordinal) && p.path.EndsWith(".xml",StringComparison.Ordinal)).ToArray();
+            Check(Regex.IsMatch(request.restorationNativeXmlSha256 ?? "","^[a-f0-9]{64}$") && xmlPins.Length==1 && xmlPins[0].sha256==request.restorationNativeXmlSha256 && Pinned(request,xmlPins[0].path,xmlPins[0].sha256) && new FileInfo(RepoFile(xmlPins[0].path)).Length<=10*1024*1024,"RESTORATION_XML");
+            var document=new XmlDocument { XmlResolver=null };
+            using(var reader=XmlReader.Create(RepoFile(xmlPins[0].path),new XmlReaderSettings { DtdProcessing=DtdProcessing.Prohibit,XmlResolver=null })) document.Load(reader);
+            var root=document.DocumentElement;var cases=document.GetElementsByTagName("test-case");
+            Check(root!=null && root.Name=="test-run" && root.GetAttribute("result")=="Passed" && root.GetAttribute("total")=="1" && root.GetAttribute("passed")=="1" && root.GetAttribute("failed")=="0" && root.GetAttribute("skipped")=="0" && root.GetAttribute("inconclusive")=="0" && cases.Count==1 &&
+                ((XmlElement)cases[0]).GetAttribute("fullname")=="DesertRV.Tests.JourneyRestorationTests.RevalidatePinnedRestoredJourney" && ((XmlElement)cases[0]).GetAttribute("result")=="Passed","RESTORATION_XML");
         }
         static void Verify(Lease lease, bool building)
         {
-            var r = lease.request; VerifyInventory(r);
-            Check(Hash(Input) == lease.requestHash && Hash(Receipt) == r.generatedReceiptSha256, "Actual Linux build request/producer receipt changed.");
+            var r = lease.request; VerifyInventory(r);VerifyRestoration(r);
+            Check(Hash(Input) == lease.requestHash && Hash(Receipt) == r.generatedReceiptSha256, "REQUEST_RECEIPT_HASH");
             foreach (var pin in r.files)
             {
                 string relative = pin.path.StartsWith("tasks/desert-rv/unity/",StringComparison.Ordinal) ? pin.path.Substring("tasks/desert-rv/unity/".Length) : null;
                 string expected = building && relative != null && lease.temporarySettings.TryGetValue(relative,out var temporary) ? temporary : pin.sha256;
-                Check(Hash(RepoFile(pin.path)) == expected, "Pinned source or candidate bytes changed.");
+                Check(Hash(RepoFile(pin.path)) == expected, "PIN_BYTES");
             }
             foreach (var dependency in r.dependencies)
             {
                 string path = dependency.path;
                 if (dependency.kind == "builtin")
                 {
-                    Check((path == "Resources/unity_builtin_extra" || path == "Library/unity default resources") && dependency.sha256 == "" && dependency.bytes == 0, "Unexpected builtin dependency.");
+                    Check((path == "Resources/unity_builtin_extra" || path == "Library/unity default resources") && dependency.sha256 == "" && dependency.bytes == 0, "BUILTIN_DEPENDENCY");
                     continue;
                 }
-                Check(!path.Contains("..") && !path.Contains("\\") && !Path.IsPathRooted(path), "Unsafe dependency path.");
+                Check(!path.Contains("..") && !path.Contains("\\") && !Path.IsPathRooted(path), "DEPENDENCY_PATH");
                 if (dependency.kind == "package")
                 {
                     var info = UnityEditor.PackageManager.PackageInfo.FindForAssetPath(path.EndsWith(".meta",StringComparison.Ordinal) ? path.Substring(0,path.Length-5) : path);
-                    Check(info != null && info.name == dependency.packageName && info.version == dependency.packageVersion && path.StartsWith("Packages/" + info.name + "/",StringComparison.Ordinal), "Official native package identity changed.");
+                    Check(info != null && info.name == dependency.packageName && info.version == dependency.packageVersion && path.StartsWith("Packages/" + info.name + "/",StringComparison.Ordinal), "PACKAGE_IDENTITY");
                     path = Path.Combine(info.resolvedPath,path.Substring(("Packages/" + info.name + "/").Length));
                 }
-                else Check(dependency.kind == "asset" && path.StartsWith("Assets/",StringComparison.Ordinal), "Unknown dependency class.");
-                Check(File.Exists(path) && new FileInfo(path).Length == dependency.bytes && Hash(path) == dependency.sha256, "Native dependency bytes differ from real generated export.");
+                else Check(dependency.kind == "asset" && path.StartsWith("Assets/",StringComparison.Ordinal), "DEPENDENCY_KIND");
+                Check(File.Exists(path) && new FileInfo(path).Length == dependency.bytes && Hash(path) == dependency.sha256, "DEPENDENCY_BYTES");
             }
             foreach (var scene in r.scenes)
-                Check(Hash(scene.path) == scene.sha256 && AssetDatabase.GetAssetDependencyHash(scene.path).ToString() == scene.dependencyHash &&
-                    JourneyContentChecks.DependencySha256(scene.path) == scene.dependencySha256, "Saved scene/content dependency changed.");
-            Check(lease.fingerprint == JourneyContentChecks.BuildFingerprint(), "Build scene fingerprint changed.");
+            {
+                bool bytes=Hash(scene.path)==scene.sha256; string importHash=AssetDatabase.GetAssetDependencyHash(scene.path).ToString();
+                bool dependencies=JourneyContentChecks.DependencySha256(scene.path)==scene.dependencySha256;
+                if (currentDiagnostic != null && (!bytes || importHash != scene.dependencyHash || !dependencies))
+                {
+                    var observation=diagnosticContext=="VERIFICATION" ? currentDiagnostic.verificationRootMismatch : currentDiagnostic.primaryRootMismatch;
+                    if(!observation.observed)
+                    {
+                        observation.observed=true;observation.slot=SceneRole(scene.path);observation.expectedImportHash=scene.dependencyHash;observation.observedImportHash=importHash;
+                        observation.rootBytesMatch=bytes;observation.rootDependencyBytesMatch=dependencies;
+                    }
+                }
+                Check(bytes,"ROOT_BYTES");Check(importHash==scene.dependencyHash,"ROOT_IMPORT_HASH");Check(dependencies,"ROOT_DEPENDENCY_BYTES");
+            }
+            Check(lease.fingerprint == JourneyContentChecks.BuildFingerprint(), "IMPORT_FINGERPRINT");
         }
         public static bool AllowsCandidateBuild(BuildReport report)
         {
             if (active == null) return false;
             Check(report != null && report.summary.platform == BuildTarget.StandaloneLinux64 && report.summary.options == BuildOptions.Development &&
-                Path.GetFullPath(report.summary.outputPath) == Output, "Candidate lease cannot authorize another build profile.");
+                Path.GetFullPath(report.summary.outputPath) == Output, "LEASE_PROFILE");
             Verify(active,true); return true;
         }
         static void CheckSceneObjects(Scene scene, JourneyContentManifest content)
         {
+            currentSceneRole=SceneRole(scene.path);
             var roots = scene.GetRootGameObjects();
             foreach (var root in roots)
                 foreach (var node in root.GetComponentsInChildren<Transform>(true))
-                    Check(node.GetComponents<Component>().All(c => c), "Missing compiled scene component.");
+                    Check(node.GetComponents<Component>().All(c => c), "SCENE_COMPONENT");
             var directors = roots.SelectMany(r => r.GetComponentsInChildren<JourneyDirector>(true)).ToArray();
             var bindings = roots.SelectMany(r => r.GetComponentsInChildren<RegionBinding>(true)).ToArray();
             if (scene.path == Paths[0])
             {
                 Check(directors.Length == 1 && bindings.Length == 0 && roots.SelectMany(r => r.GetComponentsInChildren<JourneySession>(true)).Count() == 1 &&
-                    roots.SelectMany(r => r.GetComponentsInChildren<JourneyMotor>(true)).Count() == 1, "Unique real bootstrap ownership required.");
-                Check(JourneyCandidateLinuxIdentity.ValidateBootstrap(directors[0],content,out var reason),reason ?? "Bootstrap bindings invalid.");
+                    roots.SelectMany(r => r.GetComponentsInChildren<JourneyMotor>(true)).Count() == 1, "BOOTSTRAP_OWNER");
+                Check(JourneyCandidateLinuxIdentity.ValidateBootstrap(directors[0],content,out var reason),"BOOTSTRAP_BINDING");
             }
             else
             {
                 int index = Array.IndexOf(Paths,scene.path);
-                Check(index > 0 && directors.Length == 0 && bindings.Length == 1 && bindings[0].region == index, "Exact region scene identity required.");
+                Check(index > 0 && directors.Length == 0 && bindings.Length == 1 && bindings[0].region == index, "REGION_IDENTITY");
                 Check(!roots.Any(r => r.GetComponentInChildren<JourneySession>(true) || r.GetComponentInChildren<JourneyMotor>(true) ||
-                    r.GetComponentInChildren<JourneyHud>(true) || r.GetComponentInChildren<Camera>(true) || r.GetComponentInChildren<AudioListener>(true)), "Regional scene duplicates persistent ownership.");
-                Check(JourneyCandidateLinuxIdentity.ValidateRegionContent(bindings[0],content,out var reason),reason ?? "Regional real bindings invalid.");
+                    r.GetComponentInChildren<JourneyHud>(true) || r.GetComponentInChildren<Camera>(true) || r.GetComponentInChildren<AudioListener>(true)), "REGION_OWNER");
+                Check(JourneyCandidateLinuxIdentity.ValidateRegionContent(bindings[0],content,out var reason),"REGION_BINDING");
             }
         }
         internal static void ProcessCandidateScene(Scene scene, BuildReport report)
         {
             if (active == null) return;
-            Check(AllowsCandidateBuild(report) && Paths.Contains(scene.path) && active.processed.Add(scene.path), "Candidate scene absent/duplicated in this build.");
+            currentSceneRole=SceneRole(scene.path);
+            Check(AllowsCandidateBuild(report) && Paths.Contains(scene.path) && active.processed.Add(scene.path), "SCENE_SEQUENCE");
             var content = AssetDatabase.LoadAssetAtPath<JourneyContentManifest>(JourneySceneAuthoring.ManifestPath);
             CheckSceneObjects(scene,content);
-            Check(!scene.GetRootGameObjects().Any(r => r.GetComponentInChildren<JourneyCandidateLinuxIdentity>(true)), "Saved source must not contain runtime diagnostic identity.");
+            Check(!scene.GetRootGameObjects().Any(r => r.GetComponentInChildren<JourneyCandidateLinuxIdentity>(true)), "SAVED_RUNTIME_IDENTITY");
             var director = scene.GetRootGameObjects().SelectMany(r => r.GetComponentsInChildren<JourneyDirector>(true)).SingleOrDefault();
             var binding = scene.GetRootGameObjects().SelectMany(r => r.GetComponentsInChildren<RegionBinding>(true)).SingleOrDefault();
             var owner = director ? director.gameObject : binding.gameObject;
@@ -182,20 +352,20 @@ namespace DesertRV.Editor
         }
         public static void BuildPreparedLinuxDiagnostic()
         {
-            var diagnostic = new Diagnostic(); Persist(diagnostic);
+            var diagnostic = new Diagnostic { activeTargetAtEntry=TargetKind(EditorUserBuildSettings.activeBuildTarget) }; currentDiagnostic=diagnostic;diagnosticContext="PRIMARY";Persist(diagnostic);
             try { BuildPrepared(diagnostic); }
             catch (Exception error)
             {
-                diagnostic.exceptionKind = error is BuildFailedException ? "BUILD_FAILED" : error is UnauthorizedAccessException ? "UNAUTHORIZED_ACCESS" : error is IOException ? "IO" : "OTHER";
+                RecordUnhandled(diagnostic,error);
                 throw;
             }
-            finally { Close(); Persist(diagnostic); }
+            finally { Close(); Persist(diagnostic);currentDiagnostic=null;diagnosticContext="PRIMARY";currentSceneRole="NONE"; }
         }
         static void BuildPrepared(Diagnostic diagnostic)
         {
-            Check(active == null && !Application.isPlaying && !BuildPipeline.isBuildingPlayer && Application.unityVersion == "6000.3.19f1", "Explicit pinned EditMode candidate build only.");
+            Check(active == null && !Application.isPlaying && !BuildPipeline.isBuildingPlayer && Application.unityVersion == "6000.3.19f1", "ENTRY_PROFILE");
             string requestHash = File.ReadAllText("JourneyEvidence/JourneyPreparation/linux-build-input.sha256").Trim();
-            Check(Regex.IsMatch(requestHash,"^[a-f0-9]{64}$") && Hash(Input) == requestHash, "Missing real host-verified build request.");
+            Check(Regex.IsMatch(requestHash,"^[a-f0-9]{64}$") && Hash(Input) == requestHash, "REQUEST_HASH");
             var request = JsonUtility.FromJson<Request>(File.ReadAllText(Input));
             Check(request != null && request.schema == 1 && request.label == "CANDIDATE_LINUX_DEVELOPMENT_ONLY" && !request.approved && request.development &&
                 request.boundaryNativeCases == 17 && Regex.IsMatch(request.boundaryNativeXmlSha256 ?? "","^[a-f0-9]{64}$") && request.target == "StandaloneLinux64" && request.define == JourneyCandidateLinuxIdentity.Define &&
@@ -203,9 +373,9 @@ namespace DesertRV.Editor
                 request.producerRunUrl == "https://github.com/yangerstar1/task-workbench/actions/runs/" + Environment.GetEnvironmentVariable("GITHUB_RUN_ID") &&
                 Regex.IsMatch(request.generatedReceiptSha256 ?? "","^[a-f0-9]{64}$") && request.files != null && request.files.Length > 100 && request.files.Select(p=>p.path).Distinct().Count()==request.files.Length &&
                 request.directories != null && request.directories.Distinct().Count()==request.directories.Length && request.dependencies != null && request.dependencies.Length > 0 && request.scenes != null && request.scenes.Length == 5 &&
-                new HashSet<string>(request.scenes.Select(p=>p.path)).SetEquals(Paths.Concat(new[] { JourneySceneAuthoring.ManifestPath })), "Current same-source same-job generated export is required.");
-            Check(BuildPipeline.IsBuildTargetSupported(BuildTargetGroup.Standalone,BuildTarget.StandaloneLinux64) && !Directory.Exists(Path.GetDirectoryName(Output)), "Fresh supported Linux build output required.");
-            var setup = EditorSceneManager.GetSceneManagerSetup(); Check(!setup.Any(s => s.isLoaded && SceneManager.GetSceneByPath(s.path).isDirty), "Dirty scenes cannot enter candidate build.");
+                new HashSet<string>(request.scenes.Select(p=>p.path)).SetEquals(Paths.Concat(new[] { JourneySceneAuthoring.ManifestPath })), "REQUEST_IDENTITY");
+            Check(BuildPipeline.IsBuildTargetSupported(BuildTargetGroup.Standalone,BuildTarget.StandaloneLinux64) && !Directory.Exists(Path.GetDirectoryName(Output)), "TARGET_OUTPUT");
+            var setup = EditorSceneManager.GetSceneManagerSetup(); Check(!setup.Any(s => s.isLoaded && SceneManager.GetSceneByPath(s.path).isDirty), "DIRTY_SCENE");
             var lease = new Lease { request=request,requestHash=requestHash,fingerprint=JourneyContentChecks.BuildFingerprint() }; Verify(lease,false);diagnostic.stage="SOURCE_VERIFIED";Persist(diagnostic);
             JourneyCandidateAssetIntegration.RequireOnlyMissingApprovals(JourneyContentChecks.Inspect(true).ToArray());
             try { foreach (var path in Paths) CheckSceneObjects(EditorSceneManager.OpenScene(path,OpenSceneMode.Single),AssetDatabase.LoadAssetAtPath<JourneyContentManifest>(JourneySceneAuthoring.ManifestPath)); }
@@ -222,29 +392,43 @@ namespace DesertRV.Editor
                 PlayerSettings.productName="DESERTRV_JOURNEY_CANDIDATE";PlayerSettings.resizableWindow=false;
                 AssetDatabase.SaveAssets();
                 lease.temporarySettings[Settings]=Hash(Settings);active=lease;
-                string[] defines={JourneyCandidateLinuxIdentity.Define};Check(ValidBuildProfile(BuildTarget.StandaloneLinux64,BuildOptions.Development,defines),"Candidate build profile rejected.");
-                diagnostic.stage="BUILD_PLAYER_ENTERED";Persist(diagnostic);
+                string[] defines={JourneyCandidateLinuxIdentity.Define};Check(ValidBuildProfile(BuildTarget.StandaloneLinux64,BuildOptions.Development,defines),"BUILD_PROFILE");
+                currentSceneRole="NONE";diagnostic.activeTargetBeforeBuild=TargetKind(EditorUserBuildSettings.activeBuildTarget);diagnostic.stage="BUILD_PLAYER_ENTERED";Persist(diagnostic);
                 result=BuildPipeline.BuildPlayer(new BuildPlayerOptions { scenes=Paths,target=BuildTarget.StandaloneLinux64,locationPathName=Output,options=BuildOptions.Development,extraScriptingDefines=defines });
-                diagnostic.stage="BUILD_PLAYER_RETURNED";diagnostic.buildResult=result != null && result.summary.result==BuildResult.Succeeded ? "SUCCEEDED" : "FAILED";Persist(diagnostic);
-                Check(result != null && result.summary.result==BuildResult.Succeeded && lease.processed.SetEquals(Paths),"Candidate Linux build or exact scene processing failed.");
+                diagnostic.stage="BUILD_PLAYER_RETURNED";diagnostic.activeTargetAfterBuild=TargetKind(EditorUserBuildSettings.activeBuildTarget);diagnostic.leaseActiveAtBuildReturn=active!=null;Report(result,diagnostic);Persist(diagnostic);
+                Check(result != null && result.summary.result==BuildResult.Succeeded && lease.processed.SetEquals(Paths),"BUILD_OR_SCENE_FAILED");
+            }
+            catch (Exception error)
+            {
+                if(diagnostic.stage=="BUILD_PLAYER_ENTERED") diagnostic.activeTargetAfterBuild=TargetKind(EditorUserBuildSettings.activeBuildTarget);
+                RememberFailure(diagnostic,"PRIMARY","UNCLASSIFIED_EXCEPTION",ExceptionKind(error));throw;
             }
             finally
             {
-                Close();
+                Close();diagnosticContext="RESTORATION";currentSceneRole="NONE";
                 try
                 {
                     PlayerSettings.SetScriptingBackend(NamedBuildTarget.Standalone,oldBackend);PlayerSettings.fullScreenMode=oldWindow;
                     PlayerSettings.defaultScreenWidth=oldWidth;PlayerSettings.defaultScreenHeight=oldHeight;PlayerSettings.productName=oldProduct;PlayerSettings.resizableWindow=oldResize;
                     AssetDatabase.SaveAssets();
                 }
+                catch (Exception error) { RememberFailure(diagnostic,"RESTORATION","UNCLASSIFIED_EXCEPTION",ExceptionKind(error));throw; }
                 finally
                 {
-                    File.WriteAllBytes(Settings,settings);
-                    try { JourneySceneAuthoring.RestoreSceneSetup(setup); } finally { Verify(lease,false);diagnostic.settingsRestored=true;diagnostic.sourceBytesUnchanged=true;Persist(diagnostic); }
+                    try { File.WriteAllBytes(Settings,settings);diagnostic.settingsRestored=Hash(Settings)==HashBytes(settings);JourneySceneAuthoring.RestoreSceneSetup(setup); }
+                    catch (Exception error) { RememberFailure(diagnostic,"RESTORATION","UNCLASSIFIED_EXCEPTION",ExceptionKind(error));throw; }
+                    finally
+                    {
+                        diagnosticContext="VERIFICATION";
+                        try { Verify(lease,false);diagnostic.sourceBytesUnchanged=true; }
+                        catch (Exception error) { RememberFailure(diagnostic,"VERIFICATION","UNCLASSIFIED_EXCEPTION",ExceptionKind(error));throw; }
+                        finally { Persist(diagnostic); }
+                    }
                 }
             }
+            diagnosticContext="PRIMARY";
             PersistJson("JourneyEvidence/JourneyPreparation/linux-build-receipt.json",JsonUtility.ToJson(new Result { sourceCommit=request.sourceCommit,producerRunUrl=request.producerRunUrl,
-                generatedReceiptSha256=request.generatedReceiptSha256,boundaryNativeXmlSha256=request.boundaryNativeXmlSha256,boundaryNativeCases=request.boundaryNativeCases,requestSha256=requestHash,executableSha256=Hash(Output),settingsRestored=true,sourceBytesUnchanged=true,scenes=Paths },true));
+                restorationProof=request.restorationProof ?? new JourneyCandidateAssetIntegration.FilePin { path="",sha256="" },assetProducerSourceCommit=request.assetProducerSourceCommit ?? "",assetProducerRunUrl=request.assetProducerRunUrl ?? "",restorationNativeXmlSha256=request.restorationNativeXmlSha256 ?? "",generatedReceiptSha256=request.generatedReceiptSha256,boundaryNativeXmlSha256=request.boundaryNativeXmlSha256,boundaryNativeCases=request.boundaryNativeCases,requestSha256=requestHash,executableSha256=Hash(Output),settingsRestored=true,sourceBytesUnchanged=true,scenes=Paths },true));
             diagnostic.stage="RECEIPT_WRITTEN";diagnostic.receiptWritten=true;Persist(diagnostic);
         }
     }

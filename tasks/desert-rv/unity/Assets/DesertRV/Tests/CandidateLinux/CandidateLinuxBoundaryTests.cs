@@ -75,6 +75,51 @@ namespace DesertRV.Tests
             string root=Path.Combine(Path.GetTempPath(),"journey-linux-json-"+Guid.NewGuid().ToString("N"));Directory.CreateDirectory(root);
             try { string path=Path.Combine(root,"receipt.json");Call("PersistJson",path,"{\"phase\":1}");Call("PersistJson",path,"{\"phase\":2}");Assert.AreEqual("{\"phase\":2}",File.ReadAllText(path));Assert.IsFalse(File.Exists(path+".tmp")); }
             finally { Directory.Delete(root,true); }
+            // Preserve the exact existing 17-test inventory while testing the new bounded diagnostics.
+            var diagnosticType=Builder.GetNestedType("Diagnostic",BindingFlags.NonPublic);var diagnostic=Activator.CreateInstance(diagnosticType,true);
+            Call("RememberFailure",diagnostic,"PRIMARY","ROOT_IMPORT_HASH","BUILD_FAILED");
+            Call("RememberFailure",diagnostic,"PRIMARY","UNCLASSIFIED_EXCEPTION","OTHER");
+            Call("RememberFailure",diagnostic,"VERIFICATION","IMPORT_FINGERPRINT","BUILD_FAILED");
+            Call("RememberFailure",diagnostic,"RESTORATION","UNCLASSIFIED_EXCEPTION","IO");
+            Assert.AreEqual("ROOT_IMPORT_HASH",diagnosticType.GetField("primaryFailureCode").GetValue(diagnostic));
+            Assert.AreEqual("IMPORT_FINGERPRINT",diagnosticType.GetField("verificationFailureCode").GetValue(diagnostic));
+            Assert.AreEqual("IO",diagnosticType.GetField("restorationExceptionKind").GetValue(diagnostic));
+            var unwound=Activator.CreateInstance(diagnosticType,true);
+            try
+            {
+                try { throw new IOException("synthetic primary failure"); }
+                catch(Exception) { Call("RememberFailure",unwound,"PRIMARY","UNCLASSIFIED_EXCEPTION","IO");throw; }
+                finally
+                {
+                    diagnosticType.GetField("settingsRestored").SetValue(unwound,true);
+                    diagnosticType.GetField("sourceBytesUnchanged").SetValue(unwound,true);
+                }
+            }
+            catch(Exception error) { Call("RecordUnhandled",unwound,error); }
+            Assert.AreEqual("IO",diagnosticType.GetField("primaryExceptionKind").GetValue(unwound));
+            Assert.AreEqual("NONE",diagnosticType.GetField("restorationFailureCode").GetValue(unwound));
+            Assert.AreEqual("NONE",diagnosticType.GetField("verificationFailureCode").GetValue(unwound));
+            Assert.IsTrue((bool)diagnosticType.GetField("sourceBytesUnchanged").GetValue(unwound));
+            var doubleFailure=Activator.CreateInstance(diagnosticType,true);
+            try
+            {
+                try { throw new IOException("synthetic primary"); }
+                catch(Exception) { Call("RememberFailure",doubleFailure,"PRIMARY","PIN_BYTES","IO");throw; }
+                finally
+                {
+                    try { throw new InvalidOperationException("synthetic verification"); }
+                    catch(Exception) { Call("RememberFailure",doubleFailure,"VERIFICATION","IMPORT_FINGERPRINT","OTHER");throw; }
+                }
+            }
+            catch(Exception error) { Call("RecordUnhandled",doubleFailure,error); }
+            Assert.AreEqual("PIN_BYTES",diagnosticType.GetField("primaryFailureCode").GetValue(doubleFailure));
+            Assert.AreEqual("IO",diagnosticType.GetField("primaryExceptionKind").GetValue(doubleFailure));
+            Assert.AreEqual("IMPORT_FINGERPRINT",diagnosticType.GetField("verificationFailureCode").GetValue(doubleFailure));
+            foreach(string raw in new[]{"/home/private/account token=SECRET password=SECRET", "error CS9999 /home/private/account.cs(1,2): SECRET", "BuildFailedException: DESERTRV_CANDIDATE_ROOT_IMPORT_HASH SECRET"})
+            {
+                string output=JsonUtility.ToJson(Call("ClassifyBuildMessage",raw));Assert.IsFalse(output.Contains("SECRET"));Assert.IsFalse(output.Contains("/home/private"));
+            }
+            string known=JsonUtility.ToJson(Call("ClassifyBuildMessage","BuildFailedException: DESERTRV_CANDIDATE_ROOT_IMPORT_HASH"));Assert.IsTrue(known.Contains("ROOT_IMPORT_HASH"));
         }
     }
 }

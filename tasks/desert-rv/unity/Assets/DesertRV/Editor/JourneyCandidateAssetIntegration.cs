@@ -548,6 +548,21 @@ namespace DesertRV.Editor
                     "Saved actor activation disagrees with Director ownership.");
             }
         }
+        // Read-only restoration uses the unchanged STRICT resolver and saved binding checks.
+        // Historical importer hashes are never refreshed in the saved manifest or import reports.
+        internal static void VerifyRestoredSavedContent(Request request)
+        {
+            ValidateRequestShape(request, Environment.GetEnvironmentVariable("GITHUB_SHA"));
+            foreach (var pin in request.savedInputs) AssetCheck(pin);
+            AssetCheck(request.muzzleFlashPrefab); AssetCheck(request.arcPresentationPrefab);
+            foreach (var sound in request.sounds) Load<AudioClip>(sound.clip);
+            var assets = request.candidates.ToDictionary(candidate => candidate.kind, Resolve);
+            VerifySavedManifest(request); VerifySavedBindings(request, assets);
+            var errors = JourneyContentChecks.Inspect(false);
+            Require(errors.Count == 0, string.Join("\n", errors));
+            RequireOnlyMissingApprovals(JourneyContentChecks.Inspect(true).ToArray());
+            VerifySavedManifest(request);
+        }
         static Dictionary<string, string> SnapshotProtected(IEnumerable<string> allowedPaths = null)
         {
             var allowed = new HashSet<string>(allowedPaths ?? TargetPaths().SelectMany(p => new[] { p, p + ".meta" }));

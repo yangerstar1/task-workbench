@@ -53,7 +53,7 @@ namespace DesertRV.Editor
             using (var stream = new FileStream(path, FileMode.CreateNew, FileAccess.Write))
             using (var writer = new StreamWriter(stream)) writer.Write(JsonUtility.ToJson(value, true));
         }
-        static DependencyPin[] DependencySnapshot()
+        internal static DependencyPin[] DependencySnapshot()
         {
             var result = new List<DependencyPin>();
             // Unity, before exit, enumerates the recursive closure of the four scenes and content manifest.

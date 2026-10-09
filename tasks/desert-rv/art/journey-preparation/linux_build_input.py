@@ -1,4 +1,4 @@
-"""Explicit same-job candidate Linux build request; no cross-run scope restoration."""
+"""Explicit same-job or freshly revalidated restoration build; old scope is never reused."""
 import json,os,sys
 import xml.etree.ElementTree as ET
 from pathlib import Path
@@ -65,16 +65,46 @@ def prepare():
     records.append(boundary['nativeXml'])
     boundary_receipt=PROJECT/'JourneyEvidence/JourneyPreparation/linux-boundary-verified.json';records.append(dict(path=str(boundary_receipt.relative_to(ROOT)),sha256=sha(boundary_receipt)))
     request=dict(schema=1,label='CANDIDATE_LINUX_DEVELOPMENT_ONLY',sourceCommit=commit,producerRunUrl=run,generatedReceiptSha256=sha(receipt_path),
-                 boundaryNativeXmlSha256=boundary['nativeXml']['sha256'],boundaryNativeCases=17,define='DESERTRV_CANDIDATE_LINUX',target='StandaloneLinux64',development=True,approved=False,files=records,dependencies=dependencies,scenes=receipt['integrationOutputs'],
+                 boundaryNativeXmlSha256=boundary['nativeXml']['sha256'],boundaryNativeCases=17,restorationProof=None,restorationNativeXmlSha256='',assetProducerSourceCommit='',assetProducerRunUrl='',define='DESERTRV_CANDIDATE_LINUX',target='StandaloneLinux64',development=True,approved=False,files=records,dependencies=dependencies,scenes=receipt['integrationOutputs'],
                  directories=sorted(name+'/'+directory for name in ('Assets','Packages','ProjectSettings') for directory in prepared_source.walk(PROJECT/name)[1]))
     destination=PROJECT/'JourneyEvidence/JourneyPreparation/linux-build-input.json';require(not destination.exists(),'LINUX_BUILD_REQUEST_EXISTS')
     prepared_source.verify();destination.write_text(json.dumps(request,indent=2)+'\n');destination.with_suffix('.sha256').write_text(sha(destination)+'\n')
     return request
+def verify():
+    path=PROJECT/'JourneyEvidence/JourneyPreparation/linux-build-input.json'
+    value=read(path);proof=value.get('restorationProof')
+    if proof is not None and (not isinstance(proof,dict) or proof.get('path') or proof.get('sha256')):
+        import restore_preparation as restore
+        restore.verify()
+        require(proof==restore.pin(restore.REPORT) and value.get('assetProducerSourceCommit')==restore.PRODUCER['sourceCommit'] and value.get('assetProducerRunUrl')==restore.RUN_URL and value.get('restorationNativeXmlSha256')==restore.native_evidence()['sha256'],'LINUX_RESTORATION_PROOF_CHANGED')
+    else:
+        require(not value.get('assetProducerSourceCommit') and not value.get('assetProducerRunUrl') and not value.get('restorationNativeXmlSha256'),'LINUX_UNDECLARED_RESTORATION')
+        prepared_source.verify();bound_boundary()
+    require(path.with_suffix('.sha256').read_text().strip()==sha(path),'LINUX_REQUEST_PIN_CHANGED')
+    return value
+
+def prepare_restored():
+    import restore_preparation as restore
+    state,bundle,verified=restore.verify();boundary=bound_boundary();report=read(restore.REPORT)
+    records={r['path']:r for r in read(restore.INPUT)['files']}
+    for path in (restore.INPUT,restore.REPORT,restore.VERIFIED,restore.SOURCE_PROOF,PROJECT/'JourneyEvidence/JourneyPreparation/linux-boundary-verified.json'):
+        item=restore.pin(path);records[item['path']]=item
+    for item in (verified['nativeXml'],boundary['nativeXml']):records[item['path']]=item
+    request=dict(schema=1,label='CANDIDATE_LINUX_DEVELOPMENT_ONLY',sourceCommit=os.environ['GITHUB_SHA'],producerRunUrl=restore.current_run(),generatedReceiptSha256=restore.PRODUCER['generatedReceiptSha256'],
+        boundaryNativeXmlSha256=boundary['nativeXml']['sha256'],boundaryNativeCases=17,restorationProof=restore.pin(restore.REPORT),restorationNativeXmlSha256=verified['nativeXml']['sha256'],
+        assetProducerSourceCommit=restore.PRODUCER['sourceCommit'],assetProducerRunUrl=restore.RUN_URL,
+        define='DESERTRV_CANDIDATE_LINUX',target='StandaloneLinux64',development=True,approved=False,files=[records[n] for n in sorted(records)],
+        dependencies=bundle['receipt']['dependencies'],scenes=report['scenes'],directories=read(restore.INPUT)['directories'])
+    destination=PROJECT/'JourneyEvidence/JourneyPreparation/linux-build-input.json';require(not destination.exists(),'LINUX_BUILD_REQUEST_EXISTS')
+    restore.verify();destination.write_text(json.dumps(request,indent=2)+'\n');destination.with_suffix('.sha256').write_text(sha(destination)+'\n')
+    verify();return request
+
 if __name__=='__main__':
     from pipeline import guard
     import argparse
-    parser=argparse.ArgumentParser();parser.add_argument('command',choices=('prepare','verify','verify-boundary'));args=parser.parse_args()
+    parser=argparse.ArgumentParser();parser.add_argument('command',choices=('prepare','prepare-restored','verify','verify-boundary'));args=parser.parse_args()
     guard()
     if args.command=='prepare':prepare()
+    elif args.command=='prepare-restored':prepare_restored()
     elif args.command=='verify-boundary':verify_boundary()
-    else:prepared_source.verify();bound_boundary()
+    else:verify()

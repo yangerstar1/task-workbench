@@ -11,12 +11,53 @@ class JourneyLinuxExportTests(unittest.TestCase):
   self.env=patch.dict(os.environ,{'GITHUB_SHA':'a'*40,'GITHUB_RUN_ID':'123'});self.env.start()
  def tearDown(self):self.env.stop();self.t.cleanup()
  def receipt(self):
-  return dict(schema=1,label=x.MODE,sourceCommit='a'*40,producerRunUrl=x.producer_url(),generatedReceiptSha256='b'*64,requestSha256='c'*64,executableSha256=x.sha(self.build/'DesertRV.x86_64'),unityVersion='6000.3.19f1',target='StandaloneLinux64',backend='Mono2x',define='DESERTRV_CANDIDATE_LINUX',executable='DesertRV.x86_64',scenes=x.SCENES,candidateOnly=True,development=True,settingsRestored=True,sourceBytesUnchanged=True,approved=False,visualReviewed=False,gameplayReviewed=False,audioAuditioned=False,temporarySettingsFiles=['ProjectSettings/ProjectSettings.asset'],boundaryNativeXmlSha256='d'*64,boundaryNativeCases=17,temporarySettingsApiFields=['scriptingBackend.Standalone','fullScreenMode','defaultScreenWidth','defaultScreenHeight','productName','resizableWindow'])
+  return dict(restorationProof={'path':'','sha256':''},assetProducerSourceCommit='',assetProducerRunUrl='',restorationNativeXmlSha256='',schema=1,label=x.MODE,sourceCommit='a'*40,producerRunUrl=x.producer_url(),generatedReceiptSha256='b'*64,requestSha256='c'*64,executableSha256=x.sha(self.build/'DesertRV.x86_64'),unityVersion='6000.3.19f1',target='StandaloneLinux64',backend='Mono2x',define='DESERTRV_CANDIDATE_LINUX',executable='DesertRV.x86_64',scenes=x.SCENES,candidateOnly=True,development=True,settingsRestored=True,sourceBytesUnchanged=True,approved=False,visualReviewed=False,gameplayReviewed=False,audioAuditioned=False,temporarySettingsFiles=['ProjectSettings/ProjectSettings.asset'],boundaryNativeXmlSha256='d'*64,boundaryNativeCases=17,temporarySettingsApiFields=['scriptingBackend.Standalone','fullScreenMode','defaultScreenWidth','defaultScreenHeight','productName','resizableWindow'])
  def control(self):
   recovery=x.recovery.empty_recovery();recovery.update(status='SUCCEEDED',sourceModesRestored=True,afterPreserved=True)
   return dict(schema=1,mode='JOURNEY_LINUX_BUILD_CONTROL',activation='SUCCEEDED',build='SUCCEEDED',licenseReturn='SUCCEEDED',privateCleanup='SUCCEEDED',buildDiagnostic=dict(batchExitCode=0,batchTimedOut=False,native=self.diagnostic(),logClassification=x.recovery.startup.empty_report()),sourceRecovery=recovery)
  def diagnostic(self):
-  return dict(schema=1,label='CANDIDATE_LINUX_BUILD_DIAGNOSTIC',stage='RECEIPT_WRITTEN',exceptionKind='NONE',buildResult='SUCCEEDED',settingsRestored=True,sourceBytesUnchanged=True,receiptWritten=True)
+  return dict(activeTargetAtEntry='LINUX64',activeTargetBeforeBuild='LINUX64',activeTargetAfterBuild='LINUX64',reportTarget='LINUX64',schema=1,label='CANDIDATE_LINUX_BUILD_DIAGNOSTIC',stage='RECEIPT_WRITTEN',exceptionKind='NONE',buildResult='SUCCEEDED',settingsRestored=True,sourceBytesUnchanged=True,receiptWritten=True,buildReportAvailable=True,leaseActiveAtBuildReturn=True,assemblyReloadObserved=False,totalErrors=0,totalWarnings=0,primaryFailureCode='NONE',primaryExceptionKind='NONE',restorationFailureCode='NONE',restorationExceptionKind='NONE',verificationFailureCode='NONE',verificationExceptionKind='NONE',leaseClosedReason='EXPLICIT',buildErrorKinds=[],primaryCallbackGate='NONE',primarySceneRole='NONE',verificationCallbackGate='NONE',verificationSceneRole='NONE',primaryRootMismatch=self.root_observation(),verificationRootMismatch=self.root_observation(),buildMessages=[],buildMessagesTruncated=False)
+ def root_observation(self):return dict(observed=False,rootBytesMatch=False,rootDependencyBytesMatch=False,slot='NONE',expectedImportHash='',observedImportHash='')
+ def test_primary_and_secondary_diagnostic_reasons_remain_distinct(self):
+  d=self.diagnostic();d.update(stage='BUILD_PLAYER_RETURNED',buildResult='FAILED',totalErrors=2,exceptionKind='BUILD_FAILED',primaryFailureCode='ROOT_IMPORT_HASH',primaryExceptionKind='BUILD_FAILED',verificationFailureCode='IMPORT_FINGERPRINT',verificationExceptionKind='BUILD_FAILED',sourceBytesUnchanged=False,receiptWritten=False)
+  d['primaryRootMismatch'].update(observed=True,slot='BOOTSTRAP',expectedImportHash='a'*32,observedImportHash='b'*32,rootBytesMatch=True,rootDependencyBytesMatch=True)
+  self.assertEqual(x.native_diagnostic(d)['primaryFailureCode'],'ROOT_IMPORT_HASH');self.assertFalse(x.diagnostic_success(d))
+ def test_diagnostic_rejects_raw_error_text_secrets_and_private_paths(self):
+  base=dict(category='CANDIDATE_GATE',code='ROOT_IMPORT_HASH',source='',line=0,text='Candidate build gate rejected: ROOT_IMPORT_HASH')
+  x.safe_build_message(base)
+  for key,value in [('text','token=SECRET'),('text','x'*10000),('source','/home/private/name.cs'),('code','UNLISTED'),('line',True)]:
+   m=dict(base);m[key]=value
+   with self.assertRaises(ValueError):x.safe_build_message(m)
+ def test_compiler_message_requires_actual_public_source_and_exact_reconstruction(self):
+  sources=x.recovery.startup.source_map(x.PROJECT);source=next(iter(sources));m=dict(category='CS_COMPILATION',code='CS1501',source=source,line=12,text='C# compiler diagnostic: CS1501 at '+source+':12');x.safe_build_message(m)
+  for code,source_value in [('CS9999',source),('CS1501','Assets/DesertRV/PRIVATE_SECRET.cs')]:
+   n=dict(m,code=code,source=source_value)
+   with self.assertRaises(ValueError):x.safe_build_message(n)
+ def test_diagnostic_counts_null_report_and_unknown_fields_fail_closed(self):
+  for key,value in [('totalErrors',-1),('totalWarnings',True),('buildReportAvailable',False),('rawError','SECRET'),('primaryCallbackGate','ARBITRARY'),('activeTargetBeforeBuild','/private/path')]:
+   d=self.diagnostic();d[key]=value
+   with self.assertRaises(ValueError):x.native_diagnostic(d)
+ def test_root_hash_diagnostic_and_schema_cannot_export_private_fields(self):
+  d=self.diagnostic();d['primaryRootMismatch'].update(observed=True,slot='BOOTSTRAP',expectedImportHash='a'*32,observedImportHash='b'*32,rootBytesMatch=True,rootDependencyBytesMatch=True);x.native_diagnostic(d)
+  for key,value in [('slot','/home/private'),('expectedImportHash','TOKEN'),('raw','SECRET')]:
+   n=dict(d);n['primaryRootMismatch']=dict(d['primaryRootMismatch']);n['primaryRootMismatch'][key]=value
+   with self.assertRaises(ValueError):x.native_diagnostic(n)
+ def test_nonzero_build_errors_or_recorded_failure_cannot_stage_success(self):
+  for key,value in [('totalErrors',1),('primaryFailureCode','ROOT_IMPORT_HASH')]:
+   d=self.diagnostic();d[key]=value;self.assertFalse(x.diagnostic_success(d))
+ def test_restoration_provenance_exact_shape_and_input_binding(self):
+  n=self.receipt();n.update(restorationProof=dict(path='tasks/desert-rv/unity/JourneyEvidence/JourneyPreparation/restoration-revalidated.json',sha256='e'*64),assetProducerSourceCommit='f'*40,assetProducerRunUrl='https://github.com/yangerstar1/task-workbench/actions/runs/456',restorationNativeXmlSha256='d'*64);x.native_receipt(n);x.restoration_matches(n,n)
+  bad=dict(n);bad['assetProducerSourceCommit']='a'*40
+  with self.assertRaises(ValueError):x.restoration_matches(n,bad)
+  n['restorationProof']['path']='../foreign.json'
+  with self.assertRaises(ValueError):x.native_receipt(n)
+ def test_csharp_failure_code_contract_and_primary_before_finally(self):
+  import re
+  root=pathlib.Path(__file__).resolve().parents[4];cs=(root/'tasks/desert-rv/unity/Assets/DesertRV/Editor/JourneyCandidateLinuxBuild.cs').read_text();part=cs.split('static readonly HashSet<string> FailureCodes')[1].split('static Lease active')[0]
+  self.assertEqual(set(re.findall(r'"([A-Z_]+)"',part)),x.FAILURE_CODES)
+  self.assertIn('Report(result,diagnostic)',cs);self.assertIn('diagnostic.stage="BUILD_PLAYER_RETURNED"',cs);self.assertIn('diagnostic.primaryFailureCode == "NONE"',cs);self.assertIn('diagnostic.verificationFailureCode == "NONE"',cs)
+  self.assertLess(cs.index('RememberFailure(diagnostic,"PRIMARY","UNCLASSIFIED_EXCEPTION"'),cs.index('Close();diagnosticContext="RESTORATION"'))
+  self.assertIn('DtdProcessing=DtdProcessing.Prohibit',cs);self.assertIn('DesertRV.Tests.JourneyRestorationTests.RevalidatePinnedRestoredJourney',cs)
  def success_fixture(self):
   from contextlib import ExitStack
   task=self.root/'task';task.mkdir();state=task/'state';state.mkdir();generated=task/'journey-preparation-export/generated';generated.mkdir(parents=True);(generated/'receipt.json').write_text('{}');(task/'SOURCE-STATE.json').write_text('{}')

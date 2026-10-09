@@ -1,0 +1,151 @@
+{
+  "schema": 1,
+  "status": "REVIEWED_DIAGNOSTIC_RESTORATION_SOURCE_ONLY",
+  "producer": {
+    "repository": "yangerstar1/task-workbench",
+    "runId": 37923953772,
+    "runAttempt": 1,
+    "sourceCommit": "7e134d4bbc4a349e5c71b27980dea90d85ff538e",
+    "artifactId": 11613499060,
+    "artifactName": "journey-preparation-UNREVIEWED-37923953772-1",
+    "artifactSha256": "81998b540f4b8e51260d5aaffdafec885bbd45215ebb978ed6a60e2dc53bfead",
+    "artifactBytes": 15840786,
+    "generatedReceiptSha256": "2b5e06b3b5dfcfb5a53afc3ff750b4eb8f460b222dc1abdca5974fc6c4702526",
+    "sourceStateSha256": "c33b884bd4caaf3fb8d310cebbc0b8de62b52c61cd483cd39a846e245425205b"
+  },
+  "changes": [
+    {
+      "path": ".github/workflows/desert-rv-journey-rebuild.yml",
+      "beforeSha256": "",
+      "beforeBytes": 0,
+      "afterSha256": "ad0b6f119e7b0176c266ec7cd4234eb9541db053775b1338a8b661a47942c701",
+      "afterBytes": 8585
+    },
+    {
+      "path": "tasks/desert-rv/art/journey-preparation/linux_build_input.py",
+      "beforeSha256": "896a810f85f63d23ea7e8ed33d3398a36c9bbcbe2346a94ea107d18c54b696c2",
+      "beforeBytes": 8240,
+      "afterSha256": "b75f1ee98c55b2abc37b94de1525248f09be242fc3223cf4df7cda93d4f59128",
+      "afterBytes": 11011
+    },
+    {
+      "path": "tasks/desert-rv/art/journey-preparation/restore_preparation.py",
+      "beforeSha256": "",
+      "beforeBytes": 0,
+      "afterSha256": "c941c588149e03c5afdc12fcaef21e6ed8fa418a74cf3daa70b479cf9b22061e",
+      "afterBytes": 37082
+    },
+    {
+      "path": "tasks/desert-rv/art/journey-preparation/test_linux_build_input.py",
+      "beforeSha256": "3beed8c7dbd5de4c195ad6318c774a7c7801659f53b116f175a327baa04bc84f",
+      "beforeBytes": 8420,
+      "afterSha256": "c73576dfd7e45193e31bfece294b9369e82f0a30387a063a7ed351bbd452ce51",
+      "afterBytes": 12748
+    },
+    {
+      "path": "tasks/desert-rv/art/journey-preparation/test_restore_preparation.py",
+      "beforeSha256": "",
+      "beforeBytes": 0,
+      "afterSha256": "33869cf3e3f2f19abe349c23c2a75f8d2a76937d25cea6a183c6b9a2e002c0f6",
+      "afterBytes": 19469
+    },
+    {
+      "path": "tasks/desert-rv/scripts/player/journey_linux_export.py",
+      "beforeSha256": "e16f9713ad4758ff362df9b89939cd7f56430c03facb596749652f1ebcdf4a06",
+      "beforeBytes": 17390,
+      "afterSha256": "de55eea10d2a1c23a521bff6ca581797aa970a6495fac2e900e12d4d8d569204",
+      "afterBytes": 24084
+    },
+    {
+      "path": "tasks/desert-rv/scripts/player/test_journey_linux_export.py",
+      "beforeSha256": "76f1becbfa0a76afceb057d6f8c695b4144cf7fb544e42cbd2ef5b3505c399d5",
+      "beforeBytes": 10516,
+      "afterSha256": "3351195e367340788132e91fa226fbdbe5c4a0500e2364125cf26a12765c3c2b",
+      "afterBytes": 15951
+    },
+    {
+      "path": "tasks/desert-rv/scripts/verify_evidence.py",
+      "beforeSha256": "bbb0f601cb00ec9699a5aa2204ccf5d84652f259a88580800d3a674077d09ec8",
+      "beforeBytes": 16289,
+      "afterSha256": "b77ac23d700659214adf25fb12d6263e3a724fa2d57c3835232cd45a0a0e7030",
+      "afterBytes": 16340
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Editor/JourneyCandidateAssetIntegration.cs",
+      "beforeSha256": "8a87e03f0f0fc4dd1db29e2995a25bb3aaceee200aadcb1443f6588ec7bdd70c",
+      "beforeBytes": 74092,
+      "afterSha256": "276ba9610b0a3c6c7f76a00ee9a902e85982a85f64fb790c494599105255c460",
+      "afterBytes": 75148
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Editor/JourneyCandidateLinuxBuild.cs",
+      "beforeSha256": "f853af2763627c96c5b2be4b53c8081517495b9eeaa20f2e1a6fcb35b8a75f36",
+      "beforeBytes": 21039,
+      "afterSha256": "6799c01ef28d3627254511c175dbc7fb7f0f47609b740f8727b82844b3963d69",
+      "afterBytes": 39142
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Editor/JourneyCandidatePreparation.cs",
+      "beforeSha256": "7e95deb602386c7e53e8a188a33d156ab8c5a6af814bd092536966df5b3da0d1",
+      "beforeBytes": 17875,
+      "afterSha256": "642c6e82a1e310249c27daa6d681a85ac8d68a335203618879976c554dd5cd24",
+      "afterBytes": 17884
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Editor/JourneyCandidateRestoration.cs",
+      "beforeSha256": "",
+      "beforeBytes": 0,
+      "afterSha256": "b8c3b879a0f45e8cc666886fbff745a0a872fc689d7e52cd36f63a77a99d6da9",
+      "afterBytes": 37937
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Editor/JourneyCandidateRestoration.cs.meta",
+      "beforeSha256": "",
+      "beforeBytes": 0,
+      "afterSha256": "de6ac72652bd04486d7b952504497546df34e20f61d1ec243ea6e06970df021d",
+      "afterBytes": 243
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Tests/CandidateLinux/CandidateLinuxBoundaryTests.cs",
+      "beforeSha256": "4af8dfba2b69f9f92d0de63b95b3266f8f1d3cfba4122819e32e83d1898ee8f9",
+      "beforeBytes": 6871,
+      "afterSha256": "09e88fb99a6899aec94c1618bad842510a2e3db14f2b455b8e82cdfd014536bb",
+      "afterBytes": 10498
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Tests/JourneyRestoration.meta",
+      "beforeSha256": "",
+      "beforeBytes": 0,
+      "afterSha256": "187a355c3590a63c12816a98843e8e95a2ea8c9f835c4f299d10a45c09fee159",
+      "afterBytes": 172
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Tests/JourneyRestoration/DesertRV.JourneyRestorationTests.asmdef",
+      "beforeSha256": "",
+      "beforeBytes": 0,
+      "afterSha256": "53d49b852d9173acedcc2e2001105baa1bd459788e7d45e560362e4c7a79f0d1",
+      "afterBytes": 328
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Tests/JourneyRestoration/DesertRV.JourneyRestorationTests.asmdef.meta",
+      "beforeSha256": "",
+      "beforeBytes": 0,
+      "afterSha256": "34439246ab4903910c711b8e2a606d2459416b4db3c581226d2602ab5b54de87",
+      "afterBytes": 166
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Tests/JourneyRestoration/JourneyRestorationTests.cs",
+      "beforeSha256": "",
+      "beforeBytes": 0,
+      "afterSha256": "7f4fd8f1543ca97797a882b3f4bdd1ba5a0518feb6c20d9ca1b86c33d50d3156",
+      "afterBytes": 939
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Tests/JourneyRestoration/JourneyRestorationTests.cs.meta",
+      "beforeSha256": "",
+      "beforeBytes": 0,
+      "afterSha256": "7a65f5979def21a3836ac51a9978bab268d89b9998ee61e08697d6d9a2e32145",
+      "afterBytes": 243
+    }
+  ]
+}

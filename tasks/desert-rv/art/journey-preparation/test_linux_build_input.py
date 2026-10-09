@@ -85,4 +85,49 @@ class LinuxBuildInputTests(unittest.TestCase):
         path=Path(__file__).resolve().parents[2]/'unity/Assets/DesertRV/Tests/CandidateLinux/CandidateLinuxBoundaryTests.cs'
         import re
         self.assertEqual(set(linux.BOUNDARY_NAMES),{'DesertRV.Tests.CandidateLinuxBoundaryTests.'+n for n in re.findall(r'\[Test\] public void (\w+)\(',path.read_text())})
+class RestoredBuildRequestTests(unittest.TestCase):
+    def setUp(self):
+        LinuxBuildInputTests.setUp(self)
+        import types,sys
+        self.root=linux.PROJECT/'JourneyEvidence/JourneyPreparation'
+        names=dict(INPUT='restoration-input.json',REPORT='restoration-revalidated.json',VERIFIED='restoration-native-verified.json',SOURCE_PROOF='restoration-source-proof.json')
+        self.restore=types.SimpleNamespace(**{k:self.root/v for k,v in names.items()})
+        receipt=json.loads(self.receipt.read_text());self.report=dict(scenes=receipt['integrationOutputs'])
+        self.restore.REPORT.write_text(json.dumps(self.report));self.restore.INPUT.write_text(json.dumps(dict(files=[dict(path='tasks/desert-rv/unity/Assets/Original.cs',sha256=linux.sha(linux.PROJECT/'Assets/Original.cs'))],directories=[])))
+        self.restore.VERIFIED.write_text('{}');self.restore.SOURCE_PROOF.write_text('{}')
+        self.native=linux.TASK/'artifacts/journey-restoration/result.xml';self.native.parent.mkdir(parents=True);self.native.write_text('<fixture/>')
+        self.restore.pin=lambda p:dict(path=str(p.relative_to(linux.ROOT)),sha256=linux.sha(p))
+        self.restore.PRODUCER=dict(sourceCommit='b'*40,generatedReceiptSha256=linux.sha(self.receipt));self.restore.RUN_URL='https://github.com/yangerstar1/task-workbench/actions/runs/123'
+        self.restore.current_run=lambda:'https://github.com/yangerstar1/task-workbench/actions/runs/'+__import__('os').environ['GITHUB_RUN_ID']
+        self.restore.native_evidence=lambda:self.restore.pin(self.native)
+        self.restore.verify=mock.Mock(return_value=({},dict(receipt=receipt),dict(nativeXml=self.restore.pin(self.native))))
+        patch=mock.patch.dict(sys.modules,restore_preparation=self.restore);patch.start();self.addCleanup(patch.stop)
+    def test_original_producer_and_new_consumer_identities_are_distinct_and_pinned(self):
+        request=linux.prepare_restored();self.assertEqual('b'*40,request['assetProducerSourceCommit']);self.assertEqual(self.restore.RUN_URL,request['assetProducerRunUrl']);self.assertNotEqual(request['sourceCommit'],request['assetProducerSourceCommit'])
+        self.assertEqual(self.restore.pin(self.restore.REPORT),request['restorationProof']);self.assertEqual(linux.sha(self.native),request['restorationNativeXmlSha256'])
+    def test_both_current_native_xml_and_input_and_source_proof_are_pinned(self):
+        request=linux.prepare_restored();pins={r['path']:r['sha256'] for r in request['files']}
+        for path in (self.native,self.xml,self.restore.INPUT,self.restore.REPORT,self.restore.SOURCE_PROOF):self.assertEqual(linux.sha(path),pins[str(path.relative_to(linux.ROOT))])
+    def test_failed_restoration_cannot_prepare_build(self):
+        self.restore.verify.side_effect=ValueError('RESTORE_NATIVE_NOT_PASSED')
+        with self.assertRaisesRegex(Exception,'NATIVE_NOT_PASSED'):linux.prepare_restored()
+        self.assertFalse(self.input.exists())
+    def test_current_boundary_failure_stops_restored_build(self):
+        self.xml.unlink()
+        with self.assertRaisesRegex(Exception,'BOUNDARY_XML_COUNT'):linux.prepare_restored()
+        self.assertFalse(self.input.exists())
+    def test_request_recheck_rejects_changed_producer_identity(self):
+        value=linux.prepare_restored();value['assetProducerSourceCommit']='e'*40;self.input.write_text(json.dumps(value));self.input.with_suffix('.sha256').write_text(linux.sha(self.input))
+        with self.assertRaisesRegex(Exception,'RESTORATION_PROOF_CHANGED'):linux.verify()
+    def test_request_recheck_rejects_changed_native_xml_pin(self):
+        linux.prepare_restored();self.native.write_text('changed')
+        with self.assertRaisesRegex(Exception,'RESTORATION_PROOF_CHANGED'):linux.verify()
+    def test_missing_restoration_marker_does_not_fall_back_to_unverified_restore(self):
+        value=linux.prepare_restored();value['restorationProof']=None;self.input.write_text(json.dumps(value))
+        with self.assertRaisesRegex(Exception,'UNDECLARED_RESTORATION'):linux.verify()
+    def test_existing_build_request_is_not_overwritten(self):
+        linux.prepare_restored();before=self.input.read_bytes()
+        with self.assertRaisesRegex(Exception,'REQUEST_EXISTS'):linux.prepare_restored()
+        self.assertEqual(before,self.input.read_bytes())
+
 if __name__=='__main__':unittest.main(verbosity=2)

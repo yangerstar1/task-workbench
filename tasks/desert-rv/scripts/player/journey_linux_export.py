@@ -11,14 +11,19 @@ RECOVERY=TASK/'journey-linux-control-private';recovery.EVIDENCE=RECOVERY
 sys.path.insert(0,str(TASK/'art/journey-preparation'));import linux_build_input
 MODE='CANDIDATE_LINUX_DEVELOPMENT_BUILT_UNREVIEWED'
 SCENES=['Assets/DesertRV/Scenes/Journey/'+n+'.unity' for n in ('JourneyBootstrap','FirstStation','Scrapyard','NightBeacon')]
-RECEIPT_KEYS={'schema','label','sourceCommit','producerRunUrl','generatedReceiptSha256','requestSha256','executableSha256','unityVersion','target','backend','define','executable','scenes','candidateOnly','development','settingsRestored','sourceBytesUnchanged','approved','visualReviewed','gameplayReviewed','audioAuditioned','temporarySettingsFiles','temporarySettingsApiFields','boundaryNativeXmlSha256','boundaryNativeCases'}
-DIAG_KEYS={'schema','label','stage','exceptionKind','buildResult','settingsRestored','sourceBytesUnchanged','receiptWritten'}
+RECEIPT_KEYS={'schema','label','sourceCommit','producerRunUrl','generatedReceiptSha256','requestSha256','executableSha256','unityVersion','target','backend','define','executable','scenes','candidateOnly','development','settingsRestored','sourceBytesUnchanged','approved','visualReviewed','gameplayReviewed','audioAuditioned','temporarySettingsFiles','temporarySettingsApiFields','boundaryNativeXmlSha256','boundaryNativeCases','restorationProof','assetProducerSourceCommit','assetProducerRunUrl','restorationNativeXmlSha256'}
+DIAG_KEYS={'activeTargetAtEntry','activeTargetBeforeBuild','activeTargetAfterBuild','reportTarget','sourceBytesUnchanged', 'primaryCallbackGate', 'settingsRestored', 'buildReportAvailable', 'restorationExceptionKind', 'verificationSceneRole', 'totalErrors', 'leaseClosedReason', 'exceptionKind', 'buildResult', 'primarySceneRole', 'buildMessages', 'verificationFailureCode', 'receiptWritten', 'primaryRootMismatch', 'restorationFailureCode', 'assemblyReloadObserved', 'primaryFailureCode', 'verificationCallbackGate', 'label', 'verificationRootMismatch', 'buildMessagesTruncated', 'stage', 'leaseActiveAtBuildReturn', 'primaryExceptionKind', 'verificationExceptionKind', 'schema', 'buildErrorKinds', 'totalWarnings'}
+FAILURE_CODES={'PIN_LINK', 'RESTORATION_XML', 'INVENTORY_NONREGULAR', 'ROOT_BYTES', 'BUILD_OR_SCENE_FAILED', 'INVENTORY_LINK', 'ROOT_IMPORT_HASH', 'PACKAGE_IDENTITY', 'PIN_BYTES', 'DEPENDENCY_PATH', 'INVENTORY_DIRECTORY', 'SAVED_RUNTIME_IDENTITY', 'BOOTSTRAP_OWNER', 'ROOT_DEPENDENCY', 'REQUEST_RECEIPT_HASH', 'BOOTSTRAP_BINDING', 'REGION_BINDING', 'REGION_OWNER', 'SCENE_COMPONENT', 'DEPENDENCY_KIND', 'INVENTORY_SET', 'ROOT_DEPENDENCY_BYTES', 'SCENE_SEQUENCE', 'PIN_MISSING', 'REGION_IDENTITY', 'BUILTIN_DEPENDENCY', 'IMPORT_FINGERPRINT', 'TARGET_OUTPUT', 'REQUEST_IDENTITY', 'PIN_PATH', 'UNCLASSIFIED_EXCEPTION', 'DIRTY_SCENE', 'ENTRY_PROFILE', 'LEASE_PROFILE', 'RESTORATION_PROOF', 'REQUEST_HASH', 'DEPENDENCY_BYTES', 'BUILD_PROFILE'}
+EXCEPTIONS={'NONE','BUILD_FAILED','UNAUTHORIZED_ACCESS','IO','OTHER'}
+CALLBACKS={'NONE','PRODUCTION_PREPROCESS','PRODUCTION_SCENE','CANDIDATE_SCENE'}
+ROLES={'NONE','CONTENT','BOOTSTRAP','FIRST_STATION','SCRAPYARD','NIGHT_BEACON'}
+BUILD_ERROR_KINDS={'CANDIDATE_GATE','PRODUCTION_GATE','CS_COMPILATION','SHADER_ERROR','UNCLASSIFIED_BUILD_ERROR'}
 RUNTIME_ROOTS={'DesertRV.x86_64','UnityPlayer.so','DesertRV_Data','MonoBleedingEdge','UnityCrashHandler64'}
 DEBUG_ROOTS={'DesertRV_BackUpThisFolder_ButDontShipItWithYourGame','DesertRV_BurstDebugInformation_DoNotShip'}
 
 def producer_url():return 'https://github.com/yangerstar1/task-workbench/actions/runs/'+os.environ['GITHUB_RUN_ID']
 def verify_union():
-    proof=linux_build_input.prepared_source.verify();linux_build_input.bound_boundary();return proof
+    return linux_build_input.verify()
 def request():
     r=read_json(STATE/'linux-build-input.json');require(sha(STATE/'linux-build-input.json')==safe(STATE/'linux-build-input.sha256').read_text().strip())
     require(r['schema']==1 and r['label']=='CANDIDATE_LINUX_DEVELOPMENT_ONLY' and r['sourceCommit']==os.environ['GITHUB_SHA'] and r['producerRunUrl']==producer_url() and r['approved'] is False)
@@ -42,17 +47,58 @@ def native_receipt(value):
     require(value['temporarySettingsFiles']==['ProjectSettings/ProjectSettings.asset'] and value['temporarySettingsApiFields']==['scriptingBackend.Standalone','fullScreenMode','defaultScreenWidth','defaultScreenHeight','productName','resizableWindow'])
     for key in ('candidateOnly','development','settingsRestored','sourceBytesUnchanged'):require(value[key] is True)
     for key in ('approved','visualReviewed','gameplayReviewed','audioAuditioned'):require(value[key] is False)
+    pin=value['restorationProof'];restored=isinstance(pin,dict) and bool(pin.get('path'))
+    if restored:
+        require(set(pin)=={'path','sha256'} and pin['path']=='tasks/desert-rv/unity/JourneyEvidence/JourneyPreparation/restoration-revalidated.json' and re.fullmatch('[a-f0-9]{64}',pin['sha256']))
+        require(re.fullmatch('[a-f0-9]{40}',value['assetProducerSourceCommit']) and re.fullmatch(r'https://github\.com/yangerstar1/task-workbench/actions/runs/[1-9][0-9]*',value['assetProducerRunUrl']) and re.fullmatch('[a-f0-9]{64}',value['restorationNativeXmlSha256']))
+    else:require(pin is None or pin=={'path':'','sha256':''});require(all(value[k] in ('',None) for k in ('assetProducerSourceCommit','assetProducerRunUrl','restorationNativeXmlSha256')))
     return value
+
+def root_observation(value):
+    require(isinstance(value,dict) and set(value)=={'observed','rootBytesMatch','rootDependencyBytesMatch','slot','expectedImportHash','observedImportHash'})
+    for k in ('observed','rootBytesMatch','rootDependencyBytesMatch'):require(type(value[k]) is bool)
+    require(value['slot'] in ROLES)
+    if value['observed']:require(value['slot']!='NONE' and all(isinstance(value[k],str) and re.fullmatch('[a-f0-9]{32}',value[k]) for k in ('expectedImportHash','observedImportHash')))
+    else:require(value['slot']=='NONE' and value['expectedImportHash']==value['observedImportHash']=='' and not value['rootBytesMatch'] and not value['rootDependencyBytesMatch'])
+
+def safe_build_message(value):
+    require(isinstance(value,dict) and set(value)=={'category','code','source','text','line'} and value['category'] in BUILD_ERROR_KINDS)
+    category=value['category'];code=value['code'];source=value['source'];line=value['line'];expected=''
+    require(type(line) is int and 0<=line<=9999999 and isinstance(source,str))
+    if category=='CANDIDATE_GATE':require(code in FAILURE_CODES and source=='' and line==0);expected='Candidate build gate rejected: '+code
+    elif category=='PRODUCTION_GATE':require(code=='NONE' and source=='' and line==0);expected='Formal journey scenes require current production content preflight.'
+    elif category=='CS_COMPILATION':
+        if code=='NONE':require(source=='' and line==0);expected='Error building Player because scripts had compiler errors.'
+        else:
+            require(code in recovery.startup.CODES);expected='C# compiler diagnostic: '+code
+            if source:require(source in recovery.startup.source_map(PROJECT) and line>0);expected+=' at '+source+':'+str(line)
+            else:require(line==0)
+    elif category=='SHADER_ERROR':require(code=='NONE' and source=='' and line==0);expected='Build report contains a shader error.'
+    else:require(code=='NONE' and source=='' and line==0)
+    require(value['text']==expected and len(expected)<=512)
 
 def native_diagnostic(value):
     require(isinstance(value,dict) and set(value)==DIAG_KEYS and type(value['schema']) is int and value['schema']==1 and value['label']=='CANDIDATE_LINUX_BUILD_DIAGNOSTIC')
     require(value['stage'] in {'ENTRY','SOURCE_VERIFIED','CONTENT_VERIFIED','BUILD_PLAYER_ENTERED','BUILD_PLAYER_RETURNED','RECEIPT_WRITTEN'})
-    require(value['exceptionKind'] in {'NONE','BUILD_FAILED','UNAUTHORIZED_ACCESS','IO','OTHER'} and value['buildResult'] in {'UNAVAILABLE','SUCCEEDED','FAILED'})
-    for key in ('settingsRestored','sourceBytesUnchanged','receiptWritten'):require(type(value[key]) is bool)
+    require(value['exceptionKind'] in EXCEPTIONS and value['buildResult'] in {'UNAVAILABLE','SUCCEEDED','FAILED','CANCELLED','UNKNOWN'})
+    for key in ('settingsRestored','sourceBytesUnchanged','receiptWritten','buildReportAvailable','leaseActiveAtBuildReturn','assemblyReloadObserved','buildMessagesTruncated'):require(type(value[key]) is bool)
+    for key in ('totalErrors','totalWarnings'):require(type(value[key]) is int and 0<=value[key]<=4294967295)
+    for key in ('activeTargetAtEntry','activeTargetBeforeBuild','activeTargetAfterBuild','reportTarget'):require(value[key] in {'NOT_OBSERVED','LINUX64','ANDROID','OTHER'})
+    require(value['buildReportAvailable']==(value['buildResult']!='UNAVAILABLE') and value['buildReportAvailable']==(value['reportTarget']!='NOT_OBSERVED'))
+    if not value['buildReportAvailable']:require(value['totalErrors']==value['totalWarnings']==0 and value['buildErrorKinds']==[] and value['buildMessages']==[])
+    for prefix in ('primary','restoration','verification'):
+        require(value[prefix+'FailureCode'] in FAILURE_CODES|{'NONE'} and value[prefix+'ExceptionKind'] in EXCEPTIONS)
+        require((value[prefix+'FailureCode']=='NONE')==(value[prefix+'ExceptionKind']=='NONE'))
+    require(value['leaseClosedReason'] in {'NONE','EXPLICIT','ASSEMBLY_RELOAD','EDITOR_QUIT'})
+    for prefix in ('primary','verification'):
+        require(value[prefix+'CallbackGate'] in CALLBACKS and value[prefix+'SceneRole'] in ROLES);root_observation(value[prefix+'RootMismatch'])
+    kinds=value['buildErrorKinds'];require(isinstance(kinds,list) and kinds==sorted(set(kinds)) and set(kinds)<=BUILD_ERROR_KINDS)
+    messages=value['buildMessages'];require(isinstance(messages,list) and len(messages)<=32)
+    for message in messages:safe_build_message(message);require(message['category'] in kinds)
     return value
 
 def diagnostic_success(d):
-    return d is not None and d['stage']=='RECEIPT_WRITTEN' and d['buildResult']=='SUCCEEDED' and d['exceptionKind']=='NONE' and all(d[k] is True for k in ('settingsRestored','sourceBytesUnchanged','receiptWritten'))
+    return d is not None and d['stage']=='RECEIPT_WRITTEN' and d['buildResult']=='SUCCEEDED' and d['exceptionKind']=='NONE' and d['buildReportAvailable'] is True and d['reportTarget']=='LINUX64' and d['totalErrors']==0 and all(d[p+'FailureCode']=='NONE' for p in ('primary','restoration','verification')) and all(d[k] is True for k in ('settingsRestored','sourceBytesUnchanged','receiptWritten'))
 
 def validate_records(records):
     require(isinstance(records,list) and 0<len(records)<=20000);previous='';total=0;roots=set()
@@ -117,10 +163,16 @@ def restore(logs):
     if recovery.recover_source(logs)!=0:return 1
     verify_union();return 0
 
+def restoration_matches(native,request):
+    for key in ('assetProducerSourceCommit','assetProducerRunUrl','restorationNativeXmlSha256'):require((native.get(key) or '')==(request.get(key) or ''))
+    a=native.get('restorationProof');b=request.get('restorationProof')
+    if isinstance(a,dict) and a.get('path'):require(a==b)
+    else:require(b is None or b=={'path':'','sha256':''})
+
 def stage():
     verify_union();r=request();_,native=sealed_native_receipt(STATE/'linux-build-receipt.json');diagnostic=native_diagnostic(read_json(STATE/'linux-build-diagnostic.json'))
     require(diagnostic_success(diagnostic))
-    require(native['requestSha256']==sha(STATE/'linux-build-input.json'))
+    require(native['requestSha256']==sha(STATE/'linux-build-input.json'));restoration_matches(native,r)
     require(native['boundaryNativeXmlSha256']==r['boundaryNativeXmlSha256'] and r['boundaryNativeCases']==17)
     require(native['generatedReceiptSha256']==r['generatedReceiptSha256']==sha(TASK/'journey-preparation-export/generated/receipt.json'))
     require(native['executableSha256']==sha(BUILD/'DesertRV.x86_64'));records=inventory(BUILD)
@@ -168,7 +220,7 @@ def export():
             verify_union();r=request();m=read_json(STAGED/'manifest.json')
             require(set(m)=={'schema','label','sourceCommit','producerRunUrl','nativeReceiptSha256','inputSha256','generatedReceiptSha256','sourceStateSha256','bundleSha256','bundleBytes','files','nativeReceipt','playerExecuted','approved'})
             require(m['schema']==1 and m['label']=='REUSABLE_CANDIDATE_LINUX_PLAYER_UNREVIEWED' and m['sourceCommit']==os.environ['GITHUB_SHA'] and m['producerRunUrl']==producer_url() and m['playerExecuted'] is False and m['approved'] is False)
-            native_receipt(m['nativeReceipt']);require(m['nativeReceipt']['requestSha256']==sha(STATE/'linux-build-input.json'));require(m['nativeReceipt']['generatedReceiptSha256']==r['generatedReceiptSha256']==m['generatedReceiptSha256'])
+            native_receipt(m['nativeReceipt']);restoration_matches(m['nativeReceipt'],r);require(m['nativeReceipt']['requestSha256']==sha(STATE/'linux-build-input.json'));require(m['nativeReceipt']['generatedReceiptSha256']==r['generatedReceiptSha256']==m['generatedReceiptSha256'])
             native_bytes,sealed=sealed_native_receipt(STATE/'linux-build-receipt.json');require(hashlib.sha256(native_bytes).hexdigest()==m['nativeReceiptSha256'] and sealed==m['nativeReceipt'])
             require(m['nativeReceipt']['boundaryNativeXmlSha256']==r['boundaryNativeXmlSha256'] and r['boundaryNativeCases']==17)
             require(m['inputSha256']==sha(STATE/'linux-build-input.json') and m['sourceStateSha256']==sha(TASK/'SOURCE-STATE.json'))
