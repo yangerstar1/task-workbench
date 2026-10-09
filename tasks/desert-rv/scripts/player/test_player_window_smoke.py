@@ -10,7 +10,9 @@ class PlayerWindowTests(unittest.TestCase):
  def tearDown(self):self.root.stop();self.env.stop();self.t.cleanup()
  def control(self,**changes):
   native=p.empty_build_native();native.update(stage='BUILD_RECEIPT_WRITTEN',targetChecked=True,targetSupported=True,buildReportAvailable=True,settingsRestored=True,buildResult='SUCCEEDED')
-  result=dict(activation='SUCCEEDED',build='SUCCEEDED',player='SUCCEEDED',licenseReturn='SUCCEEDED',privateCleanup='SUCCEEDED',buildDiagnostic=dict(native=native,logClassification=p.startup.empty_report(),failureCode='NONE'),captureFailureCode='NONE',containerSource=p.empty_source());result.update(changes);return result
+  result=dict(activation='SUCCEEDED',build='SUCCEEDED',player='SUCCEEDED',licenseReturn='SUCCEEDED',privateCleanup='SUCCEEDED',buildDiagnostic=dict(native=native,logClassification=p.startup.empty_report(),failureCode='NONE',batchExitCode=0,batchTimedOut=False),captureFailureCode='NONE',containerSource=p.empty_source(),sourceRecovery=self.recovery());result.update(changes);return result
+ def recovery(self):
+  result=p.empty_recovery();result.update(status='SUCCEEDED',sourceModesRestored=True,afterPreserved=True);result['settingsDiff']=dict(classification='NO_CHANGE',changedFields=[],unknownLineCount=0);return result
  def write(self): (self.build/'build-receipt.json').write_text(json.dumps(self.receipt))
  def test_valid_exact_receipt(self):self.write();self.assertEqual(p.verify_build(self.build)[0],self.exe)
  def test_executable_hash_mismatch(self):
@@ -114,8 +116,8 @@ class PlayerWindowTests(unittest.TestCase):
   with self.assertRaises(ValueError):p.validate_build_native(native)
  def test_build_diagnostic_recorded_before_private_removal(self):
   scripts=pathlib.Path(__file__).resolve().parent;shell=(scripts/'container_entry.sh').read_text();builder=(scripts.parents[1]/'unity/Assets/DesertRV/Editor/PlayerBuild.cs').read_text()
-  self.assertIn('build-diagnostic "$private"',shell);self.assertIn('export DESERTRV_PLAYER_DIAGNOSTIC=',shell)
-  self.assertIn('finally\n            {\n                string destination',builder);self.assertIn('report.summary.totalErrors',builder);self.assertIn('diagnostic.targetSupported = supported',builder)
+  self.assertIn('build-diagnostic "$private" "$build_exit"',shell);self.assertIn('export DESERTRV_PLAYER_DIAGNOSTIC=',shell)
+  self.assertIn('finally\n            {\n                PersistDiagnostic(diagnostic);',builder);self.assertIn('report.summary.totalErrors',builder);self.assertIn('diagnostic.targetSupported = supported',builder)
  def test_probe_uses_compatible_atomic_replace_not_move_overwrite(self):
   runtime=pathlib.Path(__file__).resolve().parents[4]/'tasks/desert-rv/unity/Assets/DesertRV/Runtime/Diagnostics/ReferencePlayerWindowProbe.cs'
   text=runtime.read_text();self.assertNotIn('File.Move(path + ".tmp", path, true)',text)
@@ -142,6 +144,69 @@ class PlayerWindowTests(unittest.TestCase):
    with self.assertRaises(ValueError):p.validate_source(value)
    value['files'][0]['path']=name;value['files'][0]['raw']='private'
    with self.assertRaises(ValueError):p.validate_source(value)
+ def test_record_build_then_capture_init_reuses_only_valid_diagnostic(self):
+  task=self.r/'task';task.mkdir();logs=self.r/'logs';logs.mkdir();ev=task/'evidence'
+  native=self.control()['buildDiagnostic']['native'];(logs/'build-diagnostic-native.json').write_text(json.dumps(native))
+  with patch.object(p,'TASK',task),patch.object(p,'EVIDENCE',ev):
+   p.record_build(logs,0);(ev/'source-recovery.json').write_text(json.dumps(self.recovery()));self.assertEqual(p.prepare_capture_evidence(),ev)
+   self.assertEqual({x.name for x in ev.iterdir()},{'build-diagnostic.json','source-recovery.json'})
+   (ev/'real-time.mp4').write_bytes(b'stale')
+   with self.assertRaises(ValueError):p.prepare_capture_evidence()
+ def test_capture_init_rejects_symlink_or_failed_build(self):
+  task=self.r/'task';task.mkdir();ev=task/'evidence';ev.mkdir();(ev/'build-diagnostic.json').write_text(json.dumps(p.empty_build()))
+  with patch.object(p,'TASK',task),patch.object(p,'EVIDENCE',ev):
+   with self.assertRaises(ValueError):p.prepare_capture_evidence()
+  link=task/'linked';link.symlink_to(ev,target_is_directory=True)
+  with patch.object(p,'EVIDENCE',link):
+   with self.assertRaises(ValueError):p.prepare_capture_evidence()
+ def test_real_batch_exit_and_timeout_are_not_inferred_from_elapsed_time(self):
+  task=self.r/'task';task.mkdir();logs=self.r/'logs';logs.mkdir();ev=task/'evidence'
+  for code in (0,1,124,137,143):
+   with patch.object(p,'TASK',task),patch.object(p,'EVIDENCE',ev):p.record_build(logs,code)
+   result=json.loads((ev/'build-diagnostic.json').read_text());self.assertEqual(result['batchExitCode'],code);self.assertEqual(result['batchTimedOut'],code==124)
+ def recovery_fixture(self):
+  task=self.r/'tasks/desert-rv';task.mkdir(exist_ok=True);logs=self.r/'logs';logs.mkdir()
+  text='  productName: ORIGINAL\n  defaultScreenWidth: 1280\n  defaultScreenHeight: 720\n  resizableWindow: 1\n  fullscreenMode: 3\n  scriptingBackend:\n    Standalone: 0\n'
+  before={}
+  for name in p.RECOVERY_PATHS:
+   file=self.r/name;file.parent.mkdir(parents=True,exist_ok=True);file.write_text(text if name==p.SETTINGS_PATH else 'unchanged public source');os.chmod(file,0o644);before[name]=p.sha(file)
+  (task/'player-source-before.json').write_text(json.dumps(before));(task/'SOURCE-STATE.json').write_text(json.dumps({'schema':'desert-rv-source-state/v1','files':[dict(path=n,sha256=v) for n,v in before.items()]}))
+  return task,logs,before
+ def test_exact_settings_backup_restores_bytes_and_four_original_modes(self):
+  task,logs,before=self.recovery_fixture();ev=task/'evidence'
+  with patch.object(p,'TASK',task),patch.object(p,'EVIDENCE',ev),patch.object(p,'tracked_names',return_value=list(p.RECOVERY_PATHS)):
+   p.snapshot_recovery(logs);file=self.r/p.SETTINGS_PATH;file.write_text(file.read_text().replace('ORIGINAL','PRIVATE_DIAGNOSTIC_VALUE').replace('resizableWindow: 1','resizableWindow: 0'))
+   for name in p.RECOVERY_PATHS:os.chmod(self.r/name,0o600)
+   self.assertEqual(p.recover_source(logs),0);result=json.loads((ev/'source-recovery.json').read_text())
+  self.assertEqual(result['before']['status'],'DIFFERENCES');self.assertEqual(result['settingsDiff']['classification'],'OWNED_FIELDS_ONLY');self.assertTrue(result['settingsBackupRestored']);self.assertNotIn('PRIVATE_DIAGNOSTIC_VALUE',json.dumps(result))
+  for name in p.RECOVERY_PATHS:self.assertEqual(p.sha(self.r/name),before[name]);self.assertEqual((self.r/name).stat().st_mode&0o777,0o644)
+ def test_recovery_never_restores_other_source_bytes(self):
+  task,logs,before=self.recovery_fixture();ev=task/'evidence'
+  with patch.object(p,'TASK',task),patch.object(p,'EVIDENCE',ev),patch.object(p,'tracked_names',return_value=list(p.RECOVERY_PATHS)):
+   p.snapshot_recovery(logs);file=self.r/p.RECOVERY_PATHS[0];file.write_text('OTHER_CHANGED');self.assertEqual(p.recover_source(logs),1)
+  self.assertEqual(file.read_text(),'OTHER_CHANGED');self.assertEqual(json.loads((ev/'source-recovery.json').read_text())['status'],'FAILED')
+ def test_unknown_settings_changes_are_classified_without_raw_content(self):
+  task,logs,before=self.recovery_fixture();original=(self.r/p.SETTINGS_PATH).read_bytes();result=p.settings_diff(original,original+b'  privateUnlistedKey: SECRET\n')
+  self.assertEqual(result['classification'],'OTHER_SETTINGS_CHANGE');self.assertGreater(result['unknownLineCount'],0);self.assertNotIn('SECRET',json.dumps(result));self.assertEqual(p.settings_diff(original,b'not yaml')['classification'],'UNAVAILABLE')
+ def test_recovery_backup_must_match_source_declared_bytes(self):
+  task,logs,before=self.recovery_fixture();ev=task/'evidence'
+  with patch.object(p,'TASK',task),patch.object(p,'EVIDENCE',ev),patch.object(p,'tracked_names',return_value=list(p.RECOVERY_PATHS)):
+   p.snapshot_recovery(logs);(logs/'ProjectSettings.original').write_text('TAMPERED');self.assertEqual(p.recover_source(logs),1)
+  self.assertEqual(p.sha(self.r/p.SETTINGS_PATH),before[p.SETTINGS_PATH])
+ def test_bounded_build_and_atomic_phase_source_contracts(self):
+  root=pathlib.Path(__file__).resolve().parents[4];shell=(root/'tasks/desert-rv/scripts/player/container_entry.sh').read_text();builder=(root/'tasks/desert-rv/unity/Assets/DesertRV/Editor/PlayerBuild.cs').read_text();workflow=(root/'.github/workflows/desert-rv-player-smoke.yml').read_text()
+  self.assertIn('65m unity-editor',shell);self.assertIn('else\n  build_exit=$?;',shell);self.assertIn('timeout-minutes: 100',workflow)
+  self.assertLess(shell.index('snapshot-recovery'),shell.index('65m unity-editor'));self.assertLess(shell.index('build-diagnostic "$private" "$build_exit"'),shell.index('recover-source "$private"'))
+  self.assertIn('if (File.Exists(destination)) File.Replace(temporary, destination, null);',builder)
+  for stage in ('TARGET_CHECKED','SCENE_VALIDATED','BUILD_PLAYER_ENTERED','BUILD_RECEIPT_WRITTEN'):self.assertIn('diagnostic.stage = "'+stage+'"; PersistDiagnostic(diagnostic);',builder)
+ def test_shell_preserves_batch_exit_before_any_later_command(self):
+  import subprocess
+  shell=(pathlib.Path(__file__).resolve().parent/'container_entry.sh').read_text();start=shell.index('if timeout --signal=TERM --kill-after=30s 65m unity-editor');end=shell.index('\nfi',start)+3;fragment=shell[start:end]
+  with tempfile.TemporaryDirectory() as private:
+   for code in (0,1,124,137):
+    script='set -e\ntimeout() { return '+str(code)+'; }\nprivate='+private+'\n'+fragment+'\nprintf "%s %s" "$build_exit" "$built"\n'
+    result=subprocess.run(['bash','-c',script],capture_output=True,text=True)
+    self.assertEqual(result.returncode,0);self.assertEqual(result.stdout,str(code)+(' SUCCEEDED' if code==0 else ' FAILED'))
  def test_source_guards_runtime_and_batch_only(self):
   root=pathlib.Path(__file__).resolve().parents[4];base=root/'tasks/desert-rv';shell=(base/'scripts/player/container_entry.sh').read_text();cs=(base/'unity/Assets/DesertRV/Runtime/Diagnostics/ReferencePlayerWindowProbe.cs').read_text();builder=(base/'unity/Assets/DesertRV/Editor/PlayerBuild.cs').read_text()
   self.assertTrue(cs.startswith('#if DESERTRV_REFERENCE_WINDOW_PROBE && !UNITY_EDITOR'))

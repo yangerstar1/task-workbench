@@ -21,6 +21,7 @@ namespace DesertRV.Editor
         public static void BuildLinuxWindowSmoke()
         {
             var diagnostic = new SmokeBuildDiagnostic();
+            PersistDiagnostic(diagnostic);
             try { BuildReference(true, diagnostic); }
             catch (Exception exception)
             {
@@ -31,9 +32,18 @@ namespace DesertRV.Editor
             }
             finally
             {
-                string destination = Environment.GetEnvironmentVariable("DESERTRV_PLAYER_DIAGNOSTIC");
-                if (!string.IsNullOrEmpty(destination)) File.WriteAllText(destination, JsonUtility.ToJson(diagnostic));
+                PersistDiagnostic(diagnostic);
             }
+        }
+        static void PersistDiagnostic(SmokeBuildDiagnostic diagnostic)
+        {
+            if (diagnostic == null) return;
+            string destination = Environment.GetEnvironmentVariable("DESERTRV_PLAYER_DIAGNOSTIC");
+            if (string.IsNullOrEmpty(destination)) return;
+            string temporary = destination + ".tmp";
+            File.WriteAllText(temporary, JsonUtility.ToJson(diagnostic));
+            if (File.Exists(destination)) File.Replace(temporary, destination, null);
+            else File.Move(temporary, destination);
         }
         [Serializable] sealed class SmokeBuildDiagnostic
         {
@@ -63,7 +73,7 @@ namespace DesertRV.Editor
         static void BuildReference(bool smoke, SmokeBuildDiagnostic diagnostic)
         {
             bool supported = BuildPipeline.IsBuildTargetSupported(BuildTargetGroup.Standalone, BuildTarget.StandaloneLinux64);
-            if (diagnostic != null) { diagnostic.targetChecked = true; diagnostic.targetSupported = supported; diagnostic.stage = "TARGET_CHECKED"; }
+            if (diagnostic != null) { diagnostic.targetChecked = true; diagnostic.targetSupported = supported; diagnostic.stage = "TARGET_CHECKED"; PersistDiagnostic(diagnostic); }
             if (!supported) throw new InvalidOperationException("LINUX_TARGET_UNSUPPORTED");
             if (!File.Exists(ReferenceScene)) throw new FileNotFoundException("Saved reference scene missing", ReferenceScene);
             var scene = EditorSceneManager.OpenScene(ReferenceScene, OpenSceneMode.Single);
@@ -83,7 +93,7 @@ namespace DesertRV.Editor
                 }
             }
             if (cameras == 0 || renderers == 0) throw new Exception("Reference has no renderable camera/world");
-            if (diagnostic != null) diagnostic.stage = "SCENE_VALIDATED";
+            if (diagnostic != null) { diagnostic.stage = "SCENE_VALIDATED"; PersistDiagnostic(diagnostic); }
             Debug.Log($"DESERT_RV_REFERENCE_VALIDATED cameras={cameras} renderers={renderers}");
             string settingsPath = Path.GetFullPath("ProjectSettings/ProjectSettings.asset");
             byte[] originalSettings = File.ReadAllBytes(settingsPath);
@@ -105,7 +115,7 @@ namespace DesertRV.Editor
                 PlayerSettings.resizableWindow = !smoke;
                 if (smoke) PlayerSettings.productName = "DESERTRV_REFERENCE_PLAYER";
                 Directory.CreateDirectory(Path.GetDirectoryName(path));
-                if (diagnostic != null) diagnostic.stage = "BUILD_PLAYER_ENTERED";
+                if (diagnostic != null) { diagnostic.stage = "BUILD_PLAYER_ENTERED"; PersistDiagnostic(diagnostic); }
                 report = BuildPipeline.BuildPlayer(new BuildPlayerOptions
                 {
                     scenes = new[] { ReferenceScene }, target = BuildTarget.StandaloneLinux64,
@@ -120,6 +130,7 @@ namespace DesertRV.Editor
                         report.summary.result == BuildResult.Failed ? "FAILED" : report.summary.result == BuildResult.Cancelled ? "CANCELLED" : "UNKNOWN";
                     diagnostic.totalErrors = (int)Math.Min(report.summary.totalErrors, (uint)int.MaxValue);
                     diagnostic.totalWarnings = (int)Math.Min(report.summary.totalWarnings, (uint)int.MaxValue);
+                    PersistDiagnostic(diagnostic);
                 }
                 if (report.summary.result != BuildResult.Succeeded)
                     throw new InvalidOperationException("REFERENCE_BUILD_FAILED");
@@ -135,7 +146,7 @@ namespace DesertRV.Editor
                 AssetDatabase.SaveAssets();
                 // Restore exact original serialization; the external full-source guard still rejects other changes.
                 File.WriteAllBytes(settingsPath, originalSettings);
-                if (diagnostic != null) diagnostic.settingsRestored = true;
+                if (diagnostic != null) { diagnostic.settingsRestored = true; PersistDiagnostic(diagnostic); }
             }
             if (smoke)
             {
@@ -144,7 +155,7 @@ namespace DesertRV.Editor
                     targetSupported = true, buildSucceeded = true, settingsRestored = true };
                 File.WriteAllText(Path.Combine(Path.GetDirectoryName(path), "build-receipt.json"), JsonUtility.ToJson(receipt));
             }
-            if (diagnostic != null) diagnostic.stage = "BUILD_RECEIPT_WRITTEN";
+            if (diagnostic != null) { diagnostic.stage = "BUILD_RECEIPT_WRITTEN"; PersistDiagnostic(diagnostic); }
             Debug.Log("DESERT_RV_LINUX_REFERENCE_BUILT bytes=" + report.summary.totalSize);
         }
     }

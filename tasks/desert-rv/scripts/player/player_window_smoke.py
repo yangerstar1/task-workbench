@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Fixed BodyStudy standalone proof; one owned window, no input, no desktop fallback."""
-import datetime,hashlib,json,math,os,pathlib,re,shutil,subprocess,sys,tempfile,threading,time
+import datetime,difflib,hashlib,json,math,os,pathlib,re,shutil,subprocess,sys,tempfile,threading,time
 sys.path.insert(0,str(pathlib.Path(__file__).resolve().parents[1]))
 from capture_game_window import identity,finish_encoder,atomic,stamp
 from prepare_safe_diagnostic_export import safe,sha,read_json,inspect_png,probe_video,require
@@ -30,23 +30,25 @@ def validate_build_native(value):
     require(value['buildReportAvailable']==(value['buildResult']!='UNAVAILABLE'))
     if not value['buildReportAvailable']:require(value['totalErrors']==value['totalWarnings']==0)
     return value
-def empty_build():return dict(native=empty_build_native(),logClassification=startup.empty_report(),failureCode='BUILD_DIAGNOSTIC_UNAVAILABLE')
+def empty_build():return dict(native=empty_build_native(),logClassification=startup.empty_report(),failureCode='BUILD_DIAGNOSTIC_UNAVAILABLE',batchExitCode=None,batchTimedOut=False)
 def validate_build(value):
-    require(isinstance(value,dict) and set(value)=={'native','logClassification','failureCode'} and value['failureCode'] in BUILD_FAILURES)
+    require(isinstance(value,dict) and set(value)=={'native','logClassification','failureCode','batchExitCode','batchTimedOut'} and value['failureCode'] in BUILD_FAILURES)
+    require(value['batchExitCode'] is None or type(value['batchExitCode']) is int and 0<=value['batchExitCode']<=255)
+    require(type(value['batchTimedOut']) is bool and value['batchTimedOut']==(value['batchExitCode']==124))
     native=validate_build_native(value['native']);startup.validate(value['logClassification'],set(startup.source_map(TASK/'unity').values()))
-    if value['failureCode']=='NONE':require(native['stage']=='BUILD_RECEIPT_WRITTEN' and native['buildResult']=='SUCCEEDED' and native['targetChecked'] and native['targetSupported'] and native['settingsRestored'] and native['exceptionKind']=='NONE' and not value['logClassification']['compileErrors'])
+    if value['failureCode']=='NONE':require(value['batchExitCode']==0 and native['stage']=='BUILD_RECEIPT_WRITTEN' and native['buildResult']=='SUCCEEDED' and native['targetChecked'] and native['targetSupported'] and native['settingsRestored'] and native['exceptionKind']=='NONE' and not value['logClassification']['compileErrors'])
     if value['failureCode']=='LINUX_TARGET_UNSUPPORTED':require(native['targetChecked'] and not native['targetSupported'])
     if value['failureCode']=='PROJECT_COMPILE_ERRORS':require(value['logClassification']['compileErrors'])
     return value
-def record_build(logs):
+def record_build(logs,exit_code=None):
     logs=safe(logs,False);native=empty_build_native()
     if (logs/'build-diagnostic-native.json').exists():native=validate_build_native(read_json(logs/'build-diagnostic-native.json'))
-    classified=startup.classify(logs,TASK/'unity')
+    classified=startup.classify(logs,TASK/'unity',editor=exit_code)
     failure='REFERENCE_BUILD_FAILED'
     if native['targetChecked'] and not native['targetSupported']:failure='LINUX_TARGET_UNSUPPORTED'
     elif classified['compileErrors']:failure='PROJECT_COMPILE_ERRORS'
-    elif native['stage']=='BUILD_RECEIPT_WRITTEN' and native['buildResult']=='SUCCEEDED' and native['settingsRestored']:failure='NONE'
-    value=validate_build(dict(native=native,logClassification=classified,failureCode=failure))
+    elif exit_code==0 and native['stage']=='BUILD_RECEIPT_WRITTEN' and native['buildResult']=='SUCCEEDED' and native['settingsRestored']:failure='NONE'
+    value=validate_build(dict(native=native,logClassification=classified,failureCode=failure,batchExitCode=exit_code,batchTimedOut=exit_code==124))
     EVIDENCE.mkdir(exist_ok=True);atomic(EVIDENCE/'build-diagnostic.json',value)
 def fixed_control(values):
     require(len(values)==5 and all(v in {'NOT_ATTEMPTED','SUCCEEDED','FAILED'} for v in values))
@@ -54,6 +56,7 @@ def fixed_control(values):
     result['buildDiagnostic']=validate_build(read_json(EVIDENCE/'build-diagnostic.json')) if (EVIDENCE/'build-diagnostic.json').exists() else empty_build()
     result['captureFailureCode']='NONE'
     result['containerSource']=source_diagnostic()
+    result['sourceRecovery']=validate_recovery(read_json(EVIDENCE/'source-recovery.json')) if (EVIDENCE/'source-recovery.json').exists() else empty_recovery()
     if (EVIDENCE/'failure.json').exists():
         detail=read_json(EVIDENCE/'failure.json');require(set(detail)=={'failureCode'} and detail['failureCode'] in PLAYER_FAILURES);result['captureFailureCode']=detail['failureCode']
     # Only fixed-schema control is made readable. Private logs, build, handshake stay private.
@@ -106,6 +109,77 @@ def source_diagnostic():
         return validate_source(dict(scope='SOURCE_STATE_DECLARED_FILES_ONLY',status='DIFFERENCES' if changes else 'UNCHANGED',changedCount=len(changes),truncated=len(changes)>32,files=changes[:32]))
     except Exception:return empty_source()
 
+RECOVERY_PATHS=(
+ 'tasks/desert-rv/unity/Assets/DesertRV/Settings/WebURP.asset',
+ 'tasks/desert-rv/unity/Assets/UniversalRenderPipelineGlobalSettings.asset',
+ 'tasks/desert-rv/unity/ProjectSettings/GraphicsSettings.asset',
+ 'tasks/desert-rv/unity/ProjectSettings/ProjectSettings.asset')
+SETTINGS_PATH=RECOVERY_PATHS[-1]
+SETTINGS_FIELDS=('productName','defaultScreenWidth','defaultScreenHeight','resizableWindow','fullscreenMode','scriptingBackend.Standalone')
+def settings_diff(before,after):
+    result=dict(classification='UNAVAILABLE',changedFields=[],unknownLineCount=None)
+    try:
+        require(len(before)<=4*1024**2 and len(after)<=4*1024**2);a=before.decode('utf-8');b=after.decode('utf-8');masked=[];fields=[]
+        for text in (a,b):
+            values={}
+            for key in SETTINGS_FIELDS[:-1]:
+                pattern=r'(?m)^  '+key+r':[^\n]*$';found=re.findall(pattern,text);require(len(found)==1);values[key]=found[0];text=re.sub(pattern,'  '+key+': <CONTROLLED>',text)
+            backend=re.search(r'(?m)^  scriptingBackend:\n((?:    [^\n]*\n)*)',text);require(backend is not None)
+            block=backend.group(1);found=re.findall(r'(?m)^    Standalone:[^\n]*$',block);require(len(found)==1);values['scriptingBackend.Standalone']=found[0]
+            replaced=re.sub(r'(?m)^    Standalone:[^\n]*$','    Standalone: <CONTROLLED>',block)
+            text=text[:backend.start(1)]+replaced+text[backend.end(1):];masked.append(text);fields.append(values)
+        result['changedFields']=[key for key in SETTINGS_FIELDS if fields[0][key]!=fields[1][key]]
+        result['classification']='NO_CHANGE' if before==after else 'OWNED_FIELDS_ONLY' if masked[0]==masked[1] else 'OTHER_SETTINGS_CHANGE'
+        difference=difflib.SequenceMatcher(None,masked[0].splitlines(),masked[1].splitlines(),autojunk=False)
+        result['unknownLineCount']=sum(max(j-i,l-k) for tag,i,j,k,l in difference.get_opcodes() if tag!='equal')
+        if result['classification']=='OTHER_SETTINGS_CHANGE':result['unknownLineCount']=max(1,result['unknownLineCount'])
+    except Exception:pass
+    return result
+
+def empty_recovery():return dict(status='UNAVAILABLE',before=empty_source(),settingsDiff=dict(classification='UNAVAILABLE',changedFields=[],unknownLineCount=None),settingsBackupRestored=False,sourceModesRestored=False,afterPreserved=False)
+def validate_recovery(value):
+    require(isinstance(value,dict) and set(value)==set(empty_recovery()) and value['status'] in {'UNAVAILABLE','SUCCEEDED','FAILED'})
+    validate_source(value['before']);diff=value['settingsDiff'];require(isinstance(diff,dict) and set(diff)=={'classification','changedFields','unknownLineCount'})
+    require(diff['classification'] in {'UNAVAILABLE','NO_CHANGE','OWNED_FIELDS_ONLY','OTHER_SETTINGS_CHANGE'})
+    require(isinstance(diff['changedFields'],list) and diff['changedFields']==[key for key in SETTINGS_FIELDS if key in diff['changedFields']])
+    require(diff['unknownLineCount'] is None or type(diff['unknownLineCount']) is int and 0<=diff['unknownLineCount']<=1000000)
+    if diff['classification']=='NO_CHANGE':require(diff['changedFields']==[] and diff['unknownLineCount']==0)
+    if diff['classification']=='OWNED_FIELDS_ONLY':require(bool(diff['changedFields']) and diff['unknownLineCount']==0)
+    if diff['classification']=='OTHER_SETTINGS_CHANGE':require(type(diff['unknownLineCount']) is int and diff['unknownLineCount']>0)
+    if diff['classification']=='UNAVAILABLE':require(diff['unknownLineCount'] is None)
+    for key in ('settingsBackupRestored','sourceModesRestored','afterPreserved'):require(type(value[key]) is bool)
+    if value['status']=='SUCCEEDED':require(value['sourceModesRestored'] and value['afterPreserved'])
+    return value
+
+def snapshot_recovery(logs):
+    logs=safe(logs,False);before=read_json(TASK/'player-source-before.json');manifest=read_json(TASK/'SOURCE-STATE.json');declared={row['path']:row['sha256'] for row in manifest['files']};require(set(RECOVERY_PATHS)<=declared_names())
+    snapshot={}
+    for name in RECOVERY_PATHS:
+        file=safe(ROOT/name);digest=sha(file);mode=file.stat().st_mode & 0o777
+        require(digest==before[name]==declared[name] and mode==0o644)
+        snapshot[name]=dict(sha256=digest,mode=mode)
+    backup=safe(logs/'ProjectSettings.original',False);require(not backup.exists());shutil.copyfile(safe(ROOT/SETTINGS_PATH),backup)
+    atomic(logs/'source-recovery-before.json',snapshot)
+
+def recover_source(logs):
+    logs=safe(logs,False);result=empty_recovery();result['status']='FAILED';result['before']=source_diagnostic()
+    try:
+        snapshot=read_json(logs/'source-recovery-before.json');require(isinstance(snapshot,dict) and set(snapshot)==set(RECOVERY_PATHS) and set(RECOVERY_PATHS)<=declared_names())
+        original_hashes=read_json(TASK/'player-source-before.json')
+        for name,item in snapshot.items():require(set(item)=={'sha256','mode'} and item['sha256']==original_hashes[name] and type(item['mode']) is int and item['mode']==0o644)
+        backup=safe(logs/'ProjectSettings.original');require(sha(backup)==snapshot[SETTINGS_PATH]['sha256']);target=safe(ROOT/SETTINGS_PATH)
+        original=backup.read_bytes();observed=target.read_bytes();result['settingsDiff']=settings_diff(original,observed)
+        # Preserve observed hashes/classification BEFORE restoring this one explicitly owned settings file.
+        EVIDENCE.mkdir(exist_ok=True);atomic(EVIDENCE/'source-recovery.json',validate_recovery(result))
+        if sha(target)!=snapshot[SETTINGS_PATH]['sha256']:
+            temporary=safe(target.with_name(target.name+'.desertrv-restore.tmp'),False);require(not temporary.exists());temporary.write_bytes(original);os.replace(temporary,target);require(sha(target)==snapshot[SETTINGS_PATH]['sha256']);result['settingsBackupRestored']=True
+        for name in RECOVERY_PATHS:
+            file=safe(ROOT/name);require(sha(file)==snapshot[name]['sha256']);os.chmod(file,snapshot[name]['mode']);require((file.stat().st_mode & 0o777)==snapshot[name]['mode'])
+        result['sourceModesRestored']=True;source_unchanged();result['afterPreserved']=True;result['status']='SUCCEEDED'
+    except Exception:pass
+    EVIDENCE.mkdir(exist_ok=True);atomic(EVIDENCE/'source-recovery.json',validate_recovery(result))
+    return 0 if result['status']=='SUCCEEDED' else 1
+
 def source_unchanged():require(read_json(TASK/'player-source-before.json')==tracked())
 def tree_hash(root):
     records=[]
@@ -128,9 +202,17 @@ def verify_player(pid,exe,argv):
     raw=pathlib.Path('/proc',str(pid),'cmdline').read_bytes()
     require(raw.endswith(b'\0') and raw[:-1].decode().split('\0')==argv)
 
+def prepare_capture_evidence():
+    directory=safe(EVIDENCE,False)
+    require(directory.is_dir() and {entry.name for entry in directory.iterdir()}=={'build-diagnostic.json','source-recovery.json'})
+    require(validate_build(read_json(directory/'build-diagnostic.json'))['failureCode']=='NONE')
+    require(validate_recovery(read_json(directory/'source-recovery.json'))['status']=='SUCCEEDED')
+    return directory
+
 def capture(folder,private):
     source_unchanged();exe,build=verify_build(folder);build_tree=tree_hash(folder)
-    h=safe(private,False)/'handshake';h.mkdir();EVIDENCE.mkdir()
+    prepare_capture_evidence()
+    h=safe(private,False)/'handshake';h.mkdir()
     env=dict(os.environ)
     for key in ('UNITY_LICENSE','UNITY_EMAIL','UNITY_PASSWORD','UNITY_SERIAL'):env.pop(key,None)
     env['DESERTRV_PLAYER_HANDSHAKE']=str(h)
@@ -200,11 +282,11 @@ def export():
     require(not PUBLIC.exists());stage=pathlib.Path(tempfile.mkdtemp(prefix='player-export-',dir=TASK));success=False
     try:
         c=read_json(TASK/'player-control.json')
-        require(set(c)=={'activation','build','player','licenseReturn','privateCleanup','buildDiagnostic','captureFailureCode','containerSource'})
-        validate_build(c['buildDiagnostic']);validate_source(c['containerSource']);require(c['captureFailureCode'] in PLAYER_FAILURES|{'NONE'})
+        require(set(c)=={'activation','build','player','licenseReturn','privateCleanup','buildDiagnostic','captureFailureCode','containerSource','sourceRecovery'})
+        validate_build(c['buildDiagnostic']);validate_source(c['containerSource']);validate_recovery(c['sourceRecovery']);require(c['captureFailureCode'] in PLAYER_FAILURES|{'NONE'})
         states=[c[k] for k in ('activation','build','player','licenseReturn','privateCleanup')]
         allowed={'NOT_ATTEMPTED','SUCCEEDED','FAILED'};require(all(v in allowed for v in states))
-        ok=os.environ.get('NATIVE_OUTCOME')=='success' and all(v=='SUCCEEDED' for v in states) and c['captureFailureCode']=='NONE' and c['buildDiagnostic']['failureCode']=='NONE'
+        ok=os.environ.get('NATIVE_OUTCOME')=='success' and all(v=='SUCCEEDED' for v in states) and c['captureFailureCode']=='NONE' and c['buildDiagnostic']['failureCode']=='NONE' and c['sourceRecovery']['status']=='SUCCEEDED'
         try:source_unchanged();preserved=True
         except Exception:preserved=False
         ok=ok and preserved
@@ -235,6 +317,7 @@ def export():
             failure='NATIVE_PROCESS_NOT_SUCCESS'
             if c['buildDiagnostic']['failureCode']!='NONE':failure=c['buildDiagnostic']['failureCode']
             if c['captureFailureCode']!='NONE':failure=c['captureFailureCode']
+            if c['sourceRecovery']['status']=='FAILED':failure='SOURCE_RECOVERY_FAILED'
             if not preserved:failure='SOURCE_PRESERVATION_FAILED'
             atomic(stage/'status.json',dict(mode=MODE,status='FAILED_NOT_ACCEPTED',failureCode=failure,videoExported=False,sourcePreserved=preserved,hostSource=source_diagnostic(),control=c))
         os.replace(stage,PUBLIC);success=True
@@ -247,7 +330,9 @@ def main():
         command=sys.argv[1]
         if command=='before':
             require(not PUBLIC.exists() and not EVIDENCE.exists() and not (TASK/'player-control.json').exists());atomic(TASK/'player-source-before.json',tracked())
-        elif command=='build-diagnostic':record_build(pathlib.Path(sys.argv[2]))
+        elif command=='snapshot-recovery':snapshot_recovery(pathlib.Path(sys.argv[2]))
+        elif command=='recover-source':return recover_source(pathlib.Path(sys.argv[2]))
+        elif command=='build-diagnostic':record_build(pathlib.Path(sys.argv[2]),int(sys.argv[3]))
         elif command=='capture':return capture(pathlib.Path(sys.argv[2]),pathlib.Path(sys.argv[3]))
         elif command=='control':
             fixed_control(sys.argv[2:])

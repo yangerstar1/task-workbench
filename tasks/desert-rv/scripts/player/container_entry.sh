@@ -36,14 +36,17 @@ if timeout --signal=TERM --kill-after=15s 12m bash -c 'source /gameci/platforms/
 export DESERTRV_PLAYER_BUILD="$private/build/DesertRV.x86_64"
 export DESERTRV_PLAYER_DIAGNOSTIC="$private/build-diagnostic-native.json"
 cd /github/workspace/tasks/desert-rv/unity
-if timeout --signal=TERM --kill-after=30s 25m unity-editor -projectPath "$PWD" -executeMethod DesertRV.Editor.PlayerBuild.BuildLinuxWindowSmoke -quit -force-glcore -job-worker-count 2 -logFile "$private/editor.log" >"$private/rendered.log" 2>&1; then
-  built=SUCCEEDED
+python3 "$scripts/player/player_window_smoke.py" snapshot-recovery "$private" >/dev/null 2>&1
+if timeout --signal=TERM --kill-after=30s 65m unity-editor -projectPath "$PWD" -executeMethod DesertRV.Editor.PlayerBuild.BuildLinuxWindowSmoke -quit -force-glcore -job-worker-count 2 -logFile "$private/editor.log" >"$private/rendered.log" 2>&1; then
+  build_exit=0; built=SUCCEEDED
 else
-  built=FAILED
+  build_exit=$?; built=FAILED
 fi
 # Persist only validated build facts BEFORE private cleanup, including executeMethod-not-entered compile failures.
-if ! python3 "$scripts/player/player_window_smoke.py" build-diagnostic "$private" >/dev/null 2>&1; then built=FAILED; exit 1; fi
-[[ "$built" == SUCCEEDED ]] || exit 1
+diagnostic_ok=1
+if ! python3 "$scripts/player/player_window_smoke.py" build-diagnostic "$private" "$build_exit" >/dev/null 2>&1; then diagnostic_ok=0; fi
+if ! python3 "$scripts/player/player_window_smoke.py" recover-source "$private" >/dev/null 2>&1; then exit 1; fi
+[[ "$built" == SUCCEEDED && "$diagnostic_ok" == 1 ]] || exit 1
 export DISPLAY=:91
 Xvfb "$DISPLAY" -screen 0 1600x1000x24 -nolisten tcp >"$private/xvfb.log" 2>&1 & xvfb_pid=$!
 for attempt in $(seq 1 50); do if xdpyinfo -display "$DISPLAY" >/dev/null 2>&1; then break; fi; sleep .1; done

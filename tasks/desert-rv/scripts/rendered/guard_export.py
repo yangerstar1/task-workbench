@@ -46,6 +46,12 @@ def main():
     try:
         if subprocess.run(['git','diff','--quiet','--exit-code'],cwd=ROOT).returncode or subprocess.run(['git','diff','--cached','--quiet','--exit-code'],cwd=ROOT).returncode:
             code='PROTECTED_SOURCE_CHANGED';raise ValueError()
+        if os.environ.get('RENDER_MODE')=='journey':
+            try:
+                import prepared_source
+                prepared_source.verify()
+            except Exception:
+                code='PREPARED_SOURCE_CHANGED';raise ValueError()
         try:control=read_control(TASK/'rendered-control-export/status.json')
         except Exception:control=None
         # Detail visibility does not grant success: preserve the actual native outcome gate.

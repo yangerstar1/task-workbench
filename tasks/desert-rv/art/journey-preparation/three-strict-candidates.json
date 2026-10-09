@@ -1,0 +1,333 @@
+{
+  "schema": 1,
+  "sources": [
+    {
+      "kind": "armored",
+      "contract": "tasks/desert-rv/art/import-candidate/contracts/armored-full-strict-37850840062.json",
+      "sha256": "77cc8af4f6ae48d1226e5882de2f9c26fb4ce71dca2c3a07924428316bde7b0b"
+    },
+    {
+      "kind": "pouncer",
+      "contract": "tasks/desert-rv/art/import-candidate/contracts/pouncer-full-strict-37856618820.json",
+      "sha256": "0e2dd6db31f8579504ed1004b7fe7fc5d48c7b3c20b075a46f66bab396b8766f"
+    },
+    {
+      "kind": "weapon",
+      "contract": "tasks/desert-rv/art/import-candidate/contracts/weapon-combined-strict-37849553855.json",
+      "sha256": "586078060dfae95e41914da6c05494a5205b4e88d3860875520de649f9044d85"
+    }
+  ],
+  "fx": {
+    "schema": 1,
+    "id": "original-journey-fx-r1",
+    "sourceCommit": "",
+    "flashLifetimeSeconds": 0.045,
+    "flashDiameterMeters": 0.065,
+    "flashSpeedMetersPerSecond": 0.4,
+    "flashColor": {
+      "r": 1,
+      "g": 0.58,
+      "b": 0.16,
+      "a": 1
+    },
+    "arcWidthMeters": 0.018,
+    "impactLifetimeSeconds": 0.12,
+    "impactDiameterMeters": 0.035,
+    "impactSpeedMetersPerSecond": 0.3,
+    "arcColor": {
+      "r": 0.15,
+      "g": 0.65,
+      "b": 1,
+      "a": 1
+    },
+    "arcSlots": 6,
+    "arcSound": {
+      "path": "Assets/DesertRV/Audio/arc.wav",
+      "sha256": "",
+      "dependencyHash": "",
+      "dependencySha256": ""
+    }
+  },
+  "integration": {
+    "schema": 1,
+    "label": "STRICT_CANDIDATES_BOUND_UNREVIEWED",
+    "sourceCommit": "",
+    "candidates": [],
+    "savedInputs": [
+      {
+        "path": "Assets/DesertRV/Scenes/Journey/JourneyBootstrap.unity",
+        "sha256": "",
+        "dependencyHash": "",
+        "dependencySha256": ""
+      },
+      {
+        "path": "Assets/DesertRV/Scenes/Journey/FirstStation.unity",
+        "sha256": "",
+        "dependencyHash": "",
+        "dependencySha256": ""
+      },
+      {
+        "path": "Assets/DesertRV/Scenes/Journey/Scrapyard.unity",
+        "sha256": "",
+        "dependencyHash": "",
+        "dependencySha256": ""
+      },
+      {
+        "path": "Assets/DesertRV/Scenes/Journey/NightBeacon.unity",
+        "sha256": "",
+        "dependencyHash": "",
+        "dependencySha256": ""
+      },
+      {
+        "path": "Assets/DesertRV/Scenes/Journey/JourneyContent.asset",
+        "sha256": "",
+        "dependencyHash": "",
+        "dependencySha256": ""
+      }
+    ],
+    "muzzleFlashPrefab": {
+      "path": "",
+      "sha256": "",
+      "dependencyHash": "",
+      "dependencySha256": ""
+    },
+    "arcPresentationPrefab": {
+      "path": "",
+      "sha256": "",
+      "dependencyHash": "",
+      "dependencySha256": ""
+    },
+    "weaponCameraPose": {
+      "localPosition": {
+        "x": 0.749840021,
+        "y": -0.446830004,
+        "z": 2.446929932
+      },
+      "localRotation": {
+        "x": -0.26757446,
+        "y": 0.863942266,
+        "z": -0.044380691,
+        "w": 0.424308878
+      },
+      "localScale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "flashMuzzlePose": {
+      "localPosition": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "localScale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      },
+      "localRotation": {
+        "x": 0,
+        "y": 0,
+        "z": 0,
+        "w": 1
+      }
+    },
+    "arcModulePose": null,
+    "sounds": [
+      {
+        "role": "shot",
+        "clip": {
+          "path": "Assets/DesertRV/Audio/shot.wav",
+          "sha256": "",
+          "dependencyHash": "",
+          "dependencySha256": ""
+        }
+      },
+      {
+        "role": "hit",
+        "clip": {
+          "path": "Assets/DesertRV/Audio/hit.wav",
+          "sha256": "",
+          "dependencyHash": "",
+          "dependencySha256": ""
+        }
+      },
+      {
+        "role": "reload",
+        "clip": {
+          "path": "Assets/DesertRV/Audio/reload.wav",
+          "sha256": "",
+          "dependencyHash": "",
+          "dependencySha256": ""
+        }
+      },
+      {
+        "role": "pickup",
+        "clip": {
+          "path": "Assets/DesertRV/Audio/pickup.wav",
+          "sha256": "",
+          "dependencyHash": "",
+          "dependencySha256": ""
+        }
+      },
+      {
+        "role": "upgrade",
+        "clip": {
+          "path": "Assets/DesertRV/Audio/upgrade.wav",
+          "sha256": "",
+          "dependencyHash": "",
+          "dependencySha256": ""
+        }
+      },
+      {
+        "role": "wind",
+        "clip": {
+          "path": "Assets/DesertRV/Audio/wind.wav",
+          "sha256": "",
+          "dependencyHash": "",
+          "dependencySha256": ""
+        }
+      },
+      {
+        "role": "arc",
+        "clip": {
+          "path": "Assets/DesertRV/Audio/arc.wav",
+          "sha256": "",
+          "dependencyHash": "",
+          "dependencySha256": ""
+        }
+      }
+    ],
+    "regions": [
+      {
+        "region": 1,
+        "guards": [
+          {
+            "id": "first-station/guard-1",
+            "kind": "pouncer",
+            "position": {
+              "x": -6,
+              "y": 0,
+              "z": 18
+            },
+            "yaw": 180
+          },
+          {
+            "id": "first-station/guard-2",
+            "kind": "pouncer",
+            "position": {
+              "x": 6,
+              "y": 0,
+              "z": 24
+            },
+            "yaw": 180
+          }
+        ],
+        "roadBeasts": [
+          {
+            "id": "first-station/road-armored",
+            "kind": "armored",
+            "position": {
+              "x": 0,
+              "y": 0,
+              "z": 39
+            },
+            "yaw": 180
+          }
+        ],
+        "waves": []
+      },
+      {
+        "region": 2,
+        "guards": [],
+        "roadBeasts": [],
+        "waves": [
+          {
+            "enemies": [
+              {
+                "id": "region-2/wave-1-pouncer-1",
+                "kind": "pouncer",
+                "position": {
+                  "x": -7,
+                  "y": 0,
+                  "z": 33
+                },
+                "yaw": 180
+              },
+              {
+                "id": "region-2/wave-1-pouncer-2",
+                "kind": "pouncer",
+                "position": {
+                  "x": 7,
+                  "y": 0,
+                  "z": 39
+                },
+                "yaw": 180
+              }
+            ]
+          },
+          {
+            "enemies": [
+              {
+                "id": "region-2/wave-2-armored",
+                "kind": "armored",
+                "position": {
+                  "x": -5,
+                  "y": 0,
+                  "z": 43
+                },
+                "yaw": 180
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "region": 3,
+        "guards": [],
+        "roadBeasts": [],
+        "waves": [
+          {
+            "enemies": [
+              {
+                "id": "region-3/wave-1-pouncer-1",
+                "kind": "pouncer",
+                "position": {
+                  "x": -7,
+                  "y": 0,
+                  "z": 33
+                },
+                "yaw": 180
+              },
+              {
+                "id": "region-3/wave-1-pouncer-2",
+                "kind": "pouncer",
+                "position": {
+                  "x": 7,
+                  "y": 0,
+                  "z": 39
+                },
+                "yaw": 180
+              }
+            ]
+          },
+          {
+            "enemies": [
+              {
+                "id": "region-3/wave-2-armored",
+                "kind": "armored",
+                "position": {
+                  "x": -5,
+                  "y": 0,
+                  "z": 43
+                },
+                "yaw": 180
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

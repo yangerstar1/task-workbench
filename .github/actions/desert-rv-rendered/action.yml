@@ -42,7 +42,11 @@ runs:
         PLAN_SHA256: ${{ inputs.plan_sha256 }}
         RENDER_MODE: ${{ inputs.mode }}
       run: |
-        python3 tasks/desert-rv/scripts/verify_evidence.py guard
+        if [[ "$RENDER_MODE" == journey ]]; then
+          python3 tasks/desert-rv/scripts/rendered/prepared_source.py
+        else
+          python3 tasks/desert-rv/scripts/verify_evidence.py guard
+        fi
         python3 tasks/desert-rv/scripts/rendered/verify_inputs.py --mode "$RENDER_MODE"
     - name: Read the exact already-used official licensing implementation
       uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
@@ -100,4 +104,5 @@ runs:
       shell: bash
       env:
         NATIVE_OUTCOME: ${{ steps.native.outcome }}
+        RENDER_MODE: ${{ inputs.mode }}
       run: python3 tasks/desert-rv/scripts/rendered/guard_export.py
