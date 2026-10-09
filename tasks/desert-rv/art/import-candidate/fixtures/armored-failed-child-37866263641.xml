@@ -1,0 +1,95 @@
+<test-run id="2" testcasecount="6" result="Failed(Child)" total="6" passed="5" failed="1" inconclusive="0" skipped="0" asserts="0" engine-version="3.5.0.0" clr-version="4.0.30319.42000" start-time="2026-10-09 00:56:00Z" end-time="2026-10-09 00:56:10Z" duration="10.6789209">
+  <test-suite type="TestSuite" id="1000" name="Desert RV - Technical Preflight" fullname="Desert RV - Technical Preflight" runstate="Runnable" testcasecount="181" result="Failed" site="Child" start-time="2026-10-09 00:56:00Z" end-time="2026-10-09 00:56:10Z" duration="10.678921" total="6" passed="5" failed="1" inconclusive="0" skipped="0" asserts="0">
+    <properties>
+      <property name="platform" value="EditMode" />
+    </properties>
+    <failure>
+      <message><![CDATA[One or more child tests had errors]]></message>
+    </failure>
+    <test-suite type="Assembly" id="1009" name="DesertRV.CandidateArtTests.dll" fullname="/github/workspace/tasks/desert-rv/unity/Library/ScriptAssemblies/DesertRV.CandidateArtTests.dll" runstate="Runnable" testcasecount="6" result="Failed" site="Child" start-time="2026-10-09 00:56:00Z" end-time="2026-10-09 00:56:10Z" duration="10.668248" total="6" passed="5" failed="1" inconclusive="0" skipped="0" asserts="0">
+      <properties>
+        <property name="_PID" value="1726" />
+        <property name="_APPDOMAIN" value="Unity Child Domain" />
+        <property name="platform" value="EditMode" />
+        <property name="EditorOnly" value="True" />
+      </properties>
+      <failure>
+        <message><![CDATA[One or more child tests had errors]]></message>
+      </failure>
+      <test-suite type="TestSuite" id="1010" name="DesertRV" fullname="DesertRV" runstate="Runnable" testcasecount="6" result="Failed" site="Child" start-time="2026-10-09 00:56:00Z" end-time="2026-10-09 00:56:10Z" duration="10.667606" total="6" passed="5" failed="1" inconclusive="0" skipped="0" asserts="0">
+        <properties />
+        <failure>
+          <message><![CDATA[One or more child tests had errors]]></message>
+        </failure>
+        <test-suite type="TestSuite" id="1011" name="Tests" fullname="DesertRV.Tests" runstate="Runnable" testcasecount="6" result="Failed" site="Child" start-time="2026-10-09 00:56:00Z" end-time="2026-10-09 00:56:10Z" duration="10.667174" total="6" passed="5" failed="1" inconclusive="0" skipped="0" asserts="0">
+          <properties />
+          <failure>
+            <message><![CDATA[One or more child tests had errors]]></message>
+          </failure>
+          <test-suite type="TestFixture" id="1001" name="CandidateAnimationPolicyTests" fullname="DesertRV.Tests.CandidateAnimationPolicyTests" classname="DesertRV.Tests.CandidateAnimationPolicyTests" runstate="Runnable" testcasecount="5" result="Passed" start-time="2026-10-09 00:56:00Z" end-time="2026-10-09 00:56:00Z" duration="0.161396" total="5" passed="5" failed="0" inconclusive="0" skipped="0" asserts="0">
+            <properties />
+            <test-case id="1006" name="EqualKeyValuesDoNotExcuseUnsafeTangents" fullname="DesertRV.Tests.CandidateAnimationPolicyTests.EqualKeyValuesDoNotExcuseUnsafeTangents" methodname="EqualKeyValuesDoNotExcuseUnsafeTangents" classname="DesertRV.Tests.CandidateAnimationPolicyTests" runstate="Runnable" seed="1135786697" result="Passed" start-time="2026-10-09 00:56:00Z" end-time="2026-10-09 00:56:00Z" duration="0.013117" asserts="0">
+              <properties>
+                <property name="retryIteration" value="0" />
+                <property name="repeatIteration" value="0" />
+              </properties>
+            </test-case>
+            <test-case id="1005" name="MissingNativeAnimatorGetsCreatedAndReused" fullname="DesertRV.Tests.CandidateAnimationPolicyTests.MissingNativeAnimatorGetsCreatedAndReused" methodname="MissingNativeAnimatorGetsCreatedAndReused" classname="DesertRV.Tests.CandidateAnimationPolicyTests" runstate="Runnable" seed="774441350" result="Passed" start-time="2026-10-09 00:56:00Z" end-time="2026-10-09 00:56:00Z" duration="0.006542" asserts="0">
+              <properties>
+                <property name="retryIteration" value="0" />
+                <property name="repeatIteration" value="0" />
+              </properties>
+            </test-case>
+            <test-case id="1004" name="OnlyArmoredAttackGetsTheSourceLoopException" fullname="DesertRV.Tests.CandidateAnimationPolicyTests.OnlyArmoredAttackGetsTheSourceLoopException" methodname="OnlyArmoredAttackGetsTheSourceLoopException" classname="DesertRV.Tests.CandidateAnimationPolicyTests" runstate="Runnable" seed="300394425" result="Passed" start-time="2026-10-09 00:56:00Z" end-time="2026-10-09 00:56:00Z" duration="0.000806" asserts="0">
+              <properties>
+                <property name="retryIteration" value="0" />
+                <property name="repeatIteration" value="0" />
+              </properties>
+            </test-case>
+            <test-case id="1003" name="OpenCoreEmissionSurvivesRealSaveReimportAndReload" fullname="DesertRV.Tests.CandidateAnimationPolicyTests.OpenCoreEmissionSurvivesRealSaveReimportAndReload" methodname="OpenCoreEmissionSurvivesRealSaveReimportAndReload" classname="DesertRV.Tests.CandidateAnimationPolicyTests" runstate="Runnable" seed="2078676914" result="Passed" start-time="2026-10-09 00:56:00Z" end-time="2026-10-09 00:56:00Z" duration="0.122978" asserts="0">
+              <properties>
+                <property name="retryIteration" value="0" />
+                <property name="repeatIteration" value="0" />
+              </properties>
+            </test-case>
+            <test-case id="1002" name="RenderTargetCleanupDetachesCameraBeforeDestroy" fullname="DesertRV.Tests.CandidateAnimationPolicyTests.RenderTargetCleanupDetachesCameraBeforeDestroy" methodname="RenderTargetCleanupDetachesCameraBeforeDestroy" classname="DesertRV.Tests.CandidateAnimationPolicyTests" runstate="Runnable" seed="1877728616" result="Passed" start-time="2026-10-09 00:56:00Z" end-time="2026-10-09 00:56:00Z" duration="0.001626" asserts="0">
+              <properties>
+                <property name="retryIteration" value="0" />
+                <property name="repeatIteration" value="0" />
+              </properties>
+            </test-case>
+          </test-suite>
+          <test-suite type="TestFixture" id="1007" name="CandidateArtImportTests" fullname="DesertRV.Tests.CandidateArtImportTests" classname="DesertRV.Tests.CandidateArtImportTests" runstate="Runnable" testcasecount="1" result="Failed" site="Child" start-time="2026-10-09 00:56:00Z" end-time="2026-10-09 00:56:10Z" duration="10.504192" total="1" passed="0" failed="1" inconclusive="0" skipped="0" asserts="0">
+            <properties />
+            <failure>
+              <message><![CDATA[One or more child tests had errors]]></message>
+            </failure>
+            <test-case id="1008" name="ExecutePinnedDiscoveryOrBindingDiagnostics" fullname="DesertRV.Tests.CandidateArtImportTests.ExecutePinnedDiscoveryOrBindingDiagnostics" methodname="ExecutePinnedDiscoveryOrBindingDiagnostics" classname="DesertRV.Tests.CandidateArtImportTests" runstate="Runnable" seed="578730653" result="Failed" label="Error" start-time="2026-10-09 00:56:00Z" end-time="2026-10-09 00:56:10Z" duration="10.502636" asserts="0">
+              <properties>
+                <property name="retryIteration" value="0" />
+                <property name="repeatIteration" value="0" />
+              </properties>
+              <failure>
+                <message><![CDATA[System.Reflection.TargetInvocationException : Exception has been thrown by the target of an invocation.
+  ----> System.InvalidOperationException : Ground penetration exceeds 0.004m: Attack-0.25-Recover-0.049 minY=-4.15903473 referenceY=0]]></message>
+                <stack-trace><![CDATA[  at System.Reflection.RuntimeMethodInfo.Invoke (System.Object obj, System.Reflection.BindingFlags invokeAttr, System.Reflection.Binder binder, System.Object[] parameters, System.Globalization.CultureInfo culture) [0x00083] in <e605204d165a49d89ae7579f3d894429>:0 
+  at System.Reflection.MethodBase.Invoke (System.Object obj, System.Object[] parameters) [0x00000] in <e605204d165a49d89ae7579f3d894429>:0 
+  at DesertRV.Tests.CandidateArtImportTests.ExecutePinnedDiscoveryOrBindingDiagnostics () [0x001ac] in /github/workspace/tasks/desert-rv/unity/Assets/DesertRV/Tests/CandidateArt/CandidateArtImportTests.cs:23 
+  at (wrapper managed-to-native) System.Reflection.RuntimeMethodInfo.InternalInvoke(System.Reflection.RuntimeMethodInfo,object,object[],System.Exception&)
+  at System.Reflection.RuntimeMethodInfo.Invoke (System.Object obj, System.Reflection.BindingFlags invokeAttr, System.Reflection.Binder binder, System.Object[] parameters, System.Globalization.CultureInfo culture) [0x0006a] in <e605204d165a49d89ae7579f3d894429>:0 
+--InvalidOperationException
+  at DesertRV.Editor.JourneyCandidateArtCapture+<>c__DisplayClass2_1.<ImportAndCapture>g__Capture|5 (System.String label, System.String state, System.Single advance) [0x00488] in /github/workspace/tasks/desert-rv/unity/Assets/DesertRV/Editor/JourneyCandidateArtCapture.cs:164 
+  at DesertRV.Editor.JourneyCandidateArtCapture+<>c__DisplayClass2_1.<ImportAndCapture>g__Sequence|4 (System.String label, System.String state) [0x00034] in /github/workspace/tasks/desert-rv/unity/Assets/DesertRV/Editor/JourneyCandidateArtCapture.cs:133 
+  at DesertRV.Editor.JourneyCandidateArtCapture.ImportAndCapture () [0x009e3] in /github/workspace/tasks/desert-rv/unity/Assets/DesertRV/Editor/JourneyCandidateArtCapture.cs:106 
+  at (wrapper managed-to-native) System.Reflection.RuntimeMethodInfo.InternalInvoke(System.Reflection.RuntimeMethodInfo,object,object[],System.Exception&)
+  at System.Reflection.RuntimeMethodInfo.Invoke (System.Object obj, System.Reflection.BindingFlags invokeAttr, System.Reflection.Binder binder, System.Object[] parameters, System.Globalization.CultureInfo culture) [0x0006a] in <e605204d165a49d89ae7579f3d894429>:0 ]]></stack-trace>
+              </failure>
+              <output><![CDATA[Saving results to: /root/.config/unity3d/Local Prototype/Desert RV - Technical Preflight/TestResults.xml
+]]></output>
+            </test-case>
+          </test-suite>
+        </test-suite>
+      </test-suite>
+    </test-suite>
+  </test-suite>
+</test-run>

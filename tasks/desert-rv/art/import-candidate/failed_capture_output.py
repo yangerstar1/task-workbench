@@ -203,7 +203,7 @@ def validate_native(snap, paths):
     require(len(reports) == 1)
     data, root = reports[0]
     cases = list(root.iter('test-case'))
-    require(root.get('result') in ('Passed', 'Failed') and len(cases) == 6
+    require(root.get('result') in ('Passed', 'Failed', 'Failed(Child)') and len(cases) == 6
             and {c.get('fullname') for c in cases} == NATIVE_NAMES)
     results = {}
     for case in cases:
@@ -217,7 +217,13 @@ def validate_native(snap, paths):
         require(start.tzinfo is not None and end.tzinfo is not None and end >= start
                 and math.isfinite(duration) and 0 <= duration <= 86400)
         results[case.attrib['fullname']] = case.attrib['result']
-    require((root.get('result') == 'Failed') == ('Failed' in results.values()))
+    require((root.get('result') in ('Failed', 'Failed(Child)')) == ('Failed' in results.values()))
+    # Unity Test Framework emits this exact aggregate spelling for child errors.
+    # It remains a failed run and must agree with all six executed case results.
+    if root.get('result') == 'Failed(Child)':
+        expected = dict(testcasecount=6, total=6, passed=sum(v == 'Passed' for v in results.values()),
+                        failed=sum(v == 'Failed' for v in results.values()), inconclusive=0, skipped=0)
+        require(all(root.get(key) == str(value) for key, value in expected.items()))
     return dict(sha256=digest(data), cases=6, passed=sum(v == 'Passed' for v in results.values()),
                 failed=sum(v == 'Failed' for v in results.values()), entryResult=results[ENTRY],
                 caseResults=[dict(fullname=name, result=results[name]) for name in sorted(NATIVE_NAMES)])

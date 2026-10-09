@@ -70,6 +70,7 @@ namespace DesertRV.Editor
                 var light=lightObject.AddComponent<Light>(); light.type=LightType.Directional; light.intensity=2; light.transform.rotation=Quaternion.Euler(40,-30,0);
                 camera.transform.position=initialBounds.center+new Vector3(1,.45f,-1).normalized*initialBounds.extents.magnitude*3.2f; camera.transform.LookAt(initialBounds.center); camera.nearClipPlane=.005f; camera.farClipPlane=150;
                 var neutralMesh=new Frame();MeasureMeshes(initialRenderers,camera,neutralMesh);
+                if(contract.kind!="weapon")LogSkinProbe("neutral-before-rebind",subject,initialRenderers);
                 if(!(neutralMesh.meshWorldSize.x>0 && neutralMesh.meshWorldSize.y>0 && neutralMesh.meshWorldSize.z>0))throw new InvalidOperationException("Degenerate actual neutral mesh world dimensions.");
                 evidence.neutralMeshWorldMin=neutralMesh.meshWorldMin;evidence.neutralMeshWorldMax=neutralMesh.meshWorldMax;evidence.neutralMeshWorldSize=neutralMesh.meshWorldSize;
                 animator.Rebind();animator.Update(0);
@@ -160,6 +161,8 @@ namespace DesertRV.Editor
                     MeasureMeshes(renderers,camera,frame);
                     frame.meshSizeRatioToNeutral=new Vector3(frame.meshWorldSize.x/evidence.neutralMeshWorldSize.x,frame.meshWorldSize.y/evidence.neutralMeshWorldSize.y,frame.meshWorldSize.z/evidence.neutralMeshWorldSize.z);
                     evidence.frames.Add(frame);
+                    if(frame.groundDiagnosticApplicable && (evidence.frames.Count==1 || frame.worldMinY<frame.groundReferenceY-.004f))
+                        LogSkinProbe(frame.requestedState,subject,renderers);
                     if(frame.groundDiagnosticApplicable && frame.worldMinY<frame.groundReferenceY-.004f)
                         throw new InvalidOperationException("Ground penetration exceeds 0.004m: "+frame.requestedState+" minY="+frame.worldMinY.ToString("G9")+" referenceY="+frame.groundReferenceY.ToString("G9"));
                 }
@@ -210,6 +213,87 @@ namespace DesertRV.Editor
                     throw new InvalidOperationException("Neutral world bounds differ from locked Discovery: "+e.path+" expected center="+e.worldCenter.ToString("G9")+" extents="+e.worldExtents.ToString("G9")+"; actual="+(matches.Length==1?("center="+matches[0].worldCenter.ToString("G9")+" extents="+matches[0].worldExtents.ToString("G9")):("matches="+matches.Length))+". Refusing to frame away a scale/pose mismatch.");
             }
         }
+        [Serializable] sealed class SkinProbeInfluence
+        {
+            public int boneIndex;public float weight;public string path;
+            public Vector3 position,scale;public Quaternion rotation;
+            public float[] localToWorld,bindPose;public Vector3 weightedWorld;
+        }
+        [Serializable] sealed class SkinProbe
+        {
+            public string phase,rendererPath,rendererType,quality,rigPath,status="observed-not-acceptance";
+            public int vertexIndex,influenceCount,blendShapeCount;public bool complete;
+            public Vector3 bakedLocal,bakedWorld,sourceLocal,weightedWorld;
+            public Vector3 rendererLocalPosition,rendererLocalScale,rendererLossyScale,rigLocalPosition,rigLocalScale;
+            public Quaternion rendererLocalRotation,rigLocalRotation;
+            public float[] rendererLocalToWorld,rigLocalToWorld;
+            public float weightSum,bakedVersusWeightedDistance;
+            public List<SkinProbeInfluence> influences=new List<SkinProbeInfluence>();
+        }
+        static float[] ProbeMatrix(Matrix4x4 m)
+        {
+            var values=new float[16];for(int row=0;row<4;row++)for(int col=0;col<4;col++)values[row*4+col]=m[row,col];return values;
+        }
+        // Bounded public-asset numeric observation only; never changes the quality gate or source pose.
+        // Independent linear skinning excludes blend shapes, explicitly reported below.
+        static void LogSkinProbe(string phase,GameObject subject,Renderer[] renderers)
+        {
+            try
+            {
+                Renderer worst=null;int index=-1;Vector3 bakedLocal=default,bakedWorld=default;float min=float.PositiveInfinity;
+                foreach(var renderer in renderers)
+                {
+                    Mesh temporary=null;
+                    try
+                    {
+                        Mesh mesh;
+                        if(renderer is SkinnedMeshRenderer skin){temporary=new Mesh();skin.BakeMesh(temporary,false);mesh=temporary;}
+                        else {var filter=renderer.GetComponent<MeshFilter>();mesh=filter?filter.sharedMesh:null;}
+                        if(!mesh || !mesh.isReadable)continue;
+                        var vertices=mesh.vertices;
+                        for(int i=0;i<vertices.Length;i++)
+                        {
+                            var world=renderer.transform.TransformPoint(vertices[i]);
+                            if(world.y<min){min=world.y;worst=renderer;index=i;bakedLocal=vertices[i];bakedWorld=world;}
+                        }
+                    }
+                    finally {if(temporary)UnityEngine.Object.DestroyImmediate(temporary);}
+                }
+                if(!worst){Debug.Log("CANDIDATE_SKIN_PROBE unavailable-no-readable-vertex");return;}
+                var t=worst.transform;
+                var probe=new SkinProbe{phase=phase,rendererPath=AnimationUtility.CalculateTransformPath(t,subject.transform),rendererType=worst.GetType().Name,vertexIndex=index,bakedLocal=bakedLocal,bakedWorld=bakedWorld,rendererLocalPosition=t.localPosition,rendererLocalRotation=t.localRotation,rendererLocalScale=t.localScale,rendererLossyScale=t.lossyScale,rendererLocalToWorld=ProbeMatrix(t.localToWorldMatrix)};
+                var rig=subject.GetComponentsInChildren<Transform>(true).FirstOrDefault(x=>x.name=="Pouncer_Rig" || x.name=="Bulwark_Rig");
+                if(rig){probe.rigPath=AnimationUtility.CalculateTransformPath(rig,subject.transform);probe.rigLocalPosition=rig.localPosition;probe.rigLocalRotation=rig.localRotation;probe.rigLocalScale=rig.localScale;probe.rigLocalToWorld=ProbeMatrix(rig.localToWorldMatrix);}
+                if(worst is SkinnedMeshRenderer skinned)
+                {
+                    var mesh=skinned.sharedMesh;var bones=skinned.bones;var poses=mesh.bindposes;
+                    probe.sourceLocal=mesh.vertices[index];probe.blendShapeCount=mesh.blendShapeCount;probe.quality=skinned.quality.ToString()+"/"+QualitySettings.skinWeights;
+                    var counts=mesh.GetBonesPerVertex();var weights=mesh.GetAllBoneWeights();
+                    try
+                    {
+                        int offset=0;for(int i=0;i<index;i++)offset+=counts[i];
+                        probe.influenceCount=counts[index];probe.complete=probe.influenceCount<=16 && probe.blendShapeCount==0;
+                        for(int i=0;i<probe.influenceCount;i++)
+                        {
+                            var bw=weights[offset+i];var bone=bones[bw.boneIndex];
+                            var world=bone.localToWorldMatrix.MultiplyPoint3x4(poses[bw.boneIndex].MultiplyPoint3x4(probe.sourceLocal))*bw.weight;
+                            probe.weightedWorld+=world;probe.weightSum+=bw.weight;
+                            if(i<16)probe.influences.Add(new SkinProbeInfluence{boneIndex=bw.boneIndex,weight=bw.weight,path=AnimationUtility.CalculateTransformPath(bone,subject.transform),position=bone.localPosition,rotation=bone.localRotation,scale=bone.localScale,localToWorld=ProbeMatrix(bone.localToWorldMatrix),bindPose=ProbeMatrix(poses[bw.boneIndex]),weightedWorld=world});
+                        }
+                        probe.bakedVersusWeightedDistance=Vector3.Distance(probe.bakedWorld,probe.weightedWorld);
+                    }
+                    finally {if(weights.IsCreated)weights.Dispose();if(counts.IsCreated)counts.Dispose();}
+                }
+                else {probe.complete=true;probe.sourceLocal=bakedLocal;probe.weightedWorld=bakedWorld;}
+                Debug.Log("CANDIDATE_SKIN_PROBE "+JsonUtility.ToJson(probe));
+            }
+            catch(Exception ex)
+            {
+                // Diagnostic failure does not mask the original native quality failure or leak raw paths/stack traces.
+                Debug.Log("CANDIDATE_SKIN_PROBE unavailable-"+ex.GetType().Name);
+            }
+        }
+
         // Actual deformed vertices, not Renderer.bounds. Measurements are diagnostics, not foot-contact approval.
         static void MeasureMeshes(Renderer[] renderers,Camera camera,Frame frame)
         {

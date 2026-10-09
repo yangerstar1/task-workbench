@@ -104,8 +104,18 @@
     },
     {
       "path": "tasks/desert-rv/art/import-candidate/failed_capture_output.py",
-      "sha256": "67171c4acee544807d705bf3a6b2dcd14e1411ea80da6f8f56055d1edbd48046",
-      "size": 31535
+      "sha256": "f0fc99438703e22bd573f6364d4c895a3edee839f545de1361c10d227bec655f",
+      "size": 32071
+    },
+    {
+      "path": "tasks/desert-rv/art/import-candidate/fixtures/armored-failed-child-37866263641.xml",
+      "sha256": "ed57bf7d7eaebb07ae22ad1f442a4b9972752d97f80b5618d14a6e78790a0f84",
+      "size": 10299
+    },
+    {
+      "path": "tasks/desert-rv/art/import-candidate/fixtures/pouncer-failed-child-37866416129.xml",
+      "sha256": "c895cea92439f8924bf3bcc1e142e088fc2aeac19fee49465a7cf7a23a572914",
+      "size": 10020
     },
     {
       "path": "tasks/desert-rv/art/import-candidate/pouncer-death-input-inventory.json",
@@ -144,8 +154,8 @@
     },
     {
       "path": "tasks/desert-rv/art/import-candidate/test_failed_capture_output.py",
-      "sha256": "51a690d037fcf2f732836c03efb1a8b163716e68a32554d76793498440d74fc9",
-      "size": 31795
+      "sha256": "f1e1fb08c7351df0152de94ebb676c013aeae837a86517ae4d67f816efa2c735",
+      "size": 34546
     },
     {
       "path": "tasks/desert-rv/art/import-candidate/test_pouncer_failed_capture.py",
@@ -3724,8 +3734,8 @@
     },
     {
       "path": "tasks/desert-rv/unity/Assets/DesertRV/Editor/JourneyCandidateArtCapture.cs",
-      "sha256": "1b7ece833bfe45ed558909d84e40ebcdd103410796388057ebacfca4573bcdb4",
-      "size": 22486
+      "sha256": "8e3f5b4f9bb450ee8beeb9e12fe311f25fe6ed41c494eff258ae0544634fff1b",
+      "size": 28715
     },
     {
       "path": "tasks/desert-rv/unity/Assets/DesertRV/Editor/JourneyCandidateArtCapture.cs.meta",

@@ -204,6 +204,51 @@ class FailedCaptureTests(unittest.TestCase):
         self.assertTrue(self.run_export(native='success'));self.assertIs(self.summary['approved'],False)
 
     def test_protected_failure_forbids_export(self): self.rejected(protected='failure')
+    def test_exact_unity_failed_child_aggregate_exports_failed_diagnostics(self):
+        self.native.write_text(native_xml().replace('<test-run result="Failed">',
+            '<test-run result="Failed(Child)" testcasecount="6" total="6" passed="5" failed="1" inconclusive="0" skipped="0">'))
+        self.assertTrue(self.run_export())
+        self.assertEqual(self.summary['status'], 'FAILED_DIAGNOSTICS')
+        self.assertIs(self.summary['approved'], False)
+        self.assertEqual(self.summary['nativeFailedCases'], 1)
+
+    def test_failed_child_aggregate_count_mismatch_and_unknown_suffix_reject(self):
+        for result, passed in [('Failed(Child)', '6'), ('Failed(Forged)', '5')]:
+            with self.subTest(result=result):
+                self.native.write_text(native_xml().replace('<test-run result="Failed">',
+                    '<test-run result="'+result+'" testcasecount="6" total="6" passed="'+passed+'" failed="1" inconclusive="0" skipped="0">'))
+                self.rejected()
+
+    def assert_actual_public_unity_failed_child_report(self, name):
+        # Original XML from public Actions logs. Only parser compatibility is
+        # proven here; the image and asset fixture remains explicitly synthetic.
+        self.native.write_bytes((Path(__file__).parent / 'fixtures' / name).read_bytes())
+        self.assertTrue(self.run_export())
+        self.assertEqual(self.summary['status'], 'FAILED_DIAGNOSTICS')
+        self.assertIs(self.summary['approved'], False)
+        self.assertEqual(self.summary['nativeFailedCases'], 1)
+
+    def test_actual_public_armored_unity_failed_child_report(self):
+        self.assert_actual_public_unity_failed_child_report('armored-failed-child-37866263641.xml')
+
+    def test_actual_public_pouncer_unity_failed_child_report(self):
+        self.assert_actual_public_unity_failed_child_report('pouncer-failed-child-37866416129.xml')
+
+    def test_actual_failed_child_rejects_each_bad_aggregate(self):
+        import xml.etree.ElementTree as ET
+        original=(Path(__file__).parent / 'fixtures' / 'armored-failed-child-37866263641.xml').read_bytes()
+        for field, value in [('testcasecount','7'),('total','5'),('passed','6'),('failed','0'),
+                             ('inconclusive','1'),('skipped','1'),('result','Failed(ChildForged)')]:
+            with self.subTest(field=field):
+                root=ET.fromstring(original);root.set(field,value)
+                self.native.write_bytes(ET.tostring(root))
+                self.rejected()
+        root=ET.fromstring(original)
+        for case in root.iter('test-case'):
+            case.set('result','Passed')
+        root.set('passed','6');root.set('failed','0')
+        self.native.write_bytes(ET.tostring(root));self.rejected()
+
     def test_cancelled_native_forbids_export(self): self.rejected(native='cancelled')
     def test_unapproved_failure_code_forbids_export(self): self.summary['errorCode']='STRICT_SCHEMA_MISMATCH';self.rejected()
     def test_raw_exception_code_forbids_export(self): self.summary['errorCode']='at /secret/path token=SECRET';self.rejected()
