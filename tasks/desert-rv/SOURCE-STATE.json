@@ -377,8 +377,8 @@
     },
     {
       "path": "tasks/desert-rv/art/journey-preparation/test_pipeline.py",
-      "sha256": "28e27c70dfa08881e166783239565945e8e6aa481da72ef115aaab754c7b3f11",
-      "size": 24640
+      "sha256": "3790fcab81d9b6a7b6dd60319a7402c397f69cc3acfa0e3f3a47601f35c5afc9",
+      "size": 25570
     },
     {
       "path": "tasks/desert-rv/art/journey-preparation/three-strict-candidates.json",

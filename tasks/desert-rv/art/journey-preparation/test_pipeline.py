@@ -202,15 +202,23 @@ class PipelineTests(unittest.TestCase):
         p.verify_snapshot(sources) # The real original was not changed to make the test pass.
     def test_workflow_uses_one_workspace_and_unchanged_strict_test_assembly(self):
         source=(ORIGINAL_REPO/'.github/workflows/desert-rv-journey-prepare.yml').read_text()
-        self.assertEqual(source.count('projectPath: tasks/desert-rv/unity'),4)
+        self.assertEqual(source.count('projectPath: tasks/desert-rv/unity'),5)
         self.assertEqual(source.count('-assemblyNames DesertRV.CandidateArtTests'),3)
         self.assertEqual(source.count('-assemblyNames DesertRV.JourneyPreparationTests'),1)
+        self.assertEqual(source.count('-assemblyNames DesertRV.CandidateLinuxTests'),1)
+        native_steps=['id: armored','id: pouncer','id: weapon','id: linux_boundary','linux_build_input.py verify-boundary','id: author']
+        self.assertEqual([source.index(step) for step in native_steps],sorted(source.index(step) for step in native_steps))
         self.assertNotIn('download-artifact',source);self.assertNotIn('strategy:',source)
-    def test_optional_pilot_uploads_only_the_existing_guarded_directory(self):
+    def test_build_only_uploads_guarded_player_and_rejects_unobserved_input_plan(self):
         source=(ORIGINAL_REPO/'.github/workflows/desert-rv-journey-prepare.yml').read_text()
-        self.assertIn('id: rendered',source);self.assertIn("if: always() && steps.rendered.outputs.export_ready == 'true'",source)
-        self.assertIn('path: tasks/desert-rv/rendered-public-export/',source)
+        self.assertIn('assert not os.getenv("INPUT_PLAN") and not os.getenv("PLAN_SHA256")',source)
+        self.assertNotIn('id: rendered',source);self.assertNotIn('uses: ./.github/actions/desert-rv-rendered',source)
+        self.assertIn("if: always() && steps.linux_public.outputs.export_ready == 'true'",source)
+        self.assertIn('path: tasks/desert-rv/journey-linux-public-export/',source)
+        self.assertNotIn('path: tasks/desert-rv/journey-linux-private-build',source)
         self.assertNotIn('path: tasks/desert-rv/rendered-private-evidence',source)
+        calls=['id: finish','linux_build_input.py prepare','journey_linux_export.py before','journey_linux_container.sh','linux_build_input.py verify\n','journey_linux_export.py export']
+        self.assertEqual([source.index(call) for call in calls],sorted(source.index(call) for call in calls))
     def test_native_composition_preserves_existing_api_order_and_no_approval(self):
         source=(ORIGINAL_REPO/'tasks/desert-rv/unity/Assets/DesertRV/Editor/JourneyCandidatePreparation.cs').read_text()
         calls=['JourneySceneAuthoring.AuthorCandidateScenes();','JourneyCandidateAssetIntegration.AuthorFxFromEnvironment();','JourneyCandidateAssetIntegration.IntegrateFromEnvironment();','JourneyDiagnosticScope.PrepareRequestFromEnvironment();']
