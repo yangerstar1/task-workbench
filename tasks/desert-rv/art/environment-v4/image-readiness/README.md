@@ -1,0 +1,36 @@
+# Fixed official image readiness v4
+
+This bounded gate observes the exact official image on the same disposable runner as a separately authorized native rendering workflow. It uses fixed HEAD observations and, in one explicitly limited case, one actual image pull. It is not Unity execution, a reservation of registry capacity, or visual/gameplay acceptance.
+
+The sole image is `unityci/editor@sha256:17406791cf1e438bea2dac20671668e05d83db5ed38c916744815db4584a8264`. The workflow verifies the exact fixed-push request and the fresh full SOURCE inventory, standard runner and clean native output paths before this gate. Package installation, long validation suites, runner cleanup, Unity credentials/license use, image build and Editor execution remain after it.
+
+## Fixed observations and conditional download
+
+The helper rejects environment overrides and uses the existing local Docker socket. Before any cache or registry operation, a fixed read-only Docker info template must verify that the existing daemon has no HTTP proxy, HTTPS proxy or registry mirrors. Only three booleans are returned; no proxy or mirror addresses are retained. Unknown or nonempty configuration stops the gate without changing it.
+
+An exact local RepoDigests match can pass immediately. Otherwise two bounded official HEAD channels are used: the immutable target image manifest proves its digest, and Docker Hub's official `ratelimitpreview/test` manifest supplies quota information. Each channel permits only its fixed anonymous pull-scoped Bearer challenge and fixed token endpoint, with no redirect or caller retry. Tokens remain in process memory. No manifest GET, account login, password, refresh/offline token, persistent credentials, alternative registry or alternative image is used. The read-only phase has a 65-second total limit, an 8-second request timeout, and at most six HTTP requests.
+
+Verified target digest and positive valid preview quota permit PASS. Each rate field must use canonical `value;w=window` syntax: value is a nonnegative integer of at most nine digits, and window is a positive integer of at most nine digits. The two windows within a single HEAD channel must match; limit must be positive and remaining must be between zero and limit. Target and preview channels may declare different windows. The report's top-level windowSeconds is the actual verified preview window, not a fixed policy constant. The target's own quota headers cannot substitute for preview quota; contradictory target quota is rejected. Zero remaining, 429, partial/malformed/duplicate/multi-policy fields, zero/overflow/noncanonical windows, authentication failure, unknown status or transport failure stop without a pull.
+
+There is exactly one conditional download branch: only after target verification, a successful preview HTTP 200 with both quota headers absent may attempt the fixed `/usr/bin/docker --host=unix:///var/run/docker.sock pull --quiet` command for that same digest. This command may download and cache the image on the disposable runner. Its CLI deadline is 600 seconds, with a bounded 610-second pull-and-verification phase. There is no caller retry or second image. PASS then requires both exit code zero and a fresh exact local RepoDigests match. Pull failure, timeout, interruption, stderr overflow, or digest mismatch remain fail-closed; the original nonzero workflow status is preserved. A narrowly recognized Docker rate-limit failure is reported as RATE_LIMITED. Raw pull stderr is bounded to 65,536 bytes in memory and is never published.
+
+## Schema v4 and upload provenance
+
+Output is one bounded JSON record with fixed image identity, status/reason enums, typed quota/retry/time fields, separate target and quota stage summaries, and a bounded pull outcome. HTTP status belongs to each channel; schema v4 has no top-level `httpStatus`. The only bounded raw values allowed are the two rate-limit HEAD headers described below. Tokens, source IPs, other raw headers/bodies, arbitrary exception text, Docker inspect payloads and raw pull stderr are never uploaded.
+
+Each channel additionally contains rateDiagnostics: the first failed predicate plus separate limit and remaining observations. Each observation includes occurrence count, byte length, SHA-256, bounded format/compatibility enums, safe boundedRaw and up to four numeric policy summaries. Only single-occurrence printable ASCII rate-limit HEAD values of at most 256 bytes may be echoed, including unknown syntax. Sensitive-looking values, controls, non-ASCII, oversized values and duplicates have no raw echo. Token responses and all other headers are excluded. Diagnostics do not broaden admission. Schema v4 separately implements the authorized server-declared positive-window semantics above; unknown syntax, nonpositive/oversized windows and within-channel window disagreement still reject. The shared helper and workflow both cap serialized reports at 8192 bytes including the final newline.
+
+The workflow refuses an existing report file or link before starting the helper. Only after the helper invocation completes does it set the `report_written` output and then exit with the helper's original status. Schema validation and upload both require that fresh-write marker, an actually executed helper step, and a noncancelled job. A separate process invokes the helper's pure `validate_report` function, checks PASS against the step outcome, and rejects missing/linked/oversized/multiline/duplicate-key/nonfinite or malformed reports. It uploads only `tasks/desert-rv/image-readiness.json`, outside native evidence directories. Native rendering, strict packaging and lifecycle diagnostics retain their prior gates and paths. No failure is converted into workflow success.
+
+## Timing and limits of the result
+
+Docker documentation describes a six-hour unauthenticated pull-rate window, while a verified response may declare another positive window such as 3600 seconds. The gate validates the service-declared bounded window rather than hardcoding the documentation example. A 429 without Retry-After does not establish an exact reset time, and a rolling window does not require waiting a fresh full window after each failure. Follow the authorized single-check time; do not repeatedly start runners or change egress to evade limits. The check and original subsequent image build use the same job/runner with unchanged network settings. Even a PASS cannot reserve quota or guarantee a later image build; the unchanged build must still fail normally on an error.
+
+This v4 candidate supersedes the unpublished v3 snapshot and original unpublished v1 readiness candidate for the same independent R2 request. It does not change previously published requests, source fixtures, native scripts, cameras, materials or rendering acceptance rules. All tests are offline fixtures or bounded local Python children. No real v4 registry observation, pull, native render or resulting artwork is proved by the offline suite.
+
+## Official references
+
+- https://docs.docker.com/docker-hub/usage/pulls/
+- https://docs.docker.com/reference/api/registry/latest/operations/HeadImageManifest/
+- https://docs.docker.com/reference/api/registry/auth/
+- https://docs.docker.com/reference/cli/docker/image/pull/

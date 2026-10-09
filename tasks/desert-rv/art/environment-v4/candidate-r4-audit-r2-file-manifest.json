@@ -1,0 +1,30 @@
+{
+  "schema": 1,
+  "base_commit": "52b8839343b60a5992c45be17e131bb7caf2cc89",
+  "scope": "FIXED_OFFICIAL_IMAGE_V4_DECLARED_WINDOWS_AND_CONDITIONAL_SINGLE_PULL_GATE_NOT_NATIVE_EVIDENCE",
+  "supersedes_unpublished_candidate_manifest_sha256": "d2692d3ba4c6576d64ff55405483336f07bcb2f4a3f5cbbd6379d78493e428f6",
+  "readiness_schema_version": 4,
+  "files": [
+    {
+      "path": "tasks/desert-rv/scripts/environment_image_precheck.py",
+      "change": "added",
+      "sha256": "c561c6ae5347cd94e64ec5917ee1d4964b46fd5929939c969680f33123cfa1cc",
+      "bytes": 53744,
+      "before_sha256": null
+    },
+    {
+      "path": "tasks/desert-rv/scripts/test_environment_image_precheck.py",
+      "change": "added",
+      "sha256": "14056956f91bf12de0dec949f9e6ec96b146a353e6a596e922196b2e479c96c1",
+      "bytes": 70343,
+      "before_sha256": null
+    },
+    {
+      "path": "tasks/desert-rv/art/environment-v4/image-readiness/README.md",
+      "change": "added",
+      "sha256": "48ff69e058d9d237678caccb0d6b0b779adf65573c7dcbc8ec9fdcaed3737ab7",
+      "bytes": 7262,
+      "before_sha256": null
+    }
+  ]
+}

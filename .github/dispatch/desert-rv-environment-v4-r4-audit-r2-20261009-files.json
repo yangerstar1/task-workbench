@@ -1,0 +1,104 @@
+{
+  "schema": 1,
+  "requestId": "desert-rv-environment-v4-r4-audit-r2-20261009-once-b94c2b88",
+  "baseCommit": "52b8839343b60a5992c45be17e131bb7caf2cc89",
+  "candidateManifestSha256": "166c67c09e64b02454b8a7826e7fafaa3a039307dae378bbb1306be6d42adda7",
+  "files": [
+    {
+      "path": ".github/workflows/desert-rv-environment-v4-r4-audit-r2.yml",
+      "sha256": "36ac0c9c64ad1b4b868ec09eb0d12ec209053ba3d1ea556885d72f7a61769be7",
+      "size": 12699,
+      "mode": "100644"
+    },
+    {
+      "path": "tasks/desert-rv/art/environment-v4/candidate-r4-audit-r2-file-manifest.json",
+      "sha256": "166c67c09e64b02454b8a7826e7fafaa3a039307dae378bbb1306be6d42adda7",
+      "size": 1099,
+      "mode": "100644"
+    },
+    {
+      "path": "tasks/desert-rv/art/environment-v4/image-readiness/README.md",
+      "sha256": "48ff69e058d9d237678caccb0d6b0b779adf65573c7dcbc8ec9fdcaed3737ab7",
+      "size": 7262,
+      "mode": "100644"
+    },
+    {
+      "path": "tasks/desert-rv/scripts/environment_image_precheck.py",
+      "sha256": "c561c6ae5347cd94e64ec5917ee1d4964b46fd5929939c969680f33123cfa1cc",
+      "size": 53744,
+      "mode": "100644"
+    },
+    {
+      "path": "tasks/desert-rv/scripts/environment_v4_r4_audit_r2_dispatch.py",
+      "sha256": "96ec830b112cfe03fe5e9f916a9c97aef476c2927207c82cb3a66feb337d8e75",
+      "size": 9345,
+      "mode": "100644"
+    },
+    {
+      "path": "tasks/desert-rv/scripts/fixtures/environment-v4-r4-audit-r1-published-52b88393.json",
+      "sha256": "2cc598ec1de4f21074b052512969b2768a741df45256e1756f71529f1c1e9e52",
+      "size": 167463,
+      "mode": "100644"
+    },
+    {
+      "path": "tasks/desert-rv/scripts/prepare_runner.sh",
+      "sha256": "f1cb18db6b179b97a73ebf61de03b70467d6dcdba6f4401f9a3b12252705f127",
+      "size": 4290,
+      "mode": "100644"
+    },
+    {
+      "path": "tasks/desert-rv/scripts/test_environment_diffuse_comparison_dispatch.py",
+      "sha256": "2c5e25272ddb1cdc4ca96cd4cab6ff41e6e2f3d4783cb7934456915d8ef8b7ef",
+      "size": 40552,
+      "mode": "100644"
+    },
+    {
+      "path": "tasks/desert-rv/scripts/test_environment_diffuse_comparison_r1_dispatch.py",
+      "sha256": "64e44ecec9f04ed87e952cbf5f1230939fcb7d97d6a10daa8aae692838ebeeb4",
+      "size": 40498,
+      "mode": "100644"
+    },
+    {
+      "path": "tasks/desert-rv/scripts/test_environment_image_precheck.py",
+      "sha256": "14056956f91bf12de0dec949f9e6ec96b146a353e6a596e922196b2e479c96c1",
+      "size": 70343,
+      "mode": "100644"
+    },
+    {
+      "path": "tasks/desert-rv/scripts/test_environment_v4_r4_audit_dispatch.py",
+      "sha256": "6ad8a790a9f90551e1fbc5550446f30fb2682a003fbae22ee4e191dd66d0e5b2",
+      "size": 49642,
+      "mode": "100644"
+    },
+    {
+      "path": "tasks/desert-rv/scripts/test_environment_v4_r4_audit_r1_dispatch.py",
+      "sha256": "4407d5472968742edc77bf92dccc7d90ac4cc25f5dde97c0be2d64c2ea17caa2",
+      "size": 62363,
+      "mode": "100644"
+    },
+    {
+      "path": "tasks/desert-rv/scripts/test_environment_v4_r4_audit_r2_dispatch.py",
+      "sha256": "b6cb5f0da3afdf4d1fd41d10cb7860952d6f483f56f01d3171a4f7375a349037",
+      "size": 90403,
+      "mode": "100644"
+    },
+    {
+      "path": "tasks/desert-rv/scripts/test_environment_v4_r4_audit_r2_runner_prefix.py",
+      "sha256": "b1c1e8390dcc0de2db02171ec79641d36429370d8bda601a8f9c2c532ff3d9dc",
+      "size": 6275,
+      "mode": "100644"
+    },
+    {
+      "path": "tasks/desert-rv/scripts/test_environment_v4_r4_dispatch.py",
+      "sha256": "89682d0b090f1d5f7c8920187e9afa869f3cf61e380f73f2448b53cbbd85261a",
+      "size": 57483,
+      "mode": "100644"
+    },
+    {
+      "path": "tasks/desert-rv/scripts/verify_evidence.py",
+      "sha256": "52e1940d60f209326c2953084d43818605d3234c08355e8751386463067d92af",
+      "size": 21823,
+      "mode": "100644"
+    }
+  ]
+}
