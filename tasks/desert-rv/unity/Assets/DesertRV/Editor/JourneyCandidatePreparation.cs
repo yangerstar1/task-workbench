@@ -85,6 +85,15 @@ namespace DesertRV.Editor
         }
         public static void PrepareVerifiedSameWorkspace()
         {
+            var timer = System.Diagnostics.Stopwatch.StartNew(); double previousSeconds = 0;
+            void MarkPhase(string stage)
+            {
+                double seconds = timer.Elapsed.TotalSeconds;
+                Debug.Log("JOURNEY_PREPARATION_PHASE_COMPLETED stage=" + stage + "; seconds=" +
+                    (seconds - previousSeconds).ToString("F3", System.Globalization.CultureInfo.InvariantCulture) + "; totalSeconds=" +
+                    seconds.ToString("F3", System.Globalization.CultureInfo.InvariantCulture));
+                previousSeconds = seconds;
+            }
             Check(!Application.isPlaying && !BuildPipeline.isBuildingPlayer && Application.unityVersion == "6000.3.19f1", "Explicit pinned native EditMode preparation required.");
             Check(JourneyDiagnosticScope.IsPinnedPathSafe(Input, out string reason), reason);
             string inputHash = File.ReadAllText(Folder + "/ready-input.sha256").Trim();
@@ -138,19 +147,20 @@ namespace DesertRV.Editor
                     "Actual imported prefab/report changed after strict export. No copied-asset reimport fallback.");
             }
             Check(!File.Exists(Scope), "Never overwrite a previously pinned scope.");
+            MarkPhase("input-and-three-strict-proofs");
             var saved = new Dictionary<string, string>();
             void Set(string key, string value) { if (!saved.ContainsKey(key)) saved[key] = Environment.GetEnvironmentVariable(key); Environment.SetEnvironmentVariable(key, value); }
             try
             {
-                JourneySceneAuthoring.AuthorCandidateScenes();
-                JourneyCandidateAssetIntegration.ProposeScenePoses();
+                JourneySceneAuthoring.AuthorCandidateScenes(); MarkPhase("four-scene-authoring");
+                JourneyCandidateAssetIntegration.ProposeScenePoses(); MarkPhase("actual-scene-pose-proposal");
                 var poses = JsonUtility.FromJson<JourneyCandidateAssetIntegration.ScenePoseProposal>(File.ReadAllText("JourneyEvidence/journey-candidate-poses.json"));
                 input.fx.sourceCommit = input.sourceCommit;
                 string fxSelection = Folder + "/fx-selection.json", fxInput = Folder + "/fx-input.json";
                 WriteFresh(fxSelection, input.fx);
                 Set("DESERTRV_JOURNEY_FX_SELECTION", fxSelection); Set("DESERTRV_JOURNEY_FX_SELECTION_SHA256", Hash(fxSelection)); Set("DESERTRV_JOURNEY_FX_INPUT", fxInput);
                 JourneyCandidateAssetIntegration.FreezeSelectedFxInputFromEnvironment(); Set("DESERTRV_JOURNEY_FX_INPUT_SHA256", Hash(fxInput));
-                JourneyCandidateAssetIntegration.AuthorFxFromEnvironment();
+                JourneyCandidateAssetIntegration.AuthorFxFromEnvironment(); MarkPhase("fx-authoring-and-stable-save");
                 var fx = JsonUtility.FromJson<JourneyCandidateAssetIntegration.FxResult>(File.ReadAllText("JourneyEvidence/journey-candidate-fx.json"));
                 Check(fx.status == "ORIGINAL_NATIVE_FX_AUTHORED_UNCALIBRATED" && fx.protectedSourcesUnchanged && fx.failures.Length == 0 && !fx.visualCalibrated && !fx.audioAuditioned && !fx.gameplayReviewed, "Actual original FX authoring did not finish.");
                 input.integration.sourceCommit = input.sourceCommit;
@@ -159,15 +169,16 @@ namespace DesertRV.Editor
                 input.integration.arcModulePose = JourneyCandidateAssetIntegration.ResolveArcModulePose(input.arcModulePoseSource, input.integration.arcModulePose, poses.arcModulePose);
                 var grounding = JourneyCandidateAssetIntegration.ResolveSpawnRootHeights(input.integration, input.spawnRootHeightSource, input.selectionSha256, inputHash);
                 WriteFresh(JourneyCandidateAssetIntegration.SpawnGroundingPath, grounding);
-                string groundingSha = Hash(JourneyCandidateAssetIntegration.SpawnGroundingPath);
+                string groundingSha = Hash(JourneyCandidateAssetIntegration.SpawnGroundingPath); MarkPhase("nine-actual-root-grounding-records");
                 string selection = Folder + "/integration-selection.json", frozen = Folder + "/integration-input.json";
                 WriteFresh(selection, input.integration);
                 Set("DESERTRV_JOURNEY_ASSET_SELECTION", selection); Set("DESERTRV_JOURNEY_ASSET_SELECTION_SHA256", Hash(selection)); Set("DESERTRV_JOURNEY_ASSET_INPUT", frozen);
-                JourneyCandidateAssetIntegration.FreezeSelectedInputsFromEnvironment(); Set("DESERTRV_JOURNEY_ASSET_INPUT_SHA256", Hash(frozen));
+                JourneyCandidateAssetIntegration.FreezeSelectedInputsFromEnvironment(); Set("DESERTRV_JOURNEY_ASSET_INPUT_SHA256", Hash(frozen)); MarkPhase("freeze-integration-input");
                 JourneyCandidateAssetIntegration.IntegrateFromEnvironment();
                 var integrated = JsonUtility.FromJson<JourneyCandidateAssetIntegration.Result>(File.ReadAllText(JourneyCandidateAssetIntegration.ReportPath));
                 Check(integrated.status == JourneyCandidateAssetIntegration.Label && integrated.protectedSourcesUnchanged && integrated.failures.Length == 0 && !integrated.rolledBack &&
                     !integrated.visualReviewed && !integrated.gameplayReviewed && !integrated.audioAuditioned, "Real saved scene integration is not ready.");
+                MarkPhase("integration-save-reload-and-production-rejection");
                 Set("DESERTRV_DIAGNOSTIC_SCOPE", Scope);
                 Set("DESERTRV_DIAGNOSTIC_MODEL_PATHS", string.Join("\n", input.integration.candidates.Select(c => c.sourceModelPath)));
                 Set("DESERTRV_DIAGNOSTIC_IMPORT_REPORTS", string.Join("\n", input.integration.candidates.Select(c => c.importReport.path)));
@@ -176,12 +187,14 @@ namespace DesertRV.Editor
                 Check(JourneyDiagnosticScope.CheckRequest(scope, input.sourceCommit, out reason), reason);
                 Check(Hash(Input) == inputHash, "Preparation input changed during authoring.");
                 Check(Hash(JourneyCandidateAssetIntegration.SpawnGroundingPath) == groundingSha, "Actual native grounding evidence changed during integration.");
+                MarkPhase("diagnostic-scope-and-source-recheck");
                 var authored = Directory.GetFiles(JourneySceneAuthoring.Folder, "*", SearchOption.AllDirectories).Concat(new[] { JourneySceneAuthoring.Folder + ".meta" }).OrderBy(p => p).ToArray();
                 WriteFresh(Folder + "/authored-assets.json", new AuthoredAssets { sourceCommit = input.sourceCommit,
                     unityVersion = Application.unityVersion, importRunUrl = run, approved = false,
                     files = authored.Select(p => new JourneyCandidateAssetIntegration.FilePin { path = p.Replace('\\', '/'), sha256 = Hash(p) }).ToArray(),
                     dependencies = DependencySnapshot(),
                     spawnGrounding = new JourneyCandidateAssetIntegration.FilePin { path = JourneyCandidateAssetIntegration.SpawnGroundingPath, sha256 = groundingSha } });
+                MarkPhase("native-authored-file-and-dependency-manifest");
                 Debug.Log("JOURNEY_SAME_WORKSPACE_SCOPE_PREPARED_UNREVIEWED: no input plan, runtime session or approval has been manufactured.");
             }
             finally { foreach (var pair in saved) Environment.SetEnvironmentVariable(pair.Key, pair.Value); }

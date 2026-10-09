@@ -248,12 +248,28 @@ namespace DesertRV.Tests
             Assert.IsTrue(lines.All(line=>!line.Contains("private-")&&line.Contains("unknown-path-sha256=")));
             Debug.Log("JOURNEY_ROOT_GROUNDING_REGRESSION actual-sand/road/no-floor/declared-Y/foreign-scene/trigger/disabled/layer/unlisted/empty/diagnostic-redaction passed");
         }
+        // The real 3a49 authoring case completed all checks in 291.946 seconds, then failed the framework's 180-second default.
+        // This is a bounded Editor authoring budget, never gameplay duration or a relaxation of the exact Passed XML gate.
+        [Timeout(600000)]
         [Test] public void PrepareVerifiedSameWorkspaceJourney()
         {
+            var timer = System.Diagnostics.Stopwatch.StartNew(); double previousSeconds = 0;
+            void MarkPhase(string stage)
+            {
+                double seconds = timer.Elapsed.TotalSeconds;
+                Debug.Log("JOURNEY_PREPARATION_TEST_PHASE_COMPLETED stage=" + stage + "; seconds=" +
+                    (seconds - previousSeconds).ToString("F3", System.Globalization.CultureInfo.InvariantCulture) + "; totalSeconds=" +
+                    seconds.ToString("F3", System.Globalization.CultureInfo.InvariantCulture));
+                previousSeconds = seconds;
+            }
             // Actual native success and injected-failure cleanup, inside the existing single-case gate.
-            VerifyFxPreviewLifecycle(false); VerifyFxPreviewLifecycle(true); VerifyPoseJsonRoundtrip(); VerifyArcMeshQueries(); VerifyRootGrounding();
+            VerifyFxPreviewLifecycle(false); VerifyFxPreviewLifecycle(true); MarkPhase("fx-preview-lifecycle-regressions");
+            VerifyPoseJsonRoundtrip(); MarkPhase("pose-json-regressions");
+            VerifyArcMeshQueries(); MarkPhase("arc-geometry-regressions");
+            VerifyRootGrounding(); MarkPhase("root-grounding-regressions");
             Type.GetType("DesertRV.Editor.JourneyCandidatePreparation, Assembly-CSharp-Editor", true)
                 .GetMethod("PrepareVerifiedSameWorkspace").Invoke(null, null);
+            MarkPhase("complete-native-authoring-and-scope");
             var integration=Type.GetType("DesertRV.Editor.JourneyCandidateAssetIntegration, Assembly-CSharp-Editor",true);
             var readyType=Type.GetType("DesertRV.Editor.JourneyCandidatePreparation+ReadyInput, Assembly-CSharp-Editor",true);
             var ready=JsonUtility.FromJson(File.ReadAllText("JourneyEvidence/JourneyPreparation/ready-input.json"),readyType);
@@ -272,6 +288,8 @@ namespace DesertRV.Tests
             Resources.UnloadAsset(manifest); Assert.IsFalse(manifest);
             verifyManifest.Invoke(null, new[] { request });
             Debug.Log("JOURNEY_MANIFEST_NATIVE_UNLOAD_RELOAD_REGRESSION: passed; real saved strict identities and approval=false verified.");
+            MarkPhase("saved-grounding-and-manifest-regressions");
+            Debug.Log("JOURNEY_PREPARATION_TEST_BODY_COMPLETED_UNREVIEWED: all authoring and regression assertions returned; exact native XML must still report Passed.");
         }
     }
 }
