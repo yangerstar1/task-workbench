@@ -48,7 +48,10 @@ def validate_package(folder,p):
     with producer_environment(p):
         raw,native=bundle.sealed_native_receipt(folder/'native-build-receipt.json');require(hashlib.sha256(raw).hexdigest()==m['nativeReceiptSha256'] and native==m['nativeReceipt'])
     require(native['requestSha256']==m['inputSha256'] and native['generatedReceiptSha256']==m['generatedReceiptSha256'])
-    c=read(folder/'control.json');require(set(c)=={'schema','mode','activation','build','licenseReturn','privateCleanup','buildDiagnostic','sourceRecovery'} and c['schema']==1 and c['mode']=='JOURNEY_LINUX_BUILD_CONTROL')
+    c=read(folder/'control.json');require(set(c)=={'schema','mode','activation','build','licenseReturn','privateCleanup','buildDiagnostic','sourceRecovery','hostDiagnostic'} and c['schema']==1 and c['mode']=='JOURNEY_LINUX_BUILD_CONTROL')
+    bundle.validate_host(c['hostDiagnostic']);require(c['hostDiagnostic']['failurePhase']=='NONE')
+    pin=c['hostDiagnostic']['nativeReceiptPin']
+    if pin is not None:require(pin==dict(sha256=hashlib.sha256(raw).hexdigest(),bytes=len(raw)))
     require(all(c[k]=='SUCCEEDED' for k in ('activation','build','licenseReturn','privateCleanup')))
     # Control is inspected privately. It is never republished by this observer.
     d=c['buildDiagnostic'];require(d['batchExitCode']==0 and d['batchTimedOut'] is False);bundle.native_diagnostic(d['native']);require(bundle.diagnostic_success(d['native']))
@@ -248,6 +251,9 @@ def export():
 
 def main():
     try:
+        require(sys.argv[1:] in (['stage'], ['capture'], ['export']))
+        import journey_observer_dispatch
+        journey_observer_dispatch.verify_runtime(ROOT, os.environ)
         if sys.argv[1]=='export':export();return 0
         if sys.argv[1]=='stage':stage();return 0
         if sys.argv[1]=='capture':return capture()

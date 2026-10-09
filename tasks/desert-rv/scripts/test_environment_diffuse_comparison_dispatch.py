@@ -246,8 +246,14 @@ class FrozenComparisonAuthoringTests(unittest.TestCase):
   for name,expected in pins.items():self.assertEqual(d.sha((d.ROOT/name).read_bytes()),expected,name)
 
 class NarrowSharedIntegrationTests(unittest.TestCase):
- def test_verify_evidence_py_only_exact_comparison_insertions(self):
-  text=(Path(d.__file__).parent/'verify_evidence.py').read_text()
+ OBSERVER_ROUTE="        elif os.environ.get('GITHUB_WORKFLOW_REF') == REPOSITORY + '/.github/workflows/desert-rv-player-observe.yml@refs/heads/journey-player-observer-fa18':\n            import journey_observer_dispatch\n            journey_observer_dispatch.verify(ROOT, os.environ)  # Independent fixed observer request; no event relabeling.\n"
+ OBSERVER_BOUNDARY="    require(os.environ.get('GITHUB_REPOSITORY') == REPOSITORY and (\n        os.environ.get('GITHUB_REF') == 'refs/heads/main' or (\n            os.environ.get('GITHUB_EVENT_NAME') == 'push' and\n            os.environ.get('GITHUB_REF') == 'refs/heads/journey-player-observer-fa18' and\n            os.environ.get('GITHUB_WORKFLOW_REF') == REPOSITORY + '/.github/workflows/desert-rv-player-observe.yml@refs/heads/journey-player-observer-fa18')),\n        'Trusted repository/main or fixed observer push required')\n"
+ ORIGINAL_MAIN_BOUNDARY="    require(os.environ.get('GITHUB_REPOSITORY') == REPOSITORY and os.environ.get('GITHUB_REF') == 'refs/heads/main', 'Trusted repository/main required')\n"
+ def assert_reviewed_verify_evidence(self,text):
+  self.assertEqual(text.count(self.OBSERVER_ROUTE),1)
+  text=text.replace(self.OBSERVER_ROUTE,'',1)
+  self.assertEqual(text.count(self.OBSERVER_BOUNDARY),1)
+  text=text.replace(self.OBSERVER_BOUNDARY,self.ORIGINAL_MAIN_BOUNDARY,1)
   self.assertEqual(text.count(", '.github/workflows/desert-rv-environment-v4-r4-audit.yml', '.github/dispatch/desert-rv-environment-v4-r4-audit-20261009-files.json'"),1);text=text.replace(", '.github/workflows/desert-rv-environment-v4-r4-audit.yml', '.github/dispatch/desert-rv-environment-v4-r4-audit-20261009-files.json'",'')
   self.assertEqual(text.count("        if os.environ.get('GITHUB_WORKFLOW_REF') == REPOSITORY + '/.github/workflows/desert-rv-environment-v4-r4-audit.yml@refs/heads/main':\n            import environment_v4_r4_audit_dispatch\n            environment_v4_r4_audit_dispatch.verify(ROOT, os.environ)  # Independent fixed R4 phase audit; strict package unchanged.\n        elif os.environ.get('GITHUB_WORKFLOW_REF') == REPOSITORY + '/.github/workflows/desert-rv-environment-v4-r4.yml@refs/heads/main':"),1);text=text.replace("        if os.environ.get('GITHUB_WORKFLOW_REF') == REPOSITORY + '/.github/workflows/desert-rv-environment-v4-r4-audit.yml@refs/heads/main':\n            import environment_v4_r4_audit_dispatch\n            environment_v4_r4_audit_dispatch.verify(ROOT, os.environ)  # Independent fixed R4 phase audit; strict package unchanged.\n        elif os.environ.get('GITHUB_WORKFLOW_REF') == REPOSITORY + '/.github/workflows/desert-rv-environment-v4-r4.yml@refs/heads/main':","        if os.environ.get('GITHUB_WORKFLOW_REF') == REPOSITORY + '/.github/workflows/desert-rv-environment-v4-r4.yml@refs/heads/main':")
   self.assertEqual(text.count(", '.github/workflows/desert-rv-environment-v4-r4.yml', '.github/dispatch/desert-rv-environment-v4-r4-20261009-files.json'"),1);text=text.replace(", '.github/workflows/desert-rv-environment-v4-r4.yml', '.github/dispatch/desert-rv-environment-v4-r4-20261009-files.json'",'')
@@ -257,6 +263,30 @@ class NarrowSharedIntegrationTests(unittest.TestCase):
   self.assertEqual(text.count(", '.github/workflows/desert-rv-environment-diffuse-comparison.yml', '.github/dispatch/desert-rv-environment-diffuse-comparison-20261009-files.json'"),1);text=text.replace(", '.github/workflows/desert-rv-environment-diffuse-comparison.yml', '.github/dispatch/desert-rv-environment-diffuse-comparison-20261009-files.json'",'')
   self.assertEqual(text.count("        if os.environ.get('GITHUB_WORKFLOW_REF') == REPOSITORY + '/.github/workflows/desert-rv-environment-diffuse-comparison.yml@refs/heads/main':\n            import environment_diffuse_comparison_dispatch\n            environment_diffuse_comparison_dispatch.verify(ROOT, os.environ)  # Exact separate four-view diffuse comparison.\n        elif os.environ.get('GITHUB_WORKFLOW_REF') == REPOSITORY + '/.github/workflows/desert-rv-environment-terrain-probe.yml@refs/heads/main':"),1);text=text.replace("        if os.environ.get('GITHUB_WORKFLOW_REF') == REPOSITORY + '/.github/workflows/desert-rv-environment-diffuse-comparison.yml@refs/heads/main':\n            import environment_diffuse_comparison_dispatch\n            environment_diffuse_comparison_dispatch.verify(ROOT, os.environ)  # Exact separate four-view diffuse comparison.\n        elif os.environ.get('GITHUB_WORKFLOW_REF') == REPOSITORY + '/.github/workflows/desert-rv-environment-terrain-probe.yml@refs/heads/main':","        if os.environ.get('GITHUB_WORKFLOW_REF') == REPOSITORY + '/.github/workflows/desert-rv-environment-terrain-probe.yml@refs/heads/main':")
   self.assertEqual(d.sha(text.encode()),'4ff24d3c6285bad2508db2ac63effef96c270d64513da13b9878684e86bc4e60')
+
+ def test_verify_evidence_py_only_exact_comparison_insertions(self):
+  self.assert_reviewed_verify_evidence((Path(d.__file__).parent/'verify_evidence.py').read_text())
+ def test_missing_fixed_observer_boundary_rejected(self):
+  text=(Path(d.__file__).parent/'verify_evidence.py').read_text()
+  with self.assertRaises(AssertionError):self.assert_reviewed_verify_evidence(text.replace(self.OBSERVER_BOUNDARY,self.ORIGINAL_MAIN_BOUNDARY,1))
+ def test_duplicate_fixed_observer_boundary_rejected(self):
+  text=(Path(d.__file__).parent/'verify_evidence.py').read_text()
+  with self.assertRaises(AssertionError):self.assert_reviewed_verify_evidence(text.replace(self.OBSERVER_BOUNDARY,self.OBSERVER_BOUNDARY*2,1))
+ def test_tampered_fixed_observer_boundary_rejected(self):
+  text=(Path(d.__file__).parent/'verify_evidence.py').read_text()
+  with self.assertRaises(AssertionError):self.assert_reviewed_verify_evidence(text.replace(self.OBSERVER_BOUNDARY,self.OBSERVER_BOUNDARY.replace('journey-player-observer-fa18','arbitrary-branch'),1))
+ def test_missing_observer_route_rejected(self):
+  text=(Path(d.__file__).parent/'verify_evidence.py').read_text()
+  with self.assertRaises(AssertionError):self.assert_reviewed_verify_evidence(text.replace(self.OBSERVER_ROUTE,'',1))
+ def test_duplicate_observer_route_rejected(self):
+  text=(Path(d.__file__).parent/'verify_evidence.py').read_text()
+  with self.assertRaises(AssertionError):self.assert_reviewed_verify_evidence(text.replace(self.OBSERVER_ROUTE,self.OBSERVER_ROUTE*2,1))
+ def test_tampered_observer_route_rejected(self):
+  text=(Path(d.__file__).parent/'verify_evidence.py').read_text()
+  with self.assertRaises(AssertionError):self.assert_reviewed_verify_evidence(text.replace(self.OBSERVER_ROUTE,self.OBSERVER_ROUTE.replace('verify(ROOT, os.environ)','verify(ROOT, {})'),1))
+ def test_unknown_observer_route_rejected(self):
+  text=(Path(d.__file__).parent/'verify_evidence.py').read_text()
+  with self.assertRaises(AssertionError):self.assert_reviewed_verify_evidence(text.replace(self.OBSERVER_ROUTE,self.OBSERVER_ROUTE+self.OBSERVER_ROUTE.replace('desert-rv-player-observe.yml','unknown-observer.yml').replace('journey_observer_dispatch','unknown_observer_dispatch'),1))
  def test_prepare_runner_sh_only_exact_comparison_insertions(self):
   text=(Path(d.__file__).parent/'prepare_runner.sh').read_text()
   self.assertEqual(text.count('  if [[ "${GITHUB_WORKFLOW_REF:-}" == \'yangerstar1/task-workbench/.github/workflows/desert-rv-environment-v4-r4-audit.yml@refs/heads/main\' ]]; then\n    /usr/bin/python3 "$(dirname "${BASH_SOURCE[0]}")/environment_v4_r4_audit_dispatch.py" --verify-only\n  elif [[ "${GITHUB_WORKFLOW_REF:-}" == \'yangerstar1/task-workbench/.github/workflows/desert-rv-environment-v4-r4.yml@refs/heads/main\' ]]; then'),1);text=text.replace('  if [[ "${GITHUB_WORKFLOW_REF:-}" == \'yangerstar1/task-workbench/.github/workflows/desert-rv-environment-v4-r4-audit.yml@refs/heads/main\' ]]; then\n    /usr/bin/python3 "$(dirname "${BASH_SOURCE[0]}")/environment_v4_r4_audit_dispatch.py" --verify-only\n  elif [[ "${GITHUB_WORKFLOW_REF:-}" == \'yangerstar1/task-workbench/.github/workflows/desert-rv-environment-v4-r4.yml@refs/heads/main\' ]]; then','  if [[ "${GITHUB_WORKFLOW_REF:-}" == \'yangerstar1/task-workbench/.github/workflows/desert-rv-environment-v4-r4.yml@refs/heads/main\' ]]; then')

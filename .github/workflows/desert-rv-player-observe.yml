@@ -1,5 +1,8 @@
 name: Desert RV verified candidate player observation
 on:
+  push:
+    branches: [journey-player-observer-fa18]
+    paths: [.github/dispatch/desert-rv-player-observe-20261009-2e731b69.json]
   workflow_dispatch:
     inputs:
       producer_run_id:
@@ -27,50 +30,134 @@ concurrency:
 jobs:
   observe:
     if: >-
-      github.repository == 'yangerstar1/task-workbench' && github.ref == 'refs/heads/main' &&
-      github.actor == 'yangerstar1' && github.triggering_actor == 'yangerstar1' && github.event.repository.visibility == 'public'
+      github.repository == 'yangerstar1/task-workbench' &&
+      github.actor == 'yangerstar1' && github.triggering_actor == 'yangerstar1' && github.event.repository.visibility == 'public' &&
+      ((github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' &&
+        github.workflow_ref == 'yangerstar1/task-workbench/.github/workflows/desert-rv-player-observe.yml@refs/heads/main') ||
+       (github.event_name == 'push' && github.ref == 'refs/heads/journey-player-observer-fa18' &&
+        github.workflow_ref == 'yangerstar1/task-workbench/.github/workflows/desert-rv-player-observe.yml@refs/heads/journey-player-observer-fa18' &&
+        github.run_attempt == 1 && github.event.before == 'fa18f21620028e04145be9026ab3c333fa9cadd4'))
     runs-on: ubuntu-24.04
     timeout-minutes: 25
     env:
-      PRODUCER_RUN_ID: ${{ inputs.producer_run_id }}
-      PRODUCER_COMMIT: ${{ inputs.producer_commit }}
-      PRODUCER_ARTIFACT_ID: ${{ inputs.producer_artifact_id }}
-      PRODUCER_ZIP_SHA256: ${{ inputs.producer_zip_sha256 }}
+      GITHUB_REPOSITORY_VISIBILITY: ${{ github.event.repository.visibility }}
+      MANUAL_PRODUCER_RUN_ID: ${{ inputs.producer_run_id }}
+      MANUAL_PRODUCER_COMMIT: ${{ inputs.producer_commit }}
+      MANUAL_PRODUCER_ARTIFACT_ID: ${{ inputs.producer_artifact_id }}
+      MANUAL_PRODUCER_ZIP_SHA256: ${{ inputs.producer_zip_sha256 }}
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
           persist-credentials: false
           lfs: false
-      - name: Validate observer source and offline byte fixtures
+          fetch-depth: 2
+      - name: Verify explicit manual pins or the single reviewed observer push
+        id: observer_request
         run: |
+          python3 tasks/desert-rv/scripts/journey_observer_dispatch.py
           python3 tasks/desert-rv/scripts/verify_evidence.py guard
+      - name: Verify fixed image availability and bounded pull on this runner
+        id: image_precheck
+        if: ${{ success() && steps.observer_request.outcome == 'success' }}
+        timeout-minutes: 12
+        run: |
+          python3 - <<'PY'
+          import contextlib, io, json, os, sys
+          from pathlib import Path
+          sys.path.insert(0, 'tasks/desert-rv/scripts')
+          import environment_image_precheck as readiness
+          try:
+              directory = Path(os.environ['RUNNER_TEMP'])
+              if not directory.is_absolute() or not directory.is_dir() or any(p.is_symlink() for p in (directory, *directory.parents)):
+                  raise ValueError('report directory')
+              path = directory / 'desert-rv-player-image-readiness.json'
+              if path.exists() or path.is_symlink():
+                  raise ValueError('preexisting report')
+              captured = io.StringIO()
+              with contextlib.redirect_stdout(captured):
+                  code = readiness.main([])
+              raw = captured.getvalue()
+              if not (0 < len(raw.encode('utf-8')) <= 8192 and raw.endswith('\n') and raw.count('\n') == 1):
+                  raise ValueError('report shape')
+              report = json.loads(raw, object_pairs_hook=readiness.unique_object)
+              if not readiness.validate_report(report) or type(code) is not int or code != (0 if report['status'] == 'PASS' else 2):
+                  raise ValueError('report identity')
+              descriptor = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
+              with os.fdopen(descriptor, 'w', encoding='utf-8') as stream:
+                  stream.write(json.dumps(report, sort_keys=True, separators=(',', ':')) + '\n')
+              with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as stream:
+                  stream.write('report_written=true\nreport_ready=true\nimage_ready=' + ('true' if code == 0 else 'false') + '\n')
+          except Exception:
+              raise SystemExit('IMAGE_PRECHECK_REPORT_REJECTED') from None
+          raise SystemExit(code)
+          PY
+      - name: Save only the validated image readiness JSON
+        if: ${{ !cancelled() && steps.observer_request.outcome == 'success' && steps.image_precheck.outputs.report_written == 'true' && steps.image_precheck.outputs.report_ready == 'true' }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: journey-player-image-readiness-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/desert-rv-player-image-readiness.json
+          if-no-files-found: error
+          retention-days: 7
+      - name: Validate observer source and offline byte fixtures
+        if: ${{ success() && steps.image_precheck.outputs.image_ready == 'true' }}
+        run: |
+          python3 tasks/desert-rv/scripts/test_journey_observer_dispatch.py
+          python3 tasks/desert-rv/scripts/test_environment_image_precheck.py
           sudo apt-get update && sudo apt-get install -y --no-install-recommends python3-pil
           python3 tasks/desert-rv/scripts/player/test_observe_journey_player.py
       - name: Obtain only the pinned successful producer package
+        if: ${{ success() && steps.image_precheck.outputs.image_ready == 'true' }}
         env:
           GH_TOKEN: ${{ github.token }}
+          OBSERVER_EVENT_SHA256: ${{ steps.observer_request.outputs.observer_event_sha256 }}
+          PRODUCER_RUN_ID: ${{ steps.observer_request.outputs.producer_run_id }}
+          PRODUCER_COMMIT: ${{ steps.observer_request.outputs.producer_commit }}
+          PRODUCER_ARTIFACT_ID: ${{ steps.observer_request.outputs.producer_artifact_id }}
+          PRODUCER_ZIP_SHA256: ${{ steps.observer_request.outputs.producer_zip_sha256 }}
         run: python3 tasks/desert-rv/scripts/player/observe_journey_player.py stage
       - name: Prepare existing fixed rendering image without Editor activation
+        if: ${{ success() && steps.image_precheck.outputs.image_ready == 'true' }}
         run: |
           docker build --build-arg BASE_IMAGE=unityci/editor@sha256:17406791cf1e438bea2dac20671668e05d83db5ed38c916744815db4584a8264 --file tasks/desert-rv/scripts/Environment.Dockerfile --tag desert-rv-environment:local tasks/desert-rv/scripts
           docker build --build-arg BASE_IMAGE=desert-rv-environment:local --file tasks/desert-rv/scripts/rendered/Rendered.Dockerfile --tag desert-rv-observer:local tasks/desert-rv/scripts/rendered
       - name: Observe only the owned candidate player window for fifteen seconds
         id: native
+        if: ${{ success() && steps.image_precheck.outputs.image_ready == 'true' }}
+        env:
+          OBSERVER_EVENT_SHA256: ${{ steps.observer_request.outputs.observer_event_sha256 }}
+          PRODUCER_RUN_ID: ${{ steps.observer_request.outputs.producer_run_id }}
+          PRODUCER_COMMIT: ${{ steps.observer_request.outputs.producer_commit }}
+          PRODUCER_ARTIFACT_ID: ${{ steps.observer_request.outputs.producer_artifact_id }}
+          PRODUCER_ZIP_SHA256: ${{ steps.observer_request.outputs.producer_zip_sha256 }}
         run: |
           mkdir -p tasks/desert-rv/player-observer-work
           docker run --rm --init --cpus=2 --memory=12g --stop-timeout=30 \
             --workdir /github/workspace \
             --volume "$GITHUB_WORKSPACE:/github/workspace:ro" \
+            --volume "$GITHUB_EVENT_PATH:/github/observer-event.json:ro" \
             --volume "$GITHUB_WORKSPACE/tasks/desert-rv/player-observer-work:/github/workspace/tasks/desert-rv/player-observer-work:rw" \
-            --env GITHUB_SHA --env GITHUB_RUN_ID \
+            --env GITHUB_SHA --env GITHUB_RUN_ID --env GITHUB_RUN_ATTEMPT \
+            --env GITHUB_ACTIONS --env GITHUB_REPOSITORY --env GITHUB_REPOSITORY_VISIBILITY \
+            --env GITHUB_ACTOR --env GITHUB_TRIGGERING_ACTOR --env GITHUB_REF --env GITHUB_WORKFLOW_REF \
+            --env OBSERVER_EVENT_SHA256 \
+            --env GITHUB_EVENT_NAME --env GITHUB_EVENT_PATH=/github/observer-event.json \
+            --env RUNNER_ENVIRONMENT --env RUNNER_OS \
+            --env MANUAL_PRODUCER_RUN_ID --env MANUAL_PRODUCER_COMMIT \
+            --env MANUAL_PRODUCER_ARTIFACT_ID --env MANUAL_PRODUCER_ZIP_SHA256 \
             --env PRODUCER_RUN_ID --env PRODUCER_COMMIT --env PRODUCER_ARTIFACT_ID --env PRODUCER_ZIP_SHA256 \
             --entrypoint /usr/bin/timeout desert-rv-observer:local \
             --signal=TERM --kill-after=15s 180s python3 /github/workspace/tasks/desert-rv/scripts/player/observe_journey_player.py capture
       - name: Gate media on actual observer process success
         id: public
-        if: always()
+        if: ${{ always() && steps.image_precheck.outputs.image_ready == 'true' }}
         env:
           NATIVE_OUTCOME: ${{ steps.native.outcome }}
+          OBSERVER_EVENT_SHA256: ${{ steps.observer_request.outputs.observer_event_sha256 }}
+          PRODUCER_RUN_ID: ${{ steps.observer_request.outputs.producer_run_id }}
+          PRODUCER_COMMIT: ${{ steps.observer_request.outputs.producer_commit }}
+          PRODUCER_ARTIFACT_ID: ${{ steps.observer_request.outputs.producer_artifact_id }}
+          PRODUCER_ZIP_SHA256: ${{ steps.observer_request.outputs.producer_zip_sha256 }}
         run: python3 tasks/desert-rv/scripts/player/observe_journey_player.py export
       - name: Upload fixed safe status and verified game-only media
         if: always() && steps.public.outputs.export_ready == 'true' 

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Synthetic archives and source contracts only; no Unity, player or network."""
-import io,json,os,pathlib,tarfile,tempfile,unittest,zipfile,shutil
+import copy,io,json,os,pathlib,tarfile,tempfile,unittest,zipfile,shutil
 from unittest.mock import patch
 import observe_journey_player as o
 import test_journey_linux_export as fixture
@@ -9,6 +9,123 @@ class ObserveTests(unittest.TestCase):
   self.f=fixture.JourneyLinuxExportTests();self.f.setUp();self.addCleanup(self.f.tearDown);self.addCleanup(self.f.doCleanups)
   self.task,self.raw=self.f.success_fixture();fixture.x.stage();fixture.x.export();self.package=self.task/'public';self.root=self.f.root
   self.p=dict(PRODUCER_RUN_ID='123',PRODUCER_COMMIT='a'*40,PRODUCER_ARTIFACT_ID='456',PRODUCER_ZIP_SHA256='c'*64)
+  # The main exporter stays unchanged. Adapt only this synthetic consumer package
+  # to the recovery producer's exact additional control field.
+  control=json.loads((self.package/'control.json').read_text());host=o.bundle.empty_host()
+  host.update(lastPhase='STAGED',completedPhases=['PREFLIGHT','RECORD','STAGE','STAGED'],
+              nativeReceiptPin=dict(sha256=o.sha(self.package/'native-build-receipt.json'),bytes=len(self.raw)))
+  records=json.loads((self.package/'manifest.json').read_text())['files']
+  rows=[dict(path=r['path'],kind='FILE',mode=r['mode'],bytes=r['size'],sha256=r['sha256']) for r in records]
+  host['runtime']=dict(observed=True,totalEntries=len(rows),omittedEntries=0,entries=rows)
+  control['hostDiagnostic']=host;(self.package/'control.json').write_text(json.dumps(control));self.control_fixture=copy.deepcopy(control)
+ def control(self):return json.loads((self.package/'control.json').read_text())
+ def write_control(self,value):(self.package/'control.json').write_text(json.dumps(value))
+ def reject_control(self,value):
+  self.write_control(value)
+  with self.assertRaises(ValueError):o.validate_package(self.package,self.p)
+ def test_recovery_control_schema_and_exact_receipt_pin_accepted(self):
+  control=self.control();self.assertEqual(set(control),{'schema','mode','activation','build','licenseReturn','privateCleanup','buildDiagnostic','sourceRecovery','hostDiagnostic'})
+  self.assertEqual(control['hostDiagnostic'],o.bundle.validate_host(control['hostDiagnostic']))
+  self.assertEqual(o.validate_package(self.package,self.p)['nativeReceiptSha256'],control['hostDiagnostic']['nativeReceiptPin']['sha256'])
+ def test_missing_and_unknown_control_fields_rejected(self):
+  for field in list(self.control()):
+   value=self.control();value.pop(field)
+   with self.subTest(field=field):self.reject_control(value)
+   self.set_control_fixture()
+  value=self.control();value['rawPrivateLog']='MUST_NOT_PASS';self.reject_control(value)
+ def set_control_fixture(self):self.write_control(copy.deepcopy(self.control_fixture))
+ def test_missing_and_unknown_host_fields_rejected(self):
+  original=self.control()
+  for field in list(original['hostDiagnostic']):
+   value=copy.deepcopy(original);value['hostDiagnostic'].pop(field)
+   with self.subTest(field=field):self.reject_control(value)
+  value=copy.deepcopy(original);value['hostDiagnostic']['rawException']='MUST_NOT_PASS';self.reject_control(value)
+ def test_host_failure_or_unknown_phase_and_code_rejected(self):
+  original=self.control()
+  for update in (dict(failurePhase='STAGE_ARCHIVE',failureCode='PERMISSION_DENIED'),
+                 dict(lastPhase='UNKNOWN'),dict(failurePhase='UNKNOWN',failureCode='OTHER_ERROR'),
+                 dict(failurePhase='STAGE',failureCode='PRIVATE_EXCEPTION_TEXT'),dict(failurePhase='STAGE',failureCode='NONE')):
+   value=copy.deepcopy(original);value['hostDiagnostic'].update(update)
+   with self.subTest(update=update):self.reject_control(value)
+ def test_wrong_receipt_host_pin_hash_or_size_rejected(self):
+  original=self.control()
+  for pin in (dict(sha256='f'*64,bytes=len(self.raw)),dict(sha256=o.sha(self.package/'native-build-receipt.json'),bytes=len(self.raw)+1),
+              dict(sha256='__UNFINALIZED__',bytes=len(self.raw)),dict(sha256='f'*64,bytes=True),dict(sha256='f'*64,bytes=0),{'sha256':'f'*64,'bytes':10,'raw':'private'}):
+   value=copy.deepcopy(original);value['hostDiagnostic']['nativeReceiptPin']=pin
+   with self.subTest(pin=pin):self.reject_control(value)
+ def test_absent_optional_host_receipt_pin_does_not_replace_original_receipt_gate(self):
+  value=self.control();value['hostDiagnostic']['nativeReceiptPin']=None;self.write_control(value)
+  o.validate_package(self.package,self.p)
+  (self.package/'native-build-receipt.json').write_bytes(self.raw+b' ')
+  with self.assertRaises(ValueError):o.validate_package(self.package,self.p)
+ def test_runtime_diagnostic_private_or_traversal_path_rejected(self):
+  original=self.control()
+  for name in ('../secret','/tmp/private','DesertRV_Data/private.log','DesertRV_Data/.credentials','DesertRV_Data/credentials.json','unknown.bin'):
+   value=copy.deepcopy(original);value['hostDiagnostic']['runtime']['entries'][0]['path']=name
+   with self.subTest(name=name):self.reject_control(value)
+ def test_runtime_diagnostic_counts_unknown_fields_and_order_rejected(self):
+  original=self.control()
+  mutations=[lambda r:r.update(totalEntries=True),lambda r:r.update(omittedEntries=1),lambda r:r.update(observed=False),
+             lambda r:r.update(entries=list(reversed(r['entries']))),lambda r:r['entries'][0].update(raw='private'),
+             lambda r:r['entries'][0].update(kind='UNKNOWN'),lambda r:r['entries'][0].update(mode=True),
+             lambda r:r['entries'][0].update(bytes=-1),lambda r:r['entries'][0].update(sha256='__UNFINALIZED__')]
+  for mutate in mutations:
+   value=copy.deepcopy(original);mutate(value['hostDiagnostic']['runtime']);self.reject_control(value)
+ def test_host_source_and_line_must_be_closed_and_paired(self):
+  original=self.control()
+  for update in (dict(failureSource='/tmp/private.log',failureLine=1),dict(failureSource=o.bundle.HOST_SOURCE_PATHS[0],failureLine=0),dict(failureSource='',failureLine=1)):
+   value=copy.deepcopy(original);value['hostDiagnostic'].update(update);self.reject_control(value)
+ def test_host_completed_phases_reject_duplicates_and_unknown(self):
+  original=self.control()
+  for done in (['STAGED','STAGED'],['PRIVATE_PHASE'],['NONE']):
+   value=copy.deepcopy(original);value['hostDiagnostic']['completedPhases']=done;self.reject_control(value)
+ def stage_fixture(self,run_update=None,artifact_update=None):
+  # A synthetic branch producer ZIP exercises real stage validation, never a download/run.
+  manifest=json.loads((self.package/'manifest.json').read_text());native=manifest['nativeReceipt']
+  native.update(restorationProof=dict(path='tasks/desert-rv/unity/JourneyEvidence/JourneyPreparation/restoration-revalidated.json',sha256='d'*64),
+                assetProducerSourceCommit='f'*40,assetProducerRunUrl='https://github.com/yangerstar1/task-workbench/actions/runs/456',restorationNativeXmlSha256='e'*64)
+  raw=(json.dumps(native,indent=2)+'\n').encode();(self.package/'native-build-receipt.json').write_bytes(raw)
+  manifest['nativeReceiptSha256']=o.sha(self.package/'native-build-receipt.json');(self.package/'manifest.json').write_text(json.dumps(manifest))
+  control=self.control();control['hostDiagnostic']['nativeReceiptPin']=dict(sha256=manifest['nativeReceiptSha256'],bytes=len(raw));self.write_control(control)
+  out=io.BytesIO()
+  with zipfile.ZipFile(out,'w') as archive:
+   for name in sorted(o.PACKAGE_FILES):archive.writestr(name,(self.package/name).read_bytes())
+  zip_raw=out.getvalue();pins=dict(self.p,PRODUCER_ZIP_SHA256=o.hashlib.sha256(zip_raw).hexdigest())
+  run=dict(status='completed',conclusion='success',head_sha=pins['PRODUCER_COMMIT'],head_branch='journey-linux-export-recovery-938',path=o.REBUILD_WORKFLOW,run_attempt=1)
+  artifact=dict(workflow_run=dict(id=int(pins['PRODUCER_RUN_ID']),head_sha=pins['PRODUCER_COMMIT']),expired=False,digest='sha256:'+pins['PRODUCER_ZIP_SHA256'],size_in_bytes=len(zip_raw),name='journey-linux-CANDIDATE-NOT-PLAYTESTED-123-1')
+  run.update(run_update or {});artifact.update(artifact_update or {})
+  stack=__import__('contextlib').ExitStack();self.addCleanup(stack.close)
+  source=self.root/'staged-observer-source';stack.enter_context(patch.object(o,'SOURCE',source));stack.enter_context(patch.object(o,'TASK',self.root))
+  stack.enter_context(patch.dict(os.environ,pins))
+  def api(endpoint):
+   self.assertIn(endpoint,('/actions/runs/123','/actions/artifacts/456'));return run if endpoint=='/actions/runs/123' else artifact
+  def transfer(args,**kwargs):
+   self.assertEqual(args,['gh','api','repos/'+o.REPO+'/actions/artifacts/456/zip']);kwargs['stdout'].write(zip_raw)
+   return o.subprocess.CompletedProcess(args,0)
+  stack.enter_context(patch.object(o,'api',side_effect=api));download=stack.enter_context(patch.object(o.subprocess,'run',side_effect=transfer))
+  return source,pins,download
+ def test_branch_producer_stages_exact_original_verified_package(self):
+  source,pins,download=self.stage_fixture();o.stage();download.assert_called_once()
+  verified=json.loads((source/'verified.json').read_text());self.assertEqual(verified['pins'],pins);self.assertEqual(verified['producerWorkflowPath'],o.REBUILD_WORKFLOW)
+  self.assertEqual((source/'package/native-build-receipt.json').read_bytes(),(self.package/'native-build-receipt.json').read_bytes())
+  self.assertEqual(o.sha(source/'producer.zip'),pins['PRODUCER_ZIP_SHA256'])
+  self.assertEqual(o.bundle.inventory(source/'runtime'),json.loads((source/'package/manifest.json').read_text())['files'])
+ def test_branch_producer_unsuccessful_run_is_rejected_before_zip(self):
+  source,pins,download=self.stage_fixture(run_update=dict(conclusion='failure'))
+  with self.assertRaises(ValueError):o.stage()
+  download.assert_not_called();self.assertFalse(source.exists())
+ def test_branch_producer_wrong_build_commit_is_rejected_before_zip(self):
+  source,pins,download=self.stage_fixture(run_update=dict(head_sha='f'*40))
+  with self.assertRaises(ValueError):o.stage()
+  download.assert_not_called();self.assertFalse(source.exists())
+ def test_branch_producer_wrong_workflow_is_rejected_before_zip(self):
+  source,pins,download=self.stage_fixture(run_update=dict(path='.github/workflows/other.yml'))
+  with self.assertRaises(ValueError):o.stage()
+  download.assert_not_called();self.assertFalse(source.exists())
+ def test_branch_producer_wrong_artifact_digest_is_rejected_before_zip(self):
+  source,pins,download=self.stage_fixture(artifact_update=dict(digest='sha256:'+'f'*64))
+  with self.assertRaises(ValueError):o.stage()
+  download.assert_not_called();self.assertFalse(source.exists())
  def test_new_observer_does_not_relabel_old_producer(self):
   with patch.dict(os.environ,{'GITHUB_SHA':'e'*40,'GITHUB_RUN_ID':'789'}):
    m=o.validate_package(self.package,self.p);self.assertEqual(m['sourceCommit'],'a'*40);self.assertEqual(os.environ['GITHUB_SHA'],'e'*40)

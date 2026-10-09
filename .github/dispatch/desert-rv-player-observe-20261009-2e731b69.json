@@ -1,0 +1,11 @@
+{
+  "schema": 1,
+  "requestId": "desert-rv-player-observe-20261009-once-2e731b69",
+  "baseCommit": "fa18f21620028e04145be9026ab3c333fa9cadd4",
+  "policySha256": "568887d4921833a448903c549d9ee5b526eb3dff45aa53129c7aa9a521479777",
+  "sourceStateSha256": "5cafdba3d19ce0b14101553225fccc3e6715b8af21230184c5a0c498f9ef589e",
+  "producerRunId": "37999653419",
+  "producerCommit": "6648cf7ae3133a6db5e6ec16d1fd8951bed27561",
+  "producerArtifactId": "11651186549",
+  "producerZipSha256": "82fc193bd27c759283be8d794eda2178fdd5e5da4a843c1c0257f1e2f9ed7701"
+}

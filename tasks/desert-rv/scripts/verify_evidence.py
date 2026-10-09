@@ -153,10 +153,18 @@ def guard():
         elif os.environ.get('GITHUB_WORKFLOW_REF') == REPOSITORY + '/.github/workflows/desert-rv-armored-v004-r1-discovery.yml@refs/heads/main':
             import armored_v004_discovery_dispatch
             armored_v004_discovery_dispatch.verify(ROOT, os.environ)  # Exact separate Discovery-only push.
+        elif os.environ.get('GITHUB_WORKFLOW_REF') == REPOSITORY + '/.github/workflows/desert-rv-player-observe.yml@refs/heads/journey-player-observer-fa18':
+            import journey_observer_dispatch
+            journey_observer_dispatch.verify(ROOT, os.environ)  # Independent fixed observer request; no event relabeling.
         else:
             import journey_rebuild_dispatch
             journey_rebuild_dispatch.verify(ROOT, os.environ)  # Preserve the existing rebuild-only guard unchanged.
-    require(os.environ.get('GITHUB_REPOSITORY') == REPOSITORY and os.environ.get('GITHUB_REF') == 'refs/heads/main', 'Trusted repository/main required')
+    require(os.environ.get('GITHUB_REPOSITORY') == REPOSITORY and (
+        os.environ.get('GITHUB_REF') == 'refs/heads/main' or (
+            os.environ.get('GITHUB_EVENT_NAME') == 'push' and
+            os.environ.get('GITHUB_REF') == 'refs/heads/journey-player-observer-fa18' and
+            os.environ.get('GITHUB_WORKFLOW_REF') == REPOSITORY + '/.github/workflows/desert-rv-player-observe.yml@refs/heads/journey-player-observer-fa18')),
+        'Trusted repository/main or fixed observer push required')
     require(os.environ.get('GITHUB_ACTOR') == OWNER and os.environ.get('GITHUB_TRIGGERING_ACTOR') == OWNER, 'Owner dispatch and owner rerun required')
     repo = read_json(os.environ['GITHUB_EVENT_PATH'])['repository']
     require(repo.get('full_name') == REPOSITORY and repo.get('private') is False and repo.get('fork') is False and repo.get('default_branch') == 'main', 'Public original repository required')
