@@ -62,7 +62,8 @@ MAX_TOKEN_BODY = 16384
 MAX_TOKEN_LENGTH = 8192
 MAX_CACHE_BODY = 16384
 MAX_PULL_STDERR = 65536
-WINDOW_SECONDS = 21600
+MAX_RATE_INTEGER = 999999999
+RATE_PATTERN = re.compile(r"(?P<value>0|[1-9][0-9]{0,8});w=(?P<window>[1-9][0-9]{0,8})", re.ASCII)
 MAX_RETRY_SECONDS = 604800
 UTC = dt.timezone.utc
 CRITICAL_HEADERS = frozenset(("docker-content-digest", "ratelimit-limit", "ratelimit-remaining", "retry-after", "www-authenticate", "content-type", "content-length", "content-encoding", "transfer-encoding", "location"))
@@ -197,8 +198,8 @@ POLICY_ATOM = r"[0-9]{1,10}(?:[ \t]*;[ \t]*w[ \t]*=[ \t]*[0-9]{1,10})?"
 NUMERIC_POLICY = re.compile(r"[ \t]*" + POLICY_ATOM + r"(?:[ \t]*,[ \t]*" + POLICY_ATOM + r"){0,3}[ \t]*", re.ASCII)
 DIAG_KEYS = frozenset(("occurrenceCount", "lengthBytes", "sha256", "format", "gateCompatibility", "boundedRaw", "policies"))
 DIAG_FORMATS = frozenset(("NOT_OBSERVED", "MISSING", "DUPLICATE", "TOO_LONG", "NON_ASCII_OR_CONTROL", "REDACTED_SENSITIVE", "UNKNOWN_SYNTAX", "NUMERIC_SINGLE", "NUMERIC_MULTI"))
-DIAG_COMPATIBILITY = frozenset(("NOT_EVALUATED", "MISSING", "DUPLICATE", "UNKNOWN_SYNTAX", "STRICT_FORMAT_MATCH", "WINDOW_MISSING", "WINDOW_NOT_21600", "MULTIPLE_POLICIES", "NONCANONICAL_NUMBER", "NONCANONICAL_SYNTAX"))
-FAILED_PREDICATES = frozenset(("NOT_EVALUATED", "NONE", "HEADER_SAFETY", "TARGET_DIGEST_MATCH", "HTTP_STATUS_200", "HTTP_STATUS_429", "QUOTA_BOTH_HEADERS_MISSING", "LIMIT_MISSING", "REMAINING_MISSING", "LIMIT_HEADER_NOT_VALID", "REMAINING_HEADER_NOT_VALID", "LIMIT_STRICT_REGEX", "REMAINING_STRICT_REGEX", "LIMIT_NOT_POSITIVE", "REMAINING_GT_LIMIT", "REMAINING_NOT_POSITIVE"))
+DIAG_COMPATIBILITY = frozenset(("NOT_EVALUATED", "MISSING", "DUPLICATE", "UNKNOWN_SYNTAX", "STRICT_FORMAT_MATCH", "WINDOW_MISSING", "WINDOW_NOT_POSITIVE", "WINDOW_OUT_OF_RANGE", "NONCANONICAL_WINDOW", "MULTIPLE_POLICIES", "NONCANONICAL_NUMBER", "NONCANONICAL_SYNTAX"))
+FAILED_PREDICATES = frozenset(("NOT_EVALUATED", "NONE", "HEADER_SAFETY", "TARGET_DIGEST_MATCH", "HTTP_STATUS_200", "HTTP_STATUS_429", "QUOTA_BOTH_HEADERS_MISSING", "LIMIT_MISSING", "REMAINING_MISSING", "LIMIT_HEADER_NOT_VALID", "REMAINING_HEADER_NOT_VALID", "LIMIT_STRICT_REGEX", "REMAINING_STRICT_REGEX", "LIMIT_NOT_POSITIVE", "REMAINING_GT_LIMIT", "REMAINING_NOT_POSITIVE", "CHANNEL_WINDOWS_MATCH"))
 
 
 def blank_rate_header():
@@ -261,12 +262,16 @@ def diagnose_rate_header(response, name):
         compatibility = "MULTIPLE_POLICIES"
     elif policies[0]["windowSeconds"] is None:
         compatibility = "WINDOW_MISSING"
-    elif policies[0]["windowSeconds"] != WINDOW_SECONDS:
-        compatibility = "WINDOW_NOT_21600"
-    elif re.fullmatch(r"(?:0|[1-9][0-9]{0,8});w=21600", value):
+    elif policies[0]["windowSeconds"] <= 0:
+        compatibility = "WINDOW_NOT_POSITIVE"
+    elif policies[0]["windowSeconds"] > MAX_RATE_INTEGER:
+        compatibility = "WINDOW_OUT_OF_RANGE"
+    elif RATE_PATTERN.fullmatch(value):
         compatibility = "STRICT_FORMAT_MATCH"
     elif not re.fullmatch(r"(?:0|[1-9][0-9]{0,8})", value.split(";", 1)[0].strip(" \t")):
         compatibility = "NONCANONICAL_NUMBER"
+    elif not re.fullmatch(r"[1-9][0-9]{0,8}", value.split("=", 1)[1].strip(" \t")):
+        compatibility = "NONCANONICAL_WINDOW"
     else:
         compatibility = "NONCANONICAL_SYNTAX"
     result["gateCompatibility"] = compatibility
@@ -298,7 +303,7 @@ def blank_headers(route):
 
 
 def blank_result():
-    return {"schemaVersion": 3, "status": "UNKNOWN", "reason": "NOT_STARTED",
+    return {"schemaVersion": 4, "status": "UNKNOWN", "reason": "NOT_STARTED",
             "image": IMAGE, "digest": DIGEST, "cacheHit": False,
             "limit": None, "remaining": None, "windowSeconds": None,
             "retryAfter": None, "checkedAt": utc_text(utc_now()),
@@ -468,7 +473,7 @@ def accept_response(record, response, route, is_token=False):
 
 
 def quota_values(record, response):
-    values = []
+    values, windows = [], []
     missing = sum(record["headers"][key] == "MISSING" for key in ("limit", "remaining"))
     if missing:
         record["reason"] = "QUOTA_HEADERS_ABSENT" if missing == 2 else "QUOTA_HEADER_PARTIAL"
@@ -477,20 +482,27 @@ def quota_values(record, response):
     for key in ("limit", "remaining"):
         state = record["headers"][key]
         value = header(response, "ratelimit-" + key)
-        if state != "VALID" or value is None or not re.fullmatch(r"(?:0|[1-9][0-9]{0,8});w=21600", value):
+        parsed = RATE_PATTERN.fullmatch(value) if value is not None else None
+        if state != "VALID" or parsed is None:
             rate_predicate(record, key.upper() + ("_HEADER_NOT_VALID" if state != "VALID" or value is None else "_STRICT_REGEX"))
             if state == "VALID":
                 record["headers"][key] = "INVALID"
             record["reason"] = "QUOTA_INVALID"
             return None
-        values.append(int(value.split(";", 1)[0]))
+        values.append(int(parsed.group("value")))
+        windows.append(int(parsed.group("window")))
+    if windows[0] != windows[1]:
+        rate_predicate(record, "CHANNEL_WINDOWS_MATCH")
+        record["headers"]["limit"] = record["headers"]["remaining"] = "INVALID"
+        record["reason"] = "QUOTA_INVALID"
+        return None
     if values[0] <= 0 or values[1] > values[0]:
         rate_predicate(record, "LIMIT_NOT_POSITIVE" if values[0] <= 0 else "REMAINING_GT_LIMIT")
         record["headers"]["limit"] = record["headers"]["remaining"] = "INVALID"
         record["reason"] = "QUOTA_INVALID"
         return None
     rate_predicate(record, "NONE")
-    return tuple(values)
+    return values[0], values[1], windows[0]
 
 
 def finish_head(result, record, response, route):
@@ -502,8 +514,7 @@ def finish_head(result, record, response, route):
         if route is Route.QUOTA and record["headers"]["safety"] == "VALID":
             values = quota_values(record, response)
             if values is not None:
-                result["limit"], result["remaining"] = values
-                result["windowSeconds"] = WINDOW_SECONDS
+                result["limit"], result["remaining"], result["windowSeconds"] = values
             record["reason"] = "HTTP_RATE_LIMITED"
         rate_predicate(record, "HTTP_STATUS_429")
         return False
@@ -536,8 +547,7 @@ def finish_head(result, record, response, route):
     values = quota_values(record, response)
     if values is None:
         return False
-    result["limit"], result["remaining"] = values
-    result["windowSeconds"] = WINDOW_SECONDS
+    result["limit"], result["remaining"], result["windowSeconds"] = values
     rate_predicate(record, "NONE" if values[1] > 0 else "REMAINING_NOT_POSITIVE")
     record.update(complete=True, reason="QUOTA_AVAILABLE" if values[1] > 0 else "QUOTA_EXHAUSTED")
     return values[1] > 0
@@ -787,6 +797,17 @@ def validate_rate_diagnostics(diagnostic):
             and validate_rate_header(diagnostic["limit"]) and validate_rate_header(diagnostic["remaining"]))
 
 
+def report_rate_pair(record):
+    diagnostics = record["rateDiagnostics"]
+    if any(diagnostics[key]["gateCompatibility"] != "STRICT_FORMAT_MATCH" or len(diagnostics[key]["policies"]) != 1 for key in ("limit", "remaining")):
+        return None
+    limit = diagnostics["limit"]["policies"][0]
+    remaining = diagnostics["remaining"]["policies"][0]
+    if limit["windowSeconds"] != remaining["windowSeconds"] or not 0 < limit["windowSeconds"] <= MAX_RATE_INTEGER or not 0 < limit["value"] <= MAX_RATE_INTEGER or not 0 <= remaining["value"] <= limit["value"]:
+        return None
+    return limit["value"], remaining["value"], limit["windowSeconds"]
+
+
 def validate_channel(record, route):
     if type(record) is not dict or set(record) != CHANNEL_KEYS or type(record["complete"]) is not bool:
         return False
@@ -821,7 +842,8 @@ def validate_channel(record, route):
         if code != 200 or record["currentStage"] not in ("INITIAL_HEAD", "AUTHENTICATED_HEAD") or headers["safety"] != "VALID":
             return False
         if route is Route.TARGET:
-            return record["reason"] == "TARGET_VERIFIED" and headers["digest"] == "VALID" and ((headers["limit"] == headers["remaining"] == "MISSING") or (headers["limit"] == headers["remaining"] == "VALID"))
+            pair = report_rate_pair(record)
+            return record["reason"] == "TARGET_VERIFIED" and headers["digest"] == "VALID" and ((headers["limit"] == headers["remaining"] == "MISSING") or (headers["limit"] == headers["remaining"] == "VALID" and pair is not None and pair[1] > 0))
         return record["reason"] in ("QUOTA_AVAILABLE", "QUOTA_EXHAUSTED") and headers["limit"] == headers["remaining"] == "VALID"
     return record["reason"] not in ("TARGET_VERIFIED", "QUOTA_AVAILABLE", "QUOTA_EXHAUSTED")
 
@@ -829,7 +851,7 @@ def validate_channel(record, route):
 def validate_report(report):
     """Pure fixed-schema/type/status consistency check; never performs I/O."""
     try:
-        if type(report) is not dict or set(report) != REPORT_KEYS or type(report["schemaVersion"]) is not int or report["schemaVersion"] != 3:
+        if type(report) is not dict or set(report) != REPORT_KEYS or type(report["schemaVersion"]) is not int or report["schemaVersion"] != 4:
             return False
         if len(json.dumps(report, sort_keys=True, separators=(",", ":"), allow_nan=False).encode("utf-8")) + 1 > MAX_SERIALIZED_REPORT_BYTES:
             return False
@@ -842,7 +864,7 @@ def validate_report(report):
             return False
         limit, remaining, window = (report[key] for key in ("limit", "remaining", "windowSeconds"))
         no_quota = limit is None and remaining is None and window is None
-        valid_quota = type(limit) is int and type(remaining) is int and type(window) is int and 0 < limit <= 999999999 and 0 <= remaining <= limit and window == WINDOW_SECONDS
+        valid_quota = type(limit) is int and type(remaining) is int and type(window) is int and 0 < limit <= 999999999 and 0 <= remaining <= limit and 0 < window <= MAX_RATE_INTEGER
         if not no_quota and not valid_quota:
             return False
         target, quota = report["target"], report["quota"]
@@ -887,6 +909,8 @@ def validate_report(report):
                 return False
         elif report["reason"].startswith("PULL_"):
             return False
+        if valid_quota and report_rate_pair(quota) != (limit, remaining, window):
+            return False
         if valid_quota and (quota["currentStage"] not in ("INITIAL_HEAD", "AUTHENTICATED_HEAD") or quota["httpStatus"] not in (200, 429) or quota["headers"]["limit"] != "VALID" or quota["headers"]["remaining"] != "VALID" or quota["headers"]["safety"] != "VALID"):
             return False
         if quota["complete"] and not valid_quota:
@@ -918,7 +942,7 @@ def validate_report(report):
             if report["reason"] == "PULL_RATE_LIMITED":
                 return pull["attempted"] and pull["outcome"] == "NONZERO_EXIT" and pull["failureClass"] == "DOCKER_RATE_LIMITED"
             if report["reason"] == "TARGET_QUOTA_EXHAUSTED":
-                return target["httpStatus"] == 200 and target["reason"] == "TARGET_QUOTA_EXHAUSTED" and target["headers"]["limit"] == target["headers"]["remaining"] == "VALID" and no_quota and quota == blank_channel(Route.QUOTA)
+                return target["httpStatus"] == 200 and target["reason"] == "TARGET_QUOTA_EXHAUSTED" and target["headers"]["limit"] == target["headers"]["remaining"] == "VALID" and report_rate_pair(target) is not None and report_rate_pair(target)[1] == 0 and no_quota and quota == blank_channel(Route.QUOTA)
             if report["reason"] == "QUOTA_EXHAUSTED":
                 return target["complete"] and quota["complete"] and valid_quota and remaining == 0
             route = Route.TARGET if report["reason"] == "TARGET_RATE_LIMITED" else Route.QUOTA if report["reason"] == "QUOTA_RATE_LIMITED" else None

@@ -670,7 +670,7 @@ class ReportTests(OfflineCase):
     def test_schema_fixed_and_validator_pure(self):
         report, _ = self.exercise([target(), quota()])
         self.assertEqual(set(report), p.REPORT_KEYS)
-        self.assertEqual(report["schemaVersion"], 3)
+        self.assertEqual(report["schemaVersion"], 4)
         with mock.patch.object(p, "utc_now", side_effect=AssertionError("clock")), mock.patch.object(p, "cache_hit", side_effect=AssertionError("I/O")):
             self.assertTrue(p.validate_report(report))
 
@@ -928,7 +928,7 @@ class RateDiagnosticTests(OfflineCase):
             self.assertTrue(p.validate_rate_header(diagnostic))
 
     def test_actual_numeric_windows_and_known_formats_are_diagnostic_only(self):
-        cases = [('100;w=21600', 'STRICT_FORMAT_MATCH', [{'value': 100, 'windowSeconds': 21600}]), ('100;w=3600', 'WINDOW_NOT_21600', [{'value': 100, 'windowSeconds': 3600}]), ('100', 'WINDOW_MISSING', [{'value': 100, 'windowSeconds': None}]), ('100, 100;w=21600', 'MULTIPLE_POLICIES', [{'value': 100, 'windowSeconds': None}, {'value': 100, 'windowSeconds': 21600}]), ('100 ; w = 21600', 'NONCANONICAL_SYNTAX', [{'value': 100, 'windowSeconds': 21600}]), ('0100;w=21600', 'NONCANONICAL_NUMBER', [{'value': 100, 'windowSeconds': 21600}]), ('1000000000;w=21600', 'NONCANONICAL_NUMBER', [{'value': 1000000000, 'windowSeconds': 21600}])]
+        cases = [('100;w=21600', 'STRICT_FORMAT_MATCH', [{'value': 100, 'windowSeconds': 21600}]), ('100;w=3600', 'STRICT_FORMAT_MATCH', [{'value': 100, 'windowSeconds': 3600}]), ('100', 'WINDOW_MISSING', [{'value': 100, 'windowSeconds': None}]), ('100, 100;w=21600', 'MULTIPLE_POLICIES', [{'value': 100, 'windowSeconds': None}, {'value': 100, 'windowSeconds': 21600}]), ('100 ; w = 21600', 'NONCANONICAL_SYNTAX', [{'value': 100, 'windowSeconds': 21600}]), ('0100;w=21600', 'NONCANONICAL_NUMBER', [{'value': 100, 'windowSeconds': 21600}]), ('1000000000;w=21600', 'NONCANONICAL_NUMBER', [{'value': 1000000000, 'windowSeconds': 21600}])]
         for value, classification, policies in cases:
             diagnostic = self.diagnostic(value)
             self.assertEqual(diagnostic["gateCompatibility"], classification)
@@ -940,16 +940,16 @@ class RateDiagnosticTests(OfflineCase):
                 self.assertEqual(report["target"]["rateDiagnostics"]["firstFailedPredicate"], 'LIMIT_STRICT_REGEX')
                 self.pull_mock.assert_not_called()
 
-    def test_both_headers_diagnosed_even_when_first_limit_fails(self):
+    def test_both_headers_diagnosed_before_channel_window_conflict(self):
         report, _ = self.exercise([Raw(200, TARGET_HEADERS + (("RateLimit-Limit", '100;w=3600'), ("RateLimit-Remaining", '12;w=7200')))])
         diagnostic = report["target"]["rateDiagnostics"]
-        self.assertEqual(diagnostic["firstFailedPredicate"], 'LIMIT_STRICT_REGEX')
+        self.assertEqual(diagnostic["firstFailedPredicate"], 'CHANNEL_WINDOWS_MATCH')
         self.assertEqual(diagnostic["remaining"]["policies"][0]["windowSeconds"], 7200)
-        self.assertEqual(report["target"]["headers"]["remaining"], 'VALID')
-        self.assertEqual(diagnostic["remaining"]["gateCompatibility"], 'WINDOW_NOT_21600')
+        self.assertEqual(report["target"]["headers"]["remaining"], 'INVALID')
+        self.assertEqual(diagnostic["remaining"]["gateCompatibility"], 'STRICT_FORMAT_MATCH')
 
     def test_exact_first_failed_predicates(self):
-        cases = [((("RateLimit-Limit", '100;w=21600'),), 'REMAINING_MISSING'), ((("RateLimit-Remaining", '1;w=21600'),), 'LIMIT_MISSING'), ((("RateLimit-Limit", '100;w=21600'), ("RateLimit-Remaining", '1;w=60')), 'REMAINING_STRICT_REGEX'), ((("RateLimit-Limit", '0;w=21600'), ("RateLimit-Remaining", '0;w=21600')), 'LIMIT_NOT_POSITIVE'), ((("RateLimit-Limit", '100;w=21600'), ("RateLimit-Remaining", '101;w=21600')), 'REMAINING_GT_LIMIT'), ((("RateLimit-Limit", '100;w=21600'), ("RateLimit-Remaining", '0;w=21600')), 'REMAINING_NOT_POSITIVE')]
+        cases = [((("RateLimit-Limit", '100;w=21600'),), 'REMAINING_MISSING'), ((("RateLimit-Remaining", '1;w=21600'),), 'LIMIT_MISSING'), ((("RateLimit-Limit", '100;w=21600'), ("RateLimit-Remaining", '1;w=60')), 'CHANNEL_WINDOWS_MATCH'), ((("RateLimit-Limit", '0;w=21600'), ("RateLimit-Remaining", '0;w=21600')), 'LIMIT_NOT_POSITIVE'), ((("RateLimit-Limit", '100;w=21600'), ("RateLimit-Remaining", '101;w=21600')), 'REMAINING_GT_LIMIT'), ((("RateLimit-Limit", '100;w=21600'), ("RateLimit-Remaining", '0;w=21600')), 'REMAINING_NOT_POSITIVE')]
         for headers, predicate in cases:
             report, _ = self.exercise([Raw(200, TARGET_HEADERS + headers)])
             self.assertEqual(report["target"]["rateDiagnostics"]["firstFailedPredicate"], predicate)
@@ -1026,11 +1026,11 @@ class RateDiagnosticTests(OfflineCase):
         # This bounds every allowlisted schema field, not just reachable reports.
         longest = lambda choices: max(choices, key=len)
         upper = p.blank_result()
-        upper.update(status='RATE_LIMITED', reason=longest(p.TOP_REASONS), limit=999999999, remaining=999999999, windowSeconds=21600, retryAfter={'utc': '9999-12-31T23:59:59Z'}, checkedAt='9999-12-31T23:59:59Z')
+        upper.update(status='RATE_LIMITED', reason=longest(p.TOP_REASONS), limit=999999999, remaining=999999999, windowSeconds=999999999, retryAfter={'utc': '9999-12-31T23:59:59Z'}, checkedAt='9999-12-31T23:59:59Z')
         diagnostic = {'occurrenceCount': None, 'lengthBytes': 16777216, 'sha256': 'f' * 64, 'format': longest(p.DIAG_FORMATS), 'gateCompatibility': longest(p.DIAG_COMPATIBILITY), 'boundedRaw': '\\' * 256, 'policies': [{'value': 9999999999, 'windowSeconds': 9999999999}] * 4}
         for route in ('target', 'quota'):
             record = upper[route]
-            record.update(complete=False, currentStage=longest(p.STAGES), httpStatus=599, reason=longest(p.CHANNEL_REASONS), headers={key: longest(p.HEADER_STATES) for key in p.HEADER_KEYS}, rateDiagnostics={'firstFailedPredicate': longest(p.FAILED_PREDICATES), 'limit': copy.deepcopy(diagnostic), 'remaining': copy.deepcopy(diagnostic)})
+            record.update(complete=False, currentStage=longest(p.STAGES), httpStatus=None, reason=longest(p.CHANNEL_REASONS), headers={key: longest(p.HEADER_STATES) for key in p.HEADER_KEYS}, rateDiagnostics={'firstFailedPredicate': longest(p.FAILED_PREDICATES), 'limit': copy.deepcopy(diagnostic), 'remaining': copy.deepcopy(diagnostic)})
         upper['pull'].update(attempted=False, currentStage=longest(p.PULL_STAGES), outcome=longest(p.PULL_OUTCOMES), exitCode=-128, cacheVerified=False, failureClass=longest(p.PULL_FAILURE_CLASSES))
         budget = len(json.dumps(upper, sort_keys=True, separators=(',', ':')).encode()) + 1
         self.assertEqual(budget, SERIALIZED_CONSERVATIVE_MAX)
@@ -1043,7 +1043,108 @@ class RateDiagnosticTests(OfflineCase):
             self.assertEqual(len(json.dumps(diagnostic['boundedRaw'])) - 2, 512)
 
 
-SERIALIZED_CONSERVATIVE_MAX = 5019
+class ServerWindowTests(OfflineCase):
+    @staticmethod
+    def pair(window, limit=100, remaining=20):
+        return (("RateLimit-Limit", str(limit) + ';w=' + str(window)), ("RateLimit-Remaining", str(remaining) + ';w=' + str(window)))
+
+    def test_each_legal_positive_window_is_reported_without_policy_guess(self):
+        for window in (1, 60, 3600, 21600, 86400, 1234567, 999999999):
+            report, _ = self.exercise([Raw(200, TARGET_HEADERS + self.pair(window)), Raw(200, self.pair(window))], main=True)
+            self.assertEqual((report['status'], report['reason']), ('PASS', 'READY'))
+            self.assertEqual(report['windowSeconds'], window)
+            for route in ('target', 'quota'):
+                for key in ('limit', 'remaining'):
+                    diagnostic = report[route]['rateDiagnostics'][key]
+                    self.assertEqual(diagnostic['policies'][0]['windowSeconds'], window)
+                    self.assertEqual(diagnostic['gateCompatibility'], 'STRICT_FORMAT_MATCH')
+            self.pull_mock.assert_not_called()
+
+    def test_observed_3600_target_and_independent_preview_window(self):
+        report, _ = self.auth(target_response=Raw(200, TARGET_HEADERS + self.pair(3600, 100, 100)), quota_response=Raw(200, self.pair(21600, 100, 20)))
+        self.assertEqual(report['status'], 'PASS')
+        self.assertEqual(report['target']['rateDiagnostics']['limit']['boundedRaw'], '100;w=3600')
+        self.assertEqual(report['windowSeconds'], 21600)
+
+    def test_target_and_preview_windows_may_differ(self):
+        for target_window, preview_window in ((3600,21600),(21600,3600),(1,999999999),(777,888)):
+            report, _ = self.exercise([Raw(200, TARGET_HEADERS + self.pair(target_window)), Raw(200, self.pair(preview_window))])
+            self.assertEqual(report['status'], 'PASS')
+            self.assertEqual(report['windowSeconds'], preview_window)
+
+    def test_window_conflict_within_target_stops_before_preview(self):
+        headers = (self.pair(3600)[0], self.pair(21600)[1])
+        report, transport = self.exercise([Raw(200, TARGET_HEADERS + headers), quota()])
+        self.assertEqual(report['reason'], 'TARGET_QUOTA_INVALID')
+        self.assertEqual(report['target']['rateDiagnostics']['firstFailedPredicate'], 'CHANNEL_WINDOWS_MATCH')
+        self.assertEqual(len(transport.calls), 1)
+        self.pull_mock.assert_not_called()
+
+    def test_window_conflict_within_preview_denies_pull(self):
+        report, _ = self.exercise([target(), Raw(200, (self.pair(3600)[0], self.pair(21600)[1]))])
+        self.assertEqual(report['reason'], 'QUOTA_INVALID')
+        self.assertEqual(report['quota']['rateDiagnostics']['firstFailedPredicate'], 'CHANNEL_WINDOWS_MATCH')
+        self.assertIsNone(report['windowSeconds'])
+        self.pull_mock.assert_not_called()
+
+    def test_zero_overflow_and_noncanonical_windows_are_rejected(self):
+        for value in ('0', '1000000000', '-1', '01', '03600', '+3600', '3600.0', '3e3'):
+            report, _ = self.exercise([target(), Raw(200, self.pair(value))])
+            self.assertEqual(report['status'], 'UNKNOWN')
+            self.assertEqual(report['reason'], 'QUOTA_INVALID')
+            self.assertIsNone(report['windowSeconds'])
+            self.pull_mock.assert_not_called()
+        self.assertEqual(p.diagnose_rate_header(p.Response(200, self.pair(0)), 'ratelimit-limit')['gateCompatibility'], 'WINDOW_NOT_POSITIVE')
+        self.assertEqual(p.diagnose_rate_header(p.Response(200, self.pair(1000000000)), 'ratelimit-limit')['gateCompatibility'], 'WINDOW_OUT_OF_RANGE')
+
+    def test_zero_remaining_remains_denied_at_every_positive_window(self):
+        for window in (1,3600,21600,999999999):
+            report, _ = self.exercise([Raw(200, TARGET_HEADERS + self.pair(window, remaining=0)), Raw(200)])
+            self.assertEqual(report['reason'], 'TARGET_QUOTA_EXHAUSTED')
+            self.pull_mock.assert_not_called()
+            report, _ = self.exercise([target(), Raw(200, self.pair(window, remaining=0))])
+            self.assertEqual(report['reason'], 'QUOTA_EXHAUSTED')
+            self.assertEqual(report['windowSeconds'], window)
+            self.assertEqual(report['remaining'], 0)
+            self.pull_mock.assert_not_called()
+
+    def test_limit_zero_and_remaining_above_limit_remain_denied(self):
+        for limit, remaining in ((0,0),(1,2)):
+            report, _ = self.exercise([target(), Raw(200, self.pair(3600, limit, remaining))])
+            self.assertEqual(report['reason'], 'QUOTA_INVALID')
+            self.pull_mock.assert_not_called()
+
+    def test_duplicate_partial_multi_and_bad_format_never_gain_pull(self):
+        pair = self.pair(3600)
+        invalid = [pair+pair,(pair[0],),(pair[1],),((pair[0][0],'100;w=3600,100;w=21600'),pair[1]),((pair[0][0],'100; w=3600'),pair[1]),((pair[0][0],'100'),pair[1])]
+        for headers in invalid:
+            report, _ = self.exercise([target(), Raw(200, headers)])
+            self.assertEqual(report['status'], 'UNKNOWN')
+            self.pull_mock.assert_not_called()
+
+    def test_preview_429_retains_actual_window_without_passing(self):
+        report, _ = self.exercise([target(), Raw(429, self.pair(3600))])
+        self.assertEqual(report['status'], 'RATE_LIMITED')
+        self.assertEqual(report['windowSeconds'], 3600)
+        self.pull_mock.assert_not_called()
+
+    def test_validator_rejects_window_not_matching_preview_evidence(self):
+        report, _ = self.exercise([target(), Raw(200, self.pair(3600))])
+        for window in (0,21600,1000000000,True):
+            bad = copy.deepcopy(report);bad['windowSeconds']=window
+            self.assertFalse(p.validate_report(bad))
+        bad=copy.deepcopy(report);bad['quota']['rateDiagnostics']['remaining']['policies'][0]['windowSeconds']=21600
+        self.assertFalse(p.validate_report(bad))
+
+    def test_nonstandard_target_window_does_not_broaden_absent_preview_rule(self):
+        self.pull_mock.return_value=('SUCCESS',0,'NONE')
+        report, _ = self.exercise([Raw(200,TARGET_HEADERS+self.pair(3600)),Raw(200)],cache_after_pull=True)
+        self.assertEqual(report['reason'],'PULL_SUCCEEDED')
+        self.assertIsNone(report['windowSeconds'])
+        self.pull_mock.assert_called_once_with()
+
+
+SERIALIZED_CONSERVATIVE_MAX = 5025
 
 
 if __name__ == "__main__":
