@@ -36,9 +36,19 @@ namespace DesertRV.Editor
             if (string.IsNullOrWhiteSpace(value)) throw new InvalidOperationException("Missing explicit " + name);
             return value;
         }
+        static void MarkPhase(string phase)
+        {
+            string directory = Environment.GetEnvironmentVariable("DESERTRV_PROGRESS_DIR");
+            if (string.IsNullOrWhiteSpace(directory)) return;
+            if (!Directory.Exists(directory)) throw new InvalidOperationException("Diagnostic progress directory unavailable.");
+            string marker = Path.Combine(directory, phase);
+            if (File.Exists(marker)) return;
+            File.WriteAllText(marker + ".tmp", "1"); File.Move(marker + ".tmp", marker);
+        }
         public static void RunWindowSmoke() => Run();
         public static void Run()
         {
+            MarkPhase("executeMethod-entered");
             if (!ExplicitInvocation || Application.isBatchMode || SystemInfo.graphicsDeviceType == GraphicsDeviceType.Null)
                 throw new InvalidOperationException("Use explicit rendered non-batch Editor under Xvfb.");
             if (!Smoke) { Required("DESERTRV_DIAGNOSTIC_SCOPE"); Required("DESERTRV_INPUT_PLAN"); }
@@ -54,6 +64,7 @@ namespace DesertRV.Editor
             if (state != PlayModeStateChange.EnteredPlayMode || !ExplicitInvocation) return;
             try
             {
+                MarkPhase("playmode-entered");
                 if (Application.isBatchMode || SystemInfo.graphicsDeviceType == GraphicsDeviceType.Null)
                     throw new InvalidOperationException("Rendered Editor required.");
                 if (!Smoke) JourneyDiagnosticScope.Open(Required("DESERTRV_DIAGNOSTIC_SCOPE"));
@@ -65,6 +76,7 @@ namespace DesertRV.Editor
                 captureView.titleContent = new GUIContent(captureTitle);
                 captureView.position = new Rect(20, 40, 1280, 760);
                 captureView.ShowUtility(); captureView.Focus();
+                MarkPhase("view-created");
                 pid = System.Diagnostics.Process.GetCurrentProcess().Id;
                 handshake = Required("DESERTRV_CAPTURE_HANDSHAKE_DIR");
                 if (!Directory.Exists(handshake) || Directory.GetFileSystemEntries(handshake).Length != 0)
@@ -125,14 +137,22 @@ namespace DesertRV.Editor
                     if (EditorApplication.timeSinceStartup - started > 10 &&
                         (smokeRecorder.CaptureCount == 0 || Time.realtimeSinceStartupAsDouble - smokeRecorder.LastCaptureWall > 5))
                         throw new InvalidOperationException("Smoke PNG heartbeat missing.");
-                    if (smokeRecorder.Stopped) Finish(smokeRecorder.StopReason == "window-smoke-ended" ? 0 : 1);
+                    if (smokeRecorder.Stopped)
+                    {
+                        if (smokeRecorder.StopReason == "window-smoke-ended") MarkPhase("duration-complete");
+                        Finish(smokeRecorder.StopReason == "window-smoke-ended" ? 0 : 1);
+                    }
                     return;
                 }
                 if (!recorder) throw new InvalidOperationException("Recorder lost.");
                 if (EditorApplication.timeSinceStartup - started > 10 &&
                     (recorder.CaptureCount == 0 || Time.realtimeSinceStartupAsDouble - recorder.LastCaptureWall > 5))
                     throw new InvalidOperationException("End-of-frame PNG heartbeat missing.");
-                if (recorder.Stopped) Finish(recorder.StopReason.StartsWith("plan-ended", StringComparison.Ordinal) ? 0 : 1);
+                if (recorder.Stopped)
+                {
+                    if (recorder.StopReason.StartsWith("plan-ended", StringComparison.Ordinal)) MarkPhase("duration-complete");
+                    Finish(recorder.StopReason.StartsWith("plan-ended", StringComparison.Ordinal) ? 0 : 1);
+                }
             }
             catch (Exception) { recorder?.Stop("blocked: verified-game-window capture unavailable"); smokeRecorder?.Stop("blocked: verified-game-window capture unavailable"); Finish(3); }
         }

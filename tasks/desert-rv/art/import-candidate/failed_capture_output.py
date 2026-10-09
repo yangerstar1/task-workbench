@@ -510,13 +510,26 @@ def validate_staged(staged, records, receipt_bytes):
     require(actual_files == set(expected) and actual_directories == directories)
 
 
+COLLECTION_STAGES = frozenset(('GUARD', 'FREEZE', 'NATIVE', 'IMPORT', 'GENERATED',
+                               'CAPTURE', 'SNAPSHOT', 'STAGING', 'COMMIT'))
+
+
+def collection_stage(stage):
+    # Controlled stage names only. No exception, path, input value or raw report
+    # is printed; failed diagnostics remain false/nonzero and never acceptance.
+    require(stage in COLLECTION_STAGES)
+    print('FAILED_CAPTURE_COLLECTION_STAGE=' + stage)
+
+
 def _export(root, output, c, summary, native, protected):
+    collection_stage('GUARD')
     code = summary.get('errorCode')
     require(code in FAILURE_CODES and native in ('success', 'failure') and protected == 'success')
     require(strict.digest(summary.get('importCommit'), 40)
             and type(summary.get('importRunUrl')) is str and re.fullmatch(RUN_URL, summary['importRunUrl']))
     output = safe_node(Path(output).absolute(), True)
     require(not any(output.iterdir()))
+    collection_stage('FREEZE')
     snap, contract, imp, capture, native_paths = freeze(root)
     require(contract == c and c.get('kind') in ('armored', 'weapon', 'pouncer')
             and type(c.get('schema')) is int and c['schema'] == 1)
@@ -539,6 +552,7 @@ def _export(root, output, c, summary, native, protected):
                 if field in report:
                     del report[field]
                     normalized_away.append(name + '.' + field)
+    collection_stage('NATIVE')
     native_info = validate_native(snap, native_paths)
     if native == 'success':
         require(native_info['failed'] == 0)
@@ -549,8 +563,11 @@ def _export(root, output, c, summary, native, protected):
     try:
         snap.materialize(frozen)
         project = frozen / 'unity'
+        collection_stage('IMPORT')
         prefix = validator.validate_import(project, c, project / 'CandidateImportInput/contract.json', imp)
+        collection_stage('GENERATED')
         validator.generated_files(project, c, prefix, imp, files)
+        collection_stage('CAPTURE')
         safe_capture = sanitize_capture(c, imp, capture, snap)
         source_identity = {key: c[key] for key in ('sourceCommit', 'runUrl', 'artifactId', 'artifactName',
                                                    'artifactSha256', 'mode', 'scope', 'kind')}
@@ -564,7 +581,9 @@ def _export(root, output, c, summary, native, protected):
         document['rawReportSha256'] = {name: digest(snap.data[snap.root / 'unity/JourneyEvidence/CandidateArt' / name])
             for name in ('import-report.json', 'capture-report.json')}
         require(len(json.dumps(document, allow_nan=False)) <= 16 * 1024**2)
+        collection_stage('SNAPSHOT')
         snap.verify()
+        collection_stage('STAGING')
         staged = Path(tempfile.mkdtemp(prefix='.failed-diagnostics-', dir=output.parent))
         records = []
         for index in select_images(document['frames'], c['kind']):
@@ -595,6 +614,7 @@ def _export(root, output, c, summary, native, protected):
         safe_node(output, True)
         require(not any(output.iterdir()))
         # Replace the empty runner-owned directory in one atomic operation.
+        collection_stage('COMMIT')
         staged.replace(output)
         staged = None
         summary.clear()

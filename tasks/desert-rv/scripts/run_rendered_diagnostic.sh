@@ -16,13 +16,19 @@ private_logs="${DESERTRV_PRIVATE_LOG_DIR:-$(mktemp -d)}"
 export DISPLAY=:91
 export DESERTRV_CAPTURE_HANDSHAKE_DIR="$(mktemp -d)"
 private_capture="$(mktemp -d)"
+export DESERTRV_PROGRESS_DIR="$(mktemp -d)"
+script_dir="$(cd -- "$(dirname -- "$0")" && pwd)"
 Xvfb "$DISPLAY" -screen 0 1600x1000x24 -nolisten tcp >"$private_logs/xvfb.log" 2>&1 & xvfb_pid=$!
 unity_pid=''
 wm_pid=''
 cleanup() {
+  original=$?
+  trap - EXIT
   [[ -z "$unity_pid" ]] || kill "$unity_pid" 2>/dev/null || true
   [[ -z "$wm_pid" ]] || kill "$wm_pid" 2>/dev/null || true
   kill "$xvfb_pid" 2>/dev/null || true
+  if ! python3 "$script_dir/rendered/write_control_status.py" --record-progress "$DESERTRV_PROGRESS_DIR" "$DESERTRV_EVIDENCE_DIR" >/dev/null 2>&1; then original=1; fi
+  exit "$original"
 }
 trap cleanup EXIT
 for i in $(seq 1 100); do xdpyinfo -display "$DISPLAY" >/dev/null 2>&1 && break; sleep .1; done
@@ -34,9 +40,12 @@ xprop -root _NET_SUPPORTING_WM_CHECK | grep -q 'window id'
 # No batchmode/nographics/quit and no screen capture before the dedicated-window handshake.
 timeout --signal=TERM --kill-after=30s 15m "$UNITY_EDITOR" -projectPath "$DESERTRV_UNITY_PROJECT" \
   -executeMethod "$entry" -force-glcore -job-worker-count 2 -logFile "$private_logs/editor.log" & unity_pid=$!
+printf 1 > "$DESERTRV_PROGRESS_DIR/editor-spawn"
 set +e
 python3 "$(dirname "$0")/capture_game_window.py" "$DESERTRV_CAPTURE_HANDSHAKE_DIR" "$private_capture/real-time.mp4" "$private_capture/capture-receipt.json" "$unity_pid"
 capture_status=$?
+# Recording failure is terminal. Do not wait five more minutes for the unrelated outer watchdog.
+if [[ "$capture_status" != 0 ]]; then kill -TERM "$unity_pid" 2>/dev/null || true; fi
 wait "$unity_pid"; editor_status=$?
 set -e
 unity_pid=''

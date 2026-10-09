@@ -4,6 +4,29 @@ import hashlib,json,os,pathlib,re,shutil,subprocess,tempfile
 ROOT=pathlib.Path(__file__).resolve().parents[4]
 TASK=ROOT/'tasks/desert-rv'
 CODES={'editor-startup','request-identity','process-identity','duplicate-window','game-window-unavailable','window-identity','window-not-viewable','window-size','window-resized','ffmpeg-exited','video-frame-heartbeat','editor-stop-not-success','editor-disappeared','capture-watchdog','capture-validation-failed','encoder-shutdown','encoder-not-started','encoder-exited-before-stop','encoder-stop-pipe','encoder-stop-timeout','encoder-exit-nonzero','encoder-missing-video','capture-not-started','NONE','UNAVAILABLE'}
+STATES={'NOT_ATTEMPTED','SUCCEEDED','FAILED'}
+PHASES=('editor-spawn','executeMethod-entered','playmode-entered','view-created','X11-window-verified','first-encoded-frame','duration-complete')
+CONTROL_FIELDS={'schema','mode','activation','licenseReturn','renderProcess','privateCleanup','captureFailureCode','renderPhases'}
+def unique_object(pairs):
+    out={}
+    for key,value in pairs:
+        if key in out:raise ValueError()
+        out[key]=value
+    return out
+def read_control(p):
+    p=safe(p)
+    if not p.is_file() or p.stat().st_size>4096:raise ValueError()
+    value=json.loads(p.read_text(),object_pairs_hook=unique_object)
+    if not isinstance(value,dict) or set(value)!=CONTROL_FIELDS:raise ValueError()
+    if type(value['schema']) is not int or value['schema']!=1 or value['mode']!='RENDERED_CONTROL_ONLY_NOT_ACCEPTANCE':raise ValueError()
+    if any(type(value[k]) is not str or value[k] not in STATES for k in ('activation','licenseReturn','renderProcess','privateCleanup')):raise ValueError()
+    if type(value['captureFailureCode']) is not str or value['captureFailureCode'] not in CODES:raise ValueError()
+    phases=value['renderPhases']
+    if not isinstance(phases,list) or phases!=[p for p in PHASES if p in phases]:raise ValueError()
+    return value
+def failure_details(control):
+    # Reconstruct from finite enums only. Never copy arbitrary receipt fields, logs, or traces.
+    return {key:control[key] for key in ('activation','licenseReturn','renderProcess','privateCleanup','captureFailureCode','renderPhases')}
 def safe(p):
     if p.is_symlink() or any(x.is_symlink() for x in p.parents):raise ValueError()
     return p
@@ -15,12 +38,15 @@ def sha(p):
 def main():
     final=safe(TASK/'rendered-public-export')
     if final.exists():return 1
-    stage=pathlib.Path(tempfile.mkdtemp(prefix='.rendered-public-',dir=TASK));code='EVIDENCE_UNAVAILABLE';ok=False
+    stage=pathlib.Path(tempfile.mkdtemp(prefix='.rendered-public-',dir=TASK));code='EVIDENCE_UNAVAILABLE';ok=False;control=None
     try:
         if subprocess.run(['git','diff','--quiet','--exit-code'],cwd=ROOT).returncode or subprocess.run(['git','diff','--cached','--quiet','--exit-code'],cwd=ROOT).returncode:
             code='PROTECTED_SOURCE_CHANGED';raise ValueError()
+        try:control=read_control(TASK/'rendered-control-export/status.json')
+        except Exception:control=None
+        # Detail visibility does not grant success: preserve the actual native outcome gate.
         if os.environ.get('NATIVE_OUTCOME')!='success':code='NATIVE_PROCESS_NOT_SUCCESS';raise ValueError()
-        control=json.loads(safe(TASK/'rendered-control-export/status.json').read_text())
+        if control is None:code='CONTROL_STATUS_SCHEMA_INVALID_OR_UNAVAILABLE';raise ValueError()
         if control.get('privateCleanup')!='SUCCEEDED':code='PRIVATE_CLEANUP_FAILED';raise ValueError()
         if control.get('activation')!='SUCCEEDED':code='ACTIVATION_FAILED';raise ValueError()
         if control.get('licenseReturn')!='SUCCEEDED':code='LICENSE_RETURN_FAILED';raise ValueError()
@@ -43,7 +69,9 @@ def main():
     except Exception:
         # No partial video/images escape even if a later check failed.
         for p in stage.iterdir():p.unlink()
-        (stage/'status.json').write_text(json.dumps({'status':'RENDERED_DIAGNOSTIC_FAILED_NOT_ACCEPTED','failureCode':code,'videoExported':False})+'\n')
+        report={'status':'RENDERED_DIAGNOSTIC_FAILED_NOT_ACCEPTED','failureCode':code,'videoExported':False}
+        if control is not None:report['diagnosticDetails']=failure_details(control)
+        (stage/'status.json').write_text(json.dumps(report)+'\n')
     os.rename(stage,final)
     if os.environ.get("GITHUB_OUTPUT"):
         with open(os.environ["GITHUB_OUTPUT"],"a") as output:output.write("export_ready=true\n")

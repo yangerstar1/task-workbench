@@ -34,6 +34,14 @@ def finish_encoder(process):
         process.kill();process.wait();return process.returncode,method,'encoder-stop-timeout'
     return code,method,None if type(code) is int and code==0 else 'encoder-exit-nonzero'
 
+def mark_phase(phase):
+    # Optional diagnostic facts, never a success override or a source of arbitrary public text.
+    directory=os.environ.get('DESERTRV_PROGRESS_DIR')
+    if directory:
+        if phase not in {'X11-window-verified','first-encoded-frame'}:raise RuntimeError('capture-validation-failed')
+        marker=pathlib.Path(directory)/phase
+        marker.write_text('1')
+
 def main():
     ap=argparse.ArgumentParser(); ap.add_argument('handshake'); ap.add_argument('video'); ap.add_argument('receipt'); ap.add_argument('launcher_pid',type=int); a=ap.parse_args()
     h=pathlib.Path(a.handshake); video=pathlib.Path(a.video); receipt=pathlib.Path(a.receipt)
@@ -57,6 +65,7 @@ def main():
             if len(ids)>1: raise RuntimeError('duplicate-window')
             time.sleep(.1)
         if window is None: raise RuntimeError('game-window-unavailable')
+        mark_phase('X11-window-verified')
         began=stamp()
         encoder_log=open(h/'ffmpeg-private.log','w')
         ff=subprocess.Popen(['ffmpeg','-y','-f','x11grab','-window_id',window,'-framerate','30',
@@ -74,6 +83,7 @@ def main():
             if frames[0]!=last_frame: last_frame=frames[0]; last_progress=time.monotonic()
             if time.monotonic()-last_progress>5: raise RuntimeError('video-frame-heartbeat')
             if not ready and frames[0]>0:
+                mark_phase('first-encoded-frame')
                 atomic(h/'ready.json',{'valid':True,'title':title,'pid':pid,'windowId':window}); ready=True
             if (h/'stop.json').exists():
                 stop=json.loads((h/'stop.json').read_text())

@@ -30,14 +30,14 @@ true
     def test_native_failure_blocks_old_success_control_receipt(self):
         with tempfile.TemporaryDirectory() as d:
             root=pathlib.Path(d);task=root/'tasks/desert-rv';control=task/'rendered-control-export';control.mkdir(parents=True)
-            (control/'status.json').write_text(json.dumps(dict(activation='SUCCEEDED',licenseReturn='SUCCEEDED',renderProcess='SUCCEEDED',privateCleanup='SUCCEEDED')))
+            (control/'status.json').write_text(json.dumps(dict(schema=1,mode='RENDERED_CONTROL_ONLY_NOT_ACCEPTANCE',captureFailureCode='NONE',renderPhases=[],activation='SUCCEEDED',licenseReturn='SUCCEEDED',renderProcess='SUCCEEDED',privateCleanup='SUCCEEDED')))
             with patch.object(guard,'ROOT',root),patch.object(guard,'TASK',task),patch.dict(os.environ,NATIVE_OUTCOME='failure',GITHUB_OUTPUT=str(root/'outputs')),patch.object(guard.subprocess,'run',return_value=types.SimpleNamespace(returncode=0)):
                 code=guard.main()
             self.assertEqual(code,1);out=task/'rendered-public-export';self.assertEqual([p.name for p in out.iterdir()],['status.json']);self.assertEqual(json.loads((out/'status.json').read_text())['failureCode'],'NATIVE_PROCESS_NOT_SUCCESS')
     def test_cleanup_failure_blocks_video_even_with_success_native_outcome(self):
         with tempfile.TemporaryDirectory() as d:
             root=pathlib.Path(d);task=root/'tasks/desert-rv';control=task/'rendered-control-export';control.mkdir(parents=True)
-            (control/'status.json').write_text(json.dumps(dict(activation='SUCCEEDED',licenseReturn='SUCCEEDED',renderProcess='SUCCEEDED',privateCleanup='FAILED')))
+            (control/'status.json').write_text(json.dumps(dict(schema=1,mode='RENDERED_CONTROL_ONLY_NOT_ACCEPTANCE',captureFailureCode='NONE',renderPhases=[],activation='SUCCEEDED',licenseReturn='SUCCEEDED',renderProcess='SUCCEEDED',privateCleanup='FAILED')))
             with patch.object(guard,'ROOT',root),patch.object(guard,'TASK',task),patch.dict(os.environ,NATIVE_OUTCOME='success',GITHUB_OUTPUT=str(root/'outputs')),patch.object(guard.subprocess,'run',return_value=types.SimpleNamespace(returncode=0)):
                 self.assertEqual(guard.main(),1)
             self.assertEqual(json.loads((task/'rendered-public-export/status.json').read_text())['failureCode'],'PRIVATE_CLEANUP_FAILED')

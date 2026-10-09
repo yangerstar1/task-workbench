@@ -167,6 +167,19 @@ class FailedCaptureTests(unittest.TestCase):
         row['meshWorldSize']['y'] = 2-value
         row['meshSizeRatioToNeutral']['y'] = (2-value)/2
 
+    def test_collection_stage_reports_only_fixed_allowlisted_labels(self):
+        from contextlib import redirect_stdout
+        output=io.StringIO()
+        with redirect_stdout(output):
+            self.assertTrue(self.run_export())
+        labels=output.getvalue().splitlines()
+        self.assertEqual(labels,['FAILED_CAPTURE_COLLECTION_STAGE='+x for x in
+            ('GUARD','FREEZE','NATIVE','IMPORT','GENERATED','CAPTURE','SNAPSHOT','STAGING','COMMIT')])
+        output=io.StringIO()
+        with redirect_stdout(output),self.assertRaises(ValueError):
+            f.collection_stage('SECRET/path?token=private')
+        self.assertEqual(output.getvalue(),'')
+
     def test_failed_native_exports_only_bounded_safe_diagnostics(self):
         (self.ev/'private.log').write_text('SECRET STACK')
         self.assertTrue(self.run_export())

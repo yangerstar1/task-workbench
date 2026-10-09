@@ -104,8 +104,8 @@
     },
     {
       "path": "tasks/desert-rv/art/import-candidate/failed_capture_output.py",
-      "sha256": "a0be650491462ef6fef258e3a90c0229f0128ff1e23ef31a39f2ceb9f9633eee",
-      "size": 32635
+      "sha256": "d966d3697850e3294f6cdfd0ca24d70378211661032cd203e7d46f14caf42966",
+      "size": 33391
     },
     {
       "path": "tasks/desert-rv/art/import-candidate/fixtures/armored-failed-child-37866263641.xml",
@@ -154,8 +154,8 @@
     },
     {
       "path": "tasks/desert-rv/art/import-candidate/test_failed_capture_output.py",
-      "sha256": "798ba5d1f26c0b6f854f379268a5e5ffcd131a763e87f2c799ba3825ea02bb99",
-      "size": 34969
+      "sha256": "223961ccd9a4699fe4f9b447199f19895789b42d47d6017bccf79108da9633cd",
+      "size": 35638
     },
     {
       "path": "tasks/desert-rv/art/import-candidate/test_pouncer_failed_capture.py",
@@ -219,8 +219,8 @@
     },
     {
       "path": "tasks/desert-rv/scripts/capture_game_window.py",
-      "sha256": "6aaf19a3ac619342c84e34abda5c5258d9f1b9f2f2fea0353a785a1f7d122346",
-      "size": 7584
+      "sha256": "cf72735f35fd25d92d67e459187b40875041f387866547e44f46947308392c4f",
+      "size": 8062
     },
     {
       "path": "tasks/desert-rv/scripts/check_playthrough_evidence.py",
@@ -264,8 +264,8 @@
     },
     {
       "path": "tasks/desert-rv/scripts/rendered/guard_export.py",
-      "sha256": "0bbd0cff596df75eb82d7492c5143fdaf016e1cb5fc0c7a413180f866644012f",
-      "size": 4424
+      "sha256": "913332a35b66ee0f945aab82be981181241d9e617d3ae72c0e57f70ce0c71660",
+      "size": 6306
     },
     {
       "path": "tasks/desert-rv/scripts/rendered/official-gameci-pins.json",
@@ -284,13 +284,18 @@
     },
     {
       "path": "tasks/desert-rv/scripts/rendered/test_cleanup_truth.py",
-      "sha256": "36f104f94607f73923658648a93b031f53061922542d1a2ed95743e4f6194ed0",
-      "size": 3890
+      "sha256": "ff2bf722eaaec11198073bb819d4676eef029178669ffff6f9917d95092a4e3b",
+      "size": 4080
     },
     {
       "path": "tasks/desert-rv/scripts/rendered/test_rendered_shell.py",
       "sha256": "737929a683116246f09cdac3236ce563129e1d01208a0995e157c49ac5bcd45d",
       "size": 4260
+    },
+    {
+      "path": "tasks/desert-rv/scripts/rendered/test_smoke_failure_details.py",
+      "sha256": "570d261600fea49164dd1989fb7a1efc0ed4aebed0061f4b520e76ae707a5495",
+      "size": 7154
     },
     {
       "path": "tasks/desert-rv/scripts/rendered/verify_inputs.py",
@@ -299,13 +304,13 @@
     },
     {
       "path": "tasks/desert-rv/scripts/rendered/write_control_status.py",
-      "sha256": "33e38c309907540a686b08ec9f7d2c2caaf3f55ebb04d2d0f6ee67de7b1ef6f4",
-      "size": 1475
+      "sha256": "ff13a880a5f023e5835afe08bd167e364868b16c6cdf7d6fb8c202b05a29da8a",
+      "size": 4408
     },
     {
       "path": "tasks/desert-rv/scripts/run_rendered_diagnostic.sh",
-      "sha256": "c8915fa72cb2462265a75aee49d4150500813dbfbf4574253bebddf757716810",
-      "size": 2933
+      "sha256": "b277fa9c45fb820e41e3c219ea4f6f3facac7bb8688af40a38c51afb126a09cf",
+      "size": 3473
     },
     {
       "path": "tasks/desert-rv/scripts/supply_evidence.py",
@@ -4044,8 +4049,8 @@
     },
     {
       "path": "tasks/desert-rv/unity/Assets/DesertRV/Runtime/Diagnostics/JourneyRenderedDiagnosticRunner.cs",
-      "sha256": "9a355de480f8fcc50f2653e814d9ed0db76baedd3fc62104e864ab012ab53fae",
-      "size": 10469
+      "sha256": "2aa7e359edf21cbfbab97e118dd6b11019dbd50505060901cb25e59d55657e63",
+      "size": 11510
     },
     {
       "path": "tasks/desert-rv/unity/Assets/DesertRV/Runtime/Diagnostics/JourneyRenderedDiagnosticRunner.cs.meta",
