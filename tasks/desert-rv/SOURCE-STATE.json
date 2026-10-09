@@ -30,7 +30,8 @@
     ".github/dispatch/desert-rv-environment-v4-r2-20261009-files.json",
     ".github/workflows/desert-rv-armored-v004-r1-discovery.yml",
     ".github/workflows/desert-rv-environment-v4-r3.yml",
-    ".github/dispatch/desert-rv-environment-v4-r3-20261009-files.json"
+    ".github/dispatch/desert-rv-environment-v4-r3-20261009-files.json",
+    ".github/workflows/desert-rv-armored-v004-r1-strict.yml"
   ],
   "restoredFiles": [
     {
@@ -69,6 +70,11 @@
       "path": ".github/workflows/desert-rv-armored-v004-r1-discovery.yml",
       "sha256": "e9d002447ffda6e559df2bce20fb7eae684285f7937d0e3e16e847f7ba8031e6",
       "size": 5812
+    },
+    {
+      "path": ".github/workflows/desert-rv-armored-v004-r1-strict.yml",
+      "sha256": "cca09e27c17e0d5a84637169f8a0ee0b520d77f43513a05293a2933ccf3ac6ba",
+      "size": 5789
     },
     {
       "path": ".github/workflows/desert-rv-candidate-art-import.yml",
@@ -229,6 +235,11 @@
       "path": "tasks/desert-rv/art/import-candidate/contracts/armored-v004-r1-discovery-37955418340.json",
       "sha256": "88ce9d59103097189ff94f85734f0715454aba3378af75125a1cc86fb209400b",
       "size": 1076
+    },
+    {
+      "path": "tasks/desert-rv/art/import-candidate/contracts/armored-v004-r1-full-strict-37955418340-capsule-r2.json",
+      "sha256": "67b4b04c71f9c837a192990c37e15be7c73c4571d73dc3323c527c2f10b7bcd7",
+      "size": 7303
     },
     {
       "path": "tasks/desert-rv/art/import-candidate/contracts/pouncer-death-discovery-37829068773.json",
@@ -556,6 +567,11 @@
       "size": 13040
     },
     {
+      "path": "tasks/desert-rv/scripts/armored_v004_strict_dispatch.py",
+      "sha256": "7248d35f9abb6cd03de768f673d58b97cce7efef883bc1b37447d5aa397300b8",
+      "size": 13221
+    },
+    {
       "path": "tasks/desert-rv/scripts/backup/restore_unity_font.py",
       "sha256": "6cf3a11ddf58ef821198156861a7d598e1ee3515d81d90b40b9da866ec16939c",
       "size": 2429
@@ -652,8 +668,8 @@
     },
     {
       "path": "tasks/desert-rv/scripts/prepare_runner.sh",
-      "sha256": "ac861230348f1261dbba2dc41819174e5ca88b7a178d16dc9254a8e1a1803eee",
-      "size": 2225
+      "sha256": "9c6b80a2d3ea878b0a1a2157334428f161770f954cd15e5a02c4c11377ba67be",
+      "size": 2474
     },
     {
       "path": "tasks/desert-rv/scripts/prepare_safe_diagnostic_export.py",
@@ -771,6 +787,11 @@
       "size": 18939
     },
     {
+      "path": "tasks/desert-rv/scripts/test_armored_v004_strict_dispatch.py",
+      "sha256": "94e5b3c1a9a891c70e92aa4a91e2a0a39f8e45e8a03b2be93ccc28fed955c1a8",
+      "size": 19307
+    },
+    {
       "path": "tasks/desert-rv/scripts/test_environment_evidence.py",
       "sha256": "b9c4a530453d3ae9050ef5e898b29b483536545b56b247a6177164ec8933b776",
       "size": 16047
@@ -847,8 +868,8 @@
     },
     {
       "path": "tasks/desert-rv/scripts/verify_evidence.py",
-      "sha256": "cf3101352ff104cf98e995579c03fc0d84c91f0771380443e3366283b1c70b82",
-      "size": 18156
+      "sha256": "7df61b6e3b574f90a359cbddb999ba561f693d3a8f1a6ea662697c146aac97a8",
+      "size": 18501
     },
     {
       "path": "tasks/desert-rv/unity/Assets/DefaultVolumeProfile.asset",

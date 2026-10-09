@@ -1,0 +1,105 @@
+# One reviewed direct-parent push. STRICT output never grants acceptance.
+name: Desert RV armored v004-r1 STRICT only
+run-name: Armored v004-r1 actual Unity strict candidate, never acceptance · ${{ github.sha }}
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/dispatch/armored-v004-r1-strict-20261009-once-c8521e4b.json
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: desert-rv-armored-v004-r1-strict-c8521e4b
+  cancel-in-progress: false
+jobs:
+  import:
+    if: >-
+      github.event_name == 'push' &&
+      github.event.before == '120f6d6f0d34dbe432854c31ae91945ccd8496ab' &&
+      github.repository == 'yangerstar1/task-workbench' && github.ref == 'refs/heads/main' &&
+      github.actor == 'yangerstar1' && github.triggering_actor == 'yangerstar1'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 50
+    env:
+      GITHUB_REPOSITORY_VISIBILITY: ${{ github.event.repository.visibility }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+          fetch-depth: 2
+          lfs: false
+      - id: request
+        name: Verify exact one-time STRICT push and reviewed source pins
+        run: /usr/bin/python3 tasks/desert-rv/scripts/armored_v004_strict_dispatch.py
+      - name: Install official bounded image validators
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends python3-pil python3-yaml
+      - name: Verify hosted identity and complete current source inventory
+        run: |
+          /usr/bin/python3 tasks/desert-rv/scripts/verify_evidence.py guard
+          /usr/bin/python3 tasks/desert-rv/scripts/test_verify_evidence.py
+          /usr/bin/python3 tasks/desert-rv/scripts/test_armored_v004_strict_dispatch.py
+      - name: Test offline stager
+        working-directory: tasks/desert-rv/art/import-candidate
+        run: /usr/bin/python3 -m unittest -v test_stage_artifact test_capture_source test_verify_output test_strict_output test_weapon_output test_failed_capture_output test_failed_capture_dispatch test_package_snapshot.PackageSnapshotTests test_package_snapshot.WeaponPackageScopeTests test_package_snapshot.PackageExporterIntegrationTests test_package_snapshot_source test_urp_material_metadata test_material_metadata_integration test_dual_contact_integration test_paw_contact_output test_pouncer_maintex_alias
+      - name: Fetch and verify pinned candidate input
+        env:
+          GH_TOKEN: ${{ github.token }}
+          MODE: STRICT_BINDING
+          CONTRACT: ${{ steps.request.outputs.contract }}
+          CONTRACT_SHA: ${{ steps.request.outputs.contract_sha256 }}
+        run: >-
+          python3 tasks/desert-rv/art/import-candidate/prepare_input.py
+          --mode "$MODE" --contract "$CONTRACT" --sha256 "$CONTRACT_SHA"
+          --output tasks/desert-rv/unity/CandidateImportInput
+      - name: Verify actual new producer FULL declaration, artifact and 1024 texture pins
+        run: /usr/bin/python3 tasks/desert-rv/scripts/armored_v004_strict_dispatch.py --verify-input
+      - name: Restore pinned font and prepare official Unity runner
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+        run: |
+          python3 tasks/desert-rv/scripts/backup/restore_unity_font.py
+          bash tasks/desert-rv/scripts/prepare_runner.sh
+          docker build --build-arg BASE_IMAGE=unityci/editor@sha256:17406791cf1e438bea2dac20671668e05d83db5ed38c916744815db4584a8264 --file tasks/desert-rv/scripts/Environment.Dockerfile --tag desert-rv-environment:local tasks/desert-rv/scripts
+      - id: native
+        name: Import pinned candidate and run selected diagnostics
+        uses: game-ci/unity-test-runner@0ff419b913a3630032cbe0de48a0099b5a9f0ed9
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+        with:
+          unityVersion: 6000.3.19f1
+          customImage: desert-rv-environment:local
+          projectPath: tasks/desert-rv/unity
+          testMode: editmode
+          artifactsPath: tasks/desert-rv/artifacts/candidate-art
+          customParameters: -assemblyNames DesertRV.CandidateArtTests -force-glcore -job-worker-count 2
+          dockerCpuLimit: 2
+          dockerMemoryLimit: 12g
+      - id: exact_native
+        name: Require the unchanged exact 26 native cases through the existing XML gate
+        if: always() && steps.native.outcome == 'success'
+        run: /usr/bin/python3 tasks/desert-rv/scripts/armored_v004_strict_dispatch.py --native-gate
+      - id: protected
+        name: Reject changes to any tracked source including Assets Packages and ProjectSettings
+        if: always()
+        run: |
+          git diff --quiet --exit-code
+          git diff --cached --quiet --exit-code
+      - name: Export only validated mode-specific files or safe failure code
+        if: always()
+        env:
+          NATIVE_RESULT: ${{ steps.native.outcome == 'success' && steps.exact_native.outcome == 'success' && 'success' || 'failure' }}
+          PROTECTED_RESULT: ${{ steps.protected.outcome }}
+        run: /usr/bin/python3 tasks/desert-rv/art/import-candidate/verify_output.py --native "$NATIVE_RESULT" --protected "$PROTECTED_RESULT"
+      - name: Upload candidate outputs only (never approval)
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: armored-v004-r1-strict-NOT-ACCEPTED-${{ github.run_id }}-${{ github.run_attempt }}
+          path: tasks/desert-rv/candidate-art-export/
+          if-no-files-found: error
+          retention-days: 7

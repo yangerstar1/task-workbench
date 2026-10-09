@@ -11,6 +11,8 @@ if [[ "${GITHUB_EVENT_NAME:-}" != workflow_dispatch ]]; then
     /usr/bin/python3 "$(dirname "${BASH_SOURCE[0]}")/environment_v4_r2_dispatch.py" --verify-only
   elif [[ "${GITHUB_WORKFLOW_REF:-}" == 'yangerstar1/task-workbench/.github/workflows/desert-rv-environment-v4.yml@refs/heads/main' ]]; then
     /usr/bin/python3 "$(dirname "${BASH_SOURCE[0]}")/environment_v4_dispatch.py" --verify-only
+  elif [[ "${GITHUB_WORKFLOW_REF:-}" == 'yangerstar1/task-workbench/.github/workflows/desert-rv-armored-v004-r1-strict.yml@refs/heads/main' ]]; then
+    /usr/bin/python3 "$(dirname "${BASH_SOURCE[0]}")/armored_v004_strict_dispatch.py" --verify-only
   elif [[ "${GITHUB_WORKFLOW_REF:-}" == 'yangerstar1/task-workbench/.github/workflows/desert-rv-armored-v004-r1-discovery.yml@refs/heads/main' ]]; then
     /usr/bin/python3 "$(dirname "${BASH_SOURCE[0]}")/armored_v004_discovery_dispatch.py" --verify-only
   else

@@ -1,0 +1,8 @@
+{
+  "schema": 1,
+  "requestId": "armored-v004-r1-strict-20261009-once-c8521e4b",
+  "baseCommit": "120f6d6f0d34dbe432854c31ae91945ccd8496ab",
+  "contractSha256": "67b4b04c71f9c837a192990c37e15be7c73c4571d73dc3323c527c2f10b7bcd7",
+  "filesManifestSha256": "7107fa05cbc12706b4545595deaeab6ced546e46cd474d1f9e2e8355ee315043",
+  "sourceStateSha256": "80f6fda5be688b9fde238d3ab89d3239e94bfa56611f8840211bbd182c21ce0a"
+}

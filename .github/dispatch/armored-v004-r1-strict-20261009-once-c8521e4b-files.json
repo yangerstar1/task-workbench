@@ -1,0 +1,49 @@
+{
+  "schema": 1,
+  "requestId": "armored-v004-r1-strict-20261009-once-c8521e4b",
+  "baseCommit": "120f6d6f0d34dbe432854c31ae91945ccd8496ab",
+  "files": [
+    {
+      "path": ".github/workflows/desert-rv-armored-v004-r1-strict.yml",
+      "sha256": "cca09e27c17e0d5a84637169f8a0ee0b520d77f43513a05293a2933ccf3ac6ba",
+      "priorSha256": null,
+      "size": 5789,
+      "mode": "100644"
+    },
+    {
+      "path": "tasks/desert-rv/art/import-candidate/contracts/armored-v004-r1-full-strict-37955418340-capsule-r2.json",
+      "sha256": "67b4b04c71f9c837a192990c37e15be7c73c4571d73dc3323c527c2f10b7bcd7",
+      "priorSha256": null,
+      "size": 7303,
+      "mode": "100644"
+    },
+    {
+      "path": "tasks/desert-rv/scripts/armored_v004_strict_dispatch.py",
+      "sha256": "7248d35f9abb6cd03de768f673d58b97cce7efef883bc1b37447d5aa397300b8",
+      "priorSha256": null,
+      "size": 13221,
+      "mode": "100644"
+    },
+    {
+      "path": "tasks/desert-rv/scripts/prepare_runner.sh",
+      "sha256": "9c6b80a2d3ea878b0a1a2157334428f161770f954cd15e5a02c4c11377ba67be",
+      "priorSha256": "ac861230348f1261dbba2dc41819174e5ca88b7a178d16dc9254a8e1a1803eee",
+      "size": 2474,
+      "mode": "100644"
+    },
+    {
+      "path": "tasks/desert-rv/scripts/test_armored_v004_strict_dispatch.py",
+      "sha256": "94e5b3c1a9a891c70e92aa4a91e2a0a39f8e45e8a03b2be93ccc28fed955c1a8",
+      "priorSha256": null,
+      "size": 19307,
+      "mode": "100644"
+    },
+    {
+      "path": "tasks/desert-rv/scripts/verify_evidence.py",
+      "sha256": "7df61b6e3b574f90a359cbddb999ba561f693d3a8f1a6ea662697c146aac97a8",
+      "priorSha256": "cf3101352ff104cf98e995579c03fc0d84c91f0771380443e3366283b1c70b82",
+      "size": 18501,
+      "mode": "100644"
+    }
+  ]
+}
