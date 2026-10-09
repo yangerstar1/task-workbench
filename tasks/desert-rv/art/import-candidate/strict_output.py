@@ -109,7 +109,7 @@ def native_report(root):
   require(safe(p).stat().st_size<=10*1024**2,'STRICT_NATIVE_OVERSIZE');r=ET.parse(p).getroot()
   if r.tag=='test-run':reports.append((p,r))
  require(len(reports)==1,'STRICT_NATIVE_COUNT');p,r=reports[0];cases=list(r.iter('test-case'))
- require(r.get('result')=='Passed' and len(cases)==7 and {c.get('fullname') for c in cases}=={NATIVE,'DesertRV.Tests.CandidateAnimationPolicyTests.OnlyArmoredAttackGetsTheSourceLoopException','DesertRV.Tests.CandidateAnimationPolicyTests.EqualKeyValuesDoNotExcuseUnsafeTangents','DesertRV.Tests.CandidateAnimationPolicyTests.MissingNativeAnimatorGetsCreatedAndReused','DesertRV.Tests.CandidateAnimationPolicyTests.OpenCoreEmissionSurvivesRealSaveReimportAndReload','DesertRV.Tests.CandidateAnimationPolicyTests.RenderTargetCleanupDetachesCameraBeforeDestroy','DesertRV.Tests.CandidateMaterialIdentityTests.PersistedWeaponMaterialIdentitySurvivesNeutralSamplingAndRejectsImpostors'} and all(c.get('result')=='Passed' for c in cases),'STRICT_NATIVE_FAILED')
+ require(r.get('result')=='Passed' and len(cases)==10 and {c.get('fullname') for c in cases}=={NATIVE,'DesertRV.Tests.CandidateAnimationPolicyTests.OnlyArmoredAttackGetsTheSourceLoopException','DesertRV.Tests.CandidateAnimationPolicyTests.EqualKeyValuesDoNotExcuseUnsafeTangents','DesertRV.Tests.CandidateAnimationPolicyTests.MissingNativeAnimatorGetsCreatedAndReused','DesertRV.Tests.CandidateAnimationPolicyTests.OpenCoreEmissionSurvivesRealSaveReimportAndReload','DesertRV.Tests.CandidateAnimationPolicyTests.RenderTargetCleanupDetachesCameraBeforeDestroy','DesertRV.Tests.CandidateMaterialIdentityTests.PersistedWeaponMaterialIdentitySurvivesNeutralSamplingAndRejectsImpostors','DesertRV.Tests.CandidateMeshMeasurementTests.ScaledTranslatedRotatedHierarchyMatchesIndependentSkinning','DesertRV.Tests.CandidateMeshMeasurementTests.RejectsBlendShapesAndTruncatedSkinQuality','DesertRV.Tests.CandidateMeshMeasurementTests.StaticMeshesAndFourMillimetreGateUseWorldVertices'} and all(c.get('result')=='Passed' for c in cases),'STRICT_NATIVE_FAILED')
  return sha(p)
 
 def inspect_png(path,size=(960,540)):
@@ -120,17 +120,38 @@ def inspect_png(path,size=(960,540)):
   require(im.format=='PNG' and im.size==size,'STRICT_IMAGE_DIMENSIONS');im.load();rgb=im.convert('RGB');ranges=rgb.getextrema()
   require(max(v[1] for v in ranges)>=26 and max(v[1]-v[0] for v in ranges)>=16 and max(ImageStat.Stat(rgb).stddev)>=2,'STRICT_BLANK_IMAGE')
 
-def dependency_digest(project,dependencies):
- require(isinstance(dependencies,list) and 1<=len(dependencies)<=300 and len(dependencies)==len(set(dependencies)),'STRICT_DEPENDENCY_LIST');h=hashlib.sha256()
+def dependency_digest(project,dependencies,trace=False):
+ require(isinstance(dependencies,list) and 1<=len(dependencies)<=300 and len(dependencies)==len(set(dependencies)),'STRICT_DEPENDENCY_LIST');h=hashlib.sha256();rows=[]
+ subjects=[n for n in dependencies if isinstance(n,str) and n.startswith('Assets/DesertRV/CandidateArtImports/') and n.endswith('/Candidate.prefab')];subject=subjects[0] if len(subjects)==1 else ''
  for name in sorted(dependencies):
   require(rel(name) and (name.startswith('Assets/DesertRV/') or re.match(r'Packages/com\.unity\.[a-z0-9_.-]+/',name) or name in ('Resources/unity_builtin_extra','Library/unity default resources')),'STRICT_DEPENDENCY_PATH')
   if name.startswith('Assets/DesertRV/'):
    safe(project/name);safe(project/(name+'.meta'))
   for item in (name,name+'.meta'):
    p=project/item
-   if not p.exists():continue
+   if not p.exists():
+    if trace:rows.append(dict(side='host',subject=subject,phase='host-mismatch',file=item,exists=False,projectExists=False,bytes=-1,sha256=''))
+    continue
    data=safe(p).read_bytes();encoded=item.encode();h.update(str(len(encoded)).encode()+b':'+encoded+str(len(data)).encode()+b':'+data)
- return h.hexdigest()
+   if trace:rows.append(dict(side='host',subject=subject,phase='host-mismatch',file=item,exists=True,projectExists=True,bytes=len(data),sha256=hashlib.sha256(data).hexdigest()))
+ result=h.hexdigest()
+ if trace:
+  print('CANDIDATE_DEPENDENCY_HEADER '+json.dumps(dict(side='host',subject=subject,phase='host-mismatch',aggregateSha256=result,aggregateValid=True,dependencyCount=len(dependencies),hashedFileCount=sum(r['exists'] for r in rows),missingFileCount=sum(not r['exists'] for r in rows),omittedItems=0),sort_keys=True))
+  for row in rows:print('CANDIDATE_DEPENDENCY_ITEM '+json.dumps(row,sort_keys=True))
+ return result
+
+
+def observe_dependency_mismatch(project,dependencies,reported_unity_hash,stored_sha256,actual_sha256):
+ try:
+  # Only validated hexadecimal values and shape flags enter logs; never echo an invalid raw report value.
+  valid_unity=bool(digest(reported_unity_hash,32));valid_sha=bool(digest(stored_sha256))
+  print('CANDIDATE_DEPENDENCY_CHECK '+json.dumps(dict(dependencyHash128Valid=valid_unity,dependencyHash128Length=len(reported_unity_hash) if isinstance(reported_unity_hash,str) else -1,storedSha256Valid=valid_sha,
+   storedSha256Length=len(stored_sha256) if isinstance(stored_sha256,str) else -1,
+   storedSha256=stored_sha256 if valid_sha else '',actualSha256=actual_sha256 if digest(actual_sha256) else ''),sort_keys=True))
+  # This is an additional read-only observation. The caller still fails against its ORIGINAL actual/expected comparison.
+  dependency_digest(project,dependencies,trace=True)
+ except Exception:
+  print('CANDIDATE_DEPENDENCY_OBSERVATION_FAILED')
 
 def derived_record(project,prefix,record,m,index,files):
  from PIL import Image
@@ -169,7 +190,11 @@ def validate_import(project,c,contract_path,report):
    if m.get(k):needed.add(prefix+'/Source/'+m[k])
   if m.get('ormFile'):needed.add(prefix+f'/Derived/ORM_{i:02}.png')
  require(isinstance(report['dependencies'],list) and needed<=set(report['dependencies']),'STRICT_REQUIRED_DEPENDENCIES')
- require(digest(report['dependencyHash'],32) and digest(report['dependencySha256']) and report['dependencySha256']==dependency_digest(project,report['dependencies']),'STRICT_DEPENDENCY_HASH')
+ actual_dependency_sha256=dependency_digest(project,report['dependencies'])
+ valid_dependency_identity=digest(report['dependencyHash'],32) and digest(report['dependencySha256'])
+ if not valid_dependency_identity or report['dependencySha256']!=actual_dependency_sha256:
+  observe_dependency_mismatch(project,report['dependencies'],report['dependencyHash'],report['dependencySha256'],actual_dependency_sha256)
+ require(valid_dependency_identity and report['dependencySha256']==actual_dependency_sha256,'STRICT_DEPENDENCY_HASH')
  require(isinstance(report['importedAnimatorPaths'],list) and all(rel(p,True) for p in report['importedAnimatorPaths']),'STRICT_ANIMATOR_PATHS')
  require(all(p==c['bindings']['animatorPath'] for p in report['importedAnimatorPaths']),'STRICT_ANIMATOR_ROOT_MISMATCH')
  require(isinstance(report['stillRequired'],list) and len(report['stillRequired'])<=10 and all(isinstance(v,str) and len(v)<200 and '\n' not in v for v in report['stillRequired']),'STRICT_NOT_COVERED_FIELDS')
@@ -328,7 +353,7 @@ def export_strict(root,output,c,summary,native,protected):
    d=staged/dest;d.parent.mkdir(parents=True,exist_ok=True);shutil.copyfile(p,d);records.append({'path':dest.as_posix(),'sha256':sha(d),'bytes':d.stat().st_size})
   for name,obj in [('import-report.json',imp),('capture-report.json',capture),('weakpoint-fixture-report.json',weak)]:
    d=staged/name;d.write_text(json.dumps(obj,indent=2)+'\n');records.append({'path':name,'sha256':sha(d),'bytes':d.stat().st_size})
-  result=dict(summary,status='STRICT_CANDIDATE_CAPTURED_NOT_ACCEPTED',approved=False,errorCode=None,files=records,nativeXmlSha256=native_hash,nativeCases=7,images=202,weakpointImages=9,protectedSource='UNCHANGED',rawReportSha256={n:sha(evidence/n) for n in ('import-report.json','capture-report.json','weakpoint-fixture-report.json')})
+  result=dict(summary,status='STRICT_CANDIDATE_CAPTURED_NOT_ACCEPTED',approved=False,errorCode=None,files=records,nativeXmlSha256=native_hash,nativeCases=10,images=202,weakpointImages=9,protectedSource='UNCHANGED',rawReportSha256={n:sha(evidence/n) for n in ('import-report.json','capture-report.json','weakpoint-fixture-report.json')})
   receipt_bytes=(json.dumps(result,indent=2)+'\n').encode()
   (staged/'receipt.json').write_bytes(receipt_bytes)
   verify_staged_inventory(staged,records,hashlib.sha256(receipt_bytes).hexdigest())

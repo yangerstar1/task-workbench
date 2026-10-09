@@ -12,6 +12,7 @@ import re
 import shutil
 import tempfile
 import xml.etree.ElementTree as ET
+from strict_output import observe_dependency_mismatch
 
 from strict_output import (StrictError, require, safe, sha, read, keys, finite,
     digest, vec, rel, native_report, inspect_png, dependency_digest, distance,
@@ -32,6 +33,9 @@ BUILTINS = {'Resources/unity_builtin_extra', 'Library/unity default resources'}
 BUILTIN_GUIDS = {'00000000000000000000000000000000',
     '0000000000000000e000000000000000', '0000000000000000f000000000000000'}
 NATIVE_NAMES = {
+    'DesertRV.Tests.CandidateMeshMeasurementTests.ScaledTranslatedRotatedHierarchyMatchesIndependentSkinning',
+    'DesertRV.Tests.CandidateMeshMeasurementTests.RejectsBlendShapesAndTruncatedSkinQuality',
+    'DesertRV.Tests.CandidateMeshMeasurementTests.StaticMeshesAndFourMillimetreGateUseWorldVertices',
     'DesertRV.Tests.CandidateMaterialIdentityTests.PersistedWeaponMaterialIdentitySurvivesNeutralSamplingAndRejectsImpostors',
     'DesertRV.Tests.CandidateArtImportTests.ExecutePinnedDiscoveryOrBindingDiagnostics',
     *('DesertRV.Tests.CandidateAnimationPolicyTests.' + name for name in (
@@ -253,8 +257,11 @@ def validate_import(project, c, contract_path, report):
         require(abs(sum(v*v for v in rotation.values())-1) <= 1e-5
             and angle(rotation, baseline['rotation']) <= .001, 'POUNCER_RIG_CURVE_BASELINE')
     deps = report['dependencies']; dependency_shape(c, prefix, deps)
-    require(digest(report['dependencyHash'], 32) and digest(report['dependencySha256'])
-        and report['dependencySha256'] == dependency_digest(project, deps), 'POUNCER_DEPENDENCY_HASH')
+    actual_dependency_sha256=dependency_digest(project,deps)
+    valid_dependency_identity=digest(report['dependencyHash'],32) and digest(report['dependencySha256'])
+    if not valid_dependency_identity or report['dependencySha256']!=actual_dependency_sha256:
+        observe_dependency_mismatch(project,deps,report['dependencyHash'],report['dependencySha256'],actual_dependency_sha256)
+    require(valid_dependency_identity and report['dependencySha256']==actual_dependency_sha256, 'POUNCER_DEPENDENCY_HASH')
     guid_set = {URP_LIT_GUID}
     for path in deps:
         if path.startswith('Assets/') or (project/(path+'.meta')).exists():
@@ -406,7 +413,7 @@ def pouncer_native_report(root):
     matching = [p for p in (root/'artifacts/candidate-art').rglob('*.xml') if sha(p) == result]
     require(len(matching) == 1, 'POUNCER_NATIVE_VERSION')
     cases = list(ET.parse(safe(matching[0])).getroot().iter('test-case'))
-    require(len(cases) == 7 and {c.get('fullname') for c in cases} == NATIVE_NAMES
+    require(len(cases) == 10 and {c.get('fullname') for c in cases} == NATIVE_NAMES
         and all(c.get('result') == 'Passed' for c in cases), 'POUNCER_NATIVE_VERSION')
     return result
 
@@ -529,7 +536,7 @@ def export_pouncer(root, output, c, summary, native, protected):
         require(pouncer_native_report(root) == native_hash, 'POUNCER_NATIVE_CHANGED_DURING_EXPORT')
         verify_snapshot(root, c, imp['dependencies'], snapshot)
         result = dict(summary, status='STRICT_CANDIDATE_CAPTURED_NOT_ACCEPTED', approved=False, errorCode=None,
-            files=records, nativeXmlSha256=native_hash, nativeCases=7, images=184, weakpointImages=0,
+            files=records, nativeXmlSha256=native_hash, nativeCases=10, images=184, weakpointImages=0,
             directImages=35, attackRecoverImages=21, deathTransitionImages=126, resetImages=2,
             protectedSource='UNCHANGED', calibratedForScene=False, visualApproved=False, gameplayAccepted=False,
             rawReportSha256=raw_hashes, discoverySha256=DISCOVERY_SHA,

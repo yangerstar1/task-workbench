@@ -47,6 +47,7 @@ namespace DesertRV.Editor
             var evidence=new Evidence{prefab=import.prefab,dependencySha256=import.dependencySha256,graphicsDeviceType=SystemInfo.graphicsDeviceType.ToString(),graphicsDeviceName=SystemInfo.graphicsDeviceName};
             var scene=EditorSceneManager.NewPreviewScene();
             GameObject subject=null; RenderTexture target=null; Texture2D pixels=null; Camera camera=null;
+            var totalMeasurement=new MeshMeasurementSummary();
             try
             {
                 subject=(GameObject)PrefabUtility.InstantiatePrefab(AssetDatabase.LoadAssetAtPath<GameObject>(import.prefab),scene);
@@ -69,7 +70,8 @@ namespace DesertRV.Editor
                 var lightObject=new GameObject("CandidateReviewLight"); UnityEngine.SceneManagement.SceneManager.MoveGameObjectToScene(lightObject,scene);
                 var light=lightObject.AddComponent<Light>(); light.type=LightType.Directional; light.intensity=2; light.transform.rotation=Quaternion.Euler(40,-30,0);
                 camera.transform.position=initialBounds.center+new Vector3(1,.45f,-1).normalized*initialBounds.extents.magnitude*3.2f; camera.transform.LookAt(initialBounds.center); camera.nearClipPlane=.005f; camera.farClipPlane=150;
-                var neutralMesh=new Frame();MeasureMeshes(initialRenderers,camera,neutralMesh);
+                var neutralMesh=new Frame();var neutralMeasurement=MeasureMeshes(initialRenderers,camera,neutralMesh);
+                totalMeasurement.Add(neutralMeasurement);LogMeshMeasurement("neutral",neutralMeasurement);
                 if(contract.kind!="weapon")LogSkinProbe("neutral-before-rebind",subject,initialRenderers);
                 if(!(neutralMesh.meshWorldSize.x>0 && neutralMesh.meshWorldSize.y>0 && neutralMesh.meshWorldSize.z>0))throw new InvalidOperationException("Degenerate actual neutral mesh world dimensions.");
                 evidence.neutralMeshWorldMin=neutralMesh.meshWorldMin;evidence.neutralMeshWorldMax=neutralMesh.meshWorldMax;evidence.neutralMeshWorldSize=neutralMesh.meshWorldSize;
@@ -125,6 +127,7 @@ namespace DesertRV.Editor
                 if(finalDependencySha!=import.dependencySha256)throw new InvalidOperationException("Prefab dependency changed during capture.");
                 evidence.dependencySha256=finalDependencySha;
                 evidence.status="captured-unreviewed";
+                LogMeshMeasurement("completed",totalMeasurement);
                 void RequireRootUnchanged()
                 {
                     if(!(Vector3.Distance(rootPosition,animator.transform.localPosition)<=.00001f) || !(Quaternion.Angle(rootRotation,animator.transform.localRotation)<=.001f) || !(Vector3.Distance(rootScale,animator.transform.localScale)<=.00001f))
@@ -158,9 +161,12 @@ namespace DesertRV.Editor
                     float positionDelta=Vector3.Distance(rootPosition,animator.transform.localPosition),angleDelta=Quaternion.Angle(rootRotation,animator.transform.localRotation),scaleDelta=Vector3.Distance(rootScale,animator.transform.localScale);
                     RequireRootUnchanged();
                     var frame=new Frame{image=file,imageSha256=imageHash,requestedState=label,advanceSeconds=advance,normalizedTime=info.normalizedTime,stateHash=info.fullPathHash,transitioning=animator.IsInTransition(0),groundDiagnosticApplicable=contract.kind!="weapon",groundReferenceY=subject.transform.position.y,rootLocalPositionDelta=positionDelta,rootLocalAngleDelta=angleDelta,rootLocalScaleDelta=scaleDelta,rootLocalPosition=animator.transform.localPosition,rootLocalRotation=animator.transform.localRotation,rootLocalScale=animator.transform.localScale};
-                    MeasureMeshes(renderers,camera,frame);
+                    var measurement=MeasureMeshes(renderers,camera,frame);totalMeasurement.Add(measurement);
                     frame.meshSizeRatioToNeutral=new Vector3(frame.meshWorldSize.x/evidence.neutralMeshWorldSize.x,frame.meshWorldSize.y/evidence.neutralMeshWorldSize.y,frame.meshWorldSize.z/evidence.neutralMeshWorldSize.z);
                     evidence.frames.Add(frame);
+                    bool firstFrame=evidence.frames.Count==1;
+                    bool failedGround=frame.groundDiagnosticApplicable && frame.worldMinY<frame.groundReferenceY-.004f;
+                    if(firstFrame || failedGround)LogMeshMeasurement(failedGround?"first-ground-failure":"first-frame",measurement);
                     if(frame.groundDiagnosticApplicable && (evidence.frames.Count==1 || frame.worldMinY<frame.groundReferenceY-.004f))
                         LogSkinProbe(frame.requestedState,subject,renderers);
                     if(frame.groundDiagnosticApplicable && frame.worldMinY<frame.groundReferenceY-.004f)
@@ -223,7 +229,14 @@ namespace DesertRV.Editor
         {
             public string phase,rendererPath,rendererType,quality,rigPath,status="observed-not-acceptance";
             public int vertexIndex,influenceCount,blendShapeCount;public bool complete;
+            public bool animatorInTransition;public int currentStateHash,nextStateHash;
+            public float currentNormalizedTime,currentLength,currentSpeed,currentSpeedMultiplier;
+            public float nextNormalizedTime,nextLength,nextSpeed,nextSpeedMultiplier,transitionNormalizedTime,transitionDuration;
+            public string transitionDurationUnit;
             public Vector3 bakedLocal,bakedWorld,sourceLocal,weightedWorld;
+            public string bakedCoordinateConvention="legacy-false-times-renderer-TRS-observation-only",selectionConvention="minimum-verified-world-vertex";
+            public Vector3 measuredWorld;
+            public Vector3 compensatedBakedLocal,compensatedBakedWorld;public float compensatedVersusWeightedDistance;
             public Vector3 rendererLocalPosition,rendererLocalScale,rendererLossyScale,rigLocalPosition,rigLocalScale;
             public Quaternion rendererLocalRotation,rigLocalRotation;
             public float[] rendererLocalToWorld,rigLocalToWorld;
@@ -240,36 +253,45 @@ namespace DesertRV.Editor
         {
             try
             {
-                Renderer worst=null;int index=-1;Vector3 bakedLocal=default,bakedWorld=default;float min=float.PositiveInfinity;
+                Renderer worst=null;int index=-1;Vector3 measuredWorld=default;float min=float.PositiveInfinity;
                 foreach(var renderer in renderers)
                 {
-                    Mesh temporary=null;
-                    try
-                    {
-                        Mesh mesh;
-                        if(renderer is SkinnedMeshRenderer skin){temporary=new Mesh();skin.BakeMesh(temporary,false);mesh=temporary;}
-                        else {var filter=renderer.GetComponent<MeshFilter>();mesh=filter?filter.sharedMesh:null;}
-                        if(!mesh || !mesh.isReadable)continue;
-                        var vertices=mesh.vertices;
-                        for(int i=0;i<vertices.Length;i++)
-                        {
-                            var world=renderer.transform.TransformPoint(vertices[i]);
-                            if(world.y<min){min=world.y;worst=renderer;index=i;bakedLocal=vertices[i];bakedWorld=world;}
-                        }
-                    }
-                    finally {if(temporary)UnityEngine.Object.DestroyImmediate(temporary);}
+                    var world=JourneyCandidateMeshMeasurement.GetWorldVertices(renderer,out _,out _);
+                    for(int i=0;i<world.Length;i++)
+                        if(world[i].y<min){min=world[i].y;worst=renderer;index=i;measuredWorld=world[i];}
                 }
                 if(!worst){Debug.Log("CANDIDATE_SKIN_PROBE unavailable-no-readable-vertex");return;}
-                var t=worst.transform;
-                var probe=new SkinProbe{phase=phase,rendererPath=AnimationUtility.CalculateTransformPath(t,subject.transform),rendererType=worst.GetType().Name,vertexIndex=index,bakedLocal=bakedLocal,bakedWorld=bakedWorld,rendererLocalPosition=t.localPosition,rendererLocalRotation=t.localRotation,rendererLocalScale=t.localScale,rendererLossyScale=t.lossyScale,rendererLocalToWorld=ProbeMatrix(t.localToWorldMatrix)};
+                var t=worst.transform;Vector3 bakedLocal;Mesh temporary=null;
+                try
+                {
+                    Mesh mesh;
+                    if(worst is SkinnedMeshRenderer skin){temporary=new Mesh();skin.BakeMesh(temporary,false);mesh=temporary;}
+                    else {var filter=worst.GetComponent<MeshFilter>();mesh=filter?filter.sharedMesh:null;}
+                    bakedLocal=mesh.vertices[index];
+                }
+                finally {if(temporary)UnityEngine.Object.DestroyImmediate(temporary);}
+                var bakedWorld=t.TransformPoint(bakedLocal);
+                var probe=new SkinProbe{phase=phase,rendererPath=AnimationUtility.CalculateTransformPath(t,subject.transform),rendererType=worst.GetType().Name,vertexIndex=index,measuredWorld=measuredWorld,bakedLocal=bakedLocal,bakedWorld=bakedWorld,rendererLocalPosition=t.localPosition,rendererLocalRotation=t.localRotation,rendererLocalScale=t.localScale,rendererLossyScale=t.lossyScale,rendererLocalToWorld=ProbeMatrix(t.localToWorldMatrix)};
+                var animator=subject.GetComponentInChildren<Animator>();
+                if(animator && animator.runtimeAnimatorController && animator.layerCount>0)
+                {
+                    var current=animator.GetCurrentAnimatorStateInfo(0);probe.animatorInTransition=animator.IsInTransition(0);
+                    probe.currentStateHash=current.fullPathHash;probe.currentNormalizedTime=current.normalizedTime;probe.currentLength=current.length;probe.currentSpeed=current.speed;probe.currentSpeedMultiplier=current.speedMultiplier;
+                    if(probe.animatorInTransition)
+                    {
+                        var next=animator.GetNextAnimatorStateInfo(0);var transition=animator.GetAnimatorTransitionInfo(0);
+                        probe.nextStateHash=next.fullPathHash;probe.nextNormalizedTime=next.normalizedTime;probe.nextLength=next.length;probe.nextSpeed=next.speed;probe.nextSpeedMultiplier=next.speedMultiplier;
+                        probe.transitionNormalizedTime=transition.normalizedTime;probe.transitionDuration=transition.duration;probe.transitionDurationUnit=transition.durationUnit.ToString();
+                    }
+                }
                 var rig=subject.GetComponentsInChildren<Transform>(true).FirstOrDefault(x=>x.name=="Pouncer_Rig" || x.name=="Bulwark_Rig");
                 if(rig){probe.rigPath=AnimationUtility.CalculateTransformPath(rig,subject.transform);probe.rigLocalPosition=rig.localPosition;probe.rigLocalRotation=rig.localRotation;probe.rigLocalScale=rig.localScale;probe.rigLocalToWorld=ProbeMatrix(rig.localToWorldMatrix);}
                 if(worst is SkinnedMeshRenderer skinned)
                 {
                     var mesh=skinned.sharedMesh;var bones=skinned.bones;var poses=mesh.bindposes;
                     probe.sourceLocal=mesh.vertices[index];probe.blendShapeCount=mesh.blendShapeCount;probe.quality=skinned.quality.ToString()+"/"+QualitySettings.skinWeights;
+                    // Borrowed Mesh-owned Allocator.None views: read only, never Dispose.
                     var counts=mesh.GetBonesPerVertex();var weights=mesh.GetAllBoneWeights();
-                    try
                     {
                         int offset=0;for(int i=0;i<index;i++)offset+=counts[i];
                         probe.influenceCount=counts[index];probe.complete=probe.influenceCount<=16 && probe.blendShapeCount==0;
@@ -281,8 +303,15 @@ namespace DesertRV.Editor
                             if(i<16)probe.influences.Add(new SkinProbeInfluence{boneIndex=bw.boneIndex,weight=bw.weight,path=AnimationUtility.CalculateTransformPath(bone,subject.transform),position=bone.localPosition,rotation=bone.localRotation,scale=bone.localScale,localToWorld=ProbeMatrix(bone.localToWorldMatrix),bindPose=ProbeMatrix(poses[bw.boneIndex]),weightedWorld=world});
                         }
                         probe.bakedVersusWeightedDistance=Vector3.Distance(probe.bakedWorld,probe.weightedWorld);
+                        var compensated=new Mesh();
+                        try
+                        {
+                            skinned.BakeMesh(compensated,true);probe.compensatedBakedLocal=compensated.vertices[index];
+                            probe.compensatedBakedWorld=t.TransformPoint(probe.compensatedBakedLocal);
+                            probe.compensatedVersusWeightedDistance=Vector3.Distance(probe.compensatedBakedWorld,probe.weightedWorld);
+                        }
+                        finally {UnityEngine.Object.DestroyImmediate(compensated);}
                     }
-                    finally {if(weights.IsCreated)weights.Dispose();if(counts.IsCreated)counts.Dispose();}
                 }
                 else {probe.complete=true;probe.sourceLocal=bakedLocal;probe.weightedWorld=bakedWorld;}
                 Debug.Log("CANDIDATE_SKIN_PROBE "+JsonUtility.ToJson(probe));
@@ -294,41 +323,56 @@ namespace DesertRV.Editor
             }
         }
 
-        // Actual deformed vertices, not Renderer.bounds. Measurements are diagnostics, not foot-contact approval.
-        static void MeasureMeshes(Renderer[] renderers,Camera camera,Frame frame)
+        [Serializable] sealed class MeshMeasurementSummary
         {
+            public string phase,method="BakeMeshTrueWorldCheckedAgainstFullDoubleLbsNoBlendShapesAutoUnlimited";
+            public int rendererCount,vertexCount,verifiedSkinVertices;
+            public float maximumErrorMetres,maximumToleranceMetres;
+            public void Add(MeshMeasurementSummary sample)
+            {
+                rendererCount+=sample.rendererCount;vertexCount+=sample.vertexCount;verifiedSkinVertices+=sample.verifiedSkinVertices;
+                maximumErrorMetres=Mathf.Max(maximumErrorMetres,sample.maximumErrorMetres);
+                maximumToleranceMetres=Mathf.Max(maximumToleranceMetres,sample.maximumToleranceMetres);
+            }
+        }
+        static void LogMeshMeasurement(string phase,MeshMeasurementSummary measurement)
+        {
+            measurement.phase=phase;Debug.Log("CANDIDATE_MESH_MEASUREMENT "+JsonUtility.ToJson(measurement));
+        }
+
+        // Actual deformed vertices, not Renderer.bounds. Measurements are diagnostics, not foot-contact approval.
+        static MeshMeasurementSummary MeasureMeshes(Renderer[] renderers,Camera camera,Frame frame)
+        {
+            var measurement=new MeshMeasurementSummary();
             float minY=float.PositiveInfinity;var minimum=Vector3.one*float.PositiveInfinity;var maximum=Vector3.one*float.NegativeInfinity;
             using(var bytes=new MemoryStream()) using(var writer=new BinaryWriter(bytes))
             {
                 foreach(var renderer in renderers)
                 {
-                    Mesh temporary=null;
-                    try
+                    // Full vertex inventory. A failed independent skin comparison throws before any
+                    // diagnostic uses the disputed coordinate convention; no fallback or rescaling.
+                    var worldVertices=JourneyCandidateMeshMeasurement.GetWorldVertices(renderer,out var skinningError,out var tolerance);
+                    measurement.rendererCount++;measurement.vertexCount+=worldVertices.Length;
+                    measurement.maximumErrorMetres=Mathf.Max(measurement.maximumErrorMetres,skinningError);
+                    measurement.maximumToleranceMetres=Mathf.Max(measurement.maximumToleranceMetres,tolerance);
+                    if(renderer is SkinnedMeshRenderer)measurement.verifiedSkinVertices+=worldVertices.Length;
+                    writer.Write(renderer.name);
+                    foreach(var world in worldVertices)
                     {
-                        Mesh mesh;
-                        if(renderer is SkinnedMeshRenderer skin) { temporary=new Mesh(); skin.BakeMesh(temporary,false); mesh=temporary; }
-                        else { var filter=renderer.GetComponent<MeshFilter>(); mesh=filter?filter.sharedMesh:null; }
-                        if(!mesh || !mesh.isReadable || mesh.vertexCount==0)throw new InvalidOperationException("Actual readable mesh required for pose diagnostics: "+renderer.name);
-                        writer.Write(renderer.name);
-                        foreach(var local in mesh.vertices)
-                        {
-                            Vector3 world=renderer.transform.TransformPoint(local);
-                            if(float.IsNaN(world.x)||float.IsNaN(world.y)||float.IsNaN(world.z)||float.IsInfinity(world.x)||float.IsInfinity(world.y)||float.IsInfinity(world.z))throw new InvalidOperationException("Nonfinite deformed vertex.");
-                            writer.Write(world.x);writer.Write(world.y);writer.Write(world.z);
-                            minY=Mathf.Min(minY,world.y);minimum=Vector3.Min(minimum,world);maximum=Vector3.Max(maximum,world);frame.sampledVertices++;
-                            var viewport=camera.WorldToViewportPoint(world);
-                            if(viewport.z<=0)frame.behindCameraVertices++;
-                            if(viewport.z<camera.nearClipPlane || viewport.z>camera.farClipPlane || viewport.x<0 || viewport.x>1 || viewport.y<0 || viewport.y>1)frame.outsideViewportVertices++;
-                            if(frame.groundDiagnosticApplicable && world.y<frame.groundReferenceY)frame.belowReferenceVertices++;
-                        }
+                        writer.Write(world.x);writer.Write(world.y);writer.Write(world.z);
+                        minY=Mathf.Min(minY,world.y);minimum=Vector3.Min(minimum,world);maximum=Vector3.Max(maximum,world);frame.sampledVertices++;
+                        var viewport=camera.WorldToViewportPoint(world);
+                        if(viewport.z<=0)frame.behindCameraVertices++;
+                        if(viewport.z<camera.nearClipPlane || viewport.z>camera.farClipPlane || viewport.x<0 || viewport.x>1 || viewport.y<0 || viewport.y>1)frame.outsideViewportVertices++;
+                        if(frame.groundDiagnosticApplicable && world.y<frame.groundReferenceY)frame.belowReferenceVertices++;
                     }
-                    finally { if(temporary)UnityEngine.Object.DestroyImmediate(temporary); }
                 }
                 if(frame.sampledVertices==0)throw new InvalidOperationException("No mesh diagnostic samples.");
                 frame.worldMinY=minY;frame.meshWorldMin=minimum;frame.meshWorldMax=maximum;frame.meshWorldSize=maximum-minimum;writer.Flush();
 
                 using(var sha=System.Security.Cryptography.SHA256.Create())frame.meshPoseSha256=BitConverter.ToString(sha.ComputeHash(bytes.ToArray())).Replace("-","").ToLowerInvariant();
             }
+            return measurement;
         }
     }
 }

@@ -104,8 +104,8 @@
     },
     {
       "path": "tasks/desert-rv/art/import-candidate/failed_capture_output.py",
-      "sha256": "d966d3697850e3294f6cdfd0ca24d70378211661032cd203e7d46f14caf42966",
-      "size": 33391
+      "sha256": "3d62a229bafefd445f0e09a89ae316f201f7ee2af0c33fbff78c7d2d7a61a0a4",
+      "size": 33698
     },
     {
       "path": "tasks/desert-rv/art/import-candidate/fixtures/armored-failed-child-37866263641.xml",
@@ -124,8 +124,8 @@
     },
     {
       "path": "tasks/desert-rv/art/import-candidate/pouncer_output.py",
-      "sha256": "6845bd4fbe66808f86ef5e0785d8f61f52e6eeb9aa81bb2830a347b8f0368714",
-      "size": 36871
+      "sha256": "2c9924ef531e0d2baaf061fa8be15fa7568c6024d52394850d7b35cb62531101",
+      "size": 37553
     },
     {
       "path": "tasks/desert-rv/art/import-candidate/prepare_input.py",
@@ -139,8 +139,8 @@
     },
     {
       "path": "tasks/desert-rv/art/import-candidate/strict_output.py",
-      "sha256": "a760c0c60ab21f9cd6a15d5719949c8878f059aba3f8850674fefab88576711a",
-      "size": 30906
+      "sha256": "134ac27676750e5cda0e39f93b279e676fb55c0f4decd5da70bd0d97afef3502",
+      "size": 33480
     },
     {
       "path": "tasks/desert-rv/art/import-candidate/test_capture_source.py",
@@ -154,8 +154,8 @@
     },
     {
       "path": "tasks/desert-rv/art/import-candidate/test_failed_capture_output.py",
-      "sha256": "223961ccd9a4699fe4f9b447199f19895789b42d47d6017bccf79108da9633cd",
-      "size": 35638
+      "sha256": "2c8d726363f1e46dda7f3ebbf768e8283417b0147a4ce32a0c234b5c5fc69621",
+      "size": 35960
     },
     {
       "path": "tasks/desert-rv/art/import-candidate/test_pouncer_failed_capture.py",
@@ -164,8 +164,8 @@
     },
     {
       "path": "tasks/desert-rv/art/import-candidate/test_pouncer_output.py",
-      "sha256": "7932a77026a371af3d34eb761df99fa013d12caaa20b6387f7f09e0999bb5ca8",
-      "size": 31743
+      "sha256": "506f8d895a564ca814eabd61001afcdd89cda245c1ee0d55e454e53418660548",
+      "size": 31744
     },
     {
       "path": "tasks/desert-rv/art/import-candidate/test_stage_artifact.py",
@@ -174,8 +174,8 @@
     },
     {
       "path": "tasks/desert-rv/art/import-candidate/test_strict_output.py",
-      "sha256": "0c831264c94a4ff105baaa646cbcc109e2b2e64c38d5dd4c9f914af5acb6ff06",
-      "size": 18891
+      "sha256": "98ba58e4c3d5b0567e8dc3bd5231f7936ae6f03234b79a67cfa2c9d82591b6ac",
+      "size": 19756
     },
     {
       "path": "tasks/desert-rv/art/import-candidate/test_verify_output.py",
@@ -184,8 +184,8 @@
     },
     {
       "path": "tasks/desert-rv/art/import-candidate/test_weapon_output.py",
-      "sha256": "8e82a58d0dd60a6d180d3d7a6a77eed69dd3a4ab36593fb38c43842f811db364",
-      "size": 34495
+      "sha256": "39240e7ba6d528cdfb3dc02b398bf458c9a54dd4ec8907dbbc73971e2c8feca4",
+      "size": 34788
     },
     {
       "path": "tasks/desert-rv/art/import-candidate/verify_output.py",
@@ -194,8 +194,8 @@
     },
     {
       "path": "tasks/desert-rv/art/import-candidate/weapon_output.py",
-      "sha256": "d43bd06ca04344efb6c92cff5edb64eb857f4545cd2446b5ff3f5874c2ba0602",
-      "size": 46180
+      "sha256": "e43ab4f3a0502dc7b2651585a1e70ed59cf85186cd865c142b2891779daf9d4f",
+      "size": 46533
     },
     {
       "path": "tasks/desert-rv/art/reload-audio/generated-candidate.json",
@@ -3688,6 +3688,16 @@
       "size": 59
     },
     {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Editor/CandidateDependencyTrace.cs",
+      "sha256": "a6549802884fbc3988a37505201ad750d1eb788ddef26897a1fcc9308a6bd2f3",
+      "size": 4907
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Editor/CandidateDependencyTrace.cs.meta",
+      "sha256": "665b3c4fb983ec6969076bf3e90241bdd6a18b1e9ab0cb3ea344bb08fc99b378",
+      "size": 243
+    },
+    {
       "path": "tasks/desert-rv/unity/Assets/DesertRV/Editor/CandidateOrmConversion.cs",
       "sha256": "9ec0ab2f2832cc1390af69144cefb81348d6a7d7bd842aae6a4932d96a944170",
       "size": 3401
@@ -3739,8 +3749,8 @@
     },
     {
       "path": "tasks/desert-rv/unity/Assets/DesertRV/Editor/JourneyCandidateArtCapture.cs",
-      "sha256": "8e3f5b4f9bb450ee8beeb9e12fe311f25fe6ed41c494eff258ae0544634fff1b",
-      "size": 28715
+      "sha256": "b1e4385eb0401d602803df40deca3386005e76ac3975c968170b7719ec0db112",
+      "size": 32457
     },
     {
       "path": "tasks/desert-rv/unity/Assets/DesertRV/Editor/JourneyCandidateArtCapture.cs.meta",
@@ -3759,8 +3769,8 @@
     },
     {
       "path": "tasks/desert-rv/unity/Assets/DesertRV/Editor/JourneyCandidateArtImport.cs",
-      "sha256": "9c5773fbf459cb28867b89808dc94d18952598b0a997831563341ea7f7b2c14f",
-      "size": 40293
+      "sha256": "9f9e9d81fe643f4c4589579f530068e5fe78638ae076bc6a76c5b26701a4cb2c",
+      "size": 40795
     },
     {
       "path": "tasks/desert-rv/unity/Assets/DesertRV/Editor/JourneyCandidateArtImport.cs.meta",
@@ -3788,9 +3798,19 @@
       "size": 243
     },
     {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Editor/JourneyCandidateMeshMeasurement.cs",
+      "sha256": "7df82cae4ae36af8163cd16013a23fdc2a17717d8174b8b69a0003bcf3ee60d6",
+      "size": 9298
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Editor/JourneyCandidateMeshMeasurement.cs.meta",
+      "sha256": "e49c28a7c4a5997acc5e90210934737a0c96fcb800b9cfb6bf7f18bd11d39a23",
+      "size": 240
+    },
+    {
       "path": "tasks/desert-rv/unity/Assets/DesertRV/Editor/JourneyContentChecks.cs",
-      "sha256": "f3642483e2419a89464cf91cbe8b2c207e3922419f0814f12b7fbbec86599560",
-      "size": 31092
+      "sha256": "e82ba8e9e50f8f5ea2702df880f01ffff847e25f8cb1bd1ca19a353f5019662e",
+      "size": 31433
     },
     {
       "path": "tasks/desert-rv/unity/Assets/DesertRV/Editor/JourneyContentChecks.cs.meta",
@@ -4584,13 +4604,23 @@
     },
     {
       "path": "tasks/desert-rv/unity/Assets/DesertRV/Tests/CandidateArt/CandidateMaterialIdentityTests.cs",
-      "sha256": "b4d87c99ab6b6e9a5ae411a5c19ee49e40a3cb737109d2ffef52e837ff0c23e9",
-      "size": 4591
+      "sha256": "9dc5d427366594ab3e5fb800f18a7662903fda9b085013b8a732c841332c45a2",
+      "size": 4808
     },
     {
       "path": "tasks/desert-rv/unity/Assets/DesertRV/Tests/CandidateArt/CandidateMaterialIdentityTests.cs.meta",
       "sha256": "0ae05baffcdea134c2fcd2fb3a2e40cc773e878bf1cec8eab1aa40fd73bba2d2",
       "size": 243
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Tests/CandidateArt/CandidateMeshMeasurementTests.cs",
+      "sha256": "7b025d3104a028c14fb2cec65a486cb2d302f70f8523e27de7bda95dd435859d",
+      "size": 12847
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Tests/CandidateArt/CandidateMeshMeasurementTests.cs.meta",
+      "sha256": "c4f4ad4e94aa11716ea61b0b36321a83a7751d8eb5a5d869f82eece43c029436",
+      "size": 240
     },
     {
       "path": "tasks/desert-rv/unity/Assets/DesertRV/Tests/CandidateArt/DesertRV.CandidateArtTests.asmdef",

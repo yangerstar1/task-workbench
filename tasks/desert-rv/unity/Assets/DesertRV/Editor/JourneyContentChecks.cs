@@ -158,19 +158,23 @@ namespace DesertRV.Editor
         // Deterministic byte-level digest over sorted project dependencies, including their meta GUIDs.
         public static string DependencySha256(string path)
         {
-            if (string.IsNullOrWhiteSpace(path) || !File.Exists(path)) return "";
+            var trace=CandidateDependencyTrace.Begin(path);
+            if (string.IsNullOrWhiteSpace(path) || !File.Exists(path)) {trace?.Finish("");return "";}
             using (var stream = new MemoryStream())
             {
-                foreach (string dependency in AssetDatabase.GetDependencies(path,true).OrderBy(x=>x,StringComparer.Ordinal))
+                var dependencyPaths=AssetDatabase.GetDependencies(path,true).OrderBy(x=>x,StringComparer.Ordinal).ToArray();
+                trace?.DependencyCount(dependencyPaths.Length);
+                foreach (string dependency in dependencyPaths)
                     foreach (string file in new[] { dependency,dependency+".meta" })
                     {
-                        if (!File.Exists(file)) continue;
+                        if (!File.Exists(file)) {trace?.Record(file,false,null);continue;}
                         byte[] name = Encoding.UTF8.GetBytes(file.Replace('\\','/')), bytes = File.ReadAllBytes(file);
+                        trace?.Record(file,true,bytes);
                         byte[] nameLength = Encoding.ASCII.GetBytes(name.Length+":"), length = Encoding.ASCII.GetBytes(bytes.LongLength+":");
                         stream.Write(nameLength,0,nameLength.Length); stream.Write(name,0,name.Length);
                         stream.Write(length,0,length.Length); stream.Write(bytes,0,bytes.Length);
                     }
-                using (var sha = SHA256.Create()) return BitConverter.ToString(sha.ComputeHash(stream.ToArray())).Replace("-","").ToLowerInvariant();
+                using (var sha = SHA256.Create()) {string digest=BitConverter.ToString(sha.ComputeHash(stream.ToArray())).Replace("-","").ToLowerInvariant();trace?.Finish(digest);return digest;}
             }
         }
         static bool HasMotion(Motion motion)

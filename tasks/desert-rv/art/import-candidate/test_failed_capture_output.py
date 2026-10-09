@@ -22,6 +22,9 @@ import failed_capture_output as f
 
 
 NATIVE_CASES = [
+    'DesertRV.Tests.CandidateMeshMeasurementTests.ScaledTranslatedRotatedHierarchyMatchesIndependentSkinning',
+    'DesertRV.Tests.CandidateMeshMeasurementTests.RejectsBlendShapesAndTruncatedSkinQuality',
+    'DesertRV.Tests.CandidateMeshMeasurementTests.StaticMeshesAndFourMillimetreGateUseWorldVertices',
     'DesertRV.Tests.CandidateArtImportTests.ExecutePinnedDiscoveryOrBindingDiagnostics',
     'DesertRV.Tests.CandidateAnimationPolicyTests.OnlyArmoredAttackGetsTheSourceLoopException',
     'DesertRV.Tests.CandidateAnimationPolicyTests.EqualKeyValuesDoNotExcuseUnsafeTangents',
@@ -38,7 +41,7 @@ def sha(data):
 
 def native_xml(failed=True):
     return ('<test-run result="' + ('Failed' if failed else 'Passed') + '">' + ''.join(
-        '<test-case fullname="' + name + '" result="' + ('Failed' if failed and i == 0 else 'Passed') +
+        '<test-case fullname="' + name + '" result="' + ('Failed' if failed and name == f.ENTRY else 'Passed') +
         '" runstate="Runnable" start-time="2026-10-08T12:00:00Z" '
         'end-time="2026-10-08T12:00:01Z" duration="1.0"/>'
         for i, name in enumerate(NATIVE_CASES)) + '</test-run>')
@@ -185,7 +188,7 @@ class FailedCaptureTests(unittest.TestCase):
         self.assertTrue(self.run_export())
         self.assertEqual(self.summary['status'], 'FAILED_DIAGNOSTICS')
         self.assertIs(self.summary['approved'], False)
-        self.assertEqual((self.summary['nativeCases'],self.summary['nativeFailedCases'],self.summary['images']), (7,1,8))
+        self.assertEqual((self.summary['nativeCases'],self.summary['nativeFailedCases'],self.summary['images']), (10,1,8))
         names = {p.relative_to(self.out).as_posix() for p in self.out.rglob('*') if p.is_file()}
         self.assertEqual(names, {'receipt.json','failed-diagnostics.json'} | {r['path'] for r in self.summary['files']})
         for name in names:
@@ -220,17 +223,17 @@ class FailedCaptureTests(unittest.TestCase):
     def test_protected_failure_forbids_export(self): self.rejected(protected='failure')
     def test_exact_unity_failed_child_aggregate_exports_failed_diagnostics(self):
         self.native.write_text(native_xml().replace('<test-run result="Failed">',
-            '<test-run result="Failed(Child)" testcasecount="7" total="7" passed="6" failed="1" inconclusive="0" skipped="0">'))
+            '<test-run result="Failed(Child)" testcasecount="10" total="10" passed="9" failed="1" inconclusive="0" skipped="0">'))
         self.assertTrue(self.run_export())
         self.assertEqual(self.summary['status'], 'FAILED_DIAGNOSTICS')
         self.assertIs(self.summary['approved'], False)
         self.assertEqual(self.summary['nativeFailedCases'], 1)
 
     def test_failed_child_aggregate_count_mismatch_and_unknown_suffix_reject(self):
-        for result, passed in [('Failed(Child)', '7'), ('Failed(Forged)', '6')]:
+        for result, passed in [('Failed(Child)', '10'), ('Failed(Forged)', '9')]:
             with self.subTest(result=result):
                 self.native.write_text(native_xml().replace('<test-run result="Failed">',
-                    '<test-run result="'+result+'" testcasecount="7" total="7" passed="'+passed+'" failed="1" inconclusive="0" skipped="0">'))
+                    '<test-run result="'+result+'" testcasecount="10" total="10" passed="'+passed+'" failed="1" inconclusive="0" skipped="0">'))
                 self.rejected()
 
     def actual_xml_results(self, root):

@@ -122,6 +122,7 @@ namespace DesertRV.Editor
                     Check(dependencies.Contains(destination+"/Source/"+file),"Prefab lost actual model/animation FBX dependency: "+file);
                 report.dependencyHash=AssetDatabase.GetAssetDependencyHash(report.prefab).ToString();
                 report.dependencySha256=JourneyContentChecks.DependencySha256(report.prefab);
+                Check(Regex.IsMatch(report.dependencyHash??"","^[a-f0-9]{32}$") && Regex.IsMatch(report.dependencySha256??"","^[a-f0-9]{64}$"),"Native dependency identities are empty or malformed; empty equality cannot prove unchanged content. Hash128Valid="+Regex.IsMatch(report.dependencyHash??"","^[a-f0-9]{32}$")+" Hash128Length="+(report.dependencyHash??"").Length+" SHA256Valid="+Regex.IsMatch(report.dependencySha256??"","^[a-f0-9]{64}$")+" SHA256Length="+(report.dependencySha256??"").Length);
                 report.status="candidate-structure-imported-unreviewed";
             }
             catch(Exception e) { report.failures.Add(e.ToString()); throw; }

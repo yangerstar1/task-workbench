@@ -50,7 +50,11 @@ namespace DesertRV.Tests
             finally
             {
                 try {if(visual)UnityEngine.Object.DestroyImmediate(visual);if(clip)UnityEngine.Object.DestroyImmediate(clip);if(impostor)UnityEngine.Object.DestroyImmediate(impostor);}
-                finally {if(AssetDatabase.IsValidFolder(folder))Assert.That(AssetDatabase.DeleteAsset(folder),Is.True,"Temporary material identity fixture cleanup failed.");}
+                finally
+                {
+                    if(AssetDatabase.IsValidFolder(folder))Assert.That(AssetDatabase.DeleteAsset(folder),Is.True,"Temporary material identity fixture cleanup failed.");
+                    Type.GetType("DesertRV.Editor.CandidateDependencyTrace, Assembly-CSharp-Editor",true).GetMethod("ObserveAfterMaterialTest").Invoke(null,null);
+                }
             }
         }
     }

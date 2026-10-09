@@ -15,7 +15,7 @@ import xml.etree.ElementTree as ET
 
 from strict_output import (StrictError, require, safe, sha, read, keys, finite,
     digest, vec, rel, payload_name, native_report, inspect_png, dependency_digest,
-    derived_record, distance, angle, unity_euler, mesh_dimensions)
+    derived_record, distance, angle, unity_euler, mesh_dimensions, observe_dependency_mismatch)
 
 STATES = {'Idle': 2.0, 'Fire': .22, 'Reload': 1.65}
 MATERIALS = ('Graphite_Parkerized', 'Brushed_Steel', 'Glove_Graphite',
@@ -42,7 +42,7 @@ ORIGINAL_SCRIPTS = {'Assets/DesertRV/Runtime/WeaponPresentation.cs', 'Assets/Des
 PACKAGE_SHADER = 'Packages/com.unity.render-pipelines.universal/Shaders/Lit.shader'
 # URP's stable Lit shader asset GUID; virtual Packages are deliberately not byte-hash claims.
 URP_LIT_GUID = '933532a4fcc9baf4fa0491de14d08ed7'
-NATIVE_CASES = 7
+NATIVE_CASES = 10
 EMISSION_CASE = 'DesertRV.Tests.CandidateAnimationPolicyTests.OpenCoreEmissionSurvivesRealSaveReimportAndReload'
 MATERIAL_IDENTITY_CASE = 'DesertRV.Tests.CandidateMaterialIdentityTests.PersistedWeaponMaterialIdentitySurvivesNeutralSamplingAndRejectsImpostors'
 ZERO = dict(x=0, y=0, z=0)
@@ -304,8 +304,11 @@ def validate_import(project, c, contract_path, report):
         if m.get('ormFile'): needed.add(prefix+f'/Derived/ORM_{i:02}.png')
     deps = report['dependencies']
     require(isinstance(deps,list) and all(isinstance(p,str) for p in deps) and needed <= set(deps), 'WEAPON_REQUIRED_DEPENDENCIES')
-    require(digest(report['dependencyHash'],32) and digest(report['dependencySha256'])
-        and report['dependencySha256'] == dependency_digest(project,deps), 'WEAPON_DEPENDENCY_HASH')
+    actual_dependency_sha256=dependency_digest(project,deps)
+    valid_dependency_identity=digest(report['dependencyHash'],32) and digest(report['dependencySha256'])
+    if not valid_dependency_identity or report['dependencySha256']!=actual_dependency_sha256:
+        observe_dependency_mismatch(project,deps,report['dependencyHash'],report['dependencySha256'],actual_dependency_sha256)
+    require(valid_dependency_identity and report['dependencySha256'] == actual_dependency_sha256, 'WEAPON_DEPENDENCY_HASH')
     # Check all serialized GUID references of candidate YAML against declared dependencies.
     guid_set = {URP_LIT_GUID}
     for path in deps:
