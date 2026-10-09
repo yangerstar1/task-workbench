@@ -294,7 +294,7 @@ class JourneyLinuxExportTests(unittest.TestCase):
   with self.assertRaises(ValueError):x.inventory(self.build)
  def test_official_template_symbols_and_libraries_complete_synthetic_export_chain(self):
   task,_=self.success_fixture()
-  for name in ('UnityPlayer_s.debug','LinuxPlayer_s.debug','libdecor-0.so.0','libdecor-cairo.so'):
+  for name in ('UnityPlayer_s.debug','DesertRV_s.debug','libdecor-0.so.0','libdecor-cairo.so'):
    p=self.build/name;p.write_bytes(b'SYNTHETIC_TEMPLATE_FILE_'+name.encode());p.chmod(0o755)
   debug=self.build/'DESERTRV_JOURNEY_CANDIDATE_BurstDebugInformation_DoNotShip';debug.mkdir();(debug/'lib_burst_generated.txt').write_bytes(b'PRIVATE_BUILD_TEXT_NEVER_EXPORTED')
   x.stage();self.assertEqual(x.export(),0);manifest=json.loads((task/'public/manifest.json').read_text());names={r['path'] for r in manifest['files']}
@@ -309,6 +309,16 @@ class JourneyLinuxExportTests(unittest.TestCase):
   p.rename(self.build/'DesertRV_BurstDebugInformation_DoNotShip')
   with self.assertRaises(ValueError):x.host_phase('STAGE_INVENTORY',lambda:x.inventory(self.build))
   self.assertEqual(x.host_state()['failureCode'],'RUNTIME_ROOT_SET')
+ def test_final_executable_symbol_name_is_exact_and_never_published(self):
+  symbol=self.build/'DesertRV_s.debug';symbol.write_bytes(b'SYNTHETIC_SYMBOL')
+  records=x.inventory(self.build);self.assertNotIn(symbol.name,{r['path'] for r in records})
+  for name in ('LinuxPlayer_s.debug','OtherGame_s.debug','DesertRV_s.debug.extra'):
+   with self.subTest(unexpected=name):
+    symbol.rename(self.build/name)
+    with self.assertRaisesRegex(ValueError,'RUNTIME_ROOT_SET'):x.inventory(self.build)
+    (self.build/name).rename(symbol)
+  symbol.unlink();symbol.mkdir()
+  with self.assertRaisesRegex(ValueError,'RUNTIME_DEBUG_TYPE'):x.inventory(self.build)
  def test_old_top_level_mono_is_rejected(self):
   p=self.build/'MonoBleedingEdge';p.mkdir()
   with self.assertRaises(ValueError):x.inventory(self.build)

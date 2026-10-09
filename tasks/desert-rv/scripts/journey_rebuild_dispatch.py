@@ -3,13 +3,13 @@ import hashlib,json,os,re,subprocess,sys
 from pathlib import Path
 
 ROOT=Path(__file__).resolve().parents[3]
-BASE='4ac351190f97783a9b99621a1a8e6bed954f0f9e'
+BASE='4bcc86731f7a030ee31b78017ad9ad27f1997383'
 BRANCH='journey-linux-export-recovery-938'
 REF='refs/heads/'+BRANCH
 REPOSITORY='yangerstar1/task-workbench'
 OWNER='yangerstar1'
-REQUEST='.github/dispatch/desert-rv-rebuild-linux-layout-20261009.json'
-REQUEST_ID='desert-rv-rebuild-linux-layout-20261009-once'
+REQUEST='.github/dispatch/desert-rv-rebuild-linux-symbol-20261009.json'
+REQUEST_ID='desert-rv-rebuild-linux-symbol-20261009-once'
 POLICY='tasks/desert-rv/art/journey-preparation/restoration-transition.json'
 
 def require(ok,code):

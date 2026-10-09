@@ -20,8 +20,8 @@ ROLES={'NONE','CONTENT','BOOTSTRAP','FIRST_STATION','SCRAPYARD','NIGHT_BEACON'}
 BUILD_ERROR_KINDS={'CANDIDATE_GATE','PRODUCTION_GATE','CS_COMPILATION','SHADER_ERROR','UNCLASSIFIED_BUILD_ERROR'}
 RUNTIME_FILE_ROOTS={'DesertRV.x86_64','UnityPlayer.so','UnityCrashHandler64','libdecor-0.so.0','libdecor-cairo.so'}
 RUNTIME_ROOTS=RUNTIME_FILE_ROOTS|{'DesertRV_Data'}
-# Exact native symbols observed in the same pinned official development_mono template.
-DEBUG_FILES={'UnityPlayer_s.debug','LinuxPlayer_s.debug'}
+# Exact final output symbols: DesertRV_s.debug matches the pinned LinuxPlayer_s.debug template bytes.
+DEBUG_FILES={'UnityPlayer_s.debug','DesertRV_s.debug'}
 MONO_FILES={'DesertRV_Data/MonoBleedingEdge/x86_64/'+n for n in ('libmonobdwgc-2.0.so','libmono-native.so','libMonoPosixHelper.so')}
 REQUIRED_FILES={'DesertRV.x86_64','UnityPlayer.so','libdecor-0.so.0','libdecor-cairo.so','DesertRV_Data/Managed/Assembly-CSharp.dll','DesertRV_Data/MonoBleedingEdge/etc/mono/config'}|MONO_FILES
 # Burst 1.8.29 FetchOutputPath uses PlayerSettings.productName, not the executable basename.

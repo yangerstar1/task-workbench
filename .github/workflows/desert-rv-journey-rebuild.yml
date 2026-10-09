@@ -2,7 +2,7 @@ name: Desert RV restore verified Journey and rebuild candidate Linux
 on:
   push:
     branches: [journey-linux-export-recovery-938]
-    paths: [.github/dispatch/desert-rv-rebuild-linux-layout-20261009.json]
+    paths: [.github/dispatch/desert-rv-rebuild-linux-symbol-20261009.json]
   workflow_dispatch:
     inputs:
       transition_sha256:
