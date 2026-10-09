@@ -4063,8 +4063,8 @@
     },
     {
       "path": "tasks/desert-rv/unity/Assets/DesertRV/Editor/JourneyCandidateAssetIntegration.Fx.cs",
-      "sha256": "4201e702f31c40f922d8fd0bb1b49a5f45e82aaa7c88280494ae9d87cbbec845",
-      "size": 15318
+      "sha256": "3bf11187a8d1085776ee96f1a15f186e53fd26ff92a56013828ce7115a229512",
+      "size": 17043
     },
     {
       "path": "tasks/desert-rv/unity/Assets/DesertRV/Editor/JourneyCandidateAssetIntegration.Fx.cs.meta",
@@ -5298,8 +5298,8 @@
     },
     {
       "path": "tasks/desert-rv/unity/Assets/DesertRV/Tests/JourneyPreparation/JourneyPreparationTests.cs",
-      "sha256": "ca42bd91a699526a784d69dddfddf252fcb8004f89c9057fbb373879eef310fb",
-      "size": 392
+      "sha256": "ac7833c3f577fea54b4ec5a6702599059abb6a1dcffa7d5b50eb849b69e4da0e",
+      "size": 3087
     },
     {
       "path": "tasks/desert-rv/unity/Assets/DesertRV/Tests/JourneyPreparation/JourneyPreparationTests.cs.meta",

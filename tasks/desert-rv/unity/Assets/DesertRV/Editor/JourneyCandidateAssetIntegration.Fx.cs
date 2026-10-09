@@ -114,11 +114,38 @@ namespace DesertRV.Editor
             ValidateFxRequestShape(r, Environment.GetEnvironmentVariable("GITHUB_SHA")); r.arcSound = CompleteSelectedAsset(r.arcSound);
             FileCheck(pin, "JourneyEvidence/"); WriteFreshInput(Environment.GetEnvironmentVariable("DESERTRV_JOURNEY_FX_INPUT"), r);
         }
+        static Scene[] FxOriginalScenes() => Enumerable.Range(0, SceneManager.sceneCount).Select(SceneManager.GetSceneAt).ToArray();
+        internal static void WithFxPreviewScene(Action<Scene> author)
+        {
+            var original = FxOriginalScenes();
+            Require(original.All(scene => !scene.isDirty), "Save/discard dirty scenes before FX authoring.");
+            var active = SceneManager.GetActiveScene();
+            var roots = original.ToDictionary(scene => scene.handle, scene => scene.GetRootGameObjects().Select(go => go.GetInstanceID()).OrderBy(id => id).ToArray());
+            var preview = EditorSceneManager.NewPreviewScene();
+            try { author(preview); }
+            finally
+            {
+                try { if (preview.IsValid()) Require(EditorSceneManager.ClosePreviewScene(preview) && !preview.IsValid(), "FX preview cleanup failed."); }
+                finally
+                {
+                    var after = FxOriginalScenes();
+                    Require(after.Select(scene => scene.handle).SequenceEqual(original.Select(scene => scene.handle)) && SceneManager.GetActiveScene() == active &&
+                        after.All(scene => !scene.isDirty && scene.GetRootGameObjects().Select(go => go.GetInstanceID()).OrderBy(id => id).SequenceEqual(roots[scene.handle])),
+                        "FX preview changed an original scene, root object, dirty state or active scene.");
+                }
+            }
+        }
+        internal static GameObject FxObject(string name, Scene preview, Transform parent = null)
+        {
+            Require(preview.IsValid() && EditorSceneManager.IsPreviewScene(preview) && (!parent || parent.gameObject.scene == preview), "FX objects require the owned preview scene.");
+            var value = new GameObject(name);
+            try { SceneManager.MoveGameObjectToScene(value, preview); if (parent) value.transform.SetParent(parent, false); return value; }
+            catch { Object.DestroyImmediate(value); throw; }
+        }
         public static void AuthorFxFromEnvironment()
         {
             Require(!Application.isPlaying && !EditorApplication.isPlayingOrWillChangePlaymode && !BuildPipeline.isBuildingPlayer, "FX authoring is explicit EditMode work only.");
-            var setup = EditorSceneManager.GetSceneManagerSetup();
-            Require(!setup.Any(s => s.isLoaded && SceneManager.GetSceneByPath(s.path).isDirty), "Save/discard dirty scenes before FX authoring.");
+            Require(FxOriginalScenes().All(scene => !scene.isDirty), "Save/discard dirty scenes before FX authoring.");
             var pin = new FilePin { path = Environment.GetEnvironmentVariable("DESERTRV_JOURNEY_FX_INPUT"), sha256 = Environment.GetEnvironmentVariable("DESERTRV_JOURNEY_FX_INPUT_SHA256") };
             FileCheck(pin, "JourneyEvidence/"); var r = JsonUtility.FromJson<FxRequest>(File.ReadAllText(pin.path)); ValidateFxRequestShape(r, Environment.GetEnvironmentVariable("GITHUB_SHA"));
             var audio = Load<AudioClip>(r.arcSound); Require(audio.length > 0, "Actual playable arc sound required.");
@@ -131,25 +158,25 @@ namespace DesertRV.Editor
             GameObject flash = null, arc = null;
             try
             {
-                var temporary = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Additive); SceneManager.SetActiveScene(temporary);
+                WithFxPreviewScene(temporary => {
                 Directory.CreateDirectory(folder); AssetDatabase.Refresh(ImportAssetOptions.ForceSynchronousImport);
                 var flashMaterial = FxMaterial(folder, "Flash", false); var arcMaterial = FxMaterial(folder, "Arc", true);
-                flash = new GameObject("Candidate muzzle short flash (unreviewed)");
+                flash = FxObject("Candidate muzzle short flash (unreviewed)", temporary);
                 Particles(flash, flashMaterial, r.flashLifetimeSeconds, r.flashDiameterMeters, r.flashSpeedMetersPerSecond, r.flashColor, 1);
                 Require(PrefabUtility.SaveAsPrefabAsset(flash, folder + "/MuzzleFlash.prefab"), "Flash prefab save failed.");
-                arc = new GameObject("Candidate arc presentation (unreviewed)");
+                arc = FxObject("Candidate arc presentation (unreviewed)", temporary);
                 var presenter = arc.AddComponent<ArcPresentation>(); presenter.enabled = false;
-                var source = new GameObject("Candidate arc source").transform; source.SetParent(arc.transform, false); presenter.source = source;
+                var source = FxObject("Candidate arc source", temporary, arc.transform).transform; presenter.source = source;
                 presenter.audioSource = source.gameObject.AddComponent<AudioSource>(); presenter.audioSource.playOnAwake = false;
                 presenter.audioSource.spatialBlend = 1; presenter.audioSource.minDistance = 2; presenter.audioSource.maxDistance = 24; presenter.arcSound = audio;
                 presenter.beams = new LineRenderer[r.arcSlots]; presenter.impacts = new ParticleSystem[r.arcSlots];
                 for (int i = 0; i < r.arcSlots; i++)
                 {
-                    var beam = new GameObject("Arc beam " + i).AddComponent<LineRenderer>(); beam.transform.SetParent(arc.transform, false);
+                    var beam = FxObject("Arc beam " + i, temporary, arc.transform).AddComponent<LineRenderer>();
                     beam.sharedMaterial = arcMaterial; beam.useWorldSpace = true; beam.positionCount = 2; beam.SetPositions(new[] { Vector3.zero, Vector3.zero });
                     beam.startWidth = r.arcWidthMeters; beam.endWidth = r.arcWidthMeters * .4f; beam.startColor = r.arcColor; beam.endColor = r.arcColor;
                     beam.textureMode = LineTextureMode.Stretch; beam.shadowCastingMode = ShadowCastingMode.Off; beam.receiveShadows = false; beam.enabled = false;
-                    var impact = new GameObject("Arc impact " + i); impact.transform.SetParent(arc.transform, false);
+                    var impact = FxObject("Arc impact " + i, temporary, arc.transform);
                     presenter.beams[i] = beam; presenter.impacts[i] = Particles(impact, flashMaterial, r.impactLifetimeSeconds, r.impactDiameterMeters, r.impactSpeedMetersPerSecond, r.arcColor, 5);
                 }
                 Require(PrefabUtility.SaveAsPrefabAsset(arc, folder + "/ArcPresentation.prefab"), "Arc prefab save failed.");
@@ -158,8 +185,9 @@ namespace DesertRV.Editor
                 FileCheck(pin, "JourneyEvidence/"); result.protectedSourcesUnchanged = false; VerifyProtected(protectedFiles, allowed); result.protectedSourcesUnchanged = true;
                 result.outputs = outputs.Select(p => new OutputFile { path = p, sha256 = JourneyDiagnosticScope.HashFile(p), dependencyHash = AssetDatabase.GetAssetDependencyHash(p).ToString(), dependencySha256 = JourneyContentChecks.DependencySha256(p) }).ToArray();
                 result.status = "ORIGINAL_NATIVE_FX_AUTHORED_UNCALIBRATED";
+                });
             }
-            catch (Exception error) { result.failures = new[] { error.ToString() }; throw; }
+            catch (Exception error) { result.status = "failed-fx-authoring"; result.failures = new[] { error.ToString() }; throw; }
             finally
             {
                 if (flash) Object.DestroyImmediate(flash); if (arc) Object.DestroyImmediate(arc);
@@ -168,8 +196,7 @@ namespace DesertRV.Editor
                 finally
                 {
                     result.protectedFiles = protectedFiles.OrderBy(p => p.Key).Select(p => new FilePin { path = p.Key, sha256 = p.Value }).ToArray();
-                    try { Directory.CreateDirectory("JourneyEvidence"); File.WriteAllText("JourneyEvidence/journey-candidate-fx.json", JsonUtility.ToJson(result, true)); }
-                    finally { JourneySceneAuthoring.RestoreSceneSetup(setup); }
+                    Directory.CreateDirectory("JourneyEvidence"); File.WriteAllText("JourneyEvidence/journey-candidate-fx.json", JsonUtility.ToJson(result, true));
                 }
             }
         }
