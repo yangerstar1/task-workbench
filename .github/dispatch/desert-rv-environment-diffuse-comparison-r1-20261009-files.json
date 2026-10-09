@@ -1,0 +1,80 @@
+{
+  "schema": 1,
+  "requestId": "desert-rv-environment-diffuse-comparison-r1-20261009-once-c91b7f42",
+  "baseCommit": "0bb5c263ad756e57d28fffd04bbec21f203ea178",
+  "candidateManifestSha256": "16d078c54c52c4350f27beddb6f54bd31adfae51d3d9ece3fd4c35afd155baa9",
+  "files": [
+    {
+      "path": ".github/workflows/desert-rv-environment-diffuse-comparison-r1.yml",
+      "sha256": "eb439295f8b9d1bd1a720f7dd487266d2806f222f84ff5a941aae6910ac0db93",
+      "size": 6859,
+      "mode": "100644"
+    },
+    {
+      "path": "tasks/desert-rv/art/environment-v4/diffuse-comparison-r1-file-manifest.json",
+      "sha256": "16d078c54c52c4350f27beddb6f54bd31adfae51d3d9ece3fd4c35afd155baa9",
+      "size": 1940,
+      "mode": "100644"
+    },
+    {
+      "path": "tasks/desert-rv/art/environment-v4/diffuse-correction/renderer-binding-fixture-r3.json",
+      "sha256": "4438b0f4bb2f25c5a63a4b4e1250873ea79f8bd3c22895800b7af55571a8a3f1",
+      "size": 1160,
+      "mode": "100644"
+    },
+    {
+      "path": "tasks/desert-rv/scripts/environment_diffuse_comparison_evidence.py",
+      "sha256": "bcb27945afb5aaa6fd1f9ad3ae2e7f2b9dc7ac7da48fed3f0cfa3ff210ff6c45",
+      "size": 14449,
+      "mode": "100644"
+    },
+    {
+      "path": "tasks/desert-rv/scripts/environment_diffuse_comparison_r1_dispatch.py",
+      "sha256": "b1ba84217ec8173343fa23eff321fc3522736c20c0a24dec5976172736e9a479",
+      "size": 8149,
+      "mode": "100644"
+    },
+    {
+      "path": "tasks/desert-rv/scripts/prepare_runner.sh",
+      "sha256": "77626e29656dde81e2ed5c16374888d25d5f0c6bd5dd20eebcfa81ac58ba70e6",
+      "size": 3274,
+      "mode": "100644"
+    },
+    {
+      "path": "tasks/desert-rv/scripts/test_environment_diffuse_comparison_dispatch.py",
+      "sha256": "c67aa6bbe418148b535258da2c9cf05033a5873a7593e610c83ae0859e9f77dc",
+      "size": 30328,
+      "mode": "100644"
+    },
+    {
+      "path": "tasks/desert-rv/scripts/test_environment_diffuse_comparison_evidence.py",
+      "sha256": "d87b63fc438953667a34afcd386b821874e848391876dcd29d19f09834f9c02e",
+      "size": 32010,
+      "mode": "100644"
+    },
+    {
+      "path": "tasks/desert-rv/scripts/test_environment_diffuse_comparison_r1_dispatch.py",
+      "sha256": "fbe7c6f9728e3108f233488374bde397157477b7ffe6b8314daa24d603420ecd",
+      "size": 30274,
+      "mode": "100644"
+    },
+    {
+      "path": "tasks/desert-rv/scripts/test_environment_diffuse_comparison_r1_runner_prefix.py",
+      "sha256": "69d0e46016f6a9df15ac2114359432cd0e97f336f4930cca11a0b722114e68ee",
+      "size": 5448,
+      "mode": "100644"
+    },
+    {
+      "path": "tasks/desert-rv/scripts/verify_evidence.py",
+      "sha256": "0d0e9cade546caa24ec5c433c0403186c5792ff44f2f8dfea2276cbb7d230d9e",
+      "size": 19948,
+      "mode": "100644"
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Editor/JourneySceneAuthoring.DiffuseComparison.cs",
+      "sha256": "57827dce31e1f5cb864cc3214d9833f0e2f44c3355d7bf7daa17c20454a8a53a",
+      "size": 19104,
+      "mode": "100644"
+    }
+  ]
+}

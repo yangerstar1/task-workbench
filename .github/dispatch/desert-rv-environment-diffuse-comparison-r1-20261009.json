@@ -1,0 +1,8 @@
+{
+  "schema": 1,
+  "requestId": "desert-rv-environment-diffuse-comparison-r1-20261009-once-c91b7f42",
+  "baseCommit": "0bb5c263ad756e57d28fffd04bbec21f203ea178",
+  "candidateManifestSha256": "16d078c54c52c4350f27beddb6f54bd31adfae51d3d9ece3fd4c35afd155baa9",
+  "filesManifestSha256": "e26ec76f89d79506c248b92ddaba3fce190db8084d71c04466d3f11051627570",
+  "sourceStateSha256": "b280ac3781f12922cfb9a215e658b139339de3454ea40f2f42727892437340a1"
+}

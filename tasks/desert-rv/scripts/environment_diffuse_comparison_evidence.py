@@ -24,10 +24,14 @@ ART = 'Assets/DesertRV/Art/EnvironmentV4/'
 ORIGINAL = ART + 'sand_03_diff_1k.jpg'
 CORRECTED = 'Assets/DesertRV/Art/TerrainDiffuseCorrection/sand_03_diff_illumination_corrected_1k.png'
 REQUIRED_ASSETS = (ORIGINAL, CORRECTED)
+GENERATED = 'Assets/DesertRV/Scenes/Journey/EnvironmentV4/'
+TERRAIN_BINDINGS = [dict(objectName='EnvironmentV4 '+role, scenePath='Assets/DesertRV/Scenes/Journey/Scrapyard.unity',
+                         meshAsset=GENERATED+'R2-'+role+'.asset', materialAsset=GENERATED+'Surface-'+material+'.mat')
+                    for role, material in (('Ground-Sand', 'Sand'), ('ReliefEast-Dune', 'Dune'), ('ReliefWest-Dune', 'Dune'))]
 ASSET_KEYS = {'assetPath', 'sha256', 'width', 'height'}
 REPORT_KEYS = {'status', 'graphicsDeviceType', 'graphicsDeviceName', 'savedSceneAndMaterialBytesPreserved',
                'captureBuffersReleased', 'terrainRenderers', 'protectedSavedAssetCount', 'warmupRenderCount',
-               'diffuseAssets', 'originalMaterials', 'images'}
+               'diffuseAssets', 'terrainBindings', 'originalMaterials', 'images'}
 IMAGE_KEYS = {'file', 'view', 'variant', 'sceneHash', 'width', 'height', 'fieldOfView', 'minimum', 'maximum',
               'normalEnabled', 'materialParametersPreserved', 'warmupRenderCount', 'cameraPosition', 'cameraTarget', 'actualMaterials'}
 MATERIAL_KEYS = {'name', 'shader', 'baseMapAsset', 'normalMapAsset', 'normalScale', 'smoothness', 'metallic',
@@ -93,6 +97,7 @@ def validate_report(report):
     require(report['savedSceneAndMaterialBytesPreserved'] is True and report['captureBuffersReleased'] is True, 'Comparison preservation/cleanup')
     for key, count in (('terrainRenderers', 3), ('protectedSavedAssetCount', 6), ('warmupRenderCount', 1)):
         require(type(report[key]) is int and report[key] == count, 'Wrong '+key)
+    require(report['terrainBindings'] == TERRAIN_BINDINGS, 'Exact original terrain object/scene/mesh/material roles required')
     assets = report['diffuseAssets']
     require(isinstance(assets, list) and len(assets) == 2, 'Required diffuse asset count')
     assets_seen = set(); asset_hashes = set()

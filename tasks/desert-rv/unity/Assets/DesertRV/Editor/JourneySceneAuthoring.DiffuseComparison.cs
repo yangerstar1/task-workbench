@@ -16,6 +16,13 @@ namespace DesertRV.Editor
         const string ComparisonOriginalDiffuse = "Assets/DesertRV/Art/EnvironmentV4/sand_03_diff_1k.jpg";
         const string ComparisonCorrectedDiffuse = "Assets/DesertRV/Art/TerrainDiffuseCorrection/sand_03_diff_illumination_corrected_1k.png";
         const string ComparisonNormal = "Assets/DesertRV/Art/EnvironmentV4/sand_03_nor_gl_1k.jpg";
+        static readonly string[][] comparisonTerrainRoles = {
+            new[]{"Ground-Sand","Sand"}, new[]{"ReliefEast-Dune","Dune"}, new[]{"ReliefWest-Dune","Dune"}
+        };
+        [Serializable] sealed class DiffuseComparisonTerrain
+        {
+            public string objectName,scenePath,meshAsset,materialAsset;
+        }
         [Serializable] sealed class DiffuseComparisonAsset
         {
             public string assetPath,sha256; public int width,height;
@@ -38,6 +45,7 @@ namespace DesertRV.Editor
             public bool savedSceneAndMaterialBytesPreserved,captureBuffersReleased;
             public int terrainRenderers,protectedSavedAssetCount,warmupRenderCount=1;
             public DiffuseComparisonAsset[] diffuseAssets;
+            public DiffuseComparisonTerrain[] terrainBindings;
             public DiffuseComparisonMaterial[] originalMaterials; public DiffuseComparisonImage[] images;
         }
         static DiffuseComparisonMaterial ReadDiffuseComparisonMaterial(Material m)
@@ -94,7 +102,7 @@ namespace DesertRV.Editor
             if(Directory.Exists(output))throw new IOException("Refuse stale diffuse comparison evidence.");Directory.CreateDirectory(output);
             var records=new List<DiffuseComparisonImage>();var clones=new List<Material>();
             RenderTexture target=null;Texture2D pixels=null;var previousTarget=RenderTexture.active;
-            Renderer[] terrain=null;Material[] originals=null;DiffuseComparisonMaterial[] materials=null;
+            Renderer[] terrain=null;Material[] originals=null;DiffuseComparisonMaterial[] materials=null;DiffuseComparisonTerrain[] terrainBindings=null;
             bool released=false,preserved=false;
             try
             {
@@ -115,9 +123,24 @@ namespace DesertRV.Editor
                 var actions=Components<JourneyActions>(boot).Single();CheckNewLayoutClearance(b,motor,actions);
                 terrain=b.GetComponentsInChildren<Renderer>(true).Where(r=>r.enabled&&r.sharedMaterial&&
                     (AssetDatabase.GetAssetPath(r.sharedMaterial)==PolishGenerated+"/Surface-Sand.mat"||AssetDatabase.GetAssetPath(r.sharedMaterial)==PolishGenerated+"/Surface-Dune.mat")).ToArray();
-                if(terrain.Length!=3||terrain.Any(r=>r.sharedMaterials.Length!=1)||
-                    !terrain.Select(r=>r.name).OrderBy(n=>n,StringComparer.Ordinal).SequenceEqual(new[]{"Ground-Sand","ReliefEast-Dune","ReliefWest-Dune"}))
-                    throw new InvalidOperationException("Expected exactly the original ground and two dune renderer groups.");
+                string found=string.Join("; ",terrain.Select(r=>r.name+" | "+r.gameObject.scene.path+" | "+AssetDatabase.GetAssetPath(r.sharedMaterial)));
+                if(terrain.Length!=3||terrain.Any(r=>r.sharedMaterials.Length!=1))
+                    throw new InvalidOperationException("Expected exactly three single-material terrain renderer groups; found: "+found);
+                var bindings=new List<DiffuseComparisonTerrain>();
+                foreach(var role in comparisonTerrainRoles)
+                {
+                    // Producer Save() prefixes GameObject names, but not mesh/material asset filenames.
+                    var matching=terrain.Where(r=>r.name=="EnvironmentV4 "+role[0]).ToArray();
+                    if(matching.Length!=1)throw new InvalidOperationException("Missing or duplicate terrain role "+role[0]+"; found: "+found);
+                    var renderer=matching[0];var filter=renderer.GetComponent<MeshFilter>();
+                    if(renderer.gameObject.scene!=env||renderer.transform.parent!=b.transform||!filter||!filter.sharedMesh||
+                        AssetDatabase.GetAssetPath(filter.sharedMesh)!=PolishGenerated+"/R2-"+role[0]+".asset"||
+                        AssetDatabase.GetAssetPath(renderer.sharedMaterial)!=PolishGenerated+"/Surface-"+role[1]+".mat")
+                        throw new InvalidOperationException("Terrain role scene, parent, mesh, or material differs: "+role[0]);
+                    bindings.Add(new DiffuseComparisonTerrain{objectName=renderer.name,scenePath=renderer.gameObject.scene.path,
+                        meshAsset=AssetDatabase.GetAssetPath(filter.sharedMesh),materialAsset=AssetDatabase.GetAssetPath(renderer.sharedMaterial)});
+                }
+                terrainBindings=bindings.ToArray();
                 originals=terrain.Select(r=>r.sharedMaterial).ToArray();
                 materials=originals.Distinct().OrderBy(m=>m.name,StringComparer.Ordinal).Select(ReadDiffuseComparisonMaterial).ToArray();
                 if(materials.Length!=2||materials.Any(m=>m.shader!="Universal Render Pipeline/Lit"||m.baseMapAsset!=ComparisonOriginalDiffuse||
@@ -194,8 +217,8 @@ namespace DesertRV.Editor
             }
             if(records.Count!=4||!released||!preserved)throw new InvalidOperationException("Incomplete diffuse comparison.");
             string report=JsonUtility.ToJson(new DiffuseComparisonReport{graphicsDeviceType=SystemInfo.graphicsDeviceType.ToString(),graphicsDeviceName=SystemInfo.graphicsDeviceName,
-                savedSceneAndMaterialBytesPreserved=preserved,captureBuffersReleased=released,terrainRenderers=3,protectedSavedAssetCount=saved.Count,
-                diffuseAssets=diffuseAssets,originalMaterials=materials,images=records.ToArray()},true);
+                savedSceneAndMaterialBytesPreserved=preserved,captureBuffersReleased=released,terrainRenderers=terrainBindings.Length,protectedSavedAssetCount=saved.Count,
+                diffuseAssets=diffuseAssets,terrainBindings=terrainBindings,originalMaterials=materials,images=records.ToArray()},true);
             string reportPath=Path.Combine(output,"comparison-report.json");File.WriteAllText(reportPath,report);
             if(File.ReadAllText(reportPath)!=report)throw new IOException("Comparison report save verification failed.");
             Debug.Log("DIFFUSE_COMPARISON_FOUR_ACTUAL_VIEWS complete; normal retained; original production materials unchanged; diagnostic only");

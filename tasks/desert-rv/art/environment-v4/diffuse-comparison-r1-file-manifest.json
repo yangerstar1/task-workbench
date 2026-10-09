@@ -1,0 +1,41 @@
+{
+  "schema": 1,
+  "base_commit": "0bb5c263ad756e57d28fffd04bbec21f203ea178",
+  "status": "DIAGNOSTIC_DIFFUSE_COMPARISON_R1_PENDING_NATIVE_NOT_ART_ACCEPTANCE",
+  "failure_run": 37973639261,
+  "failure": "Exact renderer-name assertion omitted established EnvironmentV4 prefix before first capture.",
+  "scope": "Correct exact original terrain roles; bind scene, parent, mesh and material identities; report actual bindings. Preserve all texture bytes, production source, cameras, lighting, variants and native case.",
+  "original_binary_payloads_unchanged": 29,
+  "derived_texture_unchanged": true,
+  "production_twenty_and_eight_view_gates_unchanged": true,
+  "files": [
+    {
+      "path": "tasks/desert-rv/art/environment-v4/diffuse-correction/renderer-binding-fixture-r3.json",
+      "change": "added",
+      "bytes": 1160,
+      "sha256": "4438b0f4bb2f25c5a63a4b4e1250873ea79f8bd3c22895800b7af55571a8a3f1",
+      "before_sha256": null
+    },
+    {
+      "path": "tasks/desert-rv/scripts/environment_diffuse_comparison_evidence.py",
+      "change": "modified",
+      "bytes": 14449,
+      "sha256": "bcb27945afb5aaa6fd1f9ad3ae2e7f2b9dc7ac7da48fed3f0cfa3ff210ff6c45",
+      "before_sha256": "ade51da4cf7f978b6062026d9d83de0e4a63c486247575eb260a22a9ae019f16"
+    },
+    {
+      "path": "tasks/desert-rv/scripts/test_environment_diffuse_comparison_evidence.py",
+      "change": "modified",
+      "bytes": 32010,
+      "sha256": "d87b63fc438953667a34afcd386b821874e848391876dcd29d19f09834f9c02e",
+      "before_sha256": "ee203486d5da6d50484e591bd9ff065a77c7525730f56ef58a908c90b7fe2503"
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Editor/JourneySceneAuthoring.DiffuseComparison.cs",
+      "change": "modified",
+      "bytes": 19104,
+      "sha256": "57827dce31e1f5cb864cc3214d9833f0e2f44c3355d7bf7daa17c20454a8a53a",
+      "before_sha256": "efde44d4d61eae7a92cd07ac78b4a840e59db5db3799a57ee34914cc25592156"
+    }
+  ]
+}

@@ -35,7 +35,8 @@ def valid():
               for path, letter in zip(comparison.REQUIRED_ASSETS, 'ab')]
     return dict(status=comparison.STATUS, graphicsDeviceType='OpenGLCore', graphicsDeviceName='llvmpipe (LLVM fixture)',
                 savedSceneAndMaterialBytesPreserved=True, captureBuffersReleased=True, terrainRenderers=3,
-                protectedSavedAssetCount=6, warmupRenderCount=1, diffuseAssets=assets, originalMaterials=materials, images=images)
+                terrainBindings=copy.deepcopy(comparison.TERRAIN_BINDINGS), protectedSavedAssetCount=6, warmupRenderCount=1,
+                diffuseAssets=assets, originalMaterials=materials, images=images)
 
 
 class ReportTests(unittest.TestCase):
@@ -71,6 +72,15 @@ for name, mutate in {
     'lost_buffers': lambda d: d.update(captureBuffersReleased=False),
     'renderer_count': lambda d: d.update(terrainRenderers=4),
     'bool_renderer_count': lambda d: d.update(terrainRenderers=True),
+    'renderer_missing_prefix': lambda d: d['terrainBindings'][0].update(objectName='Ground-Sand'),
+    'renderer_wrong_scene': lambda d: d['terrainBindings'][0].update(scenePath='Assets/DesertRV/Scenes/Journey/FirstStation.unity'),
+    'renderer_wrong_region_mesh': lambda d: d['terrainBindings'][0].update(meshAsset=comparison.GENERATED+'R1-Ground-Sand.asset'),
+    'renderer_wrong_material': lambda d: d['terrainBindings'][0].update(materialAsset=comparison.GENERATED+'Surface-Dune.mat'),
+    'renderer_swapped_mesh': lambda d: d['terrainBindings'][1].update(meshAsset=comparison.GENERATED+'R2-ReliefWest-Dune.asset'),
+    'renderer_missing_role': lambda d: d['terrainBindings'].pop(),
+    'renderer_duplicate_role': lambda d: d['terrainBindings'].__setitem__(1, copy.deepcopy(d['terrainBindings'][0])),
+    'renderer_extra_role': lambda d: d['terrainBindings'].append(copy.deepcopy(d['terrainBindings'][0])),
+    'renderer_extra_field': lambda d: d['terrainBindings'][0].update(unverified='no'),
     'saved_scene_count': lambda d: d.update(protectedSavedAssetCount=5),
     'zero_warmup': lambda d: d.update(warmupRenderCount=0),
     'bool_warmup': lambda d: d.update(warmupRenderCount=True),
@@ -370,6 +380,44 @@ class NativeTests(unittest.TestCase):
 
 
 class ImplementationTests(unittest.TestCase):
+    def test_native_json_field_sets_match_wrapper_schema(self):
+        import re
+        text=(TASK/'unity/Assets/DesertRV/Editor/JourneySceneAuthoring.DiffuseComparison.cs').read_text()
+        for name,keys in (('Asset',comparison.ASSET_KEYS),('Material',comparison.MATERIAL_KEYS),
+                          ('Image',comparison.IMAGE_KEYS),('Report',comparison.REPORT_KEYS),
+                          ('Terrain',set(comparison.TERRAIN_BINDINGS[0]))):
+            block=re.search(r'sealed class DiffuseComparison'+name+r'\s*\{([^}]+)\}',text).group(1)
+            declarations=re.findall(r'public\s+[A-Za-z0-9_\[\]]+\s+([^;]+);',block)
+            fields={field.strip().split('=')[0] for declaration in declarations for field in declaration.split(',')}
+            self.assertEqual(fields,keys,name)
+
+    def test_exact_roles_match_actual_r3_native_scene_fixture_and_producer(self):
+        import re
+        fixture=json.loads((TASK/'art/environment-v4/diffuse-correction/renderer-binding-fixture-r3.json').read_text())
+        self.assertEqual(fixture['sourceRun'],37961223152)
+        self.assertEqual(fixture['sourceCommit'],'120f6d6f0d34dbe432854c31ae91945ccd8496ab')
+        self.assertEqual(fixture['sourceSceneSha256'],'4eb74aedb2da30fadf0b5e810db533f1f7cba1900199004bf90c67f981f05cab')
+        self.assertEqual(fixture['terrainBindings'],comparison.TERRAIN_BINDINGS)
+        producer=(TASK/'unity/Assets/DesertRV/Editor/JourneySceneAuthoring.EnvironmentPolish.cs').read_text()
+        capture=(TASK/'unity/Assets/DesertRV/Editor/JourneySceneAuthoring.DiffuseComparison.cs').read_text()
+        self.assertIn('new GameObject("EnvironmentV4 "+item.Key)',producer)
+        self.assertIn('PolishGenerated+"/R"+region.region+"-"+item.Key+".asset"',producer)
+        roles_block=capture.split('static readonly string[][] comparisonTerrainRoles = {',1)[1].split('};',1)[0]
+        roles=re.findall(r'new\[\]\{"([^"]+)","([^"]+)"\}',roles_block)
+        region_two=producer.split('case 2: return new[]{',1)[1].split('};',1)[0]
+        expected=[]
+        for role,material in roles:
+            self.assertIn('"'+role+'"',region_two)
+            expected.append(dict(objectName='EnvironmentV4 '+role,scenePath='Assets/DesertRV/Scenes/Journey/Scrapyard.unity',
+                                 meshAsset=comparison.GENERATED+'R2-'+role+'.asset',materialAsset=comparison.GENERATED+'Surface-'+material+'.mat'))
+        self.assertEqual(expected,fixture['terrainBindings'])
+        for check in ('terrain.Length!=3','r.sharedMaterials.Length!=1','matching.Length!=1',
+                      'r.name=="EnvironmentV4 "+role[0]','renderer.gameObject.scene!=env','renderer.transform.parent!=b.transform',
+                      'AssetDatabase.GetAssetPath(filter.sharedMesh)!=PolishGenerated+"/R2-"+role[0]+".asset"',
+                      'AssetDatabase.GetAssetPath(renderer.sharedMaterial)!=PolishGenerated+"/Surface-"+role[1]+".mat"',
+                      'terrainBindings=terrainBindings','terrainRenderers=terrainBindings.Length'):
+            self.assertIn(check,capture)
+
     def test_original_production_and_eight_view_gates_byte_exact(self):
         expected = {'unity/Assets/DesertRV/Editor/JourneySceneAuthoring.EnvironmentPolish.cs': 'b829eda4869721b7956cb279b53e0a6b7e1194ef91880c80e2d712110a8366d9', 'unity/Assets/DesertRV/Editor/JourneySceneAuthoring.EnvironmentPolishCapture.cs': 'fa6cbe1f1252801ec1b0f62b864104d715f781dc01567b50ec82c9a0b30f097e', 'unity/Assets/DesertRV/Editor/JourneySceneAuthoring.TerrainProbe.cs': 'e0c8643bd5a399095aad86e49b9929d04e9737385f373e04a35e8208e81b21d1', 'scripts/environment_evidence.py': 'c8039deefc987c742b3a558f783cf8ea49fd642760c7bf71d5fb6381aeab4b6d', 'scripts/environment_v4_evidence.py': '7f8bd56d466260bbf57653a76f3845deea81d9f96d03a093366376dcfeba6548', 'scripts/environment_terrain_probe_evidence.py': 'bffbd79990a82a9d2aed171892eafb5dda97b8ab186714c00dbbac126e5abf12', 'scripts/test_environment_terrain_probe_evidence.py': '419e70c01df1b0543aad50dbfafc915a263faaf2583d07c43b3da4c8f043decc', 'unity/Assets/DesertRV/Tests/EditorTerrainProbe/JourneyTerrainProbeTests.cs': 'cd8cf81e2af6b148947582db282d2292510d6447ea477b5fc65793e32fc04cc9', 'unity/Assets/DesertRV/Tests/EditorTerrainProbe/DesertRV.EditorTerrainProbeTests.asmdef': '50932f8f3a39fd70c4d358278dec5f222d7ee4190fa75977c58fe05b5e481ff4'}
         for name, digest in expected.items():

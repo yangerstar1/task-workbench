@@ -1,0 +1,26 @@
+{
+  "schema": 1,
+  "sourceRun": 37961223152,
+  "sourceCommit": "120f6d6f0d34dbe432854c31ae91945ccd8496ab",
+  "sourceSceneSha256": "4eb74aedb2da30fadf0b5e810db533f1f7cba1900199004bf90c67f981f05cab",
+  "terrainBindings": [
+    {
+      "objectName": "EnvironmentV4 Ground-Sand",
+      "scenePath": "Assets/DesertRV/Scenes/Journey/Scrapyard.unity",
+      "meshAsset": "Assets/DesertRV/Scenes/Journey/EnvironmentV4/R2-Ground-Sand.asset",
+      "materialAsset": "Assets/DesertRV/Scenes/Journey/EnvironmentV4/Surface-Sand.mat"
+    },
+    {
+      "objectName": "EnvironmentV4 ReliefEast-Dune",
+      "scenePath": "Assets/DesertRV/Scenes/Journey/Scrapyard.unity",
+      "meshAsset": "Assets/DesertRV/Scenes/Journey/EnvironmentV4/R2-ReliefEast-Dune.asset",
+      "materialAsset": "Assets/DesertRV/Scenes/Journey/EnvironmentV4/Surface-Dune.mat"
+    },
+    {
+      "objectName": "EnvironmentV4 ReliefWest-Dune",
+      "scenePath": "Assets/DesertRV/Scenes/Journey/Scrapyard.unity",
+      "meshAsset": "Assets/DesertRV/Scenes/Journey/EnvironmentV4/R2-ReliefWest-Dune.asset",
+      "materialAsset": "Assets/DesertRV/Scenes/Journey/EnvironmentV4/Surface-Dune.mat"
+    }
+  ]
+}
