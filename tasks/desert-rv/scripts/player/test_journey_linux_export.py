@@ -6,7 +6,7 @@ import journey_linux_export as x
 class JourneyLinuxExportTests(unittest.TestCase):
  def setUp(self):
   self.t=tempfile.TemporaryDirectory();self.root=pathlib.Path(self.t.name);self.build=self.root/'build';self.build.mkdir()
-  for name in ['DesertRV.x86_64','UnityPlayer.so','DesertRV_Data/Managed/Assembly-CSharp.dll','MonoBleedingEdge/EmbedRuntime/libmonobdwgc-2.0.so']:
+  for name in sorted(x.REQUIRED_FILES):
    p=self.build/name;p.parent.mkdir(parents=True,exist_ok=True);p.write_bytes(b'SYNTHETIC_NOT_EXECUTABLE_'+name.encode())
   self.recovery_patch=patch.object(x,"RECOVERY",self.root/"recovery");self.recovery_patch.start();self.addCleanup(self.recovery_patch.stop)
   self.env=patch.dict(os.environ,{'GITHUB_SHA':'a'*40,'GITHUB_RUN_ID':'123'});self.env.start()
@@ -239,7 +239,7 @@ class JourneyLinuxExportTests(unittest.TestCase):
   (self.build/'UnityPlayer.so').unlink();(self.build/'UnityPlayer.so').mkdir();(self.build/'UnityPlayer.so/nested').write_bytes(b'x')
   with self.assertRaises(ValueError):x.inventory(self.build)
  def test_closed_runtime_roundtrip_and_normalized_metadata(self):
-  records=x.inventory(self.build);bundle=self.root/'player.tar.gz';x.tar_bundle(self.build,records,bundle);x.verify_tar(bundle,records);self.assertEqual(len(records),4)
+  records=x.inventory(self.build);bundle=self.root/'player.tar.gz';x.tar_bundle(self.build,records,bundle);x.verify_tar(bundle,records);self.assertEqual(len(records),len(x.REQUIRED_FILES))
  def test_binary_tamper_rejected_before_packaging(self):
   records=x.inventory(self.build);(self.build/'UnityPlayer.so').write_text('changed')
   with self.assertRaises(ValueError):x.tar_bundle(self.build,records,self.root/'bad.tar.gz')
@@ -252,11 +252,69 @@ class JourneyLinuxExportTests(unittest.TestCase):
   link=self.build/'DesertRV_Data/linked';link.symlink_to(self.build/'UnityPlayer.so')
   with self.assertRaises(ValueError):x.inventory(self.build)
   link.unlink();(self.build/'DesertRV_Data/Managed/symbols.pdb').write_text('DEBUG_PRIVATE')
-  debug=self.build/'DesertRV_BackUpThisFolder_ButDontShipItWithYourGame';debug.mkdir();(debug/'debug.txt').write_text('DEBUG_PRIVATE')
-  self.assertEqual(len(x.inventory(self.build)),4)
+  debug=self.build/'DESERTRV_JOURNEY_CANDIDATE_BurstDebugInformation_DoNotShip';debug.mkdir();(debug/'debug.txt').write_text('DEBUG_PRIVATE')
+  self.assertEqual(len(x.inventory(self.build)),len(x.REQUIRED_FILES))
+ def test_engine_module_observation_is_bounded_and_not_a_runtime_allowance(self):
+  engine=self.root/'engine';(engine/'Variations/linux64_development').mkdir(parents=True)
+  (engine/'Variations/linux64_development/UnityPlayer_s.debug').write_bytes(b'SYNTHETIC_MODULE_SYMBOL')
+  (engine/'Variations/linux64_development/LinuxPlayer_s.debug').write_bytes(b'SYNTHETIC_MODULE_SYMBOL')
+  (engine/'other.dat').write_bytes(b'UNRELATED')
+  rows=x.observe_runtime(engine,engine_only=True);self.assertEqual({r['path'] for r in rows['entries']},{'Variations/linux64_development/UnityPlayer_s.debug','Variations/linux64_development/LinuxPlayer_s.debug'})
+  self.assertGreater(rows['omittedEntries'],0);h=x.empty_host();h['engineLayout'].update(status='OBSERVED',runtime=rows);x.validate_host(h)
+  h['engineLayout']['scope']='/private/arbitrary'
+  with self.assertRaises(ValueError):x.validate_host(h)
+ def test_actual_nested_mono_requires_all_three_libraries_and_configuration(self):
+  records=x.inventory(self.build);self.assertTrue(x.MONO_FILES<={r['path'] for r in records})
+  for name in sorted(x.MONO_FILES|{'DesertRV_Data/MonoBleedingEdge/etc/mono/config'}):
+   p=self.build/name;raw=p.read_bytes();p.unlink()
+   with self.assertRaises(ValueError):x.inventory(self.build)
+   p.write_bytes(raw)
+ def test_known_development_symbol_is_excluded_without_general_debug_roots(self):
+  p=self.build/'UnityPlayer_s.debug';p.write_bytes(b'SYNTHETIC_SYMBOL');self.assertNotIn(p.name,{r['path'] for r in x.inventory(self.build)})
+  p.unlink();p.mkdir()
+  with self.assertRaises(ValueError):x.inventory(self.build)
+  p.rmdir();(self.build/'unknown_s.debug').write_bytes(b'UNKNOWN')
+  with self.assertRaises(ValueError):x.inventory(self.build)
+ def test_each_official_libdecor_runtime_dependency_is_required(self):
+  for name in ('libdecor-0.so.0','libdecor-cairo.so'):
+   with self.subTest(missing=name):
+    p=self.build/name;raw=p.read_bytes();p.unlink()
+    with self.assertRaisesRegex(ValueError,'RUNTIME_REQUIRED_FILES'):x.inventory(self.build)
+    p.write_bytes(raw)
+ def test_official_libdecor_files_roundtrip_and_directory_substitution_rejected(self):
+  for name in ('libdecor-0.so.0','libdecor-cairo.so'):(self.build/name).write_bytes(b'SYNTHETIC_RUNTIME_LIB')
+  records=x.inventory(self.build);bundle=self.root/'libdecor.tar.gz';x.tar_bundle(self.build,records,bundle);x.verify_tar(bundle,records)
+  self.assertTrue({'libdecor-0.so.0','libdecor-cairo.so'}<={r['path'] for r in records})
+  p=self.build/'libdecor-cairo.so';p.unlink();p.mkdir()
+  with self.assertRaises(ValueError):x.inventory(self.build)
+ def test_unknown_build_root_is_observed_but_cannot_be_published(self):
+  p=self.build/'unknown-runtime.so';p.write_bytes(b'SYNTHETIC_UNKNOWN');observed=x.observe_runtime(self.build);x.validate_host(dict(x.empty_host(),runtime=observed))
+  self.assertIn(p.name,{r['path'] for r in observed['entries']})
+  self.assertEqual(next(r for r in observed['entries'] if r['path']==p.name)['sha256'],x.sha(p))
+  with self.assertRaises(ValueError):x.inventory(self.build)
+ def test_official_template_symbols_and_libraries_complete_synthetic_export_chain(self):
+  task,_=self.success_fixture()
+  for name in ('UnityPlayer_s.debug','LinuxPlayer_s.debug','libdecor-0.so.0','libdecor-cairo.so'):
+   p=self.build/name;p.write_bytes(b'SYNTHETIC_TEMPLATE_FILE_'+name.encode());p.chmod(0o755)
+  debug=self.build/'DESERTRV_JOURNEY_CANDIDATE_BurstDebugInformation_DoNotShip';debug.mkdir();(debug/'lib_burst_generated.txt').write_bytes(b'PRIVATE_BUILD_TEXT_NEVER_EXPORTED')
+  x.stage();self.assertEqual(x.export(),0);manifest=json.loads((task/'public/manifest.json').read_text());names={r['path'] for r in manifest['files']}
+  self.assertTrue({'libdecor-0.so.0','libdecor-cairo.so'}<=names);self.assertTrue(x.DEBUG_FILES.isdisjoint(names));self.assertFalse(any(name.startswith(debug.name+'/') for name in names));x.verify_tar(task/'public/player.tar.gz',manifest['files'])
+  import observe_journey_player as observer
+  pins=dict(PRODUCER_RUN_ID='123',PRODUCER_COMMIT='a'*40,PRODUCER_ARTIFACT_ID='456',PRODUCER_ZIP_SHA256='c'*64)
+  m=observer.validate_package(task/'public',pins);observer.extract_runtime(task/'public',task/'extracted',m);self.assertEqual(x.inventory(task/'extracted'),m['files'])
+  self.assertTrue(x.MONO_FILES<={r['path'] for r in m['files']})
+ def test_debug_directory_uses_exact_candidate_product_name(self):
+  p=self.build/'DESERTRV_JOURNEY_CANDIDATE_BurstDebugInformation_DoNotShip';p.mkdir();(p/'private-build.txt').write_bytes(b'PRIVATE')
+  self.assertEqual(len(x.inventory(self.build)),len(x.REQUIRED_FILES))
+  p.rename(self.build/'DesertRV_BurstDebugInformation_DoNotShip')
+  with self.assertRaises(ValueError):x.host_phase('STAGE_INVENTORY',lambda:x.inventory(self.build))
+  self.assertEqual(x.host_state()['failureCode'],'RUNTIME_ROOT_SET')
+ def test_old_top_level_mono_is_rejected(self):
+  p=self.build/'MonoBleedingEdge';p.mkdir()
+  with self.assertRaises(ValueError):x.inventory(self.build)
  def test_missing_mono_runtime_fails_closed(self):
   import shutil
-  shutil.rmtree(self.build/'MonoBleedingEdge')
+  shutil.rmtree(self.build/'DesertRV_Data/MonoBleedingEdge')
   with self.assertRaises(ValueError):x.inventory(self.build)
  def test_archive_record_traversal_and_arbitrary_modes_rejected(self):
   records=x.inventory(self.build);records[0]['path']='../private'

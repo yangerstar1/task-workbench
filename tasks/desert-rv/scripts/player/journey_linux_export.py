@@ -18,13 +18,19 @@ EXCEPTIONS={'NONE','BUILD_FAILED','UNAUTHORIZED_ACCESS','IO','OTHER'}
 CALLBACKS={'CANDIDATE_PERFORMANCE','NONE','PRODUCTION_PREPROCESS','PRODUCTION_SCENE','CANDIDATE_SCENE'}
 ROLES={'NONE','CONTENT','BOOTSTRAP','FIRST_STATION','SCRAPYARD','NIGHT_BEACON'}
 BUILD_ERROR_KINDS={'CANDIDATE_GATE','PRODUCTION_GATE','CS_COMPILATION','SHADER_ERROR','UNCLASSIFIED_BUILD_ERROR'}
-RUNTIME_ROOTS={'DesertRV.x86_64','UnityPlayer.so','DesertRV_Data','MonoBleedingEdge','UnityCrashHandler64'}
-DEBUG_ROOTS={'DesertRV_BackUpThisFolder_ButDontShipItWithYourGame','DesertRV_BurstDebugInformation_DoNotShip'}
+RUNTIME_FILE_ROOTS={'DesertRV.x86_64','UnityPlayer.so','UnityCrashHandler64','libdecor-0.so.0','libdecor-cairo.so'}
+RUNTIME_ROOTS=RUNTIME_FILE_ROOTS|{'DesertRV_Data'}
+# Exact native symbols observed in the same pinned official development_mono template.
+DEBUG_FILES={'UnityPlayer_s.debug','LinuxPlayer_s.debug'}
+MONO_FILES={'DesertRV_Data/MonoBleedingEdge/x86_64/'+n for n in ('libmonobdwgc-2.0.so','libmono-native.so','libMonoPosixHelper.so')}
+REQUIRED_FILES={'DesertRV.x86_64','UnityPlayer.so','libdecor-0.so.0','libdecor-cairo.so','DesertRV_Data/Managed/Assembly-CSharp.dll','DesertRV_Data/MonoBleedingEdge/etc/mono/config'}|MONO_FILES
+# Burst 1.8.29 FetchOutputPath uses PlayerSettings.productName, not the executable basename.
+DEBUG_ROOTS={'DESERTRV_JOURNEY_CANDIDATE_BurstDebugInformation_DoNotShip'}
 
 # Closed post-build observations. Raw exception text and private logs never leave the container.
-HOST_PHASES={'NONE','PREFLIGHT','PREFLIGHT_GUARD','RECORD','STAGE','STAGE_REQUEST','PREFLIGHT_MODULES','PREFLIGHT_UNION','PREFLIGHT_REQUEST','PREFLIGHT_ARCHIVER','RECORD_NATIVE','RESTORE_SOURCE','RESTORE_UNION','POSTBUILD_UNION','STAGE_UNION','STAGE_RECEIPT','STAGE_INVENTORY','STAGE_ARCHIVE','STAGE_REVERIFY','STAGED'}
+HOST_PHASES={'NONE','PREFLIGHT','PREFLIGHT_GUARD','RECORD','STAGE','STAGE_REQUEST','PREFLIGHT_MODULES','PREFLIGHT_ENGINE_LAYOUT','PREFLIGHT_UNION','PREFLIGHT_REQUEST','PREFLIGHT_ARCHIVER','RECORD_NATIVE','RESTORE_SOURCE','RESTORE_UNION','POSTBUILD_UNION','STAGE_UNION','STAGE_RECEIPT','STAGE_INVENTORY','STAGE_ARCHIVE','STAGE_REVERIFY','STAGED'}
 HOST_SOURCE_PATHS=('tasks/desert-rv/scripts/journey_rebuild_dispatch.py','tasks/desert-rv/scripts/player/journey_linux_export.py','tasks/desert-rv/scripts/player/player_window_smoke.py','tasks/desert-rv/scripts/rendered/prepared_source.py','tasks/desert-rv/art/journey-preparation/linux_build_input.py','tasks/desert-rv/art/journey-preparation/restore_preparation.py','tasks/desert-rv/art/journey-preparation/generated_export.py','tasks/desert-rv/art/journey-preparation/pipeline.py','tasks/desert-rv/art/import-candidate/strict_output.py','tasks/desert-rv/art/import-candidate/pouncer_output.py','tasks/desert-rv/art/import-candidate/weapon_output.py')
-HOST_BASE_CODES={'NONE','MISSING_YAML','MISSING_PIL','MISSING_MODULE','PERMISSION_DENIED','FILE_NOT_FOUND','OS_ERROR','VALIDATION_REJECTED','OTHER_ERROR'}
+HOST_BASE_CODES={'RUNTIME_ROOT_SET','RUNTIME_REQUIRED_FILES','RUNTIME_DEBUG_TYPE','NONE','MISSING_YAML','MISSING_PIL','MISSING_MODULE','PERMISSION_DENIED','FILE_NOT_FOUND','OS_ERROR','VALIDATION_REJECTED','OTHER_ERROR'}
 
 @functools.lru_cache(maxsize=1)
 def host_codes():
@@ -40,7 +46,8 @@ def host_codes():
     return result
 
 def empty_runtime():return dict(observed=False,totalEntries=0,omittedEntries=0,entries=[])
-def empty_host():return dict(schema=1,lastPhase='NONE',completedPhases=[],failurePhase='NONE',failureCode='NONE',failureSource='',failureLine=0,nativeReceiptPin=None,runtime=empty_runtime())
+def empty_engine():return dict(scope='UNITY_6000_3_19F1_LINUX_STANDALONE_MODULE',status='NOT_OBSERVED',runtime=empty_runtime())
+def empty_host():return dict(engineLayout=empty_engine(),schema=1,lastPhase='NONE',completedPhases=[],failurePhase='NONE',failureCode='NONE',failureSource='',failureLine=0,nativeReceiptPin=None,runtime=empty_runtime())
 def host_path():return RECOVERY/'host-diagnostic.json'
 def validate_host(value):
     require(isinstance(value,dict) and set(value)==set(empty_host()) and value['schema']==1)
@@ -49,7 +56,13 @@ def validate_host(value):
     require((value['failurePhase']=='NONE')==(value['failureCode']=='NONE'))
     require(value['failureSource'] in ('',)+HOST_SOURCE_PATHS and type(value['failureLine']) is int and 0<=value['failureLine']<=100000 and (bool(value['failureSource'])==(value['failureLine']>0)))
     pin=value['nativeReceiptPin'];require(pin is None or isinstance(pin,dict) and set(pin)=={'sha256','bytes'} and re.fullmatch('[a-f0-9]{64}',pin['sha256']) and type(pin['bytes']) is int and 0<pin['bytes']<=32768)
-    runtime=value['runtime'];require(isinstance(runtime,dict) and set(runtime)==set(empty_runtime()) and type(runtime['observed']) is bool)
+    validate_runtime(value['runtime'])
+    engine=value['engineLayout'];require(isinstance(engine,dict) and set(engine)==set(empty_engine()) and engine['scope']==empty_engine()['scope'] and engine['status'] in {'NOT_OBSERVED','MISSING','OBSERVED','IO_UNAVAILABLE'})
+    validate_runtime(engine['runtime']);require(engine['runtime']['observed']==(engine['status']=='OBSERVED'))
+    return value
+
+def validate_runtime(runtime):
+    require(isinstance(runtime,dict) and set(runtime)==set(empty_runtime()) and type(runtime['observed']) is bool)
     require(type(runtime['totalEntries']) is int and type(runtime['omittedEntries']) is int and 0<=runtime['omittedEntries']<=runtime['totalEntries']<=100000)
     rows=runtime['entries'];require(isinstance(rows,list) and len(rows)<=2048 and len(rows)+runtime['omittedEntries']==runtime['totalEntries'])
     if not runtime['observed']:require(runtime['totalEntries']==0)
@@ -59,14 +72,14 @@ def validate_host(value):
         name=row['path'];require(runtime_name(name) and name>previous);previous=name
         require(row['kind'] in {'FILE','DIRECTORY','SYMLINK','OTHER'} and type(row['mode']) is int and 0<=row['mode']<=0o7777 and type(row['bytes']) is int and 0<=row['bytes']<=2**63-1)
         require(isinstance(row['sha256'],str) and (re.fullmatch('[a-f0-9]{64}',row['sha256']) if row['kind']=='FILE' and row['bytes']<=2*1024**3 else row['sha256']==''))
-    return value
+    return runtime
 
 def runtime_name(name):
     if not isinstance(name,str) or not re.fullmatch(r'[A-Za-z0-9_./ @+()\-]{1,512}',name):return False
     parts=pathlib.PurePosixPath(name).parts
-    return bool(parts) and not name.startswith('/') and all(p not in ('.','..') and not p.startswith('.') for p in parts) and parts[0] in RUNTIME_ROOTS|DEBUG_ROOTS|{'UnityPlayer_s.debug','UnityPlayer.so.debug'} and pathlib.PurePosixPath(name).suffix.lower() not in {'.log','.ulf','.alf','.lic','.key'} and parts[-1].lower() not in {'credentials','credentials.json','activation.log','return.log'}
+    return bool(parts) and not name.startswith('/') and all(p not in ('.','..') and not p.startswith('.') for p in parts) and pathlib.PurePosixPath(name).suffix.lower() not in {'.log','.ulf','.alf','.lic','.key'} and parts[-1].lower() not in {'credentials','credentials.json','activation.log','return.log'}
 
-def observe_runtime(folder):
+def observe_runtime(folder,engine_only=False):
     import stat
     result=empty_runtime()
     if not folder.is_dir() or folder.is_symlink():return result
@@ -78,6 +91,7 @@ def observe_runtime(folder):
     for p in sorted(paths):
         name=p.relative_to(folder).as_posix()
         if not runtime_name(name) or len(result['entries'])>=2048:continue
+        if engine_only and p.name not in RUNTIME_FILE_ROOTS|DEBUG_FILES|{pathlib.PurePosixPath(n).name for n in MONO_FILES} and not p.name.endswith('_s.debug'):continue
         info=p.lstat();kind='FILE' if stat.S_ISREG(info.st_mode) else 'DIRECTORY' if stat.S_ISDIR(info.st_mode) else 'SYMLINK' if stat.S_ISLNK(info.st_mode) else 'OTHER';digest=''
         if kind=='FILE' and info.st_size<=2*1024**3:
             h=hashlib.sha256()
@@ -87,11 +101,20 @@ def observe_runtime(folder):
         result['entries'].append(dict(path=name,kind=kind,mode=stat.S_IMODE(info.st_mode),bytes=info.st_size,sha256=digest))
     result['omittedEntries']=result['totalEntries']-len(result['entries']);return result
 
+def observe_engine_layout():
+    # Fixed, already version-pinned installed Unity module; no execution or package mutation.
+    root=pathlib.Path('/opt/unity/Editor/Data/PlaybackEngines/LinuxStandaloneSupport');entry=empty_engine()
+    try:
+        if root.is_dir() and not root.is_symlink():entry.update(status='OBSERVED',runtime=observe_runtime(root,engine_only=True))
+        else:entry['status']='MISSING'
+    except OSError:entry['status']='IO_UNAVAILABLE'
+    value=host_state();value['engineLayout']=entry;save_host(value)
+
 def host_state():return validate_host(read_json(host_path())) if host_path().exists() else empty_host()
 def save_host(value):RECOVERY.mkdir(exist_ok=True);atomic(host_path(),validate_host(value))
 def host_error(error):
     code='MISSING_YAML' if isinstance(error,ModuleNotFoundError) and error.name=='yaml' else 'MISSING_PIL' if isinstance(error,ModuleNotFoundError) and error.name in {'PIL','PIL.Image'} else 'MISSING_MODULE' if isinstance(error,ModuleNotFoundError) else 'PERMISSION_DENIED' if isinstance(error,PermissionError) else 'FILE_NOT_FOUND' if isinstance(error,FileNotFoundError) else 'OS_ERROR' if isinstance(error,OSError) else 'VALIDATION_REJECTED' if isinstance(error,ValueError) else 'OTHER_ERROR'
-    if str(error) in host_codes()-HOST_BASE_CODES:code=str(error)
+    if str(error) in (host_codes()-HOST_BASE_CODES)|{'RUNTIME_ROOT_SET','RUNTIME_REQUIRED_FILES','RUNTIME_DEBUG_TYPE'}:code=str(error)
     result=dict(code=code,source='',line=0);tb=error.__traceback__;allowed={str((ROOT/p).resolve()):p for p in HOST_SOURCE_PATHS}
     while tb:
         known=allowed.get(str(pathlib.Path(tb.tb_frame.f_code.co_filename).resolve()))
@@ -117,11 +140,12 @@ def preflight(logs):
     from pipeline import guard
     host_phase('PREFLIGHT_GUARD',guard)
     host_phase('PREFLIGHT_MODULES',lambda:(importlib.import_module('yaml'),importlib.import_module('PIL.Image')))
+    host_phase('PREFLIGHT_ENGINE_LAYOUT',observe_engine_layout)
     host_phase('PREFLIGHT_UNION',verify_union);host_phase('PREFLIGHT_REQUEST',request)
     def archiver():
         probe=logs/'archiver-self-test';require(not probe.exists());probe.mkdir()
         try:
-            for name in ('DesertRV.x86_64','UnityPlayer.so','DesertRV_Data/Managed/Assembly-CSharp.dll','MonoBleedingEdge/EmbedRuntime/libmonobdwgc-2.0.so'):
+            for name in sorted(REQUIRED_FILES):
                 p=probe/name;p.parent.mkdir(parents=True,exist_ok=True);p.write_bytes(b'ARCHIVER_SELF_TEST_NOT_AN_EXECUTABLE')
             records=inventory(probe);tar_bundle(probe,records,logs/'archiver-self-test.tar.gz');verify_tar(logs/'archiver-self-test.tar.gz',records)
         finally:shutil.rmtree(probe)
@@ -266,28 +290,33 @@ def native_diagnostic(value):
 def diagnostic_success(d):
     return d is not None and performance_success(d['performanceResources']) and d['stage']=='RECEIPT_WRITTEN' and d['buildResult']=='SUCCEEDED' and d['exceptionKind']=='NONE' and d['buildReportAvailable'] is True and d['reportTarget']=='LINUX64' and d['totalErrors']==0 and all(d[p+'FailureCode']=='NONE' for p in ('primary','restoration','verification')) and all(d[p+'Inventory']['totalChanges']==0 for p in ('primary','verification')) and all(d[k] is True for k in ('settingsRestored','sourceBytesUnchanged','receiptWritten'))
 
+def runtime_require(condition,code):
+    if not condition:raise ValueError(code)
+
 def validate_records(records):
     require(isinstance(records,list) and 0<len(records)<=20000);previous='';total=0;roots=set()
     for row in records:
         require(isinstance(row,dict) and set(row)=={'path','size','sha256','mode'})
         name=row['path'];require(isinstance(name,str) and len(name)<=512 and name>previous and '\\' not in name and '\x00' not in name);previous=name;path=pathlib.PurePosixPath(name)
-        require((len(path.parts)==1) == (path.parts[0] in {'DesertRV.x86_64','UnityPlayer.so','UnityCrashHandler64'}))
+        require((len(path.parts)==1) == (path.parts[0] in RUNTIME_FILE_ROOTS))
         require(not path.is_absolute() and '..' not in path.parts and path.parts[0] in RUNTIME_ROOTS and not any(part.startswith('.') for part in path.parts));roots.add(path.parts[0])
         require(path.suffix.lower() not in {'.log','.ulf','.alf','.lic','.key','.pdb','.mdb','.debug'} and path.name.lower() not in {'credentials','credentials.json','activation.log','return.log'})
         require(type(row['size']) is int and 0<=row['size']<=2*1024**3 and isinstance(row['sha256'],str) and re.fullmatch('[a-f0-9]{64}',row['sha256']))
         require(type(row['mode']) is int and row['mode']==(0o755 if path.parts[0] in {'DesertRV.x86_64','UnityCrashHandler64'} else 0o644));total+=row['size']
-    require(total<=8*1024**3 and {'DesertRV.x86_64','UnityPlayer.so','DesertRV_Data','MonoBleedingEdge'}<=roots)
-    require(any(x['path']=='DesertRV_Data/Managed/Assembly-CSharp.dll' for x in records))
+    require(total<=8*1024**3 and {'DesertRV.x86_64','UnityPlayer.so','DesertRV_Data'}<=roots)
+    runtime_require(REQUIRED_FILES<={row['path'] for row in records},'RUNTIME_REQUIRED_FILES')
     return records
 
 def inventory(folder):
     folder=safe(folder,False);require(folder.is_dir());names={p.name for p in folder.iterdir()}
-    require({'DesertRV.x86_64','UnityPlayer.so','DesertRV_Data','MonoBleedingEdge'}<=names<=RUNTIME_ROOTS|DEBUG_ROOTS)
-    for name in names & RUNTIME_ROOTS:require((folder/name).is_file() if name in {'DesertRV.x86_64','UnityPlayer.so','UnityCrashHandler64'} else (folder/name).is_dir())
+    runtime_require({'DesertRV.x86_64','UnityPlayer.so','DesertRV_Data'}<=names<=RUNTIME_ROOTS|DEBUG_ROOTS|DEBUG_FILES,'RUNTIME_ROOT_SET')
+    for name in names & DEBUG_FILES:runtime_require((folder/name).is_file(),'RUNTIME_DEBUG_TYPE')
+    for name in names & DEBUG_ROOTS:runtime_require((folder/name).is_dir(),'RUNTIME_DEBUG_TYPE')
+    for name in names & RUNTIME_ROOTS:require((folder/name).is_file() if name in RUNTIME_FILE_ROOTS else (folder/name).is_dir())
     records=[];total=0
     for p in sorted(folder.rglob('*')):
         safe(p,False);require(p.is_file() or p.is_dir());name=p.relative_to(folder).as_posix();top=p.relative_to(folder).parts[0]
-        if top in DEBUG_ROOTS:continue
+        if top in DEBUG_ROOTS or name in DEBUG_FILES:continue
         if p.is_dir():continue
         require(not any(part.startswith('.') for part in pathlib.PurePosixPath(name).parts))
         require(p.suffix.lower() not in {'.log','.ulf','.alf','.lic','.key'} and p.name.lower() not in {'credentials','credentials.json','activation.log','return.log'})

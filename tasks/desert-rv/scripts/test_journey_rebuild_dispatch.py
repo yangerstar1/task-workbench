@@ -25,7 +25,7 @@ class PushIdentityTests(unittest.TestCase):
  def test_nonfinite_json_rejected(self):self.reject('JSON_CONSTANT',raw=b'{"schema":NaN}')
  def test_boolean_schema_rejected(self):self.request['schema']=True;self.reject('REQUEST_IDENTITY')
  def test_consumed_first_request_cannot_authorize_new_run(self):
-  for nonce,parent in [('desert-rv-rebuild-performance-20261009-once','9abf31160845852d6b1eaffcf432522f60258a0a'),('desert-rv-rebuild-performance350-20261009-once','be129aef52363202d7d3cbb51c28281075bef0b5'),('desert-rv-rebuild-export-recovery938-20261009-once','93886445d69597efa0dbf190340b61a6f9ea447c')]:
+  for nonce,parent in [('desert-rv-rebuild-performance-20261009-once','9abf31160845852d6b1eaffcf432522f60258a0a'),('desert-rv-rebuild-performance350-20261009-once','be129aef52363202d7d3cbb51c28281075bef0b5'),('desert-rv-rebuild-export-recovery938-20261009-once','93886445d69597efa0dbf190340b61a6f9ea447c'),('desert-rv-linux-template-probe-20261009-once','dac4109a2a643f25760b9761ea71454e23981e8f')]:
    self.request['requestId']=nonce;self.request['baseCommit']=parent;self.reject('REQUEST_IDENTITY')
  def test_wrong_nonce_rejected(self):self.request['requestId']='other';self.reject('REQUEST_IDENTITY')
  def test_wrong_request_base_rejected(self):self.request['baseCommit']='c'*40;self.reject('REQUEST_IDENTITY')
@@ -45,7 +45,7 @@ class PushIdentityTests(unittest.TestCase):
  def test_other_triggering_actor_rejected(self):self.env['GITHUB_TRIGGERING_ACTOR']='other';self.reject('ACTOR')
  def test_other_sender_rejected(self):self.event['sender']['login']='other';self.reject('PUSH_AUTHOR')
  def test_main_push_cannot_use_recovery_request(self):self.env['GITHUB_REF']='refs/heads/main';self.reject('BRANCH')
- def test_recovery_branch_manual_cannot_bypass_push_identity(self):self.env.update(GITHUB_EVENT_NAME='workflow_dispatch',MANUAL_TRANSITION_SHA=self.sha);self.reject('EVENT')
+ def test_recovery_branch_manual_cannot_bypass_push_identity(self):self.env.update(GITHUB_EVENT_NAME='workflow_dispatch',MANUAL_TRANSITION_SHA=self.sha);self.reject('BRANCH')
  def test_other_branch_rejected(self):self.env['GITHUB_REF']='refs/heads/art';self.reject('BRANCH')
  def test_wrong_event_rejected(self):self.env['GITHUB_EVENT_NAME']='pull_request';self.reject('EVENT')
  def test_force_created_deleted_rejected(self):
@@ -54,9 +54,9 @@ class PushIdentityTests(unittest.TestCase):
  def test_existing_request_rejected(self):self.present=True;self.reject('REQUEST_GIT')
  def test_request_unchanged_rejected(self):self.changed=[];self.reject('REQUEST_GIT')
  def test_working_request_tamper_rejected(self):self.reject('REQUEST_GIT',tracked=b'other bytes')
- def test_manual_exact_policy_cannot_start_probe(self):
-  self.env.update(GITHUB_EVENT_NAME='workflow_dispatch',GITHUB_REF='refs/heads/main',MANUAL_TRANSITION_SHA=self.sha,GITHUB_RUN_ATTEMPT='2');self.reject('EVENT',raw=b'')
- def test_manual_wrong_policy_rejected(self):self.env.update(GITHUB_EVENT_NAME='workflow_dispatch',GITHUB_REF='refs/heads/main',MANUAL_TRANSITION_SHA='c'*64);self.reject('EVENT')
+ def test_manual_exact_policy_retains_original_replay_behavior(self):
+  self.env.update(GITHUB_EVENT_NAME='workflow_dispatch',GITHUB_REF='refs/heads/main',MANUAL_TRANSITION_SHA=self.sha,GITHUB_RUN_ATTEMPT='2');self.assertEqual(self.sha,self.check(raw=b''))
+ def test_manual_wrong_policy_rejected(self):self.env.update(GITHUB_EVENT_NAME='workflow_dispatch',GITHUB_REF='refs/heads/main',MANUAL_TRANSITION_SHA='c'*64);self.reject('MANUAL_POLICY')
  def test_oversized_request_rejected(self):self.reject('REQUEST_SIZE',raw=b' '*2049)
 
 class RealGitInputTests(unittest.TestCase):
@@ -74,13 +74,26 @@ class RealGitInputTests(unittest.TestCase):
    with mock.patch.object(d,'BASE',parent):
     self.assertEqual(sha,d.verify(root,env))
     workflow=(Path(__file__).resolve().parents[3]/'.github/workflows/desert-rv-journey-rebuild.yml').read_text()
-    block=workflow.split('      - name: Probe official Linux module metadata without starting Unity\n',1)[1].split('      - name:',1)[0]
-    for flag in ('--network none','--read-only','--cap-drop ALL','--security-opt no-new-privileges','--pids-limit=128','--entrypoint /usr/bin/python3'):
-     self.assertIn(flag,block)
-    self.assertEqual({'PROBE_SOURCE_COMMIT','PROBE_RUN_ID'},set(re.findall(r'--env ([A-Z_]+)',block)))
-    self.assertEqual(2,block.count('--volume '));self.assertNotIn('secrets.',workflow)
-    for denied in ('workflow_dispatch:','restore_preparation.py','unity-test-runner','unity-editor','UNITY_LICENSE','UNITY_PASSWORD','activate.sh','Build candidate Linux'):
-     self.assertNotIn(denied,workflow)
+    block=workflow.split('      - name: Build candidate Linux player without launching it\n',1)[1].split('      - name:',1)[0]
+    declared=re.findall(r'--env ([A-Z_]+)(?:=([^\s]+))?',block)
+    forwarded={key:(value or env.get(key,'')) for key,value in declared if key in env or key=='GITHUB_EVENT_PATH'}
+    self.assertEqual('/github/workflow/event.json',forwarded['GITHUB_EVENT_PATH'])
+    self.assertIn('--volume "$GITHUB_EVENT_PATH:/github/workflow/event.json:ro"',block)
+    required={'GITHUB_ACTIONS','GITHUB_SHA','GITHUB_RUN_ID','GITHUB_RUN_ATTEMPT','GITHUB_REPOSITORY','GITHUB_REF','GITHUB_ACTOR','GITHUB_TRIGGERING_ACTOR','GITHUB_EVENT_NAME','GITHUB_WORKFLOW_REF','GITHUB_EVENT_PATH','RUNNER_ENVIRONMENT','RUNNER_OS','GITHUB_REPOSITORY_VISIBILITY'}
+    self.assertEqual(required,set(forwarded))
+    # Map only the parsed read-only volume target into a local fixture mount. Every value comes from the real workflow's env declarations.
+    mounted=root/'container/github/workflow/event.json';mounted.parent.mkdir(parents=True);mounted.write_bytes(event_path.read_bytes());mounted.chmod(0o444)
+    forwarded['GITHUB_EVENT_PATH']=str(mounted);self.assertEqual(sha,d.verify(root,forwarded))
+    sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'art/journey-preparation'))
+    import pipeline
+    with mock.patch.object(pipeline,'REPO',root),mock.patch.dict(os.environ,forwarded,clear=True):pipeline.guard()
+    import verify_evidence
+    with mock.patch.object(verify_evidence,'ROOT',root),mock.patch.object(verify_evidence,'identity',return_value={}),mock.patch.object(verify_evidence,'verify_source_state',return_value={}),mock.patch.dict(os.environ,forwarded,clear=True):verify_evidence.guard()
+    with mock.patch.object(pipeline,'REPO',root),mock.patch.dict(os.environ,dict(forwarded,GITHUB_REF='refs/heads/unknown'),clear=True):
+     with self.assertRaisesRegex(ValueError,'BRANCH'):pipeline.guard()
+    for key in required:
+     missing=dict(forwarded);missing.pop(key)
+     with self.assertRaises(Exception,msg=key):d.verify(root,missing)
     request.write_bytes(request.read_bytes()+b' ')
     with self.assertRaisesRegex(ValueError,'REQUEST_GIT'):d.verify(root,env)
  def test_symlink_input_rejected(self):
