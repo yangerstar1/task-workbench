@@ -29,8 +29,8 @@ def build(motion):
     # Three pressed salvage shells: dark rolled lip under painted crown, nested curved sections.
     for i,(y,w,z) in enumerate([(-.55,.62,.91),(-.13,.67,1.),(.29,.62,.97)]):
         sections=[(0,y-.25,z-.025,w*.70,.035),(0,y-.20,z+.015,w*.92,.085),(0,y-.12,z+.025,w,.105),(0,y+.09,z,w*.96,.10),(0,y+.19,z-.065,w*.78,.065),(0,y+.24,z-.09,w*.68,.026)]
-        L('ShellRolledRim_%d'%i,sections,'body',2,20)
-        L('ShellPaintCrown_%d'%i,[(x,yy,zz+.009,ww*.966,hh*.94) for x,yy,zz,ww,hh in sections],'body',0 if i!=1 else 1,20)
+        L('ShellRolledRim_%d'%i,sections,'body',6,20)
+        L('ShellPaintCrown_%d'%i,[(x,yy,zz+.009,ww*.950,hh*.94) for x,yy,zz,ww,hh in sections],'body',0 if i!=1 else 1,20)
         # Broad spinal reinforcement instead of isolated triangular spikes.
         L('ShellSpine_%d'%i,[(0,y-.19,z+.10,.07,.015),(0,y-.08,z+.14,.085,.025),(0,y+.08,z+.12,.074,.022),(0,y+.17,z+.055,.05,.012)],'body',6,10)
         for sign in (-1,1):
@@ -75,7 +75,7 @@ def build(motion):
     return parts
 
 def core_geometry():
-    # Domed ceramic reactor with six separated lobes; one rigid renderer/material slot.
+    # Core raised 20mm inside unchanged lid; domed reactor with six separated lobes; one rigid renderer/material slot.
     # Dark static radiator hardware is kept on the body, never included in the emissive renderer.
     verts=[];faces=[]
     for sector in range(6):
@@ -84,7 +84,7 @@ def core_geometry():
             r=(.22,.65,1)[ring]
             for j in range(6):
                 a=start+(end-start)*j/5;x=.268*r*math.cos(a);y=.78+.185*r*math.sin(a)
-                verts.append((x,y,.896-.30*(y-.78)+(.012,.009,-.010)[ring]))
+                verts.append((x,y,.916-.30*(y-.78)+(.012,.009,-.010)[ring]))
         for i in range(2):
             for j in range(5):q=base+i*6+j;faces.append((q,q+1,q+7,q+6))
         top=list(range(base,base+6))+[base+6,base+12]+list(range(base+13,base+18))+[base+11,base+5]

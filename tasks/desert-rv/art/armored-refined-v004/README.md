@@ -27,3 +27,7 @@ Run standard Python unittest for test_static and test_refinement. check_refined_
 4. Unity import requires a NEW contract with actual new file/neutral-bound/material/mesh hashes, original node contract, capsule-r2, actual foot calibration and real GPU-skinned capture. Do not overwrite old candidate contracts or alias the new art to v003 receipts.
 
 No workflow is published here. The coordinator owns owner/main/manual/free-hosted Actions wiring and explicit file allowlists. Its existing official Blender SHA pin and actions commits must be retained. The legacy monolithic animate entry remains only as the source export/check definition used by the staged executor; do not run it for a long all-video job.
+
+## Revision r1 after actual static run 37947511292
+
+The prior v004 run is retained as PARTIAL_FAILED_NOT_A_SUCCESS. Two side-view Recover1.95 samples had visible core height7.30258px against the unchanged8px gate. Core rises20mm within the same unkeyed closed lid, with minimum vertical lid clearance10.84mm. Pure triangle rays reproduce the old101sample/7.30258px failure and estimate165samples/9.66272px in r1; this is not engine validation. Original motion, capsule, floor and visibility thresholds are unchanged. Bare-steel rolled rims are slightly wider; paint microvariation is reduced and steel/paint roughness separated. The packager now checks atlas1024×1024 and review960×540 by exact file category. New geometry needs a fresh public Actions static run; old images never certify r1.

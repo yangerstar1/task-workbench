@@ -2,7 +2,7 @@ name: Desert RV refined armored v004 static candidate
 on:
   push:
     branches: [main]
-    paths: [.github/dispatch/desert-rv-armored-v004-static-20261009.json]
+    paths: [.github/dispatch/desert-rv-armored-v004-r1-static-20261009.json]
   workflow_dispatch:
     inputs:
       phase:
@@ -39,10 +39,10 @@ jobs:
           python3 - <<'PYGUARD'
           import hashlib, json, os, pathlib, re, stat, subprocess
           
-          EXPECTED_PARENT = '80c3ce61a936467090c9ca8d977c543d6327b61b'
-          EXPECTED_SOURCE = '8a0fb9edf87d6e3cee7535c71987a940e4000138c49831ed2a6f956504486963'
-          EXPECTED_REQUEST = 'desert-rv-armored-v004-static-20261009-7f04c82a'
-          REQUEST_PATH = '.github/dispatch/desert-rv-armored-v004-static-20261009.json'
+          EXPECTED_PARENT = 'a9bb99ff9dec15d2b44ee914239f8b70393e287a'
+          EXPECTED_SOURCE = 'e7cc6db0032ed5265e4696eb2069d25c5bde20612e7eff67fb038b2137cf7264'
+          EXPECTED_REQUEST = 'desert-rv-armored-v004-r1-static-20261009-b29ad5e1'
+          REQUEST_PATH = '.github/dispatch/desert-rv-armored-v004-r1-static-20261009.json'
           def require(condition, reason):
               if not condition:
                   raise SystemExit('STATIC_REQUEST_REJECTED: ' + reason)

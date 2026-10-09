@@ -1,5 +1,5 @@
 {
-  "candidate": "scrapyard-bulwark-v004-refined",
+  "candidate": "scrapyard-bulwark-v004-refined-r1",
   "status": "source_only_unrendered_unapproved",
   "source_origin": "original geometry/rig/motion and licensed CC0 surface treatment",
   "third_party_assets": [
@@ -16,7 +16,7 @@
     }
   ],
   "sha256": {
-    "README.md": "eb97037aa74804addbbd6f926faf014147c1e4c6ee89c33e577c8b6fb98d88a8",
+    "README.md": "333ce7c6fc635e576025c0f6b9196e7add1045b590407a7c46fb6a65a192cf8d",
     "animate.py": "159564c94eb0780bba0d0638d415aaa6e4e6a0a9b5f0ee3a98e6d3066563e339",
     "artifact_io.py": "3a088520d8162c1beaa2c4fcf32275f8041e05db323344b1d82a1b263787a144",
     "binding_contract.py": "c9eea0fa52490b47c3d36fc8df2b9662da67326755c5a932ca1704a16e360ff9",
@@ -31,13 +31,15 @@
     "materials/ASSET-LICENSE.json": "30e37dceca601ae0142ef53f3fcf13956350a2d1e785ccc559d375a0c7a06181",
     "materials/rusty_metal_02_diff_1k.jpg": "adaf094391518b6afe787a123942110aa88ef521c844f970b124420f5ed5d3d9",
     "motion.py": "4edc78bd7ff6ec22d8ad378a71871f983f76262857c8bf9cec03a06f8ed7e010",
-    "package_evidence.py": "0d3225b8fce7342d89b6acc7ea2efe735b785d0ec899f871d9b6fbf8c6bed042",
-    "parameters.json": "1db5b3fecd7822ffe2daf0819ec0225a215815d04cabcefe0713024d5f079d12",
-    "refined_geometry.py": "444a3321d92b25c5adf60a23fcad698a4c5cf7d1977fe5252acd225a428407df",
-    "surface_atlas.py": "9a6fd0013b486a3e46b8b05f16565b163ac6fc4486e999a927baf7472f175ec9",
-    "test_refinement.py": "c50e7aa5f7271eaae346169e4faa049907f3c33de4f6c84d74f3e96634f23ed5",
+    "package_evidence.py": "2cff63adfe7d60ae37d3379392799b2ccd28c81aea0a5ff78bb1c74d928fc8f8",
+    "parameters.json": "de5442acd444b5deed17d8b7467d5381222b26b3a1eee94cdb00d8704d6075b9",
+    "refined_geometry.py": "aea1566c4e84f152987282d4b0731727dd9ee073bdd091179ca41d0926b561be",
+    "surface_atlas.py": "5871cf058ee9a8fc9d5ae8b5d40b83b2877763a896a30e42e7c804d913d1744e",
+    "test_refinement.py": "ad476f9f97f222687c1b9d3e4031f54041a27cc9fc6fc0782d4cbaf0440fc86f",
     "test_static.py": "19d8595cbf43730c6c43180ae084a7f06470cbbbb9243da57922d6080567e8fe",
     "validate_runtime_contract.py": "a2d91b8bc8f947168778cfc4f9ffc4fbc3e92cb6e8a68b7e7131bad3c8d106da",
     "write_provenance.py": "86db4e077558e1ee8cf2253c8895c82f9c6707b50b30c005ffac1a9c41a21d95"
-  }
+  },
+  "prior_static_run": "37947511292",
+  "prior_static_status": "PARTIAL_FAILED_NOT_A_SUCCESS"
 }

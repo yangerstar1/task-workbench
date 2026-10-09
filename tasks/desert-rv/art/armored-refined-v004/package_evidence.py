@@ -8,6 +8,11 @@ from evidence_layout import fps_files
 HERE=Path(__file__).resolve().parent
 P=json.loads((HERE/'parameters.json').read_text())
 def sha(path):return hashlib.sha256(path.read_bytes()).hexdigest()
+def validate_png_dimensions(name,width,height):
+    # File-specific producer contract: texture size must never excuse a wrong review size.
+    texture_names={'bulwark-basecolor.png','bulwark-orm.png'}
+    target=(1024,1024) if name in texture_names else (960,540) if name.startswith('review/') and name.endswith('.png') else None
+    if target is None or (width,height)!=target:raise ValueError('unexpected PNG size for '+name)
 def expected(phase):
     if phase=='static':
         return ['binding-contract.json','bulwark-basecolor.png','bulwark-orm.png','bulwark-static-review.blend','static-checks.json','fps-visibility.json']+[f'review/static-{i:02}.png' for i in range(8)]+['review/static-weakpoint-open.png']+fps_files(P)
@@ -35,7 +40,7 @@ def main():
                 raw=f.read_bytes()[:24]
                 if raw[:8]!=b'\x89PNG\r\n\x1a\n':raise ValueError('invalid PNG signature')
                 w,h=struct.unpack('>II',raw[16:24])
-                if (w,h) not in ((960,540),(512,512)):raise ValueError('unexpected PNG size')
+                validate_png_dimensions(name,w,h)
             elif f.suffix=='.mp4':
                 probe=json.loads(subprocess.check_output(['ffprobe','-v','error','-select_streams','v:0','-show_entries','stream=codec_name,width,height,nb_frames:format=duration','-of','json',str(f)],timeout=20))
                 stream=probe['streams'][0]; duration=float(probe['format']['duration'])

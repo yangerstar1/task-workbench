@@ -26,4 +26,34 @@ class RefinedSourceTests(unittest.TestCase):
   for n in ('refined_geometry.py','surface_atlas.py','generate.py'):
    s=(HERE/n).read_text()
    for call in ('requests.','urllib.','os.system(','subprocess.'):self.assertNotIn(call,s)
+ def test_texture_and_review_dimensions_are_distinct(self):
+  from package_evidence import validate_png_dimensions
+  for name in ('bulwark-basecolor.png','bulwark-orm.png'):
+   validate_png_dimensions(name,1024,1024)
+   for size in ((512,512),(960,540)):
+    with self.assertRaises(ValueError):validate_png_dimensions(name,*size)
+  validate_png_dimensions('review/static-01.png',960,540)
+  with self.assertRaises(ValueError):validate_png_dimensions('review/static-01.png',1024,1024)
+  with self.assertRaises(ValueError):validate_png_dimensions('unknown.png',1024,1024)
+ def test_core_stays_below_unchanged_closed_lids(self):
+  tris=[]
+  for sign in (-1,1):
+   verts,faces=c.cover(sign)
+   for face in faces:
+    tris.extend([verts[i] for i in (face[0],face[j],face[j+1])] for j in range(1,len(face)-1))
+  gaps=[]
+  for x,y,z in g.core_geometry()[0]:
+   hits=[]
+   for a,b,d in tris:
+    bx,by=b[0]-a[0],b[1]-a[1];dx,dy=d[0]-a[0],d[1]-a[1];det=bx*dy-dx*by
+    if abs(det)<1e-10:continue
+    u=((x-a[0])*dy-(y-a[1])*dx)/det;v=(bx*(y-a[1])-by*(x-a[0]))/det
+    if u>=-1e-8 and v>=-1e-8 and u+v<=1+1e-8:
+     height=a[2]+u*(b[2]-a[2])+v*(d[2]-a[2])
+     if height>z:hits.append(height-z)
+   self.assertTrue(hits);gaps.append(min(hits))
+  self.assertGreaterEqual(min(gaps),.010)
+ def test_steel_and_paint_have_separate_roughness(self):
+  _,paint=surface_atlas.texel(0,.5,.5,(.5,.3,.1));_,steel=surface_atlas.texel(6,.5,.5,(.5,.3,.1))
+  self.assertGreater(paint[1]-steel[1],.20);self.assertEqual(paint[2],0);self.assertGreaterEqual(steel[2],.85)
 if __name__=='__main__':unittest.main()
