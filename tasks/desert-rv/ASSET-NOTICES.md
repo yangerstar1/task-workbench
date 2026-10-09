@@ -33,3 +33,7 @@ New scenery resources in `unity/Assets/DesertRV/Art/EnvironmentV4` are CC0 1.0. 
 `EnvironmentV4/asset-provenance.json` records every copied asset hash and the exact roughness-to-URP mask derivation. `art/environment-v4/upstream-download-evidence.json` retains verified original download identities, and `license-evidence.json` the license-page verification. No web preview image, Quaternius QAL resource, paywalled model, or unverified candidate is included.
 
 Environment V4 R2 adds self-authored metric ground/vertex-opacity shader and procedural pump/yard geometry. No new third-party assets are introduced; the 29 CC0 binary asset files and their recorded source hashes are unchanged. See art/environment-v4/REVISION-R2.md.
+
+### Diagnostic sand diffuse derivative
+
+`Assets/DesertRV/Art/TerrainDiffuseCorrection/sand_03_diff_illumination_corrected_1k.png` is a CC0 derivative of Poly Haven `sand_03` by Charlotte Baglioni. Original: https://polyhaven.com/a/sand_03 ; license: https://polyhaven.com/license . It applies recorded linear-light low-frequency illumination correction while retaining the source grain and mean color. Original bytes, recipe, source/derived SHA256 and numerical checks are recorded in `art/environment-v4/diffuse-correction/derived-provenance.json`. It is pending native visual comparison, not production acceptance.

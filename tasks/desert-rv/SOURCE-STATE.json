@@ -33,7 +33,9 @@
     ".github/dispatch/desert-rv-environment-v4-r3-20261009-files.json",
     ".github/workflows/desert-rv-armored-v004-r1-strict.yml",
     ".github/workflows/desert-rv-environment-terrain-probe.yml",
-    ".github/dispatch/desert-rv-environment-terrain-probe-20261009-files.json"
+    ".github/dispatch/desert-rv-environment-terrain-probe-20261009-files.json",
+    ".github/workflows/desert-rv-environment-diffuse-comparison.yml",
+    ".github/dispatch/desert-rv-environment-diffuse-comparison-20261009-files.json"
   ],
   "restoredFiles": [
     {
@@ -47,6 +49,11 @@
       "path": ".github/actions/desert-rv-rendered/action.yml",
       "sha256": "acb99f2cacd1bcd42287d3f950a5811070d5f913b94687cdf82e633c6261c9d3",
       "size": 5344
+    },
+    {
+      "path": ".github/dispatch/desert-rv-environment-diffuse-comparison-20261009-files.json",
+      "sha256": "a571d25aa79a85f50488be98b5bfb1c14815375753ed4ad224bb41ac7f437093",
+      "size": 5934
     },
     {
       "path": ".github/dispatch/desert-rv-environment-terrain-probe-20261009-files.json",
@@ -87,6 +94,11 @@
       "path": ".github/workflows/desert-rv-candidate-art-import.yml",
       "sha256": "631d3e8d75d6a67b424d82b0a902c2261f444b86fc9a9690a7336613d430621c",
       "size": 5505
+    },
+    {
+      "path": ".github/workflows/desert-rv-environment-diffuse-comparison.yml",
+      "sha256": "44019cdb559597c222d28fb6de5bae84f68d9a973de7fe7b30d23e100710ebcd",
+      "size": 6637
     },
     {
       "path": ".github/workflows/desert-rv-environment-terrain-probe.yml",
@@ -145,8 +157,8 @@
     },
     {
       "path": "tasks/desert-rv/ASSET-NOTICES.md",
-      "sha256": "ebb7c0e61fa256e855b88afb1ac9b3900b38cffb1461da07c63043f16cb4fba6",
-      "size": 3231
+      "sha256": "2c44ff73cb9c2e65f7c8596a504ddb8158a1b6f712bf526da53ee07b3f47145a",
+      "size": 3849
     },
     {
       "path": "tasks/desert-rv/art/environment-v4/HANDOFF.md",
@@ -187,6 +199,31 @@
       "path": "tasks/desert-rv/art/environment-v4/candidate-r3-file-manifest.json",
       "sha256": "54c73926bcaf40f5261cc673dbba30f6c8cd1eeabafabd6203f5bc89221a4b80",
       "size": 1801
+    },
+    {
+      "path": "tasks/desert-rv/art/environment-v4/diffuse-comparison-file-manifest.json",
+      "sha256": "10c0c4f246ee4d40a5d1a0524fff490e82b5cbf71a438fe85b739d277cdf43b3",
+      "size": 5026
+    },
+    {
+      "path": "tasks/desert-rv/art/environment-v4/diffuse-correction/README.md",
+      "sha256": "65692553e346c1ce99048e6155db7e0a720449acfe3e6d68a7339d9b38d6a594",
+      "size": 2357
+    },
+    {
+      "path": "tasks/desert-rv/art/environment-v4/diffuse-correction/correct_illumination.py",
+      "sha256": "f488b7c195eaf46f33630b2811e2b89eca44b742fd0100851231e2e4fa7064a6",
+      "size": 3355
+    },
+    {
+      "path": "tasks/desert-rv/art/environment-v4/diffuse-correction/derived-provenance.json",
+      "sha256": "cdf2eefc2a9115ae734a117a1923942c93679de16086911d52fde656f3718da1",
+      "size": 2677
+    },
+    {
+      "path": "tasks/desert-rv/art/environment-v4/diffuse-correction/test_correction.py",
+      "sha256": "7aaa8900e627e184c6825052c43e74d24a6c65e74123acc73603f8b3c048ca25",
+      "size": 3481
     },
     {
       "path": "tasks/desert-rv/art/environment-v4/generated-contract.json",
@@ -609,6 +646,16 @@
       "size": 5801
     },
     {
+      "path": "tasks/desert-rv/scripts/environment_diffuse_comparison_dispatch.py",
+      "sha256": "1c3c6cf43ae8af47a8df2d9c56f5264d99d8ec11035df4bfc9ea983c0bec9cbd",
+      "size": 8117
+    },
+    {
+      "path": "tasks/desert-rv/scripts/environment_diffuse_comparison_evidence.py",
+      "sha256": "ade51da4cf7f978b6062026d9d83de0e4a63c486247575eb260a22a9ae019f16",
+      "size": 13879
+    },
+    {
       "path": "tasks/desert-rv/scripts/environment_evidence.py",
       "sha256": "c8039deefc987c742b3a558f783cf8ea49fd642760c7bf71d5fb6381aeab4b6d",
       "size": 19723
@@ -700,8 +747,8 @@
     },
     {
       "path": "tasks/desert-rv/scripts/prepare_runner.sh",
-      "sha256": "5dcd29dcbe5e648908fbb072530509a3b6d407386fbd81ee1674ea42b7f566c3",
-      "size": 2732
+      "sha256": "8c3a755951ae5332f601a7043e7fb35be058796263cab7dd150942c0b30ebf47",
+      "size": 3000
     },
     {
       "path": "tasks/desert-rv/scripts/prepare_safe_diagnostic_export.py",
@@ -824,6 +871,21 @@
       "size": 19307
     },
     {
+      "path": "tasks/desert-rv/scripts/test_environment_diffuse_comparison_dispatch.py",
+      "sha256": "72ea8ce9e26926841faebbbcf02eb4bc0eabc3a3c3d96c8a8dfe85cb9ff8672c",
+      "size": 28854
+    },
+    {
+      "path": "tasks/desert-rv/scripts/test_environment_diffuse_comparison_evidence.py",
+      "sha256": "ee203486d5da6d50484e591bd9ff065a77c7525730f56ef58a908c90b7fe2503",
+      "size": 27861
+    },
+    {
+      "path": "tasks/desert-rv/scripts/test_environment_diffuse_comparison_runner_prefix.py",
+      "sha256": "c33dba4e12540b531af31ccdba12bf84e3e1f4cbe77f36d1fc50c065fe8cb3e7",
+      "size": 5167
+    },
+    {
       "path": "tasks/desert-rv/scripts/test_environment_evidence.py",
       "sha256": "b9c4a530453d3ae9050ef5e898b29b483536545b56b247a6177164ec8933b776",
       "size": 16047
@@ -915,8 +977,8 @@
     },
     {
       "path": "tasks/desert-rv/scripts/verify_evidence.py",
-      "sha256": "4ff24d3c6285bad2508db2ac63effef96c270d64513da13b9878684e86bc4e60",
-      "size": 18961
+      "sha256": "df10bb4920503b8167c255b28f325aee781850dc0cc3020de6bf06907eb445b0",
+      "size": 19442
     },
     {
       "path": "tasks/desert-rv/unity/Assets/DefaultVolumeProfile.asset",
@@ -3984,6 +4046,21 @@
       "size": 204
     },
     {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/TerrainDiffuseCorrection.meta",
+      "sha256": "c1a8a2c2cbf05db322c774bde16f4f6e3b496be525108e42bfe09df102ab99b6",
+      "size": 172
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/TerrainDiffuseCorrection/sand_03_diff_illumination_corrected_1k.png",
+      "sha256": "4fe4e4e5745ce34d4f8eb9668e45a5fab1acf7f6c0baa96de45ae15ff98764a3",
+      "size": 1673614
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/TerrainDiffuseCorrection/sand_03_diff_illumination_corrected_1k.png.meta",
+      "sha256": "c90d8b8ae8da299cdd47af43312699c27861d72effc9a493c7b142526bd87dd3",
+      "size": 3009
+    },
+    {
       "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/Textures.meta",
       "sha256": "cd78bd8d72ae1c3c2ff630a0f7927e0823f5600fe75fce373853de4be9f3866d",
       "size": 172
@@ -4767,6 +4844,16 @@
       "path": "tasks/desert-rv/unity/Assets/DesertRV/Editor/JourneyRenderedCommandLine.cs.meta",
       "sha256": "0a8b312ba08bbe47700671ca30bda42c0c9dbfbad8216162f71c78f3314aa756",
       "size": 240
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Editor/JourneySceneAuthoring.DiffuseComparison.cs",
+      "sha256": "efde44d4d61eae7a92cd07ac78b4a840e59db5db3799a57ee34914cc25592156",
+      "size": 17184
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Editor/JourneySceneAuthoring.DiffuseComparison.cs.meta",
+      "sha256": "310f2f6ec5f652d6b1171082160b49bb32be13ce6102aaacd730b1c16d7f91ce",
+      "size": 243
     },
     {
       "path": "tasks/desert-rv/unity/Assets/DesertRV/Editor/JourneySceneAuthoring.EnvironmentPolish.cs",
@@ -5931,6 +6018,31 @@
     {
       "path": "tasks/desert-rv/unity/Assets/DesertRV/Tests/EditMode/WeaponPitchSpaceTests.cs.meta",
       "sha256": "21beedee8ff38a239ebb5dec12e604e3be3cf58c936963a545ef31cf0aa5e43b",
+      "size": 243
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Tests/EditorDiffuseComparison.meta",
+      "sha256": "71da318b880032bdff02dcd83eb77eca3e5dfe41aadc22621df3146a91bc346a",
+      "size": 172
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Tests/EditorDiffuseComparison/DesertRV.EditorDiffuseComparisonTests.asmdef",
+      "sha256": "6acab098d34c22b4cfc81033baa1a94628638d387d4aba99a57885ff147a66c9",
+      "size": 398
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Tests/EditorDiffuseComparison/DesertRV.EditorDiffuseComparisonTests.asmdef.meta",
+      "sha256": "0f4deb9907348cff05f75b5961773d6bf96d55135da7be321c6e9967c5ee5717",
+      "size": 166
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Tests/EditorDiffuseComparison/JourneyDiffuseComparisonTests.cs",
+      "sha256": "b1f3dcb27a4ce49b236c7c9cab0bd025388db35210e861a0fd76c874e6dc7584",
+      "size": 794
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Tests/EditorDiffuseComparison/JourneyDiffuseComparisonTests.cs.meta",
+      "sha256": "5d9d188f4e9a655a8a30e267b24ff457c00ff6f8c83c4f5ed08863d164e980b5",
       "size": 243
     },
     {

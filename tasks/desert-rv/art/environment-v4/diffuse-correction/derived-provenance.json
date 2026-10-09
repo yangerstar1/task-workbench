@@ -1,0 +1,74 @@
+{
+  "schema": 1,
+  "status": "DERIVED_CC0_TEXTURE_PENDING_NATIVE_COMPARISON_NOT_ACCEPTED",
+  "source": {
+    "asset_id": "sand_03",
+    "author": "Charlotte Baglioni",
+    "source_url": "https://polyhaven.com/a/sand_03",
+    "license": "CC0-1.0",
+    "license_url": "https://polyhaven.com/license",
+    "path": "unity/Assets/DesertRV/Art/EnvironmentV4/sand_03_diff_1k.jpg",
+    "sha256": "e72144f9d7b81bdb7bbdb34222b53431738dcef79346dd89412d2abd541e4d30"
+  },
+  "derived": {
+    "path": "unity/Assets/DesertRV/Art/TerrainDiffuseCorrection/sand_03_diff_illumination_corrected_1k.png",
+    "sha256": "4fe4e4e5745ce34d4f8eb9668e45a5fab1acf7f6c0baa96de45ae15ff98764a3",
+    "bytes": 1673614,
+    "dimensions": [
+      1024,
+      1024
+    ],
+    "format": "PNG RGB 8-bit sRGB",
+    "license": "CC0-1.0"
+  },
+  "recipe": {
+    "path": "art/environment-v4/diffuse-correction/correct_illumination.py",
+    "sha256": "f488b7c195eaf46f33630b2811e2b89eca44b742fd0100851231e2e4fa7064a6",
+    "operations": [
+      "Decode sRGB to linear RGB",
+      "Estimate luminance illumination using periodic FFT Gaussian lowpass sigma48px",
+      "Multiply RGB by global mean luminance / local illumination",
+      "Restore each original channel mean with one global gain",
+      "Encode back to sRGB; round to RGB8 PNG"
+    ],
+    "new_noise": false,
+    "engine_execution": false,
+    "source_modified": false
+  },
+  "metrics": {
+    "source_sha256": "e72144f9d7b81bdb7bbdb34222b53431738dcef79346dd89412d2abd541e4d30",
+    "derived_sha256": "4fe4e4e5745ce34d4f8eb9668e45a5fab1acf7f6c0baa96de45ae15ff98764a3",
+    "derived_bytes": 1673614,
+    "sigma_pixels": 48.0,
+    "tile_metres": 2,
+    "spatial_sigma_metres": 0.09375,
+    "illumination_gain_range": [
+      0.908932709540336,
+      1.0781676865725316
+    ],
+    "before": {
+      "mean_linear_rgb": [
+        0.1504798695662536,
+        0.11784527936660695,
+        0.07811187618823917
+      ],
+      "relative_luminance_std": 0.12632462264636343,
+      "x_fundamental_amplitude_fraction": 0.039467586313861464,
+      "z_fundamental_amplitude_fraction": 0.0419228857698019,
+      "low_frequency_rms_fraction_le4": 0.045257009691974805,
+      "grain_rms_fraction_ge16": 0.1169036444427761
+    },
+    "after": {
+      "mean_linear_rgb": [
+        0.15047819359563416,
+        0.11783906506713082,
+        0.07813395580178531
+      ],
+      "relative_luminance_std": 0.11825072587529543,
+      "x_fundamental_amplitude_fraction": 0.002191684844873969,
+      "z_fundamental_amplitude_fraction": 0.0017873117839793174,
+      "low_frequency_rms_fraction_le4": 0.005898465168438845,
+      "grain_rms_fraction_ge16": 0.11724859144752317
+    }
+  }
+}

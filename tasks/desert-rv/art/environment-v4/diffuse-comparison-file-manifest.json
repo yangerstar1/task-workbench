@@ -1,0 +1,129 @@
+{
+  "schema": 1,
+  "base_commit": "551be26a3faa9ffbeb3a4a57bce8d65b592b788d",
+  "status": "DIAGNOSTIC_DIFFUSE_COMPARISON_PENDING_NATIVE_NOT_ART_ACCEPTANCE",
+  "original_binary_payloads_unchanged": 29,
+  "new_derived_cc0_textures": 1,
+  "production_twenty_and_eight_view_gates_unchanged": true,
+  "files": [
+    {
+      "path": "tasks/desert-rv/ASSET-NOTICES.md",
+      "change": "modified",
+      "bytes": 3849,
+      "sha256": "2c44ff73cb9c2e65f7c8596a504ddb8158a1b6f712bf526da53ee07b3f47145a",
+      "before_sha256": "ebb7c0e61fa256e855b88afb1ac9b3900b38cffb1461da07c63043f16cb4fba6"
+    },
+    {
+      "path": "tasks/desert-rv/art/environment-v4/diffuse-correction/README.md",
+      "change": "added",
+      "bytes": 2357,
+      "sha256": "65692553e346c1ce99048e6155db7e0a720449acfe3e6d68a7339d9b38d6a594",
+      "before_sha256": null
+    },
+    {
+      "path": "tasks/desert-rv/art/environment-v4/diffuse-correction/correct_illumination.py",
+      "change": "added",
+      "bytes": 3355,
+      "sha256": "f488b7c195eaf46f33630b2811e2b89eca44b742fd0100851231e2e4fa7064a6",
+      "before_sha256": null
+    },
+    {
+      "path": "tasks/desert-rv/art/environment-v4/diffuse-correction/derived-provenance.json",
+      "change": "added",
+      "bytes": 2677,
+      "sha256": "cdf2eefc2a9115ae734a117a1923942c93679de16086911d52fde656f3718da1",
+      "before_sha256": null
+    },
+    {
+      "path": "tasks/desert-rv/art/environment-v4/diffuse-correction/test_correction.py",
+      "change": "added",
+      "bytes": 3481,
+      "sha256": "7aaa8900e627e184c6825052c43e74d24a6c65e74123acc73603f8b3c048ca25",
+      "before_sha256": null
+    },
+    {
+      "path": "tasks/desert-rv/scripts/environment_diffuse_comparison_evidence.py",
+      "change": "added",
+      "bytes": 13879,
+      "sha256": "ade51da4cf7f978b6062026d9d83de0e4a63c486247575eb260a22a9ae019f16",
+      "before_sha256": null
+    },
+    {
+      "path": "tasks/desert-rv/scripts/test_environment_diffuse_comparison_evidence.py",
+      "change": "added",
+      "bytes": 27861,
+      "sha256": "ee203486d5da6d50484e591bd9ff065a77c7525730f56ef58a908c90b7fe2503",
+      "before_sha256": null
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/TerrainDiffuseCorrection/sand_03_diff_illumination_corrected_1k.png",
+      "change": "added",
+      "bytes": 1673614,
+      "sha256": "4fe4e4e5745ce34d4f8eb9668e45a5fab1acf7f6c0baa96de45ae15ff98764a3",
+      "before_sha256": null
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/TerrainDiffuseCorrection/sand_03_diff_illumination_corrected_1k.png.meta",
+      "change": "added",
+      "bytes": 3009,
+      "sha256": "c90d8b8ae8da299cdd47af43312699c27861d72effc9a493c7b142526bd87dd3",
+      "before_sha256": null
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/TerrainDiffuseCorrection.meta",
+      "change": "added",
+      "bytes": 172,
+      "sha256": "c1a8a2c2cbf05db322c774bde16f4f6e3b496be525108e42bfe09df102ab99b6",
+      "before_sha256": null
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Editor/JourneySceneAuthoring.DiffuseComparison.cs",
+      "change": "added",
+      "bytes": 17184,
+      "sha256": "efde44d4d61eae7a92cd07ac78b4a840e59db5db3799a57ee34914cc25592156",
+      "before_sha256": null
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Editor/JourneySceneAuthoring.DiffuseComparison.cs.meta",
+      "change": "added",
+      "bytes": 243,
+      "sha256": "310f2f6ec5f652d6b1171082160b49bb32be13ce6102aaacd730b1c16d7f91ce",
+      "before_sha256": null
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Tests/EditorDiffuseComparison/DesertRV.EditorDiffuseComparisonTests.asmdef",
+      "change": "added",
+      "bytes": 398,
+      "sha256": "6acab098d34c22b4cfc81033baa1a94628638d387d4aba99a57885ff147a66c9",
+      "before_sha256": null
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Tests/EditorDiffuseComparison/DesertRV.EditorDiffuseComparisonTests.asmdef.meta",
+      "change": "added",
+      "bytes": 166,
+      "sha256": "0f4deb9907348cff05f75b5961773d6bf96d55135da7be321c6e9967c5ee5717",
+      "before_sha256": null
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Tests/EditorDiffuseComparison/JourneyDiffuseComparisonTests.cs",
+      "change": "added",
+      "bytes": 794,
+      "sha256": "b1f3dcb27a4ce49b236c7c9cab0bd025388db35210e861a0fd76c874e6dc7584",
+      "before_sha256": null
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Tests/EditorDiffuseComparison/JourneyDiffuseComparisonTests.cs.meta",
+      "change": "added",
+      "bytes": 243,
+      "sha256": "5d9d188f4e9a655a8a30e267b24ff457c00ff6f8c83c4f5ed08863d164e980b5",
+      "before_sha256": null
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Tests/EditorDiffuseComparison.meta",
+      "change": "added",
+      "bytes": 172,
+      "sha256": "71da318b880032bdff02dcd83eb77eca3e5dfe41aadc22621df3146a91bc346a",
+      "before_sha256": null
+    }
+  ]
+}
