@@ -108,6 +108,11 @@ namespace DesertRV.Editor
                 // Lock and compare the genuine imported neutral before any Rebind/Update can overwrite it.
                 var rootPosition=animator.transform.localPosition;var rootRotation=animator.transform.localRotation;var rootScale=animator.transform.localScale;
                 if(contract.kind=="weapon")CandidateWeaponDiagnostics.Prepare(subject);
+                // This preview instance renders many Animator poses within one Editor update.
+                // Unity requires per-render skin matrix refresh for this manual capture pattern.
+                // Do not persist this diagnostic policy onto the prefab or production assets.
+                foreach(var skin in subject.GetComponentsInChildren<SkinnedMeshRenderer>(true))
+                    skin.forceMatrixRecalculationPerRender=true;
                 var initialRenderers=subject.GetComponentsInChildren<Renderer>(true).Where(r=>r.enabled && !(r is ParticleSystemRenderer)).ToArray();
                 if(initialRenderers.Length==0)throw new InvalidOperationException("Missing neutral geometry.");
                 var initialBounds=initialRenderers[0].bounds;foreach(var r in initialRenderers)initialBounds.Encapsulate(r.bounds);
@@ -147,8 +152,16 @@ namespace DesertRV.Editor
                     int start=evidence.frames.Count;
                     foreach(float time in new[]{0f,.25f,.5f,.75f,.999f})
                     { animator.Play("Base Layer."+state,0,time); animator.Update(0); if(animator.GetCurrentAnimatorStateInfo(0).fullPathHash!=Animator.StringToHash("Base Layer."+state))throw new InvalidOperationException("Actual Animator did not enter "+state); Capture(state+"-"+time.ToString("0.000",System.Globalization.CultureInfo.InvariantCulture),state,0); }
-                    if(contract.clips.Single(c=>c.state==state).poseExpectation=="varying" && evidence.frames.Skip(start).Select(f=>f.meshPoseSha256).Distinct().Count()<2)
-                        throw new InvalidOperationException("Contract expected actual mesh pose variation in "+state);
+                    if(contract.clips.Single(c=>c.state==state).poseExpectation=="varying")
+                    {
+                        // Only this state's five direct samples participate. Held poses, resets,
+                        // cross-fades and later rigid weakpoint presenters cannot satisfy this gate.
+                        var stateFrames=evidence.frames.Skip(start).ToArray();
+                        if(stateFrames.Select(f=>f.meshPoseSha256).Distinct().Count()<2)
+                            throw new InvalidOperationException("Contract expected actual mesh pose variation in "+state);
+                        if(stateFrames.Select(f=>f.imageSha256).Distinct().Count()<2)
+                            throw new InvalidOperationException("Rendered images did not vary despite measured mesh poses in "+state);
+                    }
                     // Held Recover is valid when declared; presenter-owned opening is not exercised here.
                 }
                 if(states.Contains("Attack"))

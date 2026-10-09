@@ -250,8 +250,8 @@
     },
     {
       "path": "tasks/desert-rv/art/import-candidate/test_capture_source.py",
-      "sha256": "e485caac2628fb7e27f076ffc7fc7b637433bbf501bd42527e71a2b44986751b",
-      "size": 4484
+      "sha256": "adc34fd342149c8a6e6bcc789d0a730b10cf9cf78478e2d5252bc655bb81e92f",
+      "size": 6458
     },
     {
       "path": "tasks/desert-rv/art/import-candidate/test_dual_contact_integration.py",
@@ -3950,8 +3950,8 @@
     },
     {
       "path": "tasks/desert-rv/unity/Assets/DesertRV/Editor/JourneyCandidateArtCapture.cs",
-      "sha256": "14c4b842ac5c67f1700832140ea43ab29b9f8fe25beba977193530cd92fc273a",
-      "size": 38289
+      "sha256": "371791454f96cce4247a5d4f1bb71406196138e8b43f061af2dc2c1016dbbd46",
+      "size": 39295
     },
     {
       "path": "tasks/desert-rv/unity/Assets/DesertRV/Editor/JourneyCandidateArtCapture.cs.meta",

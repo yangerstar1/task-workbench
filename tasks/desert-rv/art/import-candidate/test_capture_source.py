@@ -11,7 +11,30 @@ class CaptureSourceTests(unittest.TestCase):
     def test_explicit_pose_expectations(self):
         self.assertIn('s.poseExpectation=="held" || s.poseExpectation=="varying"',IMPORT)
         self.assertIn('poseExpectation=="varying"',CAPTURE)
-        self.assertNotIn('Select(f=>f.imageSha256).Distinct()',CAPTURE)
+        state=CAPTURE[CAPTURE.index('else foreach(string state in states)'):CAPTURE.index('if(states.Contains("Attack"))')]
+        gate=state[state.index('if(contract.clips.Single(c=>c.state==state).poseExpectation=="varying")'):]
+        self.assertIn('foreach(float time in new[]{0f,.25f,.5f,.75f,.999f})',state)
+        self.assertIn('var stateFrames=evidence.frames.Skip(start).ToArray();',gate)
+        for field in ('meshPoseSha256','imageSha256'):
+            self.assertIn('stateFrames.Select(f=>f.'+field+').Distinct().Count()<2',gate)
+        self.assertLess(gate.index('meshPoseSha256'),gate.index('imageSha256'))
+        # The image check is group-scoped, not pairwise: repeated same-pose Idle
+        # frames are allowed while at least two declared varying samples differ.
+        self.assertNotIn('evidence.frames.Select(f=>f.imageSha256)',CAPTURE)
+    def test_preview_instance_refreshes_all_skinned_matrices_per_render(self):
+        setup=CAPTURE[CAPTURE.index('subject=(GameObject)PrefabUtility.InstantiatePrefab'):CAPTURE.index('animator.Rebind();animator.Update(0);')]
+        self.assertIn('foreach(var skin in subject.GetComponentsInChildren<SkinnedMeshRenderer>(true))',setup)
+        self.assertIn('skin.forceMatrixRecalculationPerRender=true;',setup)
+        self.assertEqual(CAPTURE.count('forceMatrixRecalculationPerRender=true'),1)
+        self.assertNotIn('forceMatrixRecalculationPerRender',IMPORT)
+        for forbidden in ('SaveAsPrefabAsset','SetDirty(','ApplyPrefabInstance'):
+            self.assertNotIn(forbidden,setup)
+    def test_skin_refresh_does_not_substitute_baked_render_geometry(self):
+        capture=CAPTURE[CAPTURE.index('void Capture(string label'):CAPTURE.index('static void ReleaseCandidateRenderTarget')]
+        self.assertIn('RenderPipeline.SubmitRenderRequest(camera,request)',capture)
+        self.assertNotIn('AddComponent<MeshFilter>',capture)
+        self.assertNotIn('AddComponent<MeshRenderer>',capture)
+        self.assertIn('frame.worldMinY<frame.groundReferenceY-.004f',capture)
     def test_deformed_mesh_diagnostics(self):
         for text in ['skin.BakeMesh(temporary,false)','mesh.vertices','WorldToViewportPoint','worldMinY','belowReferenceVertices','groundDiagnosticApplicable=contract.kind!="weapon"']: self.assertIn(text,CAPTURE)
     def test_cleanup_after_report_write(self):
