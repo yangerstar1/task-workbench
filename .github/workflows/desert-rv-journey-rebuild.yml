@@ -1,8 +1,8 @@
 name: Desert RV restore verified Journey and rebuild candidate Linux
 on:
   push:
-    branches: [main]
-    paths: [.github/dispatch/desert-rv-rebuild-performance350-20261009.json]
+    branches: [journey-linux-export-recovery-938]
+    paths: [.github/dispatch/desert-rv-rebuild-export-recovery938-20261009.json]
   workflow_dispatch:
     inputs:
       transition_sha256:
@@ -18,7 +18,9 @@ concurrency:
 jobs:
   rebuild:
     if: >-
-      github.repository == 'yangerstar1/task-workbench' && github.ref == 'refs/heads/main' &&
+      github.repository == 'yangerstar1/task-workbench' &&
+      ((github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main') ||
+       (github.event_name == 'push' && github.ref == 'refs/heads/journey-linux-export-recovery-938')) &&
       github.actor == 'yangerstar1' && github.triggering_actor == 'yangerstar1'
     runs-on: ubuntu-24.04
     timeout-minutes: 130
@@ -30,7 +32,7 @@ jobs:
           persist-credentials: false
           lfs: false
           fetch-depth: 2
-      - name: Verify explicit manual input or the single reviewed performance 3.5.0 push
+      - name: Verify explicit manual input or the single reviewed export-recovery branch push
         id: dispatch_identity
         env:
           MANUAL_TRANSITION_SHA: ${{ inputs.transition_sha256 }}
@@ -134,7 +136,9 @@ jobs:
             --env UNITY_LICENSE --env UNITY_EMAIL --env UNITY_PASSWORD \
             --env GITHUB_ACTIONS --env GITHUB_SHA --env GITHUB_RUN_ID --env GITHUB_RUN_ATTEMPT \
             --env GITHUB_REPOSITORY --env GITHUB_REF --env GITHUB_ACTOR --env GITHUB_TRIGGERING_ACTOR \
-            --env RUNNER_ENVIRONMENT --env GITHUB_REPOSITORY_VISIBILITY \
+            --env GITHUB_EVENT_NAME --env GITHUB_WORKFLOW_REF --env GITHUB_EVENT_PATH=/github/workflow/event.json \
+            --volume "$GITHUB_EVENT_PATH:/github/workflow/event.json:ro" \
+            --env RUNNER_ENVIRONMENT --env RUNNER_OS --env GITHUB_REPOSITORY_VISIBILITY \
             --entrypoint /bin/bash desert-rv-journey-linux:local \
             /github/workspace/tasks/desert-rv/scripts/player/journey_linux_container.sh
       - name: Reverify prepared source and exact candidate asset union

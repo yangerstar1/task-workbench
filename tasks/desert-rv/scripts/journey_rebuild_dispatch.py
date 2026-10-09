@@ -3,11 +3,13 @@ import hashlib,json,os,re,subprocess,sys
 from pathlib import Path
 
 ROOT=Path(__file__).resolve().parents[3]
-BASE='be129aef52363202d7d3cbb51c28281075bef0b5'
+BASE='93886445d69597efa0dbf190340b61a6f9ea447c'
+BRANCH='journey-linux-export-recovery-938'
+REF='refs/heads/'+BRANCH
 REPOSITORY='yangerstar1/task-workbench'
 OWNER='yangerstar1'
-REQUEST='.github/dispatch/desert-rv-rebuild-performance350-20261009.json'
-REQUEST_ID='desert-rv-rebuild-performance350-20261009-once'
+REQUEST='.github/dispatch/desert-rv-rebuild-export-recovery938-20261009.json'
+REQUEST_ID='desert-rv-rebuild-export-recovery938-20261009-once'
 POLICY='tasks/desert-rv/art/journey-preparation/restoration-transition.json'
 
 def require(ok,code):
@@ -29,17 +31,18 @@ def parse_request(raw):
 
 def validate(env,event,head,parents,request_raw,tracked_raw,request_in_parent,changed_paths,policy_sha):
  require(env.get('GITHUB_ACTIONS')=='true' and env.get('GITHUB_REPOSITORY')==REPOSITORY and env.get('GITHUB_REPOSITORY_VISIBILITY')=='public','REPOSITORY')
+ require(env.get('RUNNER_ENVIRONMENT')=='github-hosted' and env.get('RUNNER_OS')=='Linux','HOSTED_RUNNER')
  require(env.get('GITHUB_ACTOR')==OWNER and env.get('GITHUB_TRIGGERING_ACTOR')==OWNER,'ACTOR')
- require(env.get('GITHUB_REF')=='refs/heads/main','BRANCH')
+ require(env.get('GITHUB_REF')==('refs/heads/main' if env.get('GITHUB_EVENT_NAME')=='workflow_dispatch' else REF),'BRANCH')
  require(re.fullmatch('[a-f0-9]{40}',head or '') and env.get('GITHUB_SHA')==head,'HEAD')
  require(re.fullmatch('[1-9][0-9]*',env.get('GITHUB_RUN_ID','')) and re.fullmatch('[1-9][0-9]*',env.get('GITHUB_RUN_ATTEMPT','')),'RUN')
  require(re.fullmatch('[a-f0-9]{64}',policy_sha or ''),'POLICY_FORMAT')
  if env.get('GITHUB_EVENT_NAME')=='workflow_dispatch':
   require(env.get('MANUAL_TRANSITION_SHA')==policy_sha,'MANUAL_POLICY');return policy_sha
  require(env.get('GITHUB_EVENT_NAME')=='push','EVENT')
- require(env.get('GITHUB_WORKFLOW_REF')==REPOSITORY+'/.github/workflows/desert-rv-journey-rebuild.yml@refs/heads/main','WORKFLOW')
+ require(env.get('GITHUB_WORKFLOW_REF')==REPOSITORY+'/.github/workflows/desert-rv-journey-rebuild.yml@'+REF,'WORKFLOW')
  require(env.get('GITHUB_RUN_ATTEMPT')=='1','REPLAY')
- require(isinstance(event,dict) and event.get('before')==BASE and event.get('after')==head and event.get('ref')=='refs/heads/main','PUSH_IDENTITY')
+ require(isinstance(event,dict) and event.get('before')==BASE and event.get('after')==head and event.get('ref')==REF,'PUSH_IDENTITY')
  require(event.get('created') is False and event.get('deleted') is False and event.get('forced') is False,'PUSH_KIND')
  repository=event.get('repository',{})
  require(isinstance(repository,dict) and repository.get('full_name')==REPOSITORY and repository.get('private') is False and repository.get('fork') is False and repository.get('owner',{}).get('login')==OWNER,'PUSH_REPOSITORY')

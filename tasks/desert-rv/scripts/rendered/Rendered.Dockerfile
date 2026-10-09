@@ -3,7 +3,7 @@ ARG BASE_IMAGE=desert-rv-environment:local
 FROM ${BASE_IMAGE}
 USER root
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    ffmpeg xdotool x11-utils openbox python3 python3-pil dbus \
+    ffmpeg xdotool x11-utils openbox python3 python3-pil python3-yaml dbus \
     && rm -rf /var/lib/apt/lists/*
 # Assert actual pinned-image contents BEFORE any credential enters a container.
 # The wrapper's batchmode/new-Xvfb behavior is for official activation only.

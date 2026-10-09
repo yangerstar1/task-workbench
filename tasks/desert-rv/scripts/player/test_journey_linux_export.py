@@ -8,13 +8,14 @@ class JourneyLinuxExportTests(unittest.TestCase):
   self.t=tempfile.TemporaryDirectory();self.root=pathlib.Path(self.t.name);self.build=self.root/'build';self.build.mkdir()
   for name in ['DesertRV.x86_64','UnityPlayer.so','DesertRV_Data/Managed/Assembly-CSharp.dll','MonoBleedingEdge/EmbedRuntime/libmonobdwgc-2.0.so']:
    p=self.build/name;p.parent.mkdir(parents=True,exist_ok=True);p.write_bytes(b'SYNTHETIC_NOT_EXECUTABLE_'+name.encode())
+  self.recovery_patch=patch.object(x,"RECOVERY",self.root/"recovery");self.recovery_patch.start();self.addCleanup(self.recovery_patch.stop)
   self.env=patch.dict(os.environ,{'GITHUB_SHA':'a'*40,'GITHUB_RUN_ID':'123'});self.env.start()
  def tearDown(self):self.env.stop();self.t.cleanup()
  def receipt(self):
   return dict(restorationProof={'path':'','sha256':''},assetProducerSourceCommit='',assetProducerRunUrl='',restorationNativeXmlSha256='',schema=1,label=x.MODE,sourceCommit='a'*40,producerRunUrl=x.producer_url(),generatedReceiptSha256='b'*64,requestSha256='c'*64,executableSha256=x.sha(self.build/'DesertRV.x86_64'),unityVersion='6000.3.19f1',target='StandaloneLinux64',backend='Mono2x',define='DESERTRV_CANDIDATE_LINUX',executable='DesertRV.x86_64',scenes=x.SCENES,candidateOnly=True,development=True,detailedBuildReport=True,performanceTestResourcesExcluded=True,settingsRestored=True,sourceBytesUnchanged=True,approved=False,visualReviewed=False,gameplayReviewed=False,audioAuditioned=False,temporarySettingsFiles=['ProjectSettings/ProjectSettings.asset'],boundaryNativeXmlSha256='d'*64,boundaryNativeCases=17,temporarySettingsApiFields=['scriptingBackend.Standalone','fullScreenMode','defaultScreenWidth','defaultScreenHeight','productName','resizableWindow'])
  def control(self):
   recovery=x.recovery.empty_recovery();recovery.update(status='SUCCEEDED',sourceModesRestored=True,afterPreserved=True)
-  return dict(schema=1,mode='JOURNEY_LINUX_BUILD_CONTROL',activation='SUCCEEDED',build='SUCCEEDED',licenseReturn='SUCCEEDED',privateCleanup='SUCCEEDED',buildDiagnostic=dict(batchExitCode=0,batchTimedOut=False,native=self.diagnostic(),logClassification=x.recovery.startup.empty_report()),sourceRecovery=recovery)
+  return dict(schema=1,mode='JOURNEY_LINUX_BUILD_CONTROL',activation='SUCCEEDED',build='SUCCEEDED',licenseReturn='SUCCEEDED',privateCleanup='SUCCEEDED',buildDiagnostic=dict(batchExitCode=0,batchTimedOut=False,native=self.diagnostic(),logClassification=x.recovery.startup.empty_report()),sourceRecovery=recovery,hostDiagnostic=x.empty_host())
  def diagnostic(self):
   return dict(performanceResources=self.performance(),primaryInventory=self.inventory(),verificationInventory=self.inventory(),activeTargetAtEntry='LINUX64',activeTargetBeforeBuild='LINUX64',activeTargetAfterBuild='LINUX64',reportTarget='LINUX64',schema=1,label='CANDIDATE_LINUX_BUILD_DIAGNOSTIC',stage='RECEIPT_WRITTEN',exceptionKind='NONE',buildResult='SUCCEEDED',settingsRestored=True,sourceBytesUnchanged=True,receiptWritten=True,buildReportAvailable=True,leaseActiveAtBuildReturn=True,assemblyReloadObserved=False,totalErrors=0,totalWarnings=0,primaryFailureCode='NONE',primaryExceptionKind='NONE',restorationFailureCode='NONE',restorationExceptionKind='NONE',verificationFailureCode='NONE',verificationExceptionKind='NONE',leaseClosedReason='EXPLICIT',buildErrorKinds=[],primaryCallbackGate='NONE',primarySceneRole='NONE',verificationCallbackGate='NONE',verificationSceneRole='NONE',primaryRootMismatch=self.root_observation(),verificationRootMismatch=self.root_observation(),buildMessages=[],buildMessagesTruncated=False)
  def test_performance_source_order_profile_private_cleanup_and_report_are_explicit(self):
@@ -31,6 +32,83 @@ class JourneyLinuxExportTests(unittest.TestCase):
   shell=pathlib.Path(__file__).with_name('journey_linux_container.sh').read_text()
   self.assertLess(shell.index('export DESERTRV_PERFORMANCE_PRIVATE="$private"'),shell.index('65m unity-editor'))
   self.assertIn('rm -rf "$private" "$build"',shell)
+ def test_preflight_checks_full_union_request_and_archiver_before_license(self):
+  import pipeline
+  logs=self.root/'logs';logs.mkdir()
+  with patch.object(pipeline,'guard'),patch.object(x,'verify_union',return_value={}) as union,patch.object(x,'request',return_value={}) as request:
+   x.preflight(logs)
+  union.assert_called_once();request.assert_called_once();h=x.host_state()
+  self.assertTrue({'PREFLIGHT_GUARD','PREFLIGHT_MODULES','PREFLIGHT_UNION','PREFLIGHT_REQUEST','PREFLIGHT_ARCHIVER'}<=set(h['completedPhases']))
+  self.assertFalse((logs/'archiver-self-test').exists());self.assertTrue((logs/'archiver-self-test.tar.gz').is_file())
+  shell=pathlib.Path(__file__).with_name('journey_linux_container.sh').read_text()
+  self.assertLess(shell.index('preflight "$private"'),shell.index('export UNITY_SERIAL='));self.assertLess(shell.index('preflight "$private"'),shell.index('activate.sh'))
+  docker=(pathlib.Path(__file__).resolve().parents[1]/'rendered/Rendered.Dockerfile').read_text();self.assertIn('python3-pil python3-yaml',docker)
+ def test_dispatch_failure_uses_only_declared_prefixed_codes(self):
+  import journey_rebuild_dispatch
+  with self.assertRaises(ValueError):x.host_phase('PREFLIGHT_GUARD',lambda:journey_rebuild_dispatch.require(False,'ACTOR'))
+  h=x.host_state();self.assertEqual(h['failureCode'],'JOURNEY_DISPATCH_ACTOR');self.assertEqual(h['failureSource'],'tasks/desert-rv/scripts/journey_rebuild_dispatch.py');self.assertGreater(h['failureLine'],0)
+ def test_missing_yaml_fails_before_union_and_has_fixed_code(self):
+  import pipeline,importlib
+  logs=self.root/'logs';logs.mkdir()
+  with patch.object(pipeline,'guard'),patch.object(importlib,'import_module',side_effect=ModuleNotFoundError('PRIVATE_TOKEN',name='yaml')),patch.object(x,'verify_union') as union:
+   with self.assertRaises(ModuleNotFoundError):x.preflight(logs)
+  union.assert_not_called();h=x.host_state();self.assertEqual((h['failurePhase'],h['failureCode']),('PREFLIGHT_MODULES','MISSING_YAML'));self.assertNotIn('PRIVATE_TOKEN',json.dumps(h))
+ def test_original_host_failure_survives_later_success(self):
+  with self.assertRaises(PermissionError):x.host_phase('STAGE_INVENTORY',lambda:(_ for _ in ()).throw(PermissionError('/private/secret')))
+  x.host_phase('RESTORE_SOURCE',lambda:None);h=x.host_state();self.assertEqual(h['failureCode'],'PERMISSION_DENIED');self.assertEqual(h['failurePhase'],'STAGE_INVENTORY');self.assertNotIn('/private',json.dumps(h))
+ def test_host_safe_observation_preserves_mode_hash_and_omits_private_names(self):
+  (self.build/'UnityPlayer_s.debug').write_bytes(b'public-symbol-fixture');(self.build/'private.log').write_bytes(b'PRIVATE');(self.build/'DesertRV_Data/secret.ulf').write_bytes(b'PRIVATE')
+  link=self.build/'DesertRV_Data/link';link.symlink_to('/private/SECRET')
+  value=x.observe_runtime(self.build);h=x.empty_host();h['runtime']=value;x.validate_host(h)
+  rows={r['path']:r for r in value['entries']};self.assertEqual(rows['UnityPlayer.so']['sha256'],x.sha(self.build/'UnityPlayer.so'));self.assertEqual(rows['UnityPlayer.so']['mode'],(self.build/'UnityPlayer.so').stat().st_mode&0o7777)
+  self.assertEqual(rows['DesertRV_Data/link']['kind'],'SYMLINK');self.assertEqual(value['omittedEntries'],2);self.assertNotIn('PRIVATE',json.dumps(value));self.assertNotIn('SECRET',json.dumps(value))
+ def test_failed_host_export_preserves_original_native_receipt_but_no_binary(self):
+  task,raw=self.success_fixture();x.save_native_receipt_observation();h=x.host_state();h.update(failurePhase='STAGE_INVENTORY',failureCode='VALIDATION_REJECTED');x.save_host(h)
+  c=self.control();c['build']='FAILED';c['hostDiagnostic']=h;(task/'control.json').write_text(json.dumps(c));x.export()
+  self.assertEqual({p.name for p in (task/'public').iterdir()},{'status.json','native-build-receipt.json'});self.assertEqual((task/'public/native-build-receipt.json').read_bytes(),raw)
+  self.assertFalse(json.loads((task/'public/status.json').read_text())['playerExported'])
+ def test_failed_host_receipt_copy_rejects_changed_original(self):
+  task,_=self.success_fixture();x.save_native_receipt_observation();c=self.control();c['build']='FAILED';c['hostDiagnostic']=x.host_state();(task/'control.json').write_text(json.dumps(c));path=task/'state/linux-build-receipt.json';path.write_bytes(path.read_bytes()+b' ')
+  self.assertEqual(x.export(),1)
+  status=json.loads((task/'public/status.json').read_text());self.assertFalse(status['playerExported']);self.assertEqual({p.name for p in (task/'public').iterdir()},{'status.json'})
+ def assert_safe_publication_failure(self,task,phase,raw):
+  public=task/'public';status=json.loads((public/'status.json').read_text())
+  self.assertEqual(status['hostExportFailure']['phase'],phase);self.assertFalse(status['playerExported']);self.assertTrue(status['nativeReceiptExported'])
+  self.assertEqual({p.name for p in public.iterdir()},{'status.json','native-build-receipt.json'});self.assertEqual((public/'native-build-receipt.json').read_bytes(),raw)
+  self.assertNotIn('PRIVATE_SECRET',json.dumps(status));self.assertFalse(list(task.glob('journey-linux-public-*')))
+ def pinned_success_fixture(self):
+  task,raw=self.success_fixture();x.save_native_receipt_observation();c=self.control();c['hostDiagnostic']=x.host_state();(task/'control.json').write_text(json.dumps(c));x.stage();return task,raw
+ def test_host_staged_read_permission_failure_is_safe_and_retains_receipt(self):
+  task,raw=self.pinned_success_fixture();original=x.read_json
+  def read(path):
+   if path==task/'staged/manifest.json':raise PermissionError('PRIVATE_SECRET')
+   return original(path)
+  with patch.object(x,'read_json',side_effect=read):self.assertEqual(x.export(),1)
+  self.assert_safe_publication_failure(task,'HOST_EXPORT_STAGED_METADATA',raw)
+ def test_host_copy_failure_discards_partial_media_and_retains_receipt(self):
+  task,raw=self.pinned_success_fixture()
+  with patch.object(x.shutil,'copyfile',side_effect=PermissionError('PRIVATE_SECRET')):self.assertEqual(x.export(),1)
+  self.assert_safe_publication_failure(task,'HOST_EXPORT_COPY',raw)
+ def test_host_commit_failure_exports_fixed_summary_without_bundle(self):
+  task,raw=self.pinned_success_fixture();original=x.os.replace;failed=[]
+  def replace(src,dst):
+   if dst==task/'public' and not failed:failed.append(True);raise PermissionError('PRIVATE_SECRET')
+   return original(src,dst)
+  with patch.object(x.os,'replace',side_effect=replace):self.assertEqual(x.export(),1)
+  self.assert_safe_publication_failure(task,'HOST_EXPORT_COMMIT',raw)
+ def test_host_archive_hash_failure_retains_original_receipt(self):
+  task,raw=self.pinned_success_fixture();(task/'staged/player.tar.gz').write_bytes(b'CHANGED')
+  self.assertEqual(x.export(),1);self.assert_safe_publication_failure(task,'HOST_EXPORT_TAR',raw)
+ def test_host_existing_public_is_never_overwritten(self):
+  task,_=self.success_fixture();public=task/'public';public.mkdir();(public/'existing').write_bytes(b'KEEP')
+  self.assertEqual(x.export(),1);self.assertEqual((public/'existing').read_bytes(),b'KEEP');self.assertEqual(len(list(public.iterdir())),1)
+ def test_host_diagnostic_rejects_raw_codes_and_unknown_paths(self):
+  import copy
+  for changes in [dict(failurePhase='STAGE',failureCode='SECRET_TOKEN'),dict(failureSource='/private/key',failureLine=1),dict(lastPhase='ARBITRARY_PRIVATE'),dict(failurePhase='STAGE',failureCode='NONE')]:
+   h=x.empty_host();h.update(changes)
+   with self.assertRaises(ValueError):x.validate_host(h)
+  h=x.empty_host();h['runtime']=dict(observed=True,totalEntries=1,omittedEntries=0,entries=[dict(path='../private',kind='FILE',mode=420,bytes=0,sha256='a'*64)])
+  with self.assertRaises(ValueError):x.validate_host(h)
  def test_exact_performance_version_uses_resolved_lock_node(self):
   root=pathlib.Path(__file__).resolve().parents[2]
   lock=json.loads((root/'unity/Packages/packages-lock.json').read_text())
@@ -146,10 +224,10 @@ class JourneyLinuxExportTests(unittest.TestCase):
   task,_=self.success_fixture();d=self.diagnostic();d['exceptionKind']='IO';(task/'state/linux-build-diagnostic.json').write_text(json.dumps(d))
   with self.assertRaises(ValueError):x.stage()
   self.assertFalse((task/'staged').exists())
- def test_tampered_staged_archive_leaves_no_public_directory(self):
+ def test_tampered_staged_archive_exports_only_safe_failure(self):
   task,_=self.success_fixture();x.stage();(task/'staged/player.tar.gz').write_bytes(b'TAMPERED')
-  with self.assertRaises(ValueError):x.export()
-  self.assertFalse((task/'public').exists())
+  self.assertEqual(x.export(),1)
+  status=json.loads((task/'public/status.json').read_text());self.assertFalse(status['playerExported']);self.assertEqual({p.name for p in (task/'public').iterdir()},{'status.json'})
  def test_success_labels_with_nonzero_batch_exit_only_export_failure(self):
   task,_=self.success_fixture();x.stage();c=self.control();c['buildDiagnostic']['batchExitCode']=1;(task/'control.json').write_text(json.dumps(c));x.export()
   self.assertEqual({p.name for p in (task/'public').iterdir()},{'status.json'})
@@ -203,8 +281,8 @@ class JourneyLinuxExportTests(unittest.TestCase):
  def test_bad_control_has_no_partial_public_export(self):
   control=self.root/'control.json';control.write_text('{"raw":"PRIVATE"}');output=self.root/'public'
   with patch.object(x,'TASK',self.root),patch.object(x,'CONTROL',control),patch.object(x,'PUBLIC',output):
-   with self.assertRaises(ValueError):x.export()
-  self.assertFalse(output.exists())
+   self.assertEqual(x.export(),1)
+  status=json.loads((output/'status.json').read_text());self.assertIsNone(status['control']);self.assertNotIn('PRIVATE',(output/'status.json').read_text());self.assertFalse(status['playerExported'])
  def test_no_player_launch_and_pinned_batch_workflow(self):
   root=pathlib.Path(__file__).resolve().parents[4];shell=(root/'tasks/desert-rv/scripts/player/journey_linux_container.sh').read_text();flow=(root/'.github/workflows/desert-rv-journey-prepare.yml').read_text()
   self.assertIn('65m unity-editor',shell);self.assertIn('else\n  build_exit=$?',shell);self.assertIn('JourneyCandidateLinuxBuild.BuildPreparedLinuxDiagnostic',shell)

@@ -125,7 +125,8 @@ def guard():
     if os.environ.get('GITHUB_EVENT_NAME') != 'workflow_dispatch':
         import journey_rebuild_dispatch
         journey_rebuild_dispatch.verify(ROOT, os.environ)  # Only the fixed single-parent rebuild request can admit push.
-    require(os.environ.get('GITHUB_REPOSITORY') == REPOSITORY and os.environ.get('GITHUB_REF') == 'refs/heads/main', 'Trusted repository/main required')
+    require(os.environ.get('GITHUB_REPOSITORY') == REPOSITORY and (os.environ.get('GITHUB_REF') == 'refs/heads/main' or
+            os.environ.get('GITHUB_EVENT_NAME') == 'push' and os.environ.get('GITHUB_REF') == 'refs/heads/journey-linux-export-recovery-938'), 'Trusted repository/ref required')
     require(os.environ.get('GITHUB_ACTOR') == OWNER and os.environ.get('GITHUB_TRIGGERING_ACTOR') == OWNER, 'Owner dispatch and owner rerun required')
     repo = read_json(os.environ['GITHUB_EVENT_PATH'])['repository']
     require(repo.get('full_name') == REPOSITORY and repo.get('private') is False and repo.get('fork') is False and repo.get('default_branch') == 'main', 'Public original repository required')

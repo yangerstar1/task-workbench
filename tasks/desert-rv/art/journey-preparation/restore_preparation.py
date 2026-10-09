@@ -27,6 +27,7 @@ _ALLOWED=(
  'tasks/desert-rv/scripts/player/journey_linux_container.sh',
  'tasks/desert-rv/scripts/journey_rebuild_dispatch.py','tasks/desert-rv/scripts/test_journey_rebuild_dispatch.py',
  'tasks/desert-rv/scripts/prepare_runner.sh',
+ 'tasks/desert-rv/art/journey-preparation/pipeline.py','tasks/desert-rv/scripts/rendered/Rendered.Dockerfile',
  'tasks/desert-rv/scripts/player/observe_journey_player.py','tasks/desert-rv/scripts/player/test_observe_journey_player.py',
  'tasks/desert-rv/unity/Assets/DesertRV/Editor/JourneyCandidateLinuxBuild.cs',
  'tasks/desert-rv/unity/Assets/DesertRV/Tests/CandidateLinux/CandidateLinuxBoundaryTests.cs',

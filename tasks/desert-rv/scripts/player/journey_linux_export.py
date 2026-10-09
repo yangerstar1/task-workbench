@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Same-job candidate Linux build bundle. Does not execute the player or grant approval."""
-import gzip,hashlib,json,os,pathlib,re,shutil,subprocess,sys,tarfile,tempfile
+import functools,gzip,hashlib,json,os,pathlib,re,shutil,subprocess,sys,tarfile,tempfile
 import player_window_smoke as recovery
 from prepare_safe_diagnostic_export import safe,sha,read_json,require
 from capture_game_window import atomic
@@ -20,6 +20,118 @@ ROLES={'NONE','CONTENT','BOOTSTRAP','FIRST_STATION','SCRAPYARD','NIGHT_BEACON'}
 BUILD_ERROR_KINDS={'CANDIDATE_GATE','PRODUCTION_GATE','CS_COMPILATION','SHADER_ERROR','UNCLASSIFIED_BUILD_ERROR'}
 RUNTIME_ROOTS={'DesertRV.x86_64','UnityPlayer.so','DesertRV_Data','MonoBleedingEdge','UnityCrashHandler64'}
 DEBUG_ROOTS={'DesertRV_BackUpThisFolder_ButDontShipItWithYourGame','DesertRV_BurstDebugInformation_DoNotShip'}
+
+# Closed post-build observations. Raw exception text and private logs never leave the container.
+HOST_PHASES={'NONE','PREFLIGHT','PREFLIGHT_GUARD','RECORD','STAGE','STAGE_REQUEST','PREFLIGHT_MODULES','PREFLIGHT_UNION','PREFLIGHT_REQUEST','PREFLIGHT_ARCHIVER','RECORD_NATIVE','RESTORE_SOURCE','RESTORE_UNION','POSTBUILD_UNION','STAGE_UNION','STAGE_RECEIPT','STAGE_INVENTORY','STAGE_ARCHIVE','STAGE_REVERIFY','STAGED'}
+HOST_SOURCE_PATHS=('tasks/desert-rv/scripts/journey_rebuild_dispatch.py','tasks/desert-rv/scripts/player/journey_linux_export.py','tasks/desert-rv/scripts/player/player_window_smoke.py','tasks/desert-rv/scripts/rendered/prepared_source.py','tasks/desert-rv/art/journey-preparation/linux_build_input.py','tasks/desert-rv/art/journey-preparation/restore_preparation.py','tasks/desert-rv/art/journey-preparation/generated_export.py','tasks/desert-rv/art/journey-preparation/pipeline.py','tasks/desert-rv/art/import-candidate/strict_output.py','tasks/desert-rv/art/import-candidate/pouncer_output.py','tasks/desert-rv/art/import-candidate/weapon_output.py')
+HOST_BASE_CODES={'NONE','MISSING_YAML','MISSING_PIL','MISSING_MODULE','PERMISSION_DENIED','FILE_NOT_FOUND','OS_ERROR','VALIDATION_REJECTED','OTHER_ERROR'}
+
+@functools.lru_cache(maxsize=1)
+def host_codes():
+    import ast
+    result=set(HOST_BASE_CODES)
+    for name in HOST_SOURCE_PATHS:
+        tree=ast.parse((ROOT/name).read_text())
+        for node in ast.walk(tree):
+            if isinstance(node,ast.Call) and isinstance(node.func,ast.Name):
+                if node.func.id=='require' and len(node.args)>=2 and isinstance(node.args[1],ast.Constant) and isinstance(node.args[1].value,str) and re.fullmatch('[A-Z][A-Z0-9_]{0,100}',node.args[1].value):
+                    prefix='JOURNEY_DISPATCH_' if name.endswith('/journey_rebuild_dispatch.py') else '';result.add(prefix+node.args[1].value)
+                if name.endswith('/journey_rebuild_dispatch.py') and node.func.id=='ValueError' and node.args and isinstance(node.args[0],ast.Constant) and isinstance(node.args[0].value,str) and re.fullmatch('JOURNEY_DISPATCH_[A-Z0-9_]{1,80}',node.args[0].value):result.add(node.args[0].value)
+    return result
+
+def empty_runtime():return dict(observed=False,totalEntries=0,omittedEntries=0,entries=[])
+def empty_host():return dict(schema=1,lastPhase='NONE',completedPhases=[],failurePhase='NONE',failureCode='NONE',failureSource='',failureLine=0,nativeReceiptPin=None,runtime=empty_runtime())
+def host_path():return RECOVERY/'host-diagnostic.json'
+def validate_host(value):
+    require(isinstance(value,dict) and set(value)==set(empty_host()) and value['schema']==1)
+    require(value['lastPhase'] in HOST_PHASES and value['failurePhase'] in HOST_PHASES and value['failureCode'] in host_codes())
+    done=value['completedPhases'];require(isinstance(done,list) and len(done)<=len(HOST_PHASES) and len(done)==len(set(done)) and set(done)<=HOST_PHASES-{'NONE'})
+    require((value['failurePhase']=='NONE')==(value['failureCode']=='NONE'))
+    require(value['failureSource'] in ('',)+HOST_SOURCE_PATHS and type(value['failureLine']) is int and 0<=value['failureLine']<=100000 and (bool(value['failureSource'])==(value['failureLine']>0)))
+    pin=value['nativeReceiptPin'];require(pin is None or isinstance(pin,dict) and set(pin)=={'sha256','bytes'} and re.fullmatch('[a-f0-9]{64}',pin['sha256']) and type(pin['bytes']) is int and 0<pin['bytes']<=32768)
+    runtime=value['runtime'];require(isinstance(runtime,dict) and set(runtime)==set(empty_runtime()) and type(runtime['observed']) is bool)
+    require(type(runtime['totalEntries']) is int and type(runtime['omittedEntries']) is int and 0<=runtime['omittedEntries']<=runtime['totalEntries']<=100000)
+    rows=runtime['entries'];require(isinstance(rows,list) and len(rows)<=2048 and len(rows)+runtime['omittedEntries']==runtime['totalEntries'])
+    if not runtime['observed']:require(runtime['totalEntries']==0)
+    previous=''
+    for row in rows:
+        require(isinstance(row,dict) and set(row)=={'path','kind','mode','bytes','sha256'})
+        name=row['path'];require(runtime_name(name) and name>previous);previous=name
+        require(row['kind'] in {'FILE','DIRECTORY','SYMLINK','OTHER'} and type(row['mode']) is int and 0<=row['mode']<=0o7777 and type(row['bytes']) is int and 0<=row['bytes']<=2**63-1)
+        require(isinstance(row['sha256'],str) and (re.fullmatch('[a-f0-9]{64}',row['sha256']) if row['kind']=='FILE' and row['bytes']<=2*1024**3 else row['sha256']==''))
+    return value
+
+def runtime_name(name):
+    if not isinstance(name,str) or not re.fullmatch(r'[A-Za-z0-9_./ @+()\-]{1,512}',name):return False
+    parts=pathlib.PurePosixPath(name).parts
+    return bool(parts) and not name.startswith('/') and all(p not in ('.','..') and not p.startswith('.') for p in parts) and parts[0] in RUNTIME_ROOTS|DEBUG_ROOTS|{'UnityPlayer_s.debug','UnityPlayer.so.debug'} and pathlib.PurePosixPath(name).suffix.lower() not in {'.log','.ulf','.alf','.lic','.key'} and parts[-1].lower() not in {'credentials','credentials.json','activation.log','return.log'}
+
+def observe_runtime(folder):
+    import stat
+    result=empty_runtime()
+    if not folder.is_dir() or folder.is_symlink():return result
+    result['observed']=True;paths=[]
+    for current,dirs,files in os.walk(folder,followlinks=False):
+        for name in dirs+files:paths.append(pathlib.Path(current)/name)
+        dirs[:]=[name for name in dirs if runtime_name((pathlib.Path(current)/name).relative_to(folder).as_posix()) and not (pathlib.Path(current)/name).is_symlink()]
+    result['totalEntries']=len(paths)
+    for p in sorted(paths):
+        name=p.relative_to(folder).as_posix()
+        if not runtime_name(name) or len(result['entries'])>=2048:continue
+        info=p.lstat();kind='FILE' if stat.S_ISREG(info.st_mode) else 'DIRECTORY' if stat.S_ISDIR(info.st_mode) else 'SYMLINK' if stat.S_ISLNK(info.st_mode) else 'OTHER';digest=''
+        if kind=='FILE' and info.st_size<=2*1024**3:
+            h=hashlib.sha256()
+            with p.open('rb') as f:
+                for chunk in iter(lambda:f.read(1024*1024),b''):h.update(chunk)
+            digest=h.hexdigest()
+        result['entries'].append(dict(path=name,kind=kind,mode=stat.S_IMODE(info.st_mode),bytes=info.st_size,sha256=digest))
+    result['omittedEntries']=result['totalEntries']-len(result['entries']);return result
+
+def host_state():return validate_host(read_json(host_path())) if host_path().exists() else empty_host()
+def save_host(value):RECOVERY.mkdir(exist_ok=True);atomic(host_path(),validate_host(value))
+def host_error(error):
+    code='MISSING_YAML' if isinstance(error,ModuleNotFoundError) and error.name=='yaml' else 'MISSING_PIL' if isinstance(error,ModuleNotFoundError) and error.name in {'PIL','PIL.Image'} else 'MISSING_MODULE' if isinstance(error,ModuleNotFoundError) else 'PERMISSION_DENIED' if isinstance(error,PermissionError) else 'FILE_NOT_FOUND' if isinstance(error,FileNotFoundError) else 'OS_ERROR' if isinstance(error,OSError) else 'VALIDATION_REJECTED' if isinstance(error,ValueError) else 'OTHER_ERROR'
+    if str(error) in host_codes()-HOST_BASE_CODES:code=str(error)
+    result=dict(code=code,source='',line=0);tb=error.__traceback__;allowed={str((ROOT/p).resolve()):p for p in HOST_SOURCE_PATHS}
+    while tb:
+        known=allowed.get(str(pathlib.Path(tb.tb_frame.f_code.co_filename).resolve()))
+        if known:result.update(source=known,line=tb.tb_lineno)
+        tb=tb.tb_next
+    return result
+
+def host_phase(phase,action):
+    value=host_state();value['lastPhase']=phase;save_host(value)
+    try:
+        result=action();value=host_state()
+        if phase not in value['completedPhases']:value['completedPhases'].append(phase)
+        save_host(value);return result
+    except Exception as error:
+        value=host_state()
+        if value['failurePhase']=='NONE':
+            failure=host_error(error);value.update(failurePhase=phase,failureCode=failure['code'],failureSource=failure['source'],failureLine=failure['line'])
+            save_host(value)
+        raise
+
+def preflight(logs):
+    import importlib
+    from pipeline import guard
+    host_phase('PREFLIGHT_GUARD',guard)
+    host_phase('PREFLIGHT_MODULES',lambda:(importlib.import_module('yaml'),importlib.import_module('PIL.Image')))
+    host_phase('PREFLIGHT_UNION',verify_union);host_phase('PREFLIGHT_REQUEST',request)
+    def archiver():
+        probe=logs/'archiver-self-test';require(not probe.exists());probe.mkdir()
+        try:
+            for name in ('DesertRV.x86_64','UnityPlayer.so','DesertRV_Data/Managed/Assembly-CSharp.dll','MonoBleedingEdge/EmbedRuntime/libmonobdwgc-2.0.so'):
+                p=probe/name;p.parent.mkdir(parents=True,exist_ok=True);p.write_bytes(b'ARCHIVER_SELF_TEST_NOT_AN_EXECUTABLE')
+            records=inventory(probe);tar_bundle(probe,records,logs/'archiver-self-test.tar.gz');verify_tar(logs/'archiver-self-test.tar.gz',records)
+        finally:shutil.rmtree(probe)
+    host_phase('PREFLIGHT_ARCHIVER',archiver)
+
+def save_native_receipt_observation():
+    raw,native=sealed_native_receipt(STATE/'linux-build-receipt.json');r=request();require(native['requestSha256']==sha(STATE/'linux-build-input.json'));restoration_matches(native,r)
+    require(native['generatedReceiptSha256']==r['generatedReceiptSha256'] and native['boundaryNativeXmlSha256']==r['boundaryNativeXmlSha256'] and native['executableSha256']==sha(BUILD/'DesertRV.x86_64'))
+    value=host_state();value['nativeReceiptPin']=dict(sha256=hashlib.sha256(raw).hexdigest(),bytes=len(raw));save_host(value);value['runtime']=observe_runtime(BUILD);save_host(value)
+
 
 def producer_url():return 'https://github.com/yangerstar1/task-workbench/actions/runs/'+os.environ['GITHUB_RUN_ID']
 def verify_union():
@@ -214,8 +326,9 @@ def before():
 
 def snapshot(logs):recovery.snapshot_recovery(logs)
 def restore(logs):
-    if recovery.recover_source(logs)!=0:return 1
-    verify_union();return 0
+    def source():require(recovery.recover_source(logs)==0)
+    host_phase('RESTORE_SOURCE',source)
+    host_phase('RESTORE_UNION',verify_union);return 0
 
 def restoration_matches(native,request):
     for key in ('assetProducerSourceCommit','assetProducerRunUrl','restorationNativeXmlSha256'):require((native.get(key) or '')==(request.get(key) or ''))
@@ -223,20 +336,28 @@ def restoration_matches(native,request):
     if isinstance(a,dict) and a.get('path'):require(a==b)
     else:require(b is None or b=={'path':'','sha256':''})
 
-def stage():
-    verify_union();r=request();_,native=sealed_native_receipt(STATE/'linux-build-receipt.json');diagnostic=native_diagnostic(read_json(STATE/'linux-build-diagnostic.json'))
-    require(diagnostic_success(diagnostic))
-    require(native['requestSha256']==sha(STATE/'linux-build-input.json'));restoration_matches(native,r)
-    require(native['boundaryNativeXmlSha256']==r['boundaryNativeXmlSha256'] and r['boundaryNativeCases']==17)
-    require(native['generatedReceiptSha256']==r['generatedReceiptSha256']==sha(TASK/'journey-preparation-export/generated/receipt.json'))
-    require(native['executableSha256']==sha(BUILD/'DesertRV.x86_64'));records=inventory(BUILD)
+def stage():return host_phase('STAGE',stage_inner)
+
+def stage_inner():
+    host_phase('STAGE_UNION',verify_union);r=host_phase('STAGE_REQUEST',request)
+    def receipt():
+        _,native=sealed_native_receipt(STATE/'linux-build-receipt.json');diagnostic=native_diagnostic(read_json(STATE/'linux-build-diagnostic.json'));require(diagnostic_success(diagnostic))
+        require(native['requestSha256']==sha(STATE/'linux-build-input.json'));restoration_matches(native,r)
+        require(native['boundaryNativeXmlSha256']==r['boundaryNativeXmlSha256'] and r['boundaryNativeCases']==17)
+        require(native['generatedReceiptSha256']==r['generatedReceiptSha256']==sha(TASK/'journey-preparation-export/generated/receipt.json'))
+        require(native['executableSha256']==sha(BUILD/'DesertRV.x86_64'));return native
+    native=host_phase('STAGE_RECEIPT',receipt);records=host_phase('STAGE_INVENTORY',lambda:inventory(BUILD))
     require(not STAGED.exists());temp=pathlib.Path(tempfile.mkdtemp(prefix='journey-linux-stage-',dir=TASK));success=False
     try:
-        tar_bundle(BUILD,records,temp/'player.tar.gz');require(inventory(BUILD)==records);verify_union();verify_tar(temp/'player.tar.gz',records)
+        host_phase('STAGE_ARCHIVE',lambda:tar_bundle(BUILD,records,temp/'player.tar.gz'))
+        def reverify():
+            require(inventory(BUILD)==records);verify_union();verify_tar(temp/'player.tar.gz',records)
+        host_phase('STAGE_REVERIFY',reverify)
         manifest=dict(schema=1,label='REUSABLE_CANDIDATE_LINUX_PLAYER_UNREVIEWED',sourceCommit=os.environ['GITHUB_SHA'],producerRunUrl=producer_url(),nativeReceiptSha256=sha(STATE/'linux-build-receipt.json'),inputSha256=sha(STATE/'linux-build-input.json'),generatedReceiptSha256=r['generatedReceiptSha256'],sourceStateSha256=sha(TASK/'SOURCE-STATE.json'),bundleSha256=sha(temp/'player.tar.gz'),bundleBytes=(temp/'player.tar.gz').stat().st_size,files=records,nativeReceipt=native,playerExecuted=False,approved=False)
-        atomic(temp/'manifest.json',manifest);os.replace(temp,STAGED);success=True
+        def commit():atomic(temp/'manifest.json',manifest);os.replace(temp,STAGED)
+        host_phase('STAGED',commit);success=True
     finally:
-        if not success:shutil.rmtree(temp)
+        if not success:shutil.rmtree(temp,ignore_errors=True)
 
 def record(logs,exit_code):
     require(type(exit_code) is int and 0<=exit_code<=255);RECOVERY.mkdir(exist_ok=True)
@@ -244,13 +365,18 @@ def record(logs,exit_code):
     if (STATE/'linux-build-diagnostic.json').exists():diagnostic=native_diagnostic(read_json(STATE/'linux-build-diagnostic.json'))
     classified=recovery.startup.classify(logs,PROJECT,editor=exit_code)
     atomic(RECOVERY/'build-diagnostic.json',dict(batchExitCode=exit_code,batchTimedOut=exit_code==124,native=diagnostic,logClassification=classified))
+    if exit_code==0 and diagnostic is not None and diagnostic_success(diagnostic):host_phase('RECORD_NATIVE',save_native_receipt_observation)
 
 def control(values):
     require(len(values)==4 and all(v in {'NOT_ATTEMPTED','SUCCEEDED','FAILED'} for v in values))
-    result=dict(schema=1,mode='JOURNEY_LINUX_BUILD_CONTROL',activation=values[0],build=values[1],licenseReturn=values[2],privateCleanup=values[3],buildDiagnostic=None,sourceRecovery=recovery.empty_recovery())
+    result=dict(schema=1,mode='JOURNEY_LINUX_BUILD_CONTROL',activation=values[0],build=values[1],licenseReturn=values[2],privateCleanup=values[3],buildDiagnostic=None,sourceRecovery=recovery.empty_recovery(),hostDiagnostic=host_state())
     if (RECOVERY/'build-diagnostic.json').exists():result['buildDiagnostic']=read_json(RECOVERY/'build-diagnostic.json')
     if (RECOVERY/'source-recovery.json').exists():result['sourceRecovery']=read_json(RECOVERY/'source-recovery.json')
-    validate_control(result);atomic(CONTROL,result);os.chmod(safe(CONTROL),0o644)
+    validate_control(result)
+    pin=result['hostDiagnostic']['nativeReceiptPin']
+    if pin is not None:
+        raw,_=sealed_native_receipt(STATE/'linux-build-receipt.json');require(pin==dict(sha256=hashlib.sha256(raw).hexdigest(),bytes=len(raw)));os.chmod(safe(STATE/'linux-build-receipt.json'),0o644)
+    atomic(CONTROL,result);os.chmod(safe(CONTROL),0o644)
     if values[1]=='SUCCEEDED':
         sealed_native_receipt(STATE/'linux-build-receipt.json');os.chmod(safe(STATE/'linux-build-receipt.json'),0o644)
         require({p.name for p in safe(STAGED,False).iterdir()}=={'manifest.json','player.tar.gz'})
@@ -258,50 +384,97 @@ def control(values):
         os.chmod(STAGED,0o755)
 
 def validate_control(c):
-    require(isinstance(c,dict) and set(c)=={'schema','mode','activation','build','licenseReturn','privateCleanup','buildDiagnostic','sourceRecovery'} and c['schema']==1 and c['mode']=='JOURNEY_LINUX_BUILD_CONTROL')
+    require(isinstance(c,dict) and set(c)=={'schema','mode','activation','build','licenseReturn','privateCleanup','buildDiagnostic','sourceRecovery','hostDiagnostic'} and c['schema']==1 and c['mode']=='JOURNEY_LINUX_BUILD_CONTROL')
     require(all(c[k] in {'NOT_ATTEMPTED','SUCCEEDED','FAILED'} for k in ('activation','build','licenseReturn','privateCleanup')));recovery.validate_recovery(c['sourceRecovery'])
+    validate_host(c['hostDiagnostic'])
     if c['buildDiagnostic'] is not None:
         d=c['buildDiagnostic'];require(set(d)=={'batchExitCode','batchTimedOut','native','logClassification'} and type(d['batchExitCode']) is int and 0<=d['batchExitCode']<=255 and type(d['batchTimedOut']) is bool and d['batchTimedOut']==(d['batchExitCode']==124))
         if d['native'] is not None:native_diagnostic(d['native'])
         recovery.startup.validate(d['logClassification'],set(recovery.startup.source_map(PROJECT).values()))
+    if c['hostDiagnostic']['nativeReceiptPin'] is not None:require(c['buildDiagnostic'] is not None and c['buildDiagnostic']['batchExitCode']==0 and diagnostic_success(c['buildDiagnostic']['native']))
     return c
 
-def export():
-    require(not PUBLIC.exists());c=validate_control(read_json(CONTROL));ok=os.environ.get('NATIVE_OUTCOME')=='success' and os.environ.get('UNION_OUTCOME')=='success' and all(c[k]=='SUCCEEDED' for k in ('activation','build','licenseReturn','privateCleanup')) and c['sourceRecovery']['status']=='SUCCEEDED' and c['buildDiagnostic'] is not None and c['buildDiagnostic']['batchExitCode']==0 and diagnostic_success(c['buildDiagnostic']['native'])
+def export_attempt(context):
+    context['phase']='HOST_EXPORT_CONTROL';require(not PUBLIC.exists());c=validate_control(read_json(CONTROL));context['control']=c;ok=c['hostDiagnostic']['failurePhase']=='NONE' and os.environ.get('NATIVE_OUTCOME')=='success' and os.environ.get('UNION_OUTCOME')=='success' and all(c[k]=='SUCCEEDED' for k in ('activation','build','licenseReturn','privateCleanup')) and c['sourceRecovery']['status']=='SUCCEEDED' and c['buildDiagnostic'] is not None and c['buildDiagnostic']['batchExitCode']==0 and diagnostic_success(c['buildDiagnostic']['native'])
     stage_out=pathlib.Path(tempfile.mkdtemp(prefix='journey-linux-public-',dir=TASK));committed=False
     try:
         if ok:
-            verify_union();r=request();m=read_json(STAGED/'manifest.json')
+            context['phase']='HOST_EXPORT_UNION';verify_union();r=request()
+            context['phase']='HOST_EXPORT_STAGED_METADATA';m=read_json(STAGED/'manifest.json')
             require(set(m)=={'schema','label','sourceCommit','producerRunUrl','nativeReceiptSha256','inputSha256','generatedReceiptSha256','sourceStateSha256','bundleSha256','bundleBytes','files','nativeReceipt','playerExecuted','approved'})
             require(m['schema']==1 and m['label']=='REUSABLE_CANDIDATE_LINUX_PLAYER_UNREVIEWED' and m['sourceCommit']==os.environ['GITHUB_SHA'] and m['producerRunUrl']==producer_url() and m['playerExecuted'] is False and m['approved'] is False)
             native_receipt(m['nativeReceipt']);restoration_matches(m['nativeReceipt'],r);require(m['nativeReceipt']['requestSha256']==sha(STATE/'linux-build-input.json'));require(m['nativeReceipt']['generatedReceiptSha256']==r['generatedReceiptSha256']==m['generatedReceiptSha256'])
+            context['phase']='HOST_EXPORT_NATIVE_RECEIPT'
             native_bytes,sealed=sealed_native_receipt(STATE/'linux-build-receipt.json');require(hashlib.sha256(native_bytes).hexdigest()==m['nativeReceiptSha256'] and sealed==m['nativeReceipt'])
+            pin=c['hostDiagnostic']['nativeReceiptPin']
+            if pin is not None:require(pin==dict(sha256=hashlib.sha256(native_bytes).hexdigest(),bytes=len(native_bytes)))
             require(m['nativeReceipt']['boundaryNativeXmlSha256']==r['boundaryNativeXmlSha256'] and r['boundaryNativeCases']==17)
             require(m['inputSha256']==sha(STATE/'linux-build-input.json') and m['sourceStateSha256']==sha(TASK/'SOURCE-STATE.json'))
+            context['phase']='HOST_EXPORT_TAR'
             require(m['bundleSha256']==sha(STAGED/'player.tar.gz') and m['bundleBytes']==(STAGED/'player.tar.gz').stat().st_size)
             # Metadata originates in the validated closed runtime inventory; tar verification reads bytes without extracting.
             validate_records(m['files'])
             require(next(x['sha256'] for x in m['files'] if x['path']=='DesertRV.x86_64')==m['nativeReceipt']['executableSha256'])
-            verify_tar(STAGED/'player.tar.gz',m['files']);atomic(stage_out/'manifest.json',m);shutil.copyfile(safe(STAGED/'player.tar.gz'),stage_out/'player.tar.gz');atomic(stage_out/'control.json',c)
+            context['phase']='HOST_EXPORT_TAR';verify_tar(STAGED/'player.tar.gz',m['files'])
+            context['phase']='HOST_EXPORT_COPY';atomic(stage_out/'manifest.json',m);shutil.copyfile(safe(STAGED/'player.tar.gz'),stage_out/'player.tar.gz');atomic(stage_out/'control.json',c)
             (stage_out/'native-build-receipt.json').write_bytes(native_bytes)
             require(sha(stage_out/'native-build-receipt.json')==m['nativeReceiptSha256'] and (stage_out/'native-build-receipt.json').stat().st_size==len(native_bytes))
             require(sha(stage_out/'player.tar.gz')==m['bundleSha256'] and (stage_out/'player.tar.gz').stat().st_size==m['bundleBytes'])
-        else:atomic(stage_out/'status.json',dict(schema=1,status='CANDIDATE_LINUX_BUILD_FAILED_NOT_ACCEPTED',playerExported=False,control=c))
-        os.replace(stage_out,PUBLIC);committed=True
+        else:
+            context['phase']='HOST_EXPORT_FAILURE_RECEIPT'
+            pin=c['hostDiagnostic']['nativeReceiptPin']
+            if pin is not None:
+                raw,_=sealed_native_receipt(STATE/'linux-build-receipt.json');require(pin==dict(sha256=hashlib.sha256(raw).hexdigest(),bytes=len(raw)))
+                (stage_out/'native-build-receipt.json').write_bytes(raw);require(sha(stage_out/'native-build-receipt.json')==pin['sha256'])
+            atomic(stage_out/'status.json',dict(schema=1,status='CANDIDATE_LINUX_BUILD_FAILED_NOT_ACCEPTED',playerExported=False,control=c))
+        context['phase']='HOST_EXPORT_COMMIT';os.replace(stage_out,PUBLIC);committed=True;context['createdPublic']=True
     finally:
         if not committed:shutil.rmtree(stage_out)
+    context['phase']='HOST_EXPORT_OUTPUT'
     with open(os.environ['GITHUB_OUTPUT'],'a') as output:output.write('export_ready=true\n')
+
+def export():
+    context=dict(phase='HOST_EXPORT_CONTROL',control=None,createdPublic=False)
+    try:export_attempt(context);return 0
+    except Exception as error:
+        failure=dict(phase=context['phase'],**host_error(error))
+        print('JOURNEY_LINUX_HOST_EXPORT_FAILURE '+json.dumps(failure,sort_keys=True))
+        # Only remove this invocation's own published directory. An existing foreign/stale path is never overwritten.
+        temp=None
+        try:
+            if context['createdPublic']:shutil.rmtree(PUBLIC)
+            if PUBLIC.exists() or PUBLIC.is_symlink():return 1
+            temp=pathlib.Path(tempfile.mkdtemp(prefix='journey-linux-safe-failure-',dir=TASK));c=context['control'];copied=False
+            if c is not None and c['hostDiagnostic']['nativeReceiptPin'] is not None:
+                pin=c['hostDiagnostic']['nativeReceiptPin'];target=temp/'native-build-receipt.json'
+                try:
+                    raw,_=sealed_native_receipt(STATE/'linux-build-receipt.json');require(pin==dict(sha256=hashlib.sha256(raw).hexdigest(),bytes=len(raw)))
+                    target.write_bytes(raw);require(sha(target)==pin['sha256']);copied=True
+                except Exception:
+                    if target.exists():target.unlink()
+            atomic(temp/'status.json',dict(schema=1,status='CANDIDATE_LINUX_EXPORT_FAILED_NOT_ACCEPTED',playerExported=False,nativeReceiptExported=copied,hostExportFailure=failure,control=c))
+            os.replace(temp,PUBLIC);temp=None
+            with open(os.environ['GITHUB_OUTPUT'],'a') as output:output.write('export_ready=true\n')
+        except Exception:
+            print('JOURNEY_LINUX_SAFE_FAILURE_EXPORT_UNAVAILABLE')
+        finally:
+            if temp is not None:shutil.rmtree(temp,ignore_errors=True)
+        return 1
 
 def main():
     try:
         command=sys.argv[1]
-        if command=='before':before()
+        if command=='preflight':host_phase('PREFLIGHT',lambda:preflight(pathlib.Path(sys.argv[2])))
+        elif command=='verify-union':
+            from pipeline import guard
+            host_phase('POSTBUILD_UNION',lambda:(guard(),verify_union()))
+        elif command=='before':before()
         elif command=='snapshot':snapshot(pathlib.Path(sys.argv[2]))
         elif command=='restore':return restore(pathlib.Path(sys.argv[2]))
-        elif command=='record':record(pathlib.Path(sys.argv[2]),int(sys.argv[3]))
+        elif command=='record':host_phase('RECORD',lambda:record(pathlib.Path(sys.argv[2]),int(sys.argv[3])))
         elif command=='stage':stage()
         elif command=='control':control(sys.argv[2:])
-        elif command=='export':export()
+        elif command=='export':return export()
         else:raise ValueError()
     except Exception:print('JOURNEY_LINUX_FIXED_VALIDATION_FAILED');return 1
     return 0

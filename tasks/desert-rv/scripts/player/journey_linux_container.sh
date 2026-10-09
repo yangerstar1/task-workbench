@@ -29,6 +29,7 @@ cleanup() {
 trap cleanup EXIT
 trap 'exit 143' TERM
 trap 'exit 130' INT
+if ! python3 "$scripts/player/journey_linux_export.py" preflight "$private" >"$private/preflight.log" 2>&1; then built=FAILED; exit 1; fi
 export UNITY_SERIAL="$(python3 "$scripts/rendered/serial_from_license.py")"
 [[ -n "$UNITY_SERIAL" ]] || exit 2
 if [[ "$UNITY_SERIAL" = F* ]]; then dbus-uuidgen > /etc/machine-id; mkdir -p /var/lib/dbus; ln -sf /etc/machine-id /var/lib/dbus/machine-id; fi
@@ -48,5 +49,5 @@ if ! python3 "$scripts/player/journey_linux_export.py" record "$private" "$build
 restored=1
 if ! python3 "$scripts/player/journey_linux_export.py" restore "$private" >/dev/null 2>&1; then restored=0; fi
 if [[ "$build_exit" != 0 || "$observed" != 1 || "$restored" != 1 ]]; then built=FAILED; exit 1; fi
-if ! python3 /github/workspace/tasks/desert-rv/art/journey-preparation/linux_build_input.py verify >"$private/verify.log" 2>&1; then built=FAILED; exit 1; fi
+if ! python3 "$scripts/player/journey_linux_export.py" verify-union >"$private/verify.log" 2>&1; then built=FAILED; exit 1; fi
 if python3 "$scripts/player/journey_linux_export.py" stage >"$private/stage.log" 2>&1; then built=SUCCEEDED; else built=FAILED; exit 1; fi
