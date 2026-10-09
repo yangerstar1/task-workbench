@@ -31,7 +31,22 @@ class GeneratedExportTests(unittest.TestCase):
                 records.append(g.record(dest,name));self.state['assetFiles']['Assets/DesertRV/'+name]=g.sha(original)
             receipt=dict(status='STRICT_CANDIDATE_CAPTURED_NOT_ACCEPTED',approved=False,kind=kind,importCommit=COMMIT,importRunUrl=RUN,files=records,nativeXmlSha256='c'*64,nativeCases=26)
             (folder/'receipt.json').write_text(json.dumps(receipt));self.state['completed'].append(dict(kind=kind,exportReceiptSha256=g.sha(folder/'receipt.json')))
-        self.native=dict(schema=2,status='ACTUAL_NATIVE_JOURNEY_ASSETS_UNREVIEWED',sourceCommit=COMMIT,unityVersion=g.UNITY,importRunUrl=RUN,approved=False,
+        # Synthetic native rows reproduce the selected declarations; these bytes are never a Unity result.
+        plan=json.loads(Path(__file__).with_name('three-strict-candidates.json').read_text());plan['spawnRootHeightSource']=g.GROUND_SOURCE
+        selection=p.TASK/'art/journey-preparation/fixture.json';selection.parent.mkdir(parents=True,exist_ok=True);selection.write_text(json.dumps(plan))
+        self.state.update(plan=copy.deepcopy(plan),selection=str(selection.relative_to(p.ROOT)),selectionSha256=g.sha(selection))
+        ready=dict(sourceCommit=COMMIT,selectionSha256=self.state['selectionSha256'],spawnRootHeightSource=g.GROUND_SOURCE,integration=copy.deepcopy(plan['integration']))
+        ready_path=self.fixture.write('JourneyEvidence/JourneyPreparation/ready-input.json',json.dumps(ready).encode());self.state['readyInputSha256']=g.sha(ready_path)
+        self.grounding=dict(schema=1,status='ACTUAL_NATIVE_ROOT_GROUNDING_UNREVIEWED',sourceCommit=COMMIT,source=g.GROUND_SOURCE,
+            selectionSha256=self.state['selectionSha256'],readyInputSha256=self.state['readyInputSha256'],approved=False,rows=[])
+        for region in plan['integration']['regions']:
+            for row in region['guards']+region['roadBeasts']+[enemy for wave in region['waves'] for enemy in wave['enemies']]:
+                point=dict(row['position'],y=-.04)
+                self.grounding['rows'].append(dict(id=row['id'],kind=row['kind'],region=region['region'],scene=g.REGION_SCENES[region['region']],
+                    floor='Route foundation',layer=0,declaredPosition=dict(row['position']),resolvedPosition=dict(point),hitPoint=dict(point),hitNormal=dict(x=0,y=1,z=0),yaw=row['yaw']))
+        ground_path=self.fixture.write(g.GROUND_PATH,json.dumps(self.grounding).encode())
+        self.native=dict(schema=3,status='ACTUAL_NATIVE_JOURNEY_ASSETS_UNREVIEWED',sourceCommit=COMMIT,unityVersion=g.UNITY,importRunUrl=RUN,approved=False,
+            spawnGrounding=dict(path=g.GROUND_PATH,sha256=g.sha(ground_path)),
             files=[dict(path=n,sha256=h) for n,h in self.generated.items()],dependencies=[])
         for name in sorted(set(self.generated)|set(self.state['assetFiles'])|{'Assets/Original.cs','Assets/Original.cs.meta'}):
             if name.endswith('.meta') and not (p.PROJECT/name[:-5]).is_file():continue
@@ -47,10 +62,11 @@ class GeneratedExportTests(unittest.TestCase):
             p.verify_original(self.identity)
             added={**self.state['assetFiles'],**p.journey_files(self.fx)}
             p.verify_asset_union(self.fixture.source,self.fixture.dirs,added)
-            paths=[p.PROJECT/'JourneyEvidence/JourneyPreparation/authored-assets.json',p.PROJECT/'JourneyEvidence/journey-diagnostic-scope.json']
+            paths=[p.PROJECT/'JourneyEvidence/JourneyPreparation/authored-assets.json',p.PROJECT/'JourneyEvidence/journey-diagnostic-scope.json',p.PROJECT/g.GROUND_PATH]
             return dict(addedAssets=added,dataPins=[dict(path=str(path.relative_to(p.ROOT)),sha256=g.sha(path)) for path in paths])
         self.prepared=SimpleNamespace(verify=verify,journey_files=p.journey_files,STATE=p.STATE,PROOF=p.PROOF,PROJECT=p.PROJECT,TASK=p.TASK)
     def flush(self):
+        self.fixture.write(g.GROUND_PATH,json.dumps(self.grounding).encode())
         for path,data in [('JourneyEvidence/JourneyPreparation/state.json',self.state),('JourneyEvidence/JourneyPreparation/authored-assets.json',self.native),('JourneyEvidence/JourneyPreparation/prepared-source.json',{'fixture':'not-native'}),('JourneyEvidence/journey-candidate-fx.json',self.fx),('JourneyEvidence/journey-candidate-integration.json',self.integration),('JourneyEvidence/journey-diagnostic-scope.json',self.scope)]:self.fixture.write(path,json.dumps(data).encode())
     def export(self):return g.export_generated(self.prepared,'b'*64)
     def closure(self):return g.native_closure(self.native,self.generated,self.source,self.state['assetFiles'],p.PROJECT,COMMIT,RUN)
@@ -61,13 +77,14 @@ class GeneratedExportTests(unittest.TestCase):
     def test_exact_native_fixture_is_persisted_without_private_package_bytes(self):
         result=self.export();folder=p.TASK/'journey-preparation-export/generated';receipt=g.read(folder/'receipt.json')
         self.assertEqual(result['sha256'],g.sha(folder/'receipt.json'));g.verify_staged_inventory(folder,receipt['files'],result['sha256'])
-        self.assertEqual({r['path'] for r in receipt['files']},set(self.generated)|{'native-authored-assets.json','diagnostic-scope-evidence.json'});self.assertFalse(receipt['approved']);self.assertFalse(receipt['scopeReusable'])
+        self.assertEqual({r['path'] for r in receipt['files']},set(self.generated)|{'native-authored-assets.json','diagnostic-scope-evidence.json',g.GROUND_EXPORT});self.assertFalse(receipt['approved']);self.assertFalse(receipt['scopeReusable'])
         self.assertEqual({r['owner'] for r in receipt['dependencies']},{'source','strict','generated','official-package','unity-builtin'})
         self.assertFalse(any('Package' in str(f.relative_to(folder)) for f in folder.rglob('*')))
         for row in receipt['files']:
             if row['path'].startswith('Assets/'):self.assertEqual((folder/row['path']).read_bytes(),(p.PROJECT/row['path']).read_bytes())
         self.assertEqual(g.sha(folder/receipt['nativeManifestPath']),receipt['nativeManifestSha256'])
         self.assertEqual(g.sha(folder/receipt['diagnosticScopeEvidencePath']),receipt['diagnosticScopeSha256'])
+        self.assertEqual(g.sha(folder/receipt['spawnGroundingPath']),receipt['spawnGroundingSha256'])
     def test_fresh_consumer_can_reconstruct_assets_and_meta_from_exact_three_bundles(self):
         self.export();public=p.TASK/'journey-preparation-export'
         with tempfile.TemporaryDirectory() as temporary:
@@ -87,7 +104,7 @@ class GeneratedExportTests(unittest.TestCase):
     def test_unlisted_generated_script_is_rejected(self):self.fixture.write(p.JOURNEY+'/Injected.cs');self.reject('ADDITION_INVENTORY')
     def test_unknown_dependency_is_rejected(self):
         self.native['dependencies'].append(dict(path='Assets/Unknown.asset',sha256='a'*64,bytes=1,kind='asset',packageName='',packageVersion=''));self.reject('UNKNOWN_OR_AMBIGUOUS')
-    def test_native_float_schema_is_rejected(self):self.native['schema']=2.0;self.reject('NATIVE_IDENTITY')
+    def test_native_float_schema_is_rejected(self):self.native['schema']=3.0;self.reject('NATIVE_ASSET_SNAPSHOT_CHANGED')
     def test_native_replaced_foundation_layout_is_omitted_without_changing_original(self):
         name=p.JOURNEY+'/Layout-123456.mat'
         for path in (name,name+'.meta'):
@@ -155,4 +172,55 @@ class GeneratedExportTests(unittest.TestCase):
     def test_scope_unknown_field_is_rejected(self):self.scope['rawLog']='private';self.reject('SCOPE_IDENTITY')
     def test_scope_unknown_pin_kind_is_rejected(self):self.scope['files'][0]['kind']='grant-build';self.reject('SCOPE_PIN')
     def test_unknown_empty_directory_is_rejected(self):(p.PROJECT/p.JOURNEY/'empty').mkdir();self.reject('DIRECTORY_UNION')
+    def reject_grounding(self,code):
+        # Re-pin synthetic bytes to exercise semantics beyond the separate immutable-byte gate.
+        path=self.fixture.write(g.GROUND_PATH,json.dumps(self.grounding).encode())
+        self.native['spawnGrounding']['sha256']=g.sha(path);self.reject(code)
+    def test_grounding_missing_file_is_rejected(self):
+        (p.PROJECT/g.GROUND_PATH).unlink()
+        with self.assertRaises(Exception):self.export()
+        self.assertFalse((p.TASK/'journey-preparation-export/generated').exists())
+    def test_grounding_bytes_must_match_native_pin(self):
+        path=p.PROJECT/g.GROUND_PATH;path.write_bytes(path.read_bytes()+b' ')
+        with self.assertRaisesRegex(Exception,'GROUNDING_NATIVE_HASH'):self.export()
+    def test_grounding_native_pin_path_cannot_escape(self):self.native['spawnGrounding']['path']='../secret';self.reject('GROUNDING_NATIVE_PIN')
+    def test_grounding_unknown_source_is_rejected(self):self.grounding['source']='manual-offset';self.reject_grounding('GROUNDING_IDENTITY')
+    def test_grounding_approval_is_rejected(self):self.grounding['approved']=True;self.reject_grounding('GROUNDING_IDENTITY')
+    def test_grounding_unknown_field_is_rejected(self):self.grounding['rawLog']='private';self.reject_grounding('GROUNDING_IDENTITY')
+    def test_grounding_wrong_selection_hash_is_rejected(self):self.grounding['selectionSha256']='0'*64;self.reject_grounding('GROUNDING_SELECTION_PIN')
+    def test_grounding_wrong_ready_hash_is_rejected(self):self.grounding['readyInputSha256']='0'*64;self.reject_grounding('GROUNDING_READY_PIN')
+    def test_grounding_missing_row_is_rejected(self):self.grounding['rows'].pop();self.reject_grounding('GROUNDING_ROW_COUNT')
+    def test_grounding_duplicate_row_is_rejected(self):self.grounding['rows'][1]=copy.deepcopy(self.grounding['rows'][0]);self.reject_grounding('GROUNDING_ROW_ID')
+    def test_grounding_unknown_actor_is_rejected(self):self.grounding['rows'][0]['id']='unknown';self.reject_grounding('GROUNDING_ROW_ID')
+    def test_grounding_wrong_scene_is_rejected(self):self.grounding['rows'][0]['scene']=g.REGION_SCENES[2];self.reject_grounding('GROUNDING_ROW_IDENTITY')
+    def test_grounding_wrong_kind_is_rejected(self):self.grounding['rows'][0]['kind']='armored';self.reject_grounding('GROUNDING_ROW_IDENTITY')
+    def test_grounding_arbitrary_floor_path_is_rejected(self):self.grounding['rows'][0]['floor']='/runner/private';self.reject_grounding('GROUNDING_FLOOR')
+    def test_grounding_nonzero_layer_is_rejected(self):self.grounding['rows'][0]['layer']=1;self.reject_grounding('GROUNDING_FLOOR')
+    def test_grounding_shallow_normal_is_rejected(self):self.grounding['rows'][0]['hitNormal']['y']=.89;self.reject_grounding('GROUNDING_NORMAL')
+    def test_grounding_nonfinite_position_is_rejected(self):self.grounding['rows'][0]['hitPoint']['y']=float('inf');self.reject_grounding('NONFINITE_JSON')
+    def test_grounding_boolean_position_is_rejected(self):self.grounding['rows'][0]['declaredPosition']['y']=False;self.reject_grounding('GROUNDING_FINITE')
+    def test_grounding_changed_declared_position_is_rejected(self):self.grounding['rows'][0]['declaredPosition']['x']+=1;self.reject_grounding('GROUNDING_DECLARED_POSITION')
+    def test_grounding_changed_yaw_is_rejected(self):self.grounding['rows'][0]['yaw']+=1;self.reject_grounding('GROUNDING_DECLARED_POSITION')
+    def test_grounding_resolved_xz_cannot_move_spawn(self):self.grounding['rows'][0]['resolvedPosition']['x']+=.001;self.reject_grounding('GROUNDING_RESOLVED_POSITION')
+    def test_grounding_resolved_y_must_equal_actual_hit(self):self.grounding['rows'][0]['resolvedPosition']['y']+=.001;self.reject_grounding('GROUNDING_RESOLVED_POSITION')
+    def test_grounding_hit_xz_must_remain_on_declared_ray(self):self.grounding['rows'][0]['hitPoint']['x']+=.001;self.reject_grounding('GROUNDING_RESOLVED_POSITION')
+    def test_grounding_hit_xz_accepts_native_ray_precision(self):
+        self.grounding['rows'][0]['hitPoint']['x']+=.00001
+        path=self.fixture.write(g.GROUND_PATH,json.dumps(self.grounding).encode());self.native['spawnGrounding']['sha256']=g.sha(path);self.flush();self.export()
+    def test_grounding_state_rows_cannot_replace_original_selection(self):
+        self.state['plan']['integration']['regions'][0]['guards'][0]['position']['x']+=1;self.reject('GROUNDING_DECLARATION_CHANGED')
+    def test_grounding_copy_cannot_replace_prevalidated_raw_bytes(self):
+        original=g.shutil.copyfile
+        def corrupt(source,dest):
+            result=original(source,dest)
+            if Path(dest).name==g.GROUND_EXPORT:Path(dest).write_text('{"rawLog":"must not publish"}')
+            return result
+        with mock.patch.object(g.shutil,'copyfile',side_effect=corrupt):self.reject('EVIDENCE_COPY_CHANGED')
+    def test_prepared_proof_has_exact_nine_pins_including_native_grounding(self):
+        self.state.update(initialIdentity=self.identity,initialSourceDirectories=self.fixture.dirs);self.integration['protectedFiles']=[];self.flush();p.PROOF.unlink()
+        with mock.patch.object(p,'verified_package_snapshot',return_value=None):
+            p.seal();proof=p.verify();self.assertEqual(len(proof['dataPins']),9)
+            name=str((p.PROJECT/g.GROUND_PATH).relative_to(p.ROOT));self.assertIn(name,{r['path'] for r in proof['dataPins']})
+            proof['dataPins']=[r for r in proof['dataPins'] if r['path']!=name];p.PROOF.write_text(json.dumps(proof))
+            with self.assertRaisesRegex(Exception,'EXACT_DATA_PINS'):p.verify()
 if __name__=='__main__':unittest.main(verbosity=2)

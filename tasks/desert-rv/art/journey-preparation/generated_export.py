@@ -1,14 +1,20 @@
 """Persist only the exact native Journey additions. Never exports private package bytes or a live scope."""
-import hashlib, json, os, re, shutil, tempfile
+import hashlib, json, math, os, re, shutil, tempfile
 from pathlib import Path
 from strict_output import read, sha, require, safe, digest, rel, verify_staged_inventory
 
 SCHEMA='desert-rv-generated-journey/v1'
 KINDS=('armored','pouncer','weapon')
 BUILTINS={'Resources/unity_builtin_extra','Library/unity default resources'}
-NATIVE_KEYS={'schema','status','sourceCommit','unityVersion','importRunUrl','approved','files','dependencies'}
+NATIVE_KEYS={'schema','status','sourceCommit','unityVersion','importRunUrl','approved','files','dependencies','spawnGrounding'}
 DEPENDENCY_KEYS={'path','sha256','bytes','kind','packageName','packageVersion'}
 UNITY='6000.3.19f1'
+GROUND_PATH='JourneyEvidence/JourneyPreparation/spawn-grounding.json'
+GROUND_EXPORT='spawn-grounding-evidence.json'
+GROUND_SOURCE='scene-physical-floor'
+GROUND_KEYS={'schema','status','sourceCommit','source','selectionSha256','readyInputSha256','approved','rows'}
+GROUND_ROW_KEYS={'id','kind','region','scene','floor','layer','declaredPosition','resolvedPosition','hitPoint','hitNormal','yaw'}
+REGION_SCENES={i:'Assets/DesertRV/Scenes/Journey/'+name+'.unity' for i,name in enumerate(('FirstStation','Scrapyard','NightBeacon'),1)}
 
 def record(path, name):
     path=safe(path)
@@ -27,8 +33,53 @@ def sealed_json(path, proof, root):
     def finite(_):raise ValueError('GENERATED_NONFINITE_JSON')
     return json.loads(raw,object_pairs_hook=unique,parse_constant=finite),expected
 
+def grounding_pin(native):
+    pin=native.get('spawnGrounding')
+    require(type(native.get('schema')) is int and native['schema']==3 and isinstance(pin,dict) and set(pin)=={'path','sha256'} and
+            pin['path']==GROUND_PATH and digest(pin['sha256']),'GENERATED_GROUNDING_NATIVE_PIN')
+    return pin
+
+def validate_spawn_grounding(value,native,state,project,commit,actual_sha):
+    pin=grounding_pin(native);require(pin['sha256']==actual_sha,'GENERATED_GROUNDING_NATIVE_HASH')
+    require(isinstance(value,dict) and set(value)==GROUND_KEYS and type(value['schema']) is int and value['schema']==1 and
+            value['status']=='ACTUAL_NATIVE_ROOT_GROUNDING_UNREVIEWED' and value['sourceCommit']==commit and
+            value['source']==GROUND_SOURCE and value['approved'] is False,'GENERATED_GROUNDING_IDENTITY')
+    root=project.parents[2];selection_name=state['selection']
+    require(isinstance(selection_name,str) and re.fullmatch(r'tasks/desert-rv/art/journey-preparation/[a-z0-9-]+\.json',selection_name) and
+            digest(state['selectionSha256']) and sha(root/selection_name)==state['selectionSha256']==value['selectionSha256'],'GENERATED_GROUNDING_SELECTION_PIN')
+    selection=read(root/selection_name);ready_path=project/'JourneyEvidence/JourneyPreparation/ready-input.json'
+    require(digest(state['readyInputSha256']) and sha(ready_path)==state['readyInputSha256']==value['readyInputSha256'],'GENERATED_GROUNDING_READY_PIN')
+    ready=read(ready_path)
+    require(selection.get('spawnRootHeightSource')==state['plan'].get('spawnRootHeightSource')==ready.get('spawnRootHeightSource')==GROUND_SOURCE and
+            ready.get('selectionSha256')==state['selectionSha256'] and ready.get('sourceCommit')==commit,'GENERATED_GROUNDING_INPUT_IDENTITY')
+    regions=state['plan']['integration']['regions']
+    require(regions==selection['integration']['regions']==ready['integration']['regions'],'GENERATED_GROUNDING_DECLARATION_CHANGED')
+    require(isinstance(regions,list) and len(regions)==3 and {r['region'] for r in regions}==set(REGION_SCENES),'GENERATED_GROUNDING_REGIONS')
+    expected={}
+    for region in regions:
+        require(type(region['region']) is int,'GENERATED_GROUNDING_REGIONS')
+        for row in region['guards']+region['roadBeasts']+[enemy for wave in region['waves'] for enemy in wave['enemies']]:
+            require(isinstance(row['id'],str) and row['id'] not in expected and row['kind'] in ('armored','pouncer'),'GENERATED_GROUNDING_DECLARATIONS')
+            expected[row['id']]=(region['region'],row)
+    rows=value['rows'];require(len(expected)==9 and isinstance(rows,list) and len(rows)==9,'GENERATED_GROUNDING_ROW_COUNT')
+    seen=set()
+    def number(n):return type(n) in (int,float) and math.isfinite(n)
+    def vector(v):return isinstance(v,dict) and set(v)=={'x','y','z'} and all(number(n) for n in v.values())
+    for row in rows:
+        require(isinstance(row,dict) and set(row)==GROUND_ROW_KEYS,'GENERATED_GROUNDING_ROW_SCHEMA')
+        name=row['id'];require(isinstance(name,str) and name in expected and name not in seen,'GENERATED_GROUNDING_ROW_ID');seen.add(name)
+        region,declared=expected[name]
+        require(type(row['region']) is int and row['region']==region and row['scene']==REGION_SCENES[region] and row['kind']==declared['kind'],'GENERATED_GROUNDING_ROW_IDENTITY')
+        require(row['floor'] in ('Route foundation','Road surface') and type(row['layer']) is int and row['layer']==0,'GENERATED_GROUNDING_FLOOR')
+        require(all(vector(row[k]) for k in ('declaredPosition','resolvedPosition','hitPoint','hitNormal')) and number(row['yaw']) and number(declared['yaw']),'GENERATED_GROUNDING_FINITE')
+        a,b,hit,normal=(row[k] for k in ('declaredPosition','resolvedPosition','hitPoint','hitNormal'))
+        require(a==declared['position'] and a['y']==0 and row['yaw']==declared['yaw'],'GENERATED_GROUNDING_DECLARED_POSITION')
+        require(all(b[axis]==a[axis] and abs(hit[axis]-a[axis])<=.0001 for axis in ('x','z')) and b['y']==hit['y'],'GENERATED_GROUNDING_RESOLVED_POSITION')
+        require(normal['y']>=.9,'GENERATED_GROUNDING_NORMAL')
+    require(seen==set(expected),'GENERATED_GROUNDING_ROW_INVENTORY')
+
 def native_closure(native, generated, source, strict, project, commit, run):
-    require(set(native)==NATIVE_KEYS and type(native['schema']) is int and native['schema']==2 and native['status']=='ACTUAL_NATIVE_JOURNEY_ASSETS_UNREVIEWED' and
+    require(set(native)==NATIVE_KEYS and type(native['schema']) is int and native['schema']==3 and native['status']=='ACTUAL_NATIVE_JOURNEY_ASSETS_UNREVIEWED' and
             native['sourceCommit']==commit and native['unityVersion']==UNITY and native['importRunUrl']==run and native['approved'] is False,'GENERATED_NATIVE_IDENTITY')
     rows=native['files'];require(isinstance(rows,list) and rows and all(set(r)=={'path','sha256'} for r in rows),'GENERATED_NATIVE_FILES')
     require(len(rows)==len(generated) and {r['path']:r['sha256'] for r in rows}==generated,'GENERATED_NATIVE_FILES_CHANGED')
@@ -88,6 +139,8 @@ def export_generated(prepared, native_xml_sha):
     source={row['path'][len(prefix):]:row['sha256'] for row in source_state['files']+source_state['restoredFiles'] if row['path'].startswith(prefix)}
     fx=read(project/'JourneyEvidence/journey-candidate-fx.json');generated=prepared.journey_files(fx)
     native_path=project/'JourneyEvidence/JourneyPreparation/authored-assets.json';native,native_sha=sealed_json(native_path,proof,task.parent.parent)
+    ground_path=project/GROUND_PATH;ground,ground_sha=sealed_json(ground_path,proof,task.parent.parent)
+    validate_spawn_grounding(ground,native,state,project,commit,ground_sha)
     strict,refs=strict_sources(task,state,project,commit,run)
     dependencies=native_closure(native,generated,source,strict,project,commit,run)
     referenced={r['path'] for r in dependencies}
@@ -114,13 +167,14 @@ def export_generated(prepared, native_xml_sha):
         for name,h in sorted(exported.items()):
             dest=staging/name;dest.parent.mkdir(parents=True,exist_ok=True);shutil.copyfile(safe(project/name),dest)
             item=record(dest,name);require(item['sha256']==h,'GENERATED_COPY_CHANGED');files.append(item)
-        for original,name,expected in ((native_path,'native-authored-assets.json',native_sha),(scope_path,'diagnostic-scope-evidence.json',scope_sha)):
+        for original,name,expected in ((native_path,'native-authored-assets.json',native_sha),(scope_path,'diagnostic-scope-evidence.json',scope_sha),(ground_path,GROUND_EXPORT,ground_sha)):
             shutil.copyfile(safe(original),staging/name);item=record(staging/name,name)
             require(item['sha256']==expected,'GENERATED_EVIDENCE_COPY_CHANGED');files.append(item)
         controls=[record(project/name,name) for name in ('Packages/manifest.json','Packages/packages-lock.json','ProjectSettings/ProjectVersion.txt')]
         manifest=dict(schema=SCHEMA,status='GENERATED_JOURNEY_SAVED_UNREVIEWED',approved=False,sourceCommit=commit,importRunUrl=run,unityVersion=UNITY,
             runAttempt=int(attempt),sourceStateSha256=sha(task/'SOURCE-STATE.json'),strictReceipts=refs,files=files,dependencies=dependencies,packageControls=controls,
             nativeManifestPath='native-authored-assets.json',nativeManifestSha256=native_sha,diagnosticScopeEvidencePath='diagnostic-scope-evidence.json',
+            spawnGroundingPath=GROUND_EXPORT,spawnGroundingSha256=ground_sha,
             omittedUnreferencedLayout=[dict(path=n,sha256=h) for n,h in sorted(omitted.items())],
             nativeAuthoringXmlSha256=native_xml_sha,preparedProofSha256=sha(prepared.PROOF),integrationReportSha256=sha(integrated_path),
             integrationOutputs=outputs,fxParametersSha256=fx['parametersSha256'],diagnosticScopeSha256=scope_sha,

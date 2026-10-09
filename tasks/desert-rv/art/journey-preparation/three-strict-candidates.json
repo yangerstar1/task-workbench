@@ -3,8 +3,8 @@
   "sources": [
     {
       "kind": "armored",
-      "contract": "tasks/desert-rv/art/import-candidate/contracts/armored-full-strict-37850840062.json",
-      "sha256": "77cc8af4f6ae48d1226e5882de2f9c26fb4ce71dca2c3a07924428316bde7b0b"
+      "contract": "tasks/desert-rv/art/import-candidate/contracts/armored-full-strict-37850840062-capsule-r2.json",
+      "sha256": "5e0f1a8848a338b4c421c6b04067c028e77030c712b5e1e18ac87f75ede3754c"
     },
     {
       "kind": "pouncer",
@@ -329,5 +329,6 @@
         ]
       }
     ]
-  }
+  },
+  "spawnRootHeightSource": "scene-physical-floor"
 }

@@ -80,7 +80,7 @@ class PreparedSourceTests(unittest.TestCase):
         for n in ('Flash.png','Flash.mat','Arc.png','Arc.mat','MuzzleFlash.prefab','ArcPresentation.prefab'):
             path=folder+'/'+n;self.add(path);self.add(path+'.meta');outputs.append(dict(path=path,sha256=self.added[path]))
         self.add(p.JOURNEY+'/CandidateFx.meta');self.add(folder+'.meta')
-        record=dict(status='ACTUAL_NATIVE_JOURNEY_ASSETS_UNREVIEWED',sourceCommit='fixture-sha',files=[dict(path=n,sha256=h) for n,h in self.added.items()])
+        record=dict(schema=3,status='ACTUAL_NATIVE_JOURNEY_ASSETS_UNREVIEWED',sourceCommit='fixture-sha',files=[dict(path=n,sha256=h) for n,h in self.added.items()])
         self.write('JourneyEvidence/JourneyPreparation/authored-assets.json',json.dumps(record).encode())
         return dict(status='ORIGINAL_NATIVE_FX_AUTHORED_UNCALIBRATED',protectedSourcesUnchanged=True,failures=[],outputs=outputs)
     def test_exact_native_author_asset_snapshot_is_consumed(self):

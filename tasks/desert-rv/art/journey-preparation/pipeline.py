@@ -54,7 +54,8 @@ def guard():
     require(digest(os.environ.get('GITHUB_SHA'),40) and re.fullmatch('[1-9][0-9]*',os.environ.get('GITHUB_RUN_ID','')),'PREP_JOB_IDENTITY')
 
 def validate_selection(value):
-    require(set(value)=={'schema','sources','fx','integration'} and value['schema']==1,'PREP_SELECTION_SCHEMA')
+    require(set(value)=={'schema','sources','fx','integration','spawnRootHeightSource'} and value['schema']==1,'PREP_SELECTION_SCHEMA')
+    require(value['spawnRootHeightSource']=='scene-physical-floor','PREP_EXPLICIT_SPAWN_ROOT_SOURCE')
     sources=value['sources'];require(isinstance(sources,list) and [s['kind'] for s in sources]==list(KINDS),'PREP_THREE_ORDERED_KINDS')
     ids=[]
     for item in sources:
@@ -250,7 +251,7 @@ def ready():
         require(sha(PROJECT/contract)==imp['contractSha256'],'PREP_COPIED_CONTRACT_CHANGED')
         requests.append(dict(kind=kind,sourceModelPath=str(Path(contract).parent/'Source'/c['modelFile']),prefab=dict(path=prefab,sha256=sha(PROJECT/prefab),dependencyHash=imp['dependencyHash'],dependencySha256=imp['dependencySha256']),contract=dict(path=contract,sha256=sha(PROJECT/contract)),importReport=dict(path=str(dest.relative_to(PROJECT)/'import-report.json'),sha256=sha(dest/'import-report.json'))))
         proof.append(dict(path=str((PUBLIC/kind/'receipt.json').relative_to(REPO)),sha256=item['exportReceiptSha256']))
-    payload=dict(schema=1,status='THREE_NATIVE_STRICT_EXPORTS_VERIFIED_NOT_APPROVED',sourceCommit=s['sourceCommit'],fx=s['plan']['fx'],integration=s['plan']['integration'],arcModulePoseSource=arc_pose_source(s['plan']['integration']),validatedExportReceipts=proof,validationSourcePins=s['validationSourcePins'],nativeProofs=[dict(kind=x['kind'],xml=x['nativeXml'],cases=x['nativeCases']) for x in s['completed']])
+    payload=dict(schema=1,status='THREE_NATIVE_STRICT_EXPORTS_VERIFIED_NOT_APPROVED',sourceCommit=s['sourceCommit'],selectionSha256=s['selectionSha256'],spawnRootHeightSource=s['plan']['spawnRootHeightSource'],fx=s['plan']['fx'],integration=s['plan']['integration'],arcModulePoseSource=arc_pose_source(s['plan']['integration']),validatedExportReceipts=proof,validationSourcePins=s['validationSourcePins'],nativeProofs=[dict(kind=x['kind'],xml=x['nativeXml'],cases=x['nativeCases']) for x in s['completed']])
     payload['integration']['candidates']=requests
     target=PRIVATE/'ready-input.json';require(not target.exists(),'PREP_READY_INPUT_EXISTS');target.write_text(json.dumps(payload,indent=2)+'\n')
     (PRIVATE/'ready-input.sha256').write_text(sha(target)+'\n');s['phase']='ready-input-frozen';s['readyInputSha256']=sha(target);save(s)

@@ -46,6 +46,13 @@ class LinuxBuildInputTests(unittest.TestCase):
         path=linux.PROJECT/'Assets/Original.cs';data=path.read_bytes();path.unlink();outside=linux.ROOT/'external';outside.write_bytes(data);path.symlink_to(outside);self.rejects('linked|SYMLINK|UNSAFE')
     def test_native_manifest_modified_after_export_rejected(self):
         path=self.receipt.parent/'native-authored-assets.json';path.write_text(path.read_text()+' ');self.rejects('STAGING_HASH')
+    def test_grounding_evidence_is_pinned_in_native_build_request(self):
+        request=linux.prepare();name=str((linux.PROJECT/linux.generated.GROUND_PATH).relative_to(linux.ROOT))
+        self.assertEqual([r['sha256'] for r in request['files'] if r['path']==name],[linux.sha(linux.PROJECT/linux.generated.GROUND_PATH)])
+    def test_grounding_export_tampering_is_rejected(self):
+        path=self.receipt.parent/linux.generated.GROUND_EXPORT;path.write_text(path.read_text()+' ');self.rejects('STAGING_HASH')
+    def test_grounding_receipt_hash_mismatch_is_rejected(self):self.change_receipt('spawnGroundingSha256','0'*64);self.rejects('LINUX_GROUNDING_CHANGED')
+    def test_grounding_receipt_path_cannot_be_redirected(self):self.change_receipt('spawnGroundingPath','../private');self.rejects('LINUX_GROUNDING_PATH')
     def test_generated_receipt_unknown_dependency_cannot_authorize_file(self):
         value=json.loads(self.receipt.read_text());value['dependencies'].append(dict(path='Assets/Injected.cs',kind='asset',owner='source',sha256='a'*64,bytes=5,packageName='',packageVersion=''));self.receipt.write_text(json.dumps(value));self.rejects('DEPENDENCIES_CHANGED')
     def test_pinned_strict_receipt_tamper_rejected(self):

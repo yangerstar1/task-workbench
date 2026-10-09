@@ -46,7 +46,7 @@ class FailedCaptureTests(unittest.TestCase):
         self.ev.mkdir(parents=True)
         self.out = self.root / 'runner-output'
         self.out.mkdir()
-        contract = Path(strict_output.__file__).parent / 'contracts/armored-full-strict-37850840062.json'
+        contract = Path(strict_output.__file__).parent / 'contracts/armored-full-strict-37850840062-capsule-r2.json'
         self.c = json.loads(contract.read_text())
         self.c['id'] = 'synthetic-failure-fixture'
         # The known schema permits non-textured candidate materials. This keeps

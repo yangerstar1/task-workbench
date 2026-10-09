@@ -315,6 +315,77 @@ namespace DesertRV.Editor
             finally { motor.arc.SetActive(wasActive); }
             Require(All<BeastActor>(boot).Length == 0, "Persistent bootstrap cannot contain regional enemies.");
         }
+        public const string SpawnGroundingPath = "JourneyEvidence/JourneyPreparation/spawn-grounding.json";
+        [Serializable] public sealed class SpawnGroundingRow
+        {
+            public string id, kind, scene, floor;
+            public int region, layer;
+            public Vector3 declaredPosition, resolvedPosition, hitPoint, hitNormal;
+            public float yaw;
+        }
+        [Serializable] public sealed class SpawnGroundingReport
+        {
+            public int schema = 1;
+            public string status = "ACTUAL_NATIVE_ROOT_GROUNDING_UNREVIEWED", sourceCommit, source, selectionSha256, readyInputSha256;
+            public bool approved;
+            public SpawnGroundingRow[] rows;
+        }
+        static SpawnGroundingRow ResolveRootGrounding(Scene scene, Collider[] floors, EnemyPlacement row, int region)
+        {
+            Require(scene.IsValid() && scene.isLoaded && row != null && Finite(row.position) && Finite(row.yaw) && row.position.y == 0,
+                "Root grounding requires a finite declared zero-height anchor in a loaded region.");
+            Require(floors != null && floors.Length > 0 && floors.All(c => c && c.gameObject.scene == scene && c.enabled && !c.isTrigger && c.gameObject.activeInHierarchy && c.gameObject.layer == 0 &&
+                c is BoxCollider && (c.name == "Route foundation" || c.name == "Road surface") && Finite(c.bounds.min) && Finite(c.bounds.max)), "Missing/foreign/disabled/trigger/nonfloor grounding collider.");
+            float top = floors.Max(c => c.bounds.max.y) + .5f, bottom = floors.Min(c => c.bounds.min.y) - .5f;
+            var ray = new Ray(new Vector3(row.position.x, top, row.position.z), Vector3.down);
+            var hits = new List<RaycastHit>();
+            foreach (var floor in floors) if (floor.Raycast(ray, out var hit, top - bottom)) hits.Add(hit);
+            var legal = hits.Where(h => h.collider && h.collider.gameObject.scene == scene && Finite(h.point) && Finite(h.normal) && h.normal.y >= .9f).OrderByDescending(h => h.point.y).ToArray();
+            Require(legal.Length > 0, "Declared root XZ has no actual physical floor: " + row.id);
+            var selected = legal[0];
+            var resolved = new Vector3(row.position.x, selected.point.y, row.position.z);
+            Require(Mathf.Abs(selected.point.x - row.position.x) < .0001f && Mathf.Abs(selected.point.z - row.position.z) < .0001f, "Floor ray changed declared XZ.");
+            return new SpawnGroundingRow { id = row.id, kind = row.kind, region = region, scene = scene.path, floor = selected.collider.name, layer = selected.collider.gameObject.layer,
+                declaredPosition = row.position, resolvedPosition = resolved, hitPoint = selected.point, hitNormal = selected.normal, yaw = row.yaw };
+        }
+        static void RunReadOnlySceneQuery(Action query, Action restore, Action verify)
+        {
+            var errors = new List<Exception>();
+            try { query(); } catch (Exception error) { errors.Add(error); }
+            try { restore(); } catch (Exception error) { errors.Add(error); }
+            try { verify(); } catch (Exception error) { errors.Add(error); }
+            if (errors.Count == 1) System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(errors[0]).Throw();
+            if (errors.Count > 1) throw new AggregateException("Root grounding failed, including scene restoration/protected source verification.", errors);
+        }
+        public static SpawnGroundingReport ResolveSpawnRootHeights(Request request, string source, string selectionSha256, string readyInputSha256)
+        {
+            Require(source == "scene-physical-floor" && Hash(selectionSha256, 64) && Hash(readyInputSha256, 64) && request != null && Hash(request.sourceCommit, 40), "Pinned original root-grounding input required.");
+            var setup = EditorSceneManager.GetSceneManagerSetup();
+            Require(!setup.Any(s => s.isLoaded && SceneManager.GetSceneByPath(s.path).isDirty), "Root grounding must preserve open scene edits.");
+            var protectedFiles = SnapshotProtected(Array.Empty<string>()); var rows = new List<SpawnGroundingRow>();
+            SpawnGroundingReport report = null;
+            RunReadOnlySceneQuery(() => {
+                Require(request.regions != null && request.regions.Select(r => r.region).OrderBy(i => i).SequenceEqual(new[] { 1, 2, 3 }), "Root grounding requires exactly the three real regions.");
+                foreach (var plan in request.regions.OrderBy(p => p.region))
+                {
+                    var scene = EditorSceneManager.OpenScene(JourneySceneAuthoring.RegionPaths[plan.region - 1], OpenSceneMode.Single);
+                    Require(!EditorSceneManager.IsPreviewScene(scene) && scene.GetPhysicsScene() == Physics.defaultPhysicsScene, "Root grounding requires the actual ordinary region physics scene.");
+                    var binding = One<RegionBinding>(scene);
+                    Require(binding.region == plan.region && !binding.environmentVerified && !binding.combatAssetsVerified, "Root grounding region/approval mismatch.");
+                    var floors = new[] { binding.transform.Find("Route foundation"), binding.transform.Find("Road surface") };
+                    Require(floors.All(t => t && t.IsChildOf(binding.transform)), "Authored real floor bindings absent.");
+                    var colliders = floors.Select(t => t.GetComponent<Collider>()).ToArray(); Physics.SyncTransforms();
+                    foreach (var row in plan.guards.Concat(plan.roadBeasts).Concat(plan.waves.SelectMany(w => w.enemies)))
+                    {
+                        var result = ResolveRootGrounding(scene, colliders, row, plan.region); rows.Add(result); row.position = result.resolvedPosition;
+                        Debug.Log("JOURNEY_SPAWN_ROOT_RESOLVED " + JsonUtility.ToJson(result));
+                    }
+                }
+                Require(rows.Count > 0 && rows.Select(r => r.id).Distinct().Count() == rows.Count, "Duplicate/empty grounded actor inventory.");
+                report = new SpawnGroundingReport { sourceCommit = request.sourceCommit, source = source, selectionSha256 = selectionSha256, readyInputSha256 = readyInputSha256, rows = rows.ToArray() };
+            }, () => JourneySceneAuthoring.RestoreSceneSetup(setup), () => VerifyProtected(protectedFiles, Array.Empty<string>()));
+            return report;
+        }
         static BeastActor[] Spawn(EnemyPlacement[] rows, RegionBinding binding, Dictionary<string, Resolved> assets)
         {
             return rows.Select(row => {
@@ -348,6 +419,10 @@ namespace DesertRV.Editor
                         "Physical spawn penetrates " + other.name + ": " + actor.name);
                 }
                 var hits = Physics.RaycastAll(new Vector3(bounds.center.x, bounds.min.y + .25f, bounds.center.z), Vector3.down, .5f, ~0, QueryTriggerInteraction.Ignore);
+                Debug.Log("JOURNEY_SPAWN_FLOOR actor=" + actor.name + "; root=" + actor.transform.position.ToString("R") + "; capsuleMin=" + bounds.min.ToString("R") +
+                    "; scene=" + scene.path + "; defaultPhysics=" + (scene.GetPhysicsScene() == Physics.defaultPhysicsScene) + "; hits=" + string.Join(" | ", hits.OrderBy(h => h.distance).Take(16).Select(h =>
+                        h.collider.name + ",scene=" + h.collider.gameObject.scene.path + ",layer=" + h.collider.gameObject.layer + ",enabled=" + h.collider.enabled + ",trigger=" + h.collider.isTrigger +
+                        ",point=" + h.point.ToString("R") + ",normal=" + h.normal.ToString("R") + ",gap=" + Mathf.Abs(h.point.y - bounds.min.y).ToString("R", System.Globalization.CultureInfo.InvariantCulture))));
                 Require(hits.Any(h => h.collider.gameObject.scene == scene && !h.collider.GetComponentInParent<BeastActor>() &&
                     h.normal.y >= .9f && Mathf.Abs(h.point.y - bounds.min.y) <= .12f), "Spawn lacks nearby physical floor: " + actor.name);
             }
@@ -444,11 +519,73 @@ namespace DesertRV.Editor
                 }
             return result;
         }
+        [Serializable] sealed class PublicSourcePaths { public FilePin[] files, restoredFiles; }
+        [Serializable] sealed class PublicStrictPaths
+        {
+            public string status, importCommit, importRunUrl, kind;
+            public bool approved;
+            public FilePin[] files;
+        }
+        static HashSet<string> PublicProtectedPaths(Dictionary<string, string> before)
+        {
+            var result = new HashSet<string>(StringComparer.Ordinal);
+            void Accept(string path, string sha) { if (before.TryGetValue(path, out string actual) && Hash(sha, 64) && actual == sha) result.Add(path); }
+            try
+            {
+                var source = JsonUtility.FromJson<PublicSourcePaths>(File.ReadAllText("../SOURCE-STATE.json"));
+                const string prefix = "tasks/desert-rv/unity/";
+                foreach (var pin in (source.files ?? Array.Empty<FilePin>()).Concat(source.restoredFiles ?? Array.Empty<FilePin>()))
+                    if (pin.path != null && pin.path.StartsWith(prefix, StringComparison.Ordinal)) Accept(pin.path.Substring(prefix.Length), pin.sha256);
+                const string readyPath = "JourneyEvidence/JourneyPreparation/ready-input.json";
+                string readySha = File.ReadAllText("JourneyEvidence/JourneyPreparation/ready-input.sha256").Trim();
+                if (Hash(readySha, 64) && JourneyDiagnosticScope.HashFile(readyPath) == readySha)
+                {
+                    var ready = JsonUtility.FromJson<JourneyCandidatePreparation.ReadyInput>(File.ReadAllText(readyPath));
+                    foreach (var pin in ready.validatedExportReceipts ?? Array.Empty<FilePin>())
+                    {
+                        if (!Regex.IsMatch(pin.path ?? "", "^tasks/desert-rv/journey-preparation-export/(armored|pouncer|weapon)/receipt\\.json$")) continue;
+                        string file = Path.Combine("../../..", pin.path);
+                        if (!Hash(pin.sha256, 64) || JourneyDiagnosticScope.HashFile(file) != pin.sha256) continue;
+                        var receipt = JsonUtility.FromJson<PublicStrictPaths>(File.ReadAllText(file));
+                        if (receipt.approved || receipt.status != "STRICT_CANDIDATE_CAPTURED_NOT_ACCEPTED" || receipt.importCommit != ready.sourceCommit ||
+                            receipt.importRunUrl != "https://github.com/yangerstar1/task-workbench/actions/runs/" + Environment.GetEnvironmentVariable("GITHUB_RUN_ID")) continue;
+                        foreach (var row in receipt.files ?? Array.Empty<FilePin>())
+                            if (row.path == "CandidateArtImports.meta" || row.path != null && row.path.StartsWith("CandidateArtImports/", StringComparison.Ordinal)) Accept("Assets/DesertRV/" + row.path, row.sha256);
+                    }
+                }
+                var fx = JsonUtility.FromJson<FxResult>(File.ReadAllText("JourneyEvidence/journey-candidate-fx.json"));
+                if (fx.status == "ORIGINAL_NATIVE_FX_AUTHORED_UNCALIBRATED" && fx.protectedSourcesUnchanged)
+                    foreach (var pin in fx.outputs ?? Array.Empty<OutputFile>()) { Accept(pin.path, pin.sha256); if (before.ContainsKey(pin.path + ".meta")) result.Add(pin.path + ".meta"); }
+                foreach (string path in before.Keys)
+                    if (Regex.IsMatch(path, "^Assets/DesertRV/Scenes/Journey/(Layout-[0-9A-F]{6}\\.mat|Region-[123]-Sky\\.mat)(\\.meta)?$") ||
+                        path == JourneySceneAuthoring.Folder + ".meta" || path == JourneySceneAuthoring.Folder + "/CandidateFx.meta" ||
+                        Regex.IsMatch(path, "^Assets/DesertRV/Scenes/Journey/CandidateFx/[a-z0-9-]+\\.meta$")) result.Add(path);
+            }
+            catch (Exception) { /* Diagnostics fail closed: unknown paths remain hashes, never raw names. */ }
+            return result;
+        }
+        static string[] ProtectedDelta(Dictionary<string, string> before, Dictionary<string, string> after)
+        {
+            var known = PublicProtectedPaths(before);
+            string Label(string path)
+            {
+                if (known.Contains(path)) return path;
+                using (var hash = System.Security.Cryptography.SHA256.Create()) return "unknown-path-sha256=" + BitConverter.ToString(hash.ComputeHash(System.Text.Encoding.UTF8.GetBytes(path))).Replace("-", "").ToLowerInvariant();
+            }
+            return before.Keys.Concat(after.Keys).Distinct().OrderBy(p => p, StringComparer.Ordinal).Where(p => !before.TryGetValue(p, out string b) || !after.TryGetValue(p, out string a) || a != b)
+                .Select(p => (before.ContainsKey(p) ? after.ContainsKey(p) ? "changed" : "removed" : "added") + ":" + Label(p) + ":before=" + (before.TryGetValue(p, out string b) ? b : "absent") + ":after=" + (after.TryGetValue(p, out string a) ? a : "absent")).ToArray();
+        }
+        static void LogProtectedStage(string stage, Dictionary<string, string> before)
+        {
+            var delta = ProtectedDelta(before, SnapshotProtected());
+            Debug.Log("JOURNEY_PROTECTED_STAGE stage=" + stage + "; count=" + delta.Length + "; delta=" + string.Join(" | ", delta.Take(32)));
+        }
         static void VerifyProtected(Dictionary<string, string> before, IEnumerable<string> allowedPaths = null)
         {
             var after = SnapshotProtected(allowedPaths);
-            Require(before.Count == after.Count && before.All(p => after.TryGetValue(p.Key, out string value) && value == p.Value),
-                "Protected files changed outside exactly four Journey scenes and JourneyContent asset. Original RV/BodyStudy/TraversalHarness, candidates and settings must remain byte-identical.");
+            var delta = ProtectedDelta(before, after);
+            Require(delta.Length == 0, "Protected files changed outside exactly four Journey scenes and JourneyContent asset. " + string.Join(" | ", delta.Take(32)) + "; total=" + delta.Length);
+
         }
         static AssetPin CompleteSelectedAsset(AssetPin selected)
         {
@@ -606,13 +743,18 @@ namespace DesertRV.Editor
                 var manifest = AssetDatabase.LoadAssetAtPath<JourneyContentManifest>(JourneySceneAuthoring.ManifestPath);
                 Require(ManifestIsUnbound(manifest), "Manifest contains existing review/provenance/bindings; use a genuinely empty authored candidate manifest.");
                 var boot = EditorSceneManager.OpenScene(JourneySceneAuthoring.BootstrapPath, OpenSceneMode.Single);
+                LogProtectedStage("before-bootstrap-wire", protectedFiles);
                 WireBootstrap(boot, request, assets, flash, arc, audio);
+                LogProtectedStage("after-bootstrap-wire", protectedFiles);
                 Require(EditorSceneManager.SaveScene(boot, JourneySceneAuthoring.BootstrapPath), "Bootstrap save failed.");
+                LogProtectedStage("after-bootstrap-save", protectedFiles);
                 foreach (var plan in request.regions.OrderBy(p => p.region))
                 {
                     boot = EditorSceneManager.OpenScene(JourneySceneAuthoring.BootstrapPath, OpenSceneMode.Single);
                     var scene = EditorSceneManager.OpenScene(JourneySceneAuthoring.RegionPaths[plan.region - 1], OpenSceneMode.Additive);
+                    LogProtectedStage("before-region-" + plan.region, protectedFiles);
                     WireRegion(scene, boot, plan, assets);
+                    LogProtectedStage("after-region-" + plan.region, protectedFiles);
                     Require(EditorSceneManager.SaveScene(scene, JourneySceneAuthoring.RegionPaths[plan.region - 1]), "Regional scene save failed.");
                 }
                 manifest.pouncer = Review(assets["pouncer"]); manifest.armored = Review(assets["armored"]); manifest.weapon = Review(assets["weapon"]);
@@ -634,7 +776,10 @@ namespace DesertRV.Editor
                     ConfirmProtectedSources(result, () => VerifyProtected(protectedFiles));
                     WriteIntegrationReceipt(result); // No commit until actual receipt write/readback and scene restoration both succeed.
                 }, () => {
+                    // Record the original failing stage before Refresh can introduce a separate recovery delta.
+                    try { LogProtectedStage("before-rollback", protectedFiles); } catch (Exception diagnostic) { Debug.LogWarning("Protected stage diagnostic failed: " + diagnostic.GetType().Name); }
                     RestoreCandidateFiles(original); result.rolledBack = original.Count > 0;
+                    LogProtectedStage("after-rollback", protectedFiles);
                     ConfirmProtectedSources(result, () => VerifyProtected(protectedFiles));
                 });
             }

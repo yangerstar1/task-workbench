@@ -126,14 +126,33 @@ namespace DesertRV
                 MoveSwept(tangent * speed * .6f * dt);
             }
         }
+        // Candidate roots use unit world scale and a Y-axis root capsule. Reject unsupported
+        // shapes instead of silently sweeping a different volume from the actual collider.
+        internal bool TryGetSweepCapsule(out Vector3 bottomSphere, out Vector3 topSphere, out float radius)
+        {
+            bottomSphere=topSphere=Vector3.zero; radius=0;
+            var capsule=GetComponent<CapsuleCollider>();
+            if(!capsule || capsule.direction!=1 || !capsule.enabled || capsule.isTrigger ||
+                (transform.lossyScale-Vector3.one).sqrMagnitude>1e-10f ||
+                (float.IsNaN(capsule.radius) || float.IsInfinity(capsule.radius)) || (float.IsNaN(capsule.height) || float.IsInfinity(capsule.height)) ||
+                (float.IsNaN(capsule.center.x) || float.IsInfinity(capsule.center.x)) || (float.IsNaN(capsule.center.y) || float.IsInfinity(capsule.center.y)) || (float.IsNaN(capsule.center.z) || float.IsInfinity(capsule.center.z)) ||
+                capsule.radius<=0 || capsule.height<2*capsule.radius)return false;
+            radius=capsule.radius;
+            var center=transform.TransformPoint(capsule.center);
+            var half=transform.TransformDirection(Vector3.up)*(capsule.height*.5f-radius);
+            bottomSphere=center-half; topSphere=center+half;
+            return true;
+        }
         bool MoveSwept(Vector3 displacement) => MoveSwept(displacement, out _);
         bool MoveSwept(Vector3 displacement, out Collider contact)
         {
             contact = null;
             float length = displacement.magnitude;
             if (length < .0001f) return true;
-            int count = Physics.CapsuleCastNonAlloc(transform.position + Vector3.up * .45f,
-                transform.position + Vector3.up * 1.0f, armored ? .5f : .36f, displacement / length,
+            if(!TryGetSweepCapsule(out var bottomSphere,out var topSphere,out var radius))
+            { Debug.LogError("Beast sweep requires an enabled non-trigger Y capsule on a unit-scale root.",this); return false; }
+            int count = Physics.CapsuleCastNonAlloc(bottomSphere,
+                topSphere, radius, displacement / length,
                 hits, length + .04f, ~0, QueryTriggerInteraction.Ignore);
             float nearest = float.PositiveInfinity;
             for (int i = 0; i < count; i++)

@@ -19,7 +19,7 @@ namespace DesertRV.Editor
         [Serializable] public sealed class ReadyInput
         {
             public int schema;
-            public string status, sourceCommit, arcModulePoseSource;
+            public string status, sourceCommit, arcModulePoseSource, spawnRootHeightSource, selectionSha256;
             public JourneyCandidateAssetIntegration.FxRequest fx;
             public JourneyCandidateAssetIntegration.Request integration;
             public JourneyCandidateAssetIntegration.FilePin[] validatedExportReceipts, validationSourcePins;
@@ -28,9 +28,10 @@ namespace DesertRV.Editor
         [Serializable] public sealed class NativeProof { public string kind; public JourneyCandidateAssetIntegration.FilePin xml; public string[] cases; }
         [Serializable] public sealed class AuthoredAssets
         {
-            public int schema = 2;
+            public int schema = 3;
             public string status = "ACTUAL_NATIVE_JOURNEY_ASSETS_UNREVIEWED", sourceCommit, unityVersion, importRunUrl;
             public bool approved;
+            public JourneyCandidateAssetIntegration.FilePin spawnGrounding;
             public JourneyCandidateAssetIntegration.FilePin[] files;
             public DependencyPin[] dependencies;
         }
@@ -94,6 +95,7 @@ namespace DesertRV.Editor
             Check(input.integration != null && input.fx != null && input.integration.candidates != null && input.integration.candidates.Length == 3 &&
                 input.validatedExportReceipts != null && input.validatedExportReceipts.Length == 3, "All three actual strict exports required.");
             Check(input.arcModulePoseSource == "scene-geometry" || input.arcModulePoseSource == "selection", "Explicit pinned arc pose source required.");
+            Check(input.spawnRootHeightSource == "scene-physical-floor" && Regex.IsMatch(input.selectionSha256 ?? "", "^[a-f0-9]{64}$"), "Explicit native root grounding intent and original selection hash required.");
             var kinds = new[] { "armored", "pouncer", "weapon" };
             Check(new HashSet<string>(input.integration.candidates.Select(c => c.kind)).SetEquals(kinds), "Three independent strict kinds required.");
             string repo = Path.GetFullPath("../../.."), run = null;
@@ -155,6 +157,9 @@ namespace DesertRV.Editor
                 input.integration.muzzleFlashPrefab = fx.muzzleFlashPrefab; input.integration.arcPresentationPrefab = fx.arcPresentationPrefab;
                 // The host pinned the raw JSON null/object intent before Unity inline DTO deserialization.
                 input.integration.arcModulePose = JourneyCandidateAssetIntegration.ResolveArcModulePose(input.arcModulePoseSource, input.integration.arcModulePose, poses.arcModulePose);
+                var grounding = JourneyCandidateAssetIntegration.ResolveSpawnRootHeights(input.integration, input.spawnRootHeightSource, input.selectionSha256, inputHash);
+                WriteFresh(JourneyCandidateAssetIntegration.SpawnGroundingPath, grounding);
+                string groundingSha = Hash(JourneyCandidateAssetIntegration.SpawnGroundingPath);
                 string selection = Folder + "/integration-selection.json", frozen = Folder + "/integration-input.json";
                 WriteFresh(selection, input.integration);
                 Set("DESERTRV_JOURNEY_ASSET_SELECTION", selection); Set("DESERTRV_JOURNEY_ASSET_SELECTION_SHA256", Hash(selection)); Set("DESERTRV_JOURNEY_ASSET_INPUT", frozen);
@@ -170,11 +175,13 @@ namespace DesertRV.Editor
                 var scope = JsonUtility.FromJson<JourneyDiagnosticScope.Request>(File.ReadAllText(Scope));
                 Check(JourneyDiagnosticScope.CheckRequest(scope, input.sourceCommit, out reason), reason);
                 Check(Hash(Input) == inputHash, "Preparation input changed during authoring.");
+                Check(Hash(JourneyCandidateAssetIntegration.SpawnGroundingPath) == groundingSha, "Actual native grounding evidence changed during integration.");
                 var authored = Directory.GetFiles(JourneySceneAuthoring.Folder, "*", SearchOption.AllDirectories).Concat(new[] { JourneySceneAuthoring.Folder + ".meta" }).OrderBy(p => p).ToArray();
                 WriteFresh(Folder + "/authored-assets.json", new AuthoredAssets { sourceCommit = input.sourceCommit,
                     unityVersion = Application.unityVersion, importRunUrl = run, approved = false,
                     files = authored.Select(p => new JourneyCandidateAssetIntegration.FilePin { path = p.Replace('\\', '/'), sha256 = Hash(p) }).ToArray(),
-                    dependencies = DependencySnapshot() });
+                    dependencies = DependencySnapshot(),
+                    spawnGrounding = new JourneyCandidateAssetIntegration.FilePin { path = JourneyCandidateAssetIntegration.SpawnGroundingPath, sha256 = groundingSha } });
                 Debug.Log("JOURNEY_SAME_WORKSPACE_SCOPE_PREPARED_UNREVIEWED: no input plan, runtime session or approval has been manufactured.");
             }
             finally { foreach (var pair in saved) Environment.SetEnvironmentVariable(pair.Key, pair.Value); }

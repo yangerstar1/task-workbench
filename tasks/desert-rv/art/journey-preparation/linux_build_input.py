@@ -44,6 +44,10 @@ def prepare():
     strict,refs=generated.strict_sources(TASK,state,PROJECT,commit,run);require(refs==receipt['strictReceipts'],'LINUX_THREE_RECEIPTS_CHANGED')
     native=read(receipt_path.parent/'native-authored-assets.json')
     require(sha(receipt_path.parent/'native-authored-assets.json')==receipt['nativeManifestSha256'],'LINUX_NATIVE_MANIFEST_CHANGED')
+    require(receipt.get('spawnGroundingPath')==generated.GROUND_EXPORT,'LINUX_GROUNDING_PATH')
+    ground_path=PROJECT/generated.GROUND_PATH;ground,ground_sha=generated.sealed_json(ground_path,proof,ROOT)
+    require(receipt.get('spawnGroundingSha256')==ground_sha==sha(receipt_path.parent/generated.GROUND_EXPORT),'LINUX_GROUNDING_CHANGED')
+    generated.validate_spawn_grounding(ground,native,state,PROJECT,commit,ground_sha)
     source_state=read(TASK/'SOURCE-STATE.json');prefix='tasks/desert-rv/unity/'
     source={r['path'][len(prefix):]:r['sha256'] for r in source_state['files']+source_state['restoredFiles'] if r['path'].startswith(prefix)}
     authored={r['path']:r['sha256'] for r in native['files']}
@@ -57,6 +61,7 @@ def prepare():
     for kind in generated.KINDS:
         name='tasks/desert-rv/journey-preparation-export/'+kind+'/receipt.json';records.append(dict(path=name,sha256=sha(ROOT/name)))
     records.append(dict(path=str(receipt_path.relative_to(ROOT)),sha256=sha(receipt_path)))
+    records.append(dict(path=str(ground_path.relative_to(ROOT)),sha256=ground_sha))
     records.append(boundary['nativeXml'])
     boundary_receipt=PROJECT/'JourneyEvidence/JourneyPreparation/linux-boundary-verified.json';records.append(dict(path=str(boundary_receipt.relative_to(ROOT)),sha256=sha(boundary_receipt)))
     request=dict(schema=1,label='CANDIDATE_LINUX_DEVELOPMENT_ONLY',sourceCommit=commit,producerRunUrl=run,generatedReceiptSha256=sha(receipt_path),

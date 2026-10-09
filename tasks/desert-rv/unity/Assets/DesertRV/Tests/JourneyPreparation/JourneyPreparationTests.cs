@@ -201,12 +201,68 @@ namespace DesertRV.Tests
             }
             finally {UnityEngine.Object.DestroyImmediate(cube);UnityEngine.Object.DestroyImmediate(cavity);UnityEngine.Object.DestroyImmediate(concave);UnityEngine.Object.DestroyImmediate(surface);UnityEngine.Object.DestroyImmediate(collinear);UnityEngine.Object.DestroyImmediate(collapsed);UnityEngine.Object.DestroyImmediate(combined);}
         }
+        static void VerifyRootGrounding()
+        {
+            var editor=Type.GetType("DesertRV.Editor.JourneyCandidateAssetIntegration, Assembly-CSharp-Editor",true);
+            var placement=editor.GetNestedType("EnemyPlacement"); var row=Activator.CreateInstance(placement);
+            placement.GetField("id").SetValue(row,"fixture/root");placement.GetField("kind").SetValue(row,"pouncer");placement.GetField("yaw").SetValue(row,180f);
+            var resolve=editor.GetMethod("ResolveRootGrounding",BindingFlags.Static|BindingFlags.NonPublic);
+            var isolate=editor.GetMethod("WithFxPreviewScene",BindingFlags.Static|BindingFlags.NonPublic);
+            var create=editor.GetMethod("FxObject",BindingFlags.Static|BindingFlags.NonPublic);
+            var transaction=editor.GetMethod("RunReadOnlySceneQuery",BindingFlags.Static|BindingFlags.NonPublic);
+            var order=new System.Collections.Generic.List<string>();
+            Action First=()=>{order.Add("query");throw new InvalidOperationException("initial missing floor");};
+            Action Restore=()=>{order.Add("restore");throw new InvalidOperationException("restore failure");};
+            Action Verify=()=>{order.Add("verify");throw new InvalidOperationException("protected failure");};
+            var combined=Assert.Throws<TargetInvocationException>(()=>transaction.Invoke(null,new object[]{First,Restore,Verify}));
+            var aggregate=combined.InnerException as AggregateException;Assert.IsNotNull(aggregate);
+            CollectionAssert.AreEqual(new[]{"query","restore","verify"},order);
+            CollectionAssert.AreEqual(new[]{"initial missing floor","restore failure","protected failure"},aggregate.InnerExceptions.Select(e=>e.Message));
+            var ordinary=SceneManager.GetActiveScene();
+            Action<Scene> exercise=scene=>{
+                GameObject Obj(string name)=>(GameObject)create.Invoke(null,new object[]{name,scene,null});
+                var sand=Obj("Route foundation").AddComponent<BoxCollider>();sand.transform.position=new Vector3(0,-.24f,30);sand.size=new Vector3(34,.4f,94);
+                var road=Obj("Road surface").AddComponent<BoxCollider>();road.transform.position=new Vector3(0,-.015f,30);road.size=new Vector3(8,.1f,94);
+                var floors=new Collider[]{sand,road};Physics.SyncTransforms();
+                object Resolve(Vector3 at,Scene owner) {placement.GetField("position").SetValue(row,at);return resolve.Invoke(null,new object[]{owner,floors,row,1});}
+                Vector3 Value(object value,string field)=>(Vector3)value.GetType().GetField(field).GetValue(value);
+                var outside=Resolve(new Vector3(-6,0,18),scene);Assert.That(Value(outside,"resolvedPosition").y,Is.EqualTo(-.04f).Within(.00001f));
+                Assert.AreEqual(new Vector3(-6,0,18),Value(outside,"declaredPosition"));
+                var onRoad=Resolve(new Vector3(0,0,39),scene);Assert.That(Value(onRoad,"resolvedPosition").y,Is.EqualTo(.035f).Within(.00001f));
+                Assert.AreEqual(180f,onRoad.GetType().GetField("yaw").GetValue(onRoad));
+                Assert.Throws<TargetInvocationException>(()=>Resolve(new Vector3(100,0,18),scene));
+                Assert.Throws<TargetInvocationException>(()=>Resolve(new Vector3(-6,.1f,18),scene));
+                Assert.Throws<TargetInvocationException>(()=>Resolve(new Vector3(-6,0,18),ordinary));
+                sand.isTrigger=true;Assert.Throws<TargetInvocationException>(()=>Resolve(new Vector3(-6,0,18),scene));sand.isTrigger=false;
+                sand.enabled=false;Assert.Throws<TargetInvocationException>(()=>Resolve(new Vector3(-6,0,18),scene));sand.enabled=true;
+                sand.gameObject.layer=2;Assert.Throws<TargetInvocationException>(()=>Resolve(new Vector3(-6,0,18),scene));sand.gameObject.layer=0;
+                sand.name="Unlisted floor";Assert.Throws<TargetInvocationException>(()=>Resolve(new Vector3(-6,0,18),scene));sand.name="Route foundation";
+                Assert.Throws<TargetInvocationException>(()=>resolve.Invoke(null,new object[]{scene,Array.Empty<Collider>(),row,1}));
+            };
+            isolate.Invoke(null,new object[]{exercise});
+            // Unknown names cannot appear in public diagnostics, even when they sit below an Assets directory.
+            var delta=editor.GetMethod("ProtectedDelta",BindingFlags.Static|BindingFlags.NonPublic);
+            var before=new System.Collections.Generic.Dictionary<string,string>{{"Assets/private-not-approved-name.txt",new string('a',64)}};
+            var after=new System.Collections.Generic.Dictionary<string,string>{{"Assets/private-not-approved-name.txt",new string('b',64)},{"Assets/private-new-name.txt",new string('c',64)}};
+            var lines=(string[])delta.Invoke(null,new object[]{before,after});Assert.AreEqual(2,lines.Length);
+            Assert.IsTrue(lines.All(line=>!line.Contains("private-")&&line.Contains("unknown-path-sha256=")));
+            Debug.Log("JOURNEY_ROOT_GROUNDING_REGRESSION actual-sand/road/no-floor/declared-Y/foreign-scene/trigger/disabled/layer/unlisted/empty/diagnostic-redaction passed");
+        }
         [Test] public void PrepareVerifiedSameWorkspaceJourney()
         {
             // Actual native success and injected-failure cleanup, inside the existing single-case gate.
-            VerifyFxPreviewLifecycle(false); VerifyFxPreviewLifecycle(true); VerifyPoseJsonRoundtrip(); VerifyArcMeshQueries();
+            VerifyFxPreviewLifecycle(false); VerifyFxPreviewLifecycle(true); VerifyPoseJsonRoundtrip(); VerifyArcMeshQueries(); VerifyRootGrounding();
             Type.GetType("DesertRV.Editor.JourneyCandidatePreparation, Assembly-CSharp-Editor", true)
                 .GetMethod("PrepareVerifiedSameWorkspace").Invoke(null, null);
+            var integration=Type.GetType("DesertRV.Editor.JourneyCandidateAssetIntegration, Assembly-CSharp-Editor",true);
+            var readyType=Type.GetType("DesertRV.Editor.JourneyCandidatePreparation+ReadyInput, Assembly-CSharp-Editor",true);
+            var ready=JsonUtility.FromJson(File.ReadAllText("JourneyEvidence/JourneyPreparation/ready-input.json"),readyType);
+            var report=JsonUtility.FromJson(File.ReadAllText("JourneyEvidence/JourneyPreparation/spawn-grounding.json"),integration.GetNestedType("SpawnGroundingReport"));
+            var rows=(Array)report.GetType().GetField("rows").GetValue(report);
+            Assert.AreEqual(9,rows.Length);
+            CollectionAssert.AreEquivalent(new[]{1,1,1,2,2,2,3,3,3},rows.Cast<object>().Select(r=>(int)r.GetType().GetField("region").GetValue(r)));
+            Assert.AreEqual(readyType.GetField("selectionSha256").GetValue(ready),report.GetType().GetField("selectionSha256").GetValue(report));
+            Assert.IsFalse((bool)report.GetType().GetField("approved").GetValue(report));
         }
     }
 }

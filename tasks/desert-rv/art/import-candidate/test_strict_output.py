@@ -9,7 +9,7 @@ from verify_output import export,EvidenceError
 class StrictExportTests(unittest.TestCase):
  def setUp(self):
   self.tmp=tempfile.TemporaryDirectory();self.root=Path(self.tmp.name)/'desert-rv';self.project=self.root/'unity';self.out=self.root/'safe-export'
-  self.c=json.loads((Path(__file__).parent/'contracts/armored-full-strict-37850840062.json').read_text());self.c['id']='armored-test-fixture'
+  self.c=json.loads((Path(__file__).parent/'contracts/armored-full-strict-37850840062-capsule-r2.json').read_text());self.c['id']='armored-test-fixture'
   self.prefix='Assets/DesertRV/CandidateArtImports/'+self.c['id'];self.folder=self.project/self.prefix;self.ev=self.project/'JourneyEvidence/CandidateArt';self.ev.mkdir(parents=True)
   self.guid=0
   def write(rel,data):

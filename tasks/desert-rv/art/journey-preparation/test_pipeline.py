@@ -33,6 +33,13 @@ class PipelineTests(unittest.TestCase):
         for source in plan['sources']:
             dest=self.root/source['contract'];dest.parent.mkdir(parents=True,exist_ok=True);dest.write_bytes((ORIGINAL_REPO/source['contract']).read_bytes())
         p.validate_selection(plan)
+    def test_missing_spawn_root_source_is_rejected(self):
+        plan=json.loads(SELECTION.read_text());del plan['spawnRootHeightSource']
+        with self.assertRaisesRegex(Exception,'SELECTION_SCHEMA'):p.validate_selection(plan)
+    def test_unknown_or_non_string_spawn_root_source_is_rejected(self):
+        for value in ('selection','bounds',None,False,0,[]):
+            plan=json.loads(SELECTION.read_text());plan['spawnRootHeightSource']=value
+            with self.assertRaisesRegex(Exception,'EXPLICIT_SPAWN_ROOT_SOURCE'):p.validate_selection(plan)
     def test_native_report_directory_is_host_created_empty_and_writable(self):
         p.prepare_report_directory();reports=p.PROJECT/'JourneyEvidence/CandidateArt'
         self.assertEqual(list(reports.iterdir()),[]);self.assertTrue(os.access(reports,os.W_OK))

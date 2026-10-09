@@ -7,6 +7,7 @@ STATE=PROJECT/'JourneyEvidence/JourneyPreparation/state.json'
 PROOF=PROJECT/'JourneyEvidence/JourneyPreparation/prepared-source.json'
 JOURNEY='Assets/DesertRV/Scenes/Journey'
 CANDIDATES='Assets/DesertRV/CandidateArtImports'
+GROUNDING='JourneyEvidence/JourneyPreparation/spawn-grounding.json'
 # Native operational state only: never treated as source, copied to public exports, or restored across runs.
 OPERATIONAL={'Library','Temp','Logs','obj','UserSettings','JourneyEvidence'}
 def require(ok,code):
@@ -107,8 +108,22 @@ def journey_files(fx):
     actual[JOURNEY+'.meta']=sha(PROJECT/(JOURNEY+'.meta'))
     require(set(actual)==allowed,'PREPARED_JOURNEY_ADDITION_INVENTORY')
     native=read(PROJECT/'JourneyEvidence/JourneyPreparation/authored-assets.json')
-    require(native['status']=='ACTUAL_NATIVE_JOURNEY_ASSETS_UNREVIEWED' and native['sourceCommit']==os.environ['GITHUB_SHA'] and len(native['files'])==len(actual) and {r['path']:r['sha256'] for r in native['files']}==actual,'PREPARED_NATIVE_ASSET_SNAPSHOT_CHANGED')
+    require(type(native.get('schema')) is int and native['schema']==3 and native['status']=='ACTUAL_NATIVE_JOURNEY_ASSETS_UNREVIEWED' and native['sourceCommit']==os.environ['GITHUB_SHA'] and len(native['files'])==len(actual) and {r['path']:r['sha256'] for r in native['files']}==actual,'PREPARED_NATIVE_ASSET_SNAPSHOT_CHANGED')
     return actual
+
+def verified_spawn_grounding(state):
+    sys.path.insert(0,str(TASK/'art/journey-preparation'))
+    from generated_export import grounding_pin,sealed_json,validate_spawn_grounding
+    native=read(PROJECT/'JourneyEvidence/JourneyPreparation/authored-assets.json');native_pin=grounding_pin(native)
+    path=PROJECT/GROUNDING
+    proof={'dataPins':[dict(path=str(path.relative_to(ROOT)),sha256=native_pin['sha256'])]}
+    grounding,ground_sha=sealed_json(path,proof,ROOT)
+    validate_spawn_grounding(grounding,native,state,PROJECT,os.environ['GITHUB_SHA'],ground_sha)
+    return grounding
+
+def data_paths():
+    return [STATE,PROJECT/'JourneyEvidence/JourneyPreparation/authored-assets.json',PROJECT/'JourneyEvidence/journey-candidate-fx.json',
+            PROJECT/'JourneyEvidence/journey-candidate-integration.json',PROJECT/'JourneyEvidence/journey-diagnostic-scope.json',PROJECT/GROUNDING]
 
 def pin(path):return dict(path=str(path.relative_to(ROOT)),sha256=sha(path))
 def verify_data_pin(value):
@@ -119,9 +134,10 @@ def seal():
     require(not PROOF.exists(),'PREPARED_PROOF_EXISTS');s=read(STATE);source=verify_original(s['initialIdentity'])
     require([r['kind'] for r in s['completed']]==['armored','pouncer','weapon'],'PREPARED_THREE_RESULTS')
     fx_path=PROJECT/'JourneyEvidence/journey-candidate-fx.json';fx=read(fx_path)
+    verified_spawn_grounding(s)
     added={**s['assetFiles'],**journey_files(fx)}
     verify_asset_union(source,s['initialSourceDirectories'],added,verified_package_snapshot(s))
-    data=[STATE,PROJECT/'JourneyEvidence/JourneyPreparation/authored-assets.json',fx_path,PROJECT/'JourneyEvidence/journey-candidate-integration.json',PROJECT/'JourneyEvidence/journey-diagnostic-scope.json']
+    data=data_paths()
     for item in s['completed']:
         receipt=TASK/'journey-preparation-export'/item['kind']/'receipt.json';require(sha(receipt)==item['exportReceiptSha256'],'PREPARED_STRICT_RECEIPT_CHANGED');data.append(receipt)
     proof=dict(schema='desert-rv-prepared-source/v1',initialIdentity=s['initialIdentity'],initialSourceDirectories=s['initialSourceDirectories'],addedAssets=added,dataPins=[pin(path) for path in data])
@@ -132,9 +148,9 @@ def seal():
 def verify():
     proof=read(PROOF);require(proof.get('schema')=='desert-rv-prepared-source/v1','PREPARED_SCHEMA')
     source=verify_original(proof['initialIdentity'])
-    expected={str(path.relative_to(ROOT)) for path in (STATE,PROJECT/'JourneyEvidence/JourneyPreparation/authored-assets.json',PROJECT/'JourneyEvidence/journey-candidate-fx.json',PROJECT/'JourneyEvidence/journey-candidate-integration.json',PROJECT/'JourneyEvidence/journey-diagnostic-scope.json')}
+    expected={str(path.relative_to(ROOT)) for path in data_paths()}
     expected.update('tasks/desert-rv/journey-preparation-export/'+kind+'/receipt.json' for kind in ('armored','pouncer','weapon'))
-    require(len(proof['dataPins'])==8 and {p['path'] for p in proof['dataPins']}==expected,'PREPARED_EXACT_DATA_PINS')
+    require(len(proof['dataPins'])==9 and {p['path'] for p in proof['dataPins']}==expected,'PREPARED_EXACT_DATA_PINS')
     for item in proof['dataPins']:verify_data_pin(item)
     integrated=read(PROJECT/'JourneyEvidence/journey-candidate-integration.json')
     require(integrated['status']=='STRICT_CANDIDATES_BOUND_UNREVIEWED' and integrated['protectedSourcesUnchanged'] is True and integrated['failures']==[],'PREPARED_INTEGRATION_NOT_READY')
@@ -142,6 +158,7 @@ def verify():
         require(row['path'].startswith(('Assets/','Packages/','ProjectSettings/')) and '..' not in pathlib.PurePosixPath(row['path']).parts and '\\' not in row['path'],'PREPARED_NATIVE_PROTECTED_PATH')
         require(sha(PROJECT/row['path'])==row['sha256'],'PREPARED_NATIVE_PROTECTED_BYTES_CHANGED')
     s=read(STATE);require(proof['initialIdentity']==s['initialIdentity'] and proof['initialSourceDirectories']==s['initialSourceDirectories'],'PREPARED_INITIAL_PROOF_CHANGED');fx=read(PROJECT/'JourneyEvidence/journey-candidate-fx.json')
+    verified_spawn_grounding(s)
     require(proof['addedAssets']=={**s['assetFiles'],**journey_files(fx)},'PREPARED_GENERATED_PROOF_CHANGED')
     verify_asset_union(source,proof['initialSourceDirectories'],proof['addedAssets'],verified_package_snapshot(s))
     return proof
