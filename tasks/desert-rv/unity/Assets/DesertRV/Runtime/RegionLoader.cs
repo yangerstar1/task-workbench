@@ -36,7 +36,11 @@ namespace DesertRV
             if (Editor.JourneyDiagnosticScope.Active)
                 return Editor.JourneyDiagnosticScope.ValidateRegion(binding, out reason);
 #endif
+#if DESERTRV_CANDIDATE_LINUX && UNITY_STANDALONE_LINUX && DEVELOPMENT_BUILD && !UNITY_EDITOR
+            return JourneyCandidateLinuxIdentity.ValidateForLoad(binding, out reason);
+#else
             return binding.Validate(out reason);
+#endif
         }
         static void RestoreActive(Scene rejected, Scene previous)
         {

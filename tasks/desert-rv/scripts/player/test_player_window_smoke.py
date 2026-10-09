@@ -172,7 +172,7 @@ class PlayerWindowTests(unittest.TestCase):
    file=self.r/name;file.parent.mkdir(parents=True,exist_ok=True);file.write_text(text if name==p.SETTINGS_PATH else 'unchanged public source');os.chmod(file,0o644);before[name]=p.sha(file)
   (task/'player-source-before.json').write_text(json.dumps(before));(task/'SOURCE-STATE.json').write_text(json.dumps({'schema':'desert-rv-source-state/v1','files':[dict(path=n,sha256=v) for n,v in before.items()]}))
   return task,logs,before
- def test_exact_settings_backup_restores_bytes_and_four_original_modes(self):
+ def test_exact_settings_backup_restores_bytes_and_five_original_modes(self):
   task,logs,before=self.recovery_fixture();ev=task/'evidence'
   with patch.object(p,'TASK',task),patch.object(p,'EVIDENCE',ev),patch.object(p,'tracked_names',return_value=list(p.RECOVERY_PATHS)):
    p.snapshot_recovery(logs);file=self.r/p.SETTINGS_PATH;file.write_text(file.read_text().replace('ORIGINAL','PRIVATE_DIAGNOSTIC_VALUE').replace('resizableWindow: 1','resizableWindow: 0'))
@@ -180,6 +180,18 @@ class PlayerWindowTests(unittest.TestCase):
    self.assertEqual(p.recover_source(logs),0);result=json.loads((ev/'source-recovery.json').read_text())
   self.assertEqual(result['before']['status'],'DIFFERENCES');self.assertEqual(result['settingsDiff']['classification'],'OWNED_FIELDS_ONLY');self.assertTrue(result['settingsBackupRestored']);self.assertNotIn('PRIVATE_DIAGNOSTIC_VALUE',json.dumps(result))
   for name in p.RECOVERY_PATHS:self.assertEqual(p.sha(self.r/name),before[name]);self.assertEqual((self.r/name).stat().st_mode&0o777,0o644)
+ def test_shadergraph_recovery_is_mode_only_and_requires_original_hash(self):
+  task,logs,before=self.recovery_fixture();ev=task/'evidence';name='tasks/desert-rv/unity/ProjectSettings/ShaderGraphSettings.asset'
+  self.assertIn(name,p.RECOVERY_PATHS);self.assertEqual(len(p.RECOVERY_PATHS),5)
+  with patch.object(p,'TASK',task),patch.object(p,'EVIDENCE',ev),patch.object(p,'tracked_names',return_value=list(p.RECOVERY_PATHS)):
+   p.snapshot_recovery(logs);file=self.r/name;file.write_text('CHANGED_SHADER_GRAPH_BYTES');file.chmod(0o600);self.assertEqual(p.recover_source(logs),1)
+  self.assertEqual(file.read_text(),'CHANGED_SHADER_GRAPH_BYTES');self.assertEqual(file.stat().st_mode&0o777,0o600)
+ def test_capture_fixed_stages_are_public_enum_only(self):
+  import inspect
+  source=inspect.getsource(p.capture)
+  for stage in ('PLAYER_ENCODER_START_FAILED','PLAYER_IDENTITY_CHANGED','PLAYER_FOCUS_LOST','PLAYER_ENCODER_HEARTBEAT_FAILED','PLAYER_FRAME_HEARTBEAT_FAILED','PLAYER_ENCODER_STOP_FAILED','PLAYER_SCREENSHOT_FAILED','PLAYER_VIDEO_PROBE_FAILED'):
+   self.assertIn(stage,p.PLAYER_FAILURES);self.assertIn("failure='"+stage+"'",source)
+  self.assertIn("{'failureCode':failure}",source);self.assertNotIn('str(e)',source)
  def test_recovery_never_restores_other_source_bytes(self):
   task,logs,before=self.recovery_fixture();ev=task/'evidence'
   with patch.object(p,'TASK',task),patch.object(p,'EVIDENCE',ev),patch.object(p,'tracked_names',return_value=list(p.RECOVERY_PATHS)):

@@ -100,6 +100,35 @@ class PipelineTests(unittest.TestCase):
         p.verify_snapshot(sources)
         for source,(relative,h) in sources.items():self.assertEqual(source.read_bytes(),(view/relative).read_bytes());self.assertEqual(p.sha(source),h)
         self.assertEqual(p.import_inventory(),current)
+    def pouncer_solver_copy_fixture(self):
+        from paw_contact_output import SOLVER
+        current,xml=self.setup_copy()
+        self.file(SOLVER,b'// source-helper fixture, not a native pass')
+        self.file(SOLVER+'.meta',b'guid: 17ed0b5762b35543b60100e36f9279a1\n')
+        return current,xml,SOLVER
+    def test_pouncer_static_solver_is_copied_without_inventing_asset_dependencies(self):
+        current,xml,solver=self.pouncer_solver_copy_fixture();view,sources=p.copy_snapshot({'kind':'pouncer','id':'current'},current,xml)
+        p.verify_snapshot(sources)
+        for name in (solver,solver+'.meta'):
+            self.assertIn(p.PROJECT/name,sources);self.assertEqual((view/'unity'/name).read_bytes(),(p.PROJECT/name).read_bytes())
+    def test_existing_pouncer_snapshot_requires_solver_even_without_serialized_reference(self):
+        import pouncer_output
+        current,xml,solver=self.pouncer_solver_copy_fixture();view,_=p.copy_snapshot({'kind':'pouncer','id':'current'},current,xml)
+        with mock.patch.object(pouncer_output,'dependency_shape'),mock.patch.object(pouncer_output,'dependency_input_paths',return_value=set()):
+            paths=pouncer_output.snapshot_paths(view,{'id':'current'},[]);self.assertIn(view/'unity'/solver,paths)
+            (view/'unity'/solver).unlink()
+            with self.assertRaisesRegex(Exception,'STRICT_UNSAFE_FILE'):pouncer_output.snapshot_paths(view,{'id':'current'},[])
+    def test_pouncer_missing_real_solver_fails_instead_of_skipping_it(self):
+        current,xml,solver=self.pouncer_solver_copy_fixture();(p.PROJECT/solver).unlink()
+        with self.assertRaisesRegex(Exception,'STRICT_UNSAFE_FILE'):p.copy_snapshot({'kind':'pouncer','id':'current'},current,xml)
+    def test_pouncer_solver_mutation_after_copy_is_detected(self):
+        current,xml,solver=self.pouncer_solver_copy_fixture();_,sources=p.copy_snapshot({'kind':'pouncer','id':'current'},current,xml)
+        self.file(solver,b'changed helper after strict snapshot')
+        with self.assertRaisesRegex(Exception,'INPUT_CHANGED'):p.verify_snapshot(sources)
+    def test_pouncer_solver_meta_mutation_after_copy_is_detected(self):
+        current,xml,solver=self.pouncer_solver_copy_fixture();_,sources=p.copy_snapshot({'kind':'pouncer','id':'current'},current,xml)
+        self.file(solver+'.meta',b'changed GUID')
+        with self.assertRaisesRegex(Exception,'INPUT_CHANGED'):p.verify_snapshot(sources)
     def test_empty_current_directories_are_preserved_in_view(self):
         current,xml=self.setup_copy();(p.PROJECT/p.IMPORTS/'current/unknown-empty').mkdir()
         view,_=p.copy_snapshot({'kind':'armored','id':'current'},current,xml)

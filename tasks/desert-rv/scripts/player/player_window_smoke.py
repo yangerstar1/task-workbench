@@ -16,7 +16,7 @@ PUBLIC=TASK/'player-public-export'
 
 BUILD_STAGES={'NOT_OBSERVED','EXECUTE_METHOD_ENTERED','TARGET_CHECKED','SCENE_VALIDATED','BUILD_PLAYER_ENTERED','BUILD_PLAYER_RETURNED','BUILD_RECEIPT_WRITTEN'}
 BUILD_FAILURES={'NONE','LINUX_TARGET_UNSUPPORTED','PROJECT_COMPILE_ERRORS','REFERENCE_BUILD_FAILED','BUILD_DIAGNOSTIC_UNAVAILABLE'}
-PLAYER_FAILURES={'PLAYER_STARTUP_FAILED','PLAYER_WINDOW_FAILED','PLAYER_CAPTURE_FAILED'}
+PLAYER_FAILURES={'PLAYER_STARTUP_FAILED','PLAYER_WINDOW_FAILED','PLAYER_CAPTURE_FAILED','PLAYER_ENCODER_START_FAILED','PLAYER_PROCESS_STOPPED_DURING_CAPTURE','PLAYER_IDENTITY_CHANGED','PLAYER_FOCUS_LOST','PLAYER_ENCODER_HEARTBEAT_FAILED','PLAYER_FRAME_SCHEMA_FAILED','PLAYER_FRAME_HEARTBEAT_FAILED','PLAYER_DURATION_HANDSHAKE_FAILED','PLAYER_ENCODER_STOP_FAILED','PLAYER_EXIT_FAILED','PLAYER_SOURCE_CHANGED','PLAYER_SCREENSHOT_FAILED','PLAYER_VIDEO_PROBE_FAILED','PLAYER_SUMMARY_FAILED'}
 def empty_build_native():
     return dict(mode='BODY_STUDY_BUILD_FIXED_DIAGNOSTIC',stage='NOT_OBSERVED',exceptionKind='NONE',buildResult='UNAVAILABLE',targetChecked=False,targetSupported=False,buildReportAvailable=False,settingsRestored=False,totalErrors=0,totalWarnings=0)
 def validate_build_native(value):
@@ -113,6 +113,7 @@ RECOVERY_PATHS=(
  'tasks/desert-rv/unity/Assets/DesertRV/Settings/WebURP.asset',
  'tasks/desert-rv/unity/Assets/UniversalRenderPipelineGlobalSettings.asset',
  'tasks/desert-rv/unity/ProjectSettings/GraphicsSettings.asset',
+ 'tasks/desert-rv/unity/ProjectSettings/ShaderGraphSettings.asset',
  'tasks/desert-rv/unity/ProjectSettings/ProjectSettings.asset')
 SETTINGS_PATH=RECOVERY_PATHS[-1]
 SETTINGS_FIELDS=('productName','defaultScreenWidth','defaultScreenHeight','resizableWindow','fullscreenMode','scriptingBackend.Standalone')
@@ -236,7 +237,7 @@ def capture(folder,private):
         until=time.monotonic()+5
         while not (h/'frame.json').exists() or read_json(h/'frame.json').get('focused') is not True:
             require(player.poll() is None and time.monotonic()<until);time.sleep(.1)
-        began=stamp();video=EVIDENCE/'real-time.mp4';failure='PLAYER_CAPTURE_FAILED'
+        began=stamp();video=EVIDENCE/'real-time.mp4';failure='PLAYER_ENCODER_START_FAILED'
         ff=subprocess.Popen(['ffmpeg','-y','-f','x11grab','-window_id',window,'-framerate','30','-i',os.environ['DISPLAY'],'-c:v','libx264','-preset','ultrafast','-crf','23','-pix_fmt','yuv420p','-progress','pipe:1',str(video)],stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=flog,text=True)
         def progress():
             for line in ff.stdout:
@@ -244,27 +245,29 @@ def capture(folder,private):
         thread=threading.Thread(target=progress,daemon=True);thread.start()
         last_video=0;last_frame=-1;last_wall=-1;last_change=time.monotonic();last_encoded=time.monotonic();ready=False
         while True:
-            now=time.monotonic();require(now-started<100 and player.poll() is None and ff.poll() is None)
-            verify_player(player.pid,exe,argv);require(identity(window,TITLE,player.pid)==(1280,720));checks+=1
-            require(subprocess.check_output(['xdotool','getactivewindow'],text=True,stderr=subprocess.DEVNULL).strip()==window)
+            now=time.monotonic();failure='PLAYER_PROCESS_STOPPED_DURING_CAPTURE';require(now-started<100 and player.poll() is None and ff.poll() is None)
+            failure='PLAYER_IDENTITY_CHANGED';verify_player(player.pid,exe,argv);require(identity(window,TITLE,player.pid)==(1280,720));checks+=1
+            failure='PLAYER_FOCUS_LOST';require(subprocess.check_output(['xdotool','getactivewindow'],text=True,stderr=subprocess.DEVNULL).strip()==window)
             if frames[0]>last_video:last_video=frames[0];last_encoded=now
-            require(now-last_encoded<5)
-            beat=read_json(h/'frame.json');require(set(beat)=={'frame','wall','focused'})
+            failure='PLAYER_ENCODER_HEARTBEAT_FAILED';require(now-last_encoded<5)
+            failure='PLAYER_FRAME_SCHEMA_FAILED';beat=read_json(h/'frame.json');require(set(beat)=={'frame','wall','focused'})
             require(type(beat['frame']) is int and type(beat['wall']) in (int,float) and beat['wall']>=last_wall and beat['focused'] is True)
             require(beat['frame']>=last_frame)
             if beat['frame']>last_frame:last_change=now;last_frame=beat['frame'];last_wall=beat['wall']
-            require(now-last_change<3)
+            failure='PLAYER_FRAME_HEARTBEAT_FAILED';require(now-last_change<3)
+            failure='PLAYER_DURATION_HANDSHAKE_FAILED'
             if not ready and frames[0]>0:atomic(h/'ready.json',{'ready':True});ready=True
             if (h/'duration-complete.json').exists():
                 require(ready and read_json(h/'duration-complete.json')=={'seconds':15,'screenshots':3});break
             time.sleep(.1)
-        code,method,error=finish_encoder(ff);ff=None;require(code==0 and method=='stdin-q' and error is None)
-        thread.join(timeout=1);atomic(h/'stopped.json',{'stopped':True});require(player.wait(timeout=15)==0)
-        require(tree_hash(folder)==build_tree);source_unchanged()
+        failure='PLAYER_ENCODER_STOP_FAILED';code,method,error=finish_encoder(ff);ff=None;require(code==0 and method=='stdin-q' and error is None)
+        failure='PLAYER_EXIT_FAILED';thread.join(timeout=1);atomic(h/'stopped.json',{'stopped':True});require(player.wait(timeout=15)==0)
+        failure='PLAYER_SOURCE_CHANGED';require(tree_hash(folder)==build_tree);source_unchanged()
+        failure='PLAYER_SCREENSHOT_FAILED'
         for i in range(3):inspect_png(h/f'frame-{i}.png',(1280,720));shutil.copyfile(h/f'frame-{i}.png',EVIDENCE/f'frame-{i}.png')
-        video_info=probe_video(video);stream=video_info['streams'][0];duration=float(video_info['format']['duration'])
+        failure='PLAYER_VIDEO_PROBE_FAILED';video_info=probe_video(video);stream=video_info['streams'][0];duration=float(video_info['format']['duration'])
         require(15<=duration<=22 and stream['width']==1280 and stream['height']==720 and stream['r_frame_rate']=='30/1' and stream['avg_frame_rate']=='30/1')
-        summary=dict(mode=MODE,sourceCommit=os.environ['GITHUB_SHA'],candidateOnly=True,humanPlaytest=False,gameplayAccepted=False,androidVerified=False,visualReviewed=False,inputsApplied=False,sourceVerified=True,durationSeconds=duration,nominalCaptureFps=30,encodedFrameRate=stream['r_frame_rate'],averageFrameRate=stream['avg_frame_rate'],captureStartUtc=began,captureEndUtc=stamp(),identityChecks=checks,encodedProgressFrames=frames[0],windowId=window,playerPid=player.pid,playerExecutableSha256=build['executableSha256'],buildTreeSha256=build_tree,sceneSha256=build['sceneSha256'],playerExitCode=0,encoderExitCode=0,encoderStopMethod='stdin-q',screenshots=3)
+        failure='PLAYER_SUMMARY_FAILED';summary=dict(mode=MODE,sourceCommit=os.environ['GITHUB_SHA'],candidateOnly=True,humanPlaytest=False,gameplayAccepted=False,androidVerified=False,visualReviewed=False,inputsApplied=False,sourceVerified=True,durationSeconds=duration,nominalCaptureFps=30,encodedFrameRate=stream['r_frame_rate'],averageFrameRate=stream['avg_frame_rate'],captureStartUtc=began,captureEndUtc=stamp(),identityChecks=checks,encodedProgressFrames=frames[0],windowId=window,playerPid=player.pid,playerExecutableSha256=build['executableSha256'],buildTreeSha256=build_tree,sceneSha256=build['sceneSha256'],playerExitCode=0,encoderExitCode=0,encoderStopMethod='stdin-q',screenshots=3)
         atomic(EVIDENCE/'summary.json',summary);success=True;return 0
       except Exception:
         atomic(EVIDENCE/'failure.json',{'failureCode':failure});return 1

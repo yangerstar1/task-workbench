@@ -336,11 +336,13 @@ namespace DesertRV.Editor
             bool hasJourney = scene.GetRootGameObjects().Any(r=>r.GetComponentInChildren<JourneyDirector>(true) || r.GetComponentInChildren<RegionBinding>(true));
             if (!formal && !hasJourney) return;
             if (!formal) throw new BuildFailedException("Unreviewed alternate path contains formal journey components: "+scene.path);
+            if (JourneyCandidateLinuxBuild.AllowsCandidateBuild(report)) return;
             if (string.IsNullOrEmpty(JourneyContentChecks.ValidatedBuildFingerprint) || JourneyContentChecks.ValidatedBuildFingerprint != JourneyContentChecks.BuildFingerprint())
                 throw new BuildFailedException("Formal journey scenes require current production content preflight. Use JourneyContentChecks.BuildAndroidProduction; direct scene-only builds cannot bypass asset acceptance.");
         }
         public void OnPreprocessBuild(BuildReport report)
         {
+            if (JourneyCandidateLinuxBuild.AllowsCandidateBuild(report)) return;
             if (EditorBuildSettings.scenes.Any(s => s.enabled && (s.path == JourneySceneAuthoring.BootstrapPath || JourneySceneAuthoring.RegionPaths.Contains(s.path))) &&
                 (string.IsNullOrEmpty(JourneyContentChecks.ValidatedBuildFingerprint) || JourneyContentChecks.ValidatedBuildFingerprint != JourneyContentChecks.BuildFingerprint()))
                 throw new BuildFailedException("Run formal content preflight before entering BuildPipeline. Use JourneyContentChecks.BuildAndroidProduction.");

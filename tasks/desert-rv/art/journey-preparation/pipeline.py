@@ -168,6 +168,12 @@ def copy_snapshot(c,current,xml):
             # resolver includes private package bytes/manifest and project controls.
             for path in dependency_input_paths(PROJECT,deps):
                 sources[path]=(Path('unity')/path.relative_to(PROJECT),sha(path))
+    if c['kind']=='pouncer':
+        # The existing strict Pouncer exporter also freezes its statically called
+        # solver. Unity's serialized asset dependencies do not include that C# helper.
+        from paw_contact_output import SOLVER
+        for name in (SOLVER,SOLVER+'.meta'):
+            path=PROJECT/name;sources[path]=(Path('unity')/name,sha(path))
     paths=list(xml.rglob('*.xml'));require(0<len(paths)<=20,'PREP_NATIVE_XML_MISSING')
     for path in paths:sources[path]=(Path('artifacts/candidate-art')/path.relative_to(xml),sha(path))
     for path,(rel,h) in sources.items():
