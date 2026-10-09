@@ -539,6 +539,7 @@ IMPORT_REJECT_CODES = frozenset((
     'POUNCER_IMPORT_STATUS',
     'POUNCER_MATERIAL_ASSET',
     'POUNCER_MATERIAL_PROPERTIES',
+    'POUNCER_MAIN_TEX_ALIAS',
     'POUNCER_MATERIAL_TEXTURE_BINDING',
     'POUNCER_MATERIAL_VALUES',
     'POUNCER_META_GUID',
@@ -634,6 +635,88 @@ IMPORT_REJECT_CODES = frozenset((
 ))
 
 
+# Literal projection of current generated_files checks and their shared helpers.
+# This list grants no acceptance: the original exception is always re-raised.
+GENERATED_REJECT_CODES = frozenset((
+    'POUNCER_DEPENDENCY_GUID_CLOSURE',
+    'POUNCER_DUPLICATE_YAML_KEY',
+    'POUNCER_GENERATED_ALLOWLIST',
+    'POUNCER_GENERATED_CONTRACT',
+    'POUNCER_GENERATED_DIRECTORY',
+    'POUNCER_GENERATED_SOURCE',
+    'POUNCER_META_GUID',
+    'POUNCER_META_GUID_DUPLICATE',
+    'POUNCER_META_SIZE',
+    'POUNCER_META_YAML',
+    'POUNCER_SYMLINK_FORBIDDEN',
+    'POUNCER_UNITY_YAML',
+    'POUNCER_UNSAFE_GENERATED_NODE',
+    'POUNCER_YAML_NODE_LIMIT',
+    'STRICT_DEPENDENCY_LIST',
+    'STRICT_DEPENDENCY_PATH',
+    'STRICT_DERIVED_COUNT',
+    'STRICT_DUPLICATE_JSON_KEY',
+    'STRICT_GENERATED_ALLOWLIST',
+    'STRICT_GENERATED_CONTRACT',
+    'STRICT_GENERATED_SOURCE',
+    'STRICT_META_GUID',
+    'STRICT_META_SIZE',
+    'STRICT_NONFINITE_JSON',
+    'STRICT_ORM_DIMENSIONS',
+    'STRICT_ORM_FLAGS',
+    'STRICT_ORM_IDENTITY',
+    'STRICT_ORM_IMPORTED_PIXEL_HASH',
+    'STRICT_ORM_IMPORT_SETTINGS',
+    'STRICT_ORM_PIXEL_MAPPING',
+    'STRICT_ORM_SOURCE_CHANGED',
+    'STRICT_OVERSIZED_FILE',
+    'STRICT_OVERSIZED_JSON',
+    'STRICT_PACKAGE_CONTROL_PIN',
+    'STRICT_PACKAGE_CONTROL_SIZE',
+    'STRICT_PACKAGE_DIRECT_UNSAFE',
+    'STRICT_PACKAGE_EDITOR_PIN',
+    'STRICT_PACKAGE_FILE_GUID',
+    'STRICT_PACKAGE_FILE_HASH',
+    'STRICT_PACKAGE_FILE_SIZE',
+    'STRICT_PACKAGE_LOCK_PIN',
+    'STRICT_PACKAGE_MANIFEST_PIN',
+    'STRICT_PACKAGE_SNAPSHOT_ALLOWLIST',
+    'STRICT_PACKAGE_SNAPSHOT_FILES',
+    'STRICT_PACKAGE_SNAPSHOT_FILE_PIN',
+    'STRICT_PACKAGE_SNAPSHOT_IDENTITY',
+    'STRICT_PACKAGE_SNAPSHOT_MANIFEST_SIZE',
+    'STRICT_PACKAGE_SNAPSHOT_REQUIRED',
+    'STRICT_PACKAGE_SNAPSHOT_STALE',
+    'STRICT_PACKAGE_SNAPSHOT_UNSAFE',
+    'STRICT_SCHEMA_MISMATCH',
+    'STRICT_SYMLINK_FORBIDDEN',
+    'STRICT_UNITY_YAML',
+    'STRICT_UNSAFE_FILE',
+    'WEAPON_DERIVED_COUNT',
+    'WEAPON_GENERATED_ALLOWLIST',
+    'WEAPON_GENERATED_CONTRACT',
+    'WEAPON_GENERATED_DIRECTORY',
+    'WEAPON_GENERATED_SOURCE',
+    'WEAPON_META_GUID',
+    'WEAPON_META_GUID_DUPLICATE',
+    'WEAPON_META_SIZE',
+    'WEAPON_PACKAGE_SCRIPT_SCOPE',
+    'WEAPON_SYMLINK_FORBIDDEN',
+    'WEAPON_UNITY_YAML',
+    'WEAPON_UNSAFE_GENERATED_NODE',
+))
+
+
+def generated_rejection_summary(error):
+    # Never stringify an exception, expose unknown text, or mask the original gate.
+    try:
+        args = error.args if type(error) is strict.StrictError else ()
+        code = args[0] if len(args) == 1 and type(args[0]) is str and args[0] in GENERATED_REJECT_CODES else 'UNCLASSIFIED'
+        print('CANDIDATE_GENERATED_REJECTION ' + json.dumps(dict(code=code), sort_keys=True))
+    except Exception:
+        pass
+
+
 def import_rejection_summary(contract, report, error):
     # Closed metadata only; no raw exception, arbitrary status, path or report content.
     try:
@@ -709,7 +792,11 @@ def _export(root, output, c, summary, native, protected):
             import_rejection_summary(c, imp, import_error)
             raise
         collection_stage('GENERATED')
-        validator.generated_files(project, c, prefix, imp, files)
+        try:
+            validator.generated_files(project, c, prefix, imp, files)
+        except Exception as generated_error:
+            generated_rejection_summary(generated_error)
+            raise
         collection_stage('CAPTURE')
         safe_capture = sanitize_capture(c, imp, capture, snap)
         paw_path=snap.root/'unity/JourneyEvidence/CandidateArt/paw-contact-report.json'

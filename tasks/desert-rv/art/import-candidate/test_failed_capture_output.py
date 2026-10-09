@@ -179,6 +179,56 @@ class FailedCaptureTests(unittest.TestCase):
             f.import_rejection_summary(self.c,self.imp,strict_output.StrictError('POUNCER_DEPENDENCY_INVENTORY'))
         self.assertEqual(json.loads(output.getvalue().split(' ',1)[1])['code'],'POUNCER_DEPENDENCY_INVENTORY')
 
+    def test_generated_rejection_projects_only_literal_strict_codes(self):
+        from contextlib import redirect_stdout
+        class HostileError(Exception):
+            def __str__(self):
+                raise AssertionError('raw exception must never be stringified')
+        for error, expected in [(strict_output.StrictError(code), code) for code in f.GENERATED_REJECT_CODES] + [
+                (strict_output.StrictError('SECRET/path?token=private'), 'UNCLASSIFIED'),
+                (strict_output.StrictError('STRICT_ORM_IMPORT_SETTINGS', 'SECRET'), 'UNCLASSIFIED'),
+                (ValueError('STRICT_ORM_IMPORT_SETTINGS'), 'UNCLASSIFIED'),
+                (HostileError('SECRET'), 'UNCLASSIFIED')]:
+            with self.subTest(expected=expected):
+                output=io.StringIO()
+                with redirect_stdout(output): f.generated_rejection_summary(error)
+                self.assertEqual(output.getvalue(), 'CANDIDATE_GENERATED_REJECTION '+json.dumps(dict(code=expected),sort_keys=True)+'\n')
+                self.assertNotIn('SECRET',output.getvalue())
+
+    def test_generated_failure_matches_actual_armored_stage_boundary(self):
+        from contextlib import redirect_stdout
+        recorded=json.loads((Path(f.__file__).parent/'fixtures/unity-texture-meta/armored-37881389424-failed-stages.json').read_text())
+        self.assertEqual(recorded['runId'],37881389424)
+        original=strict_output.StrictError('STRICT_ORM_IMPORT_SETTINGS')
+        output=io.StringIO()
+        with redirect_stdout(output),patch.object(strict_output,'generated_files',side_effect=original):
+            with self.assertRaises(strict_output.StrictError) as raised:
+                f._export(self.root,self.out,self.c,self.summary,'failure','success')
+        self.assertIs(raised.exception,original)
+        lines=output.getvalue().splitlines()
+        self.assertEqual([line.split('=',1)[1] for line in lines if line.startswith('FAILED_CAPTURE_COLLECTION_STAGE=')],recorded['stages'])
+        self.assertEqual(lines[-1],'CANDIDATE_GENERATED_REJECTION {"code": "STRICT_ORM_IMPORT_SETTINGS"}')
+        self.assertEqual(list(self.out.iterdir()),[])
+        self.assertFalse(list(self.out.parent.glob('.failed-*')))
+
+    def test_unknown_generated_failure_does_not_change_failure_or_publish(self):
+        from contextlib import redirect_stdout
+        output=io.StringIO()
+        with redirect_stdout(output),patch.object(strict_output,'generated_files',side_effect=ValueError('SECRET/path?token=private')):
+            self.rejected()
+        self.assertIn('CANDIDATE_GENERATED_REJECTION {"code": "UNCLASSIFIED"}',output.getvalue())
+        self.assertNotIn('SECRET',output.getvalue())
+        self.assertNotIn('FAILED_CAPTURE_COLLECTION_STAGE=CAPTURE',output.getvalue())
+
+    def test_generated_observation_failure_cannot_mask_original_exception(self):
+        from contextlib import redirect_stdout
+        original=strict_output.StrictError('STRICT_GENERATED_ALLOWLIST')
+        with redirect_stdout(io.StringIO()),patch.object(strict_output,'generated_files',side_effect=original),patch.object(f.json,'dumps',side_effect=RuntimeError('SECRET')):
+            with self.assertRaises(strict_output.StrictError) as raised:
+                f._export(self.root,self.out,self.c,self.summary,'failure','success')
+        self.assertIs(raised.exception,original)
+        self.assertEqual(list(self.out.iterdir()),[])
+
     def test_collection_stage_reports_only_fixed_allowlisted_labels(self):
         from contextlib import redirect_stdout
         output=io.StringIO()

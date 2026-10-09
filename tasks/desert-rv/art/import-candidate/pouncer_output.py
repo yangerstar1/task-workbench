@@ -174,6 +174,30 @@ def material_file(project, prefix, spec, index):
     require(all(close(emission[a], 0) for a in 'rgb'), 'POUNCER_UNDECLARED_EMISSION')
     require('_EMISSION' not in asset.get('m_ValidKeywords', [])
         and '_EMISSION' not in str(asset.get('m_ShaderKeywords', '')).split(), 'POUNCER_UNDECLARED_EMISSION')
+    def texture_require(ok, code, role, binding, texture):
+        if ok: return
+        # A fixed role classification and comparison flags only: never serialize
+        # an arbitrary role name, texture pointer, resource path or exception.
+        try:
+            known_roles = {'_BaseMap','_MainTex','_BumpMap','_ParallaxMap','_OcclusionMap',
+                '_MetallicGlossMap','_SpecGlossMap','_EmissionMap','_DetailMask','_DetailAlbedoMap','_DetailNormalMap'}
+            base = textures.get('_BaseMap')
+            base_texture = base.get('m_Texture') if isinstance(base, dict) else None
+            identity_matches = (isinstance(base_texture, dict) and isinstance(texture, dict)
+                and set(texture) == set(base_texture) == {'guid','fileID','type'}
+                and type(texture['fileID']) is int and texture['fileID'] != 0
+                and type(texture['type']) is int and texture['type'] == 3
+                and texture == base_texture)
+            print('CANDIDATE_POUNCER_TEXTURE_REJECTION '+json.dumps(dict(
+                materialIndex=index if type(index) is int and 0<=index<9 else -1,
+                role=role if role in known_roles else 'OTHER', declaredBaseColor=bool(spec['baseColorFile']),
+                textureIdentityMatchesBaseMap=identity_matches,
+                scaleMatchesBaseMap=isinstance(base,dict) and isinstance(binding.get('m_Scale'),dict) and binding.get('m_Scale')==base.get('m_Scale'),
+                offsetMatchesBaseMap=isinstance(base,dict) and isinstance(binding.get('m_Offset'),dict) and binding.get('m_Offset')==base.get('m_Offset')),
+                sort_keys=True))
+        except Exception:
+            pass  # Optional observation cannot replace or mask the original gate.
+        raise StrictError(code)
     for role, binding in textures.items():
         require(isinstance(binding, dict), 'POUNCER_MATERIAL_TEXTURE_BINDING')
         texture = binding.get('m_Texture', {})
@@ -181,9 +205,22 @@ def material_file(project, prefix, spec, index):
         if role == '_BaseMap' and spec['baseColorFile']:
             require(texture.get('guid') == _meta_guid(project/(prefix+'/Source/'+spec['baseColorFile']))
                 and type(texture.get('fileID')) is int and texture['fileID'] != 0, 'POUNCER_MATERIAL_TEXTURE_BINDING')
+        elif role == '_MainTex' and spec['baseColorFile'] and texture.get('fileID', 0) != 0:
+            # URP 17.3 BaseShaderGUI copies this legacy GI alias from _BaseMap.
+            # Only the exact declared texture pointer and identical UV transform
+            # are accepted; no extra texture source or independent role is added.
+            base = textures.get('_BaseMap')
+            texture_require(isinstance(base, dict) and set(base) == set(binding) == {'m_Texture','m_Scale','m_Offset'}
+                and texture == base['m_Texture'], 'POUNCER_MAIN_TEX_ALIAS',role,binding,texture)
+            for coordinate in ('m_Scale','m_Offset'):
+                actual, original = binding[coordinate], base[coordinate]
+                texture_require(isinstance(actual, dict) and isinstance(original, dict)
+                    and set(actual) == set(original) == {'x','y'}
+                    and all(finite(v) for v in (*actual.values(),*original.values()))
+                    and actual == original, 'POUNCER_MAIN_TEX_ALIAS',role,binding,texture)
         else:
-            require(type(texture.get('fileID', 0)) is int and texture.get('fileID', 0) == 0
-                and not texture.get('guid'), 'POUNCER_UNDECLARED_TEXTURE')
+            texture_require(type(texture.get('fileID', 0)) is int and texture.get('fileID', 0) == 0
+                and not texture.get('guid'), 'POUNCER_UNDECLARED_TEXTURE',role,binding,texture)
     require(not spec['baseColorFile'] or '_BaseMap' in textures, 'POUNCER_MATERIAL_TEXTURE_BINDING')
 
 

@@ -314,8 +314,15 @@ def derived_record(project,prefix,record,m,index,files):
  require(actual.tobytes()==expected,'STRICT_ORM_PIXEL_MAPPING')
  pixel=actual.transpose(Image.Transpose.FLIP_TOP_BOTTOM).tobytes()
  require(hashlib.sha256(pixel).hexdigest()==record['decodedPixelSha256'],'STRICT_ORM_IMPORTED_PIXEL_HASH')
- meta=yaml.safe_load(safe(Path(str(project/dst)+'.meta')).read_text());imp=meta.get('TextureImporter',{})
- require(imp.get('sRGBTexture')==0 and imp.get('isReadable')==1 and imp.get('textureType')==0,'STRICT_ORM_IMPORT_SETTINGS')
+ meta=yaml.safe_load(safe(Path(str(project/dst)+'.meta')).read_text())
+ imp=meta.get('TextureImporter') if type(meta) is dict else None
+ mipmaps=imp.get('mipmaps') if type(imp) is dict else None
+ # Unity's TextureImporter stores this flag inside mipmaps. A top-level
+ # substitute or conflicting duplicate location is not a valid native layout.
+ require(type(imp) is dict and type(mipmaps) is dict and 'sRGBTexture' not in imp
+  and type(mipmaps.get('sRGBTexture')) is int and mipmaps['sRGBTexture']==0
+  and type(imp.get('isReadable')) is int and imp['isReadable']==1
+  and type(imp.get('textureType')) is int and imp['textureType']==0,'STRICT_ORM_IMPORT_SETTINGS')
  require(sha(project/src)==record['sourceSha256'],'STRICT_ORM_SOURCE_CHANGED')
  return dst
 

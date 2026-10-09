@@ -63,7 +63,7 @@ class StrictExportTests(unittest.TestCase):
   native.write_text('<test-run result="Passed">'+''.join('<test-case fullname="'+n+'" result="Passed"/>' for n in names)+'</test-run>')
   self.flush()
  def meta(self,p,texture=False):
-  self.guid+=1;Path(str(p)+'.meta').parent.mkdir(parents=True,exist_ok=True);Path(str(p)+'.meta').write_text('fileFormatVersion: 2\nguid: '+f'{self.guid:032x}'+'\n'+('TextureImporter:\n  sRGBTexture: 0\n  isReadable: 1\n  textureType: 0\n' if texture else 'DefaultImporter: {}\n'))
+  self.guid+=1;Path(str(p)+'.meta').parent.mkdir(parents=True,exist_ok=True);Path(str(p)+'.meta').write_text('fileFormatVersion: 2\nguid: '+f'{self.guid:032x}'+'\n'+('TextureImporter:\n  mipmaps:\n    sRGBTexture: 0\n  isReadable: 1\n  textureType: 0\n' if texture else 'DefaultImporter: {}\n'))
  def foot_report(self):
   from foot_contact_output import IDS
   zero=dict(x=0.,y=0.,z=0.);up=dict(x=0.,y=1.,z=0.)
@@ -173,6 +173,37 @@ class StrictExportTests(unittest.TestCase):
  def test_extra_report_field_refused(self):self.imp['rawLogs']='fixture-secret';self.rejected('STRICT_SCHEMA_MISMATCH')
  def test_symlink_refused(self):(self.folder/'escape').symlink_to('/tmp');self.rejected('STRICT_SYMLINK_FORBIDDEN')
  def test_source_hash_refused(self):(self.folder/'Source/bulwark-candidate.fbx').write_bytes(b'changed');self.rejected('STRICT_DEPENDENCY_HASH')
+ def derived_meta(self,text):
+  (self.folder/'Derived/ORM_00.png.meta').write_text(text)
+  return s.derived_record(self.project,self.prefix,self.imp['derivedTextures'][0],self.c['materials'][0],0,{r['file']:r['sha256'] for r in self.c['files']})
+ def test_native_texture_meta_layout_is_read_at_actual_mipmaps_location(self):
+  import yaml
+  raw=(Path(__file__).parent/'fixtures/unity-texture-meta/armored-discovery-37846596290-orm.png.meta').read_text()
+  native=yaml.safe_load(raw)['TextureImporter']
+  self.assertNotIn('sRGBTexture',native)
+  self.assertEqual(native['mipmaps']['sRGBTexture'],1)
+  self.assertEqual(native['isReadable'],0)
+  # Actual source meta bytes/layout; only authored derived settings adjusted.
+  derived=raw.replace('    sRGBTexture: 1','    sRGBTexture: 0').replace('  isReadable: 0','  isReadable: 1')
+  self.assertEqual(self.derived_meta(derived),self.prefix+'/Derived/ORM_00.png')
+ def test_orm_top_level_substitute_or_conflict_is_rejected(self):
+  variants=(
+   '  sRGBTexture: 0\n',
+   '  sRGBTexture: 0\n  mipmaps:\n    sRGBTexture: 1\n',
+   '  sRGBTexture: 1\n  mipmaps:\n    sRGBTexture: 0\n',
+   '  sRGBTexture: 0\n  mipmaps:\n    sRGBTexture: 0\n')
+  for fields in variants:
+   with self.subTest(fields=fields),self.assertRaisesRegex(s.StrictError,'^STRICT_ORM_IMPORT_SETTINGS$'):
+    self.derived_meta('TextureImporter:\n'+fields+'  isReadable: 1\n  textureType: 0\n')
+ def test_orm_wrong_nested_flag_types_or_layout_are_rejected(self):
+  variants=('mipmaps: null','mipmaps: []','mipmaps: {}','mipmaps:\n    sRGBTexture: false','mipmaps:\n    sRGBTexture: 0.0','mipmaps:\n    sRGBTexture: "0"','mipmaps:\n    sRGBTexture: 1')
+  for fields in variants:
+   with self.subTest(fields=fields),self.assertRaisesRegex(s.StrictError,'^STRICT_ORM_IMPORT_SETTINGS$'):
+    self.derived_meta('TextureImporter:\n  '+fields+'\n  isReadable: 1\n  textureType: 0\n')
+ def test_orm_readable_and_texture_type_remain_mandatory(self):
+  for readable,texture_type in ((0,0),(1,1),('true',0),(1,'false')):
+   with self.subTest(readable=readable,texture_type=texture_type),self.assertRaisesRegex(s.StrictError,'^STRICT_ORM_IMPORT_SETTINGS$'):
+    self.derived_meta(f'TextureImporter:\n  mipmaps:\n    sRGBTexture: 0\n  isReadable: {readable}\n  textureType: {texture_type}\n')
  def test_orm_gamma_refused(self):
   p=self.folder/'Derived/ORM_00.png.meta';p.write_text(p.read_text().replace('sRGBTexture: 0','sRGBTexture: 1'));self.imp['dependencySha256']=s.dependency_digest(self.project,self.imp['dependencies']);self.cap['dependencySha256']=self.imp['dependencySha256'];self.rejected('STRICT_ORM_IMPORT_SETTINGS')
  def test_orm_row_order_hash_refused(self):

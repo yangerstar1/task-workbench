@@ -139,13 +139,14 @@ namespace DesertRV.Tests
             readonly string controllerPath = "Assets/__ArmoredFootNative_" + Guid.NewGuid().ToString("N") + ".controller";
             AnimationClip clip;
             bool disposed;
+            int rawPoseEvaluation;
 
             public Fixture(bool nonuniformAncestor = false, bool withFloor = true)
             {
                 originalActive = SceneManager.GetActiveScene();
                 try
                 {
-                    ActorScene = CreateOwnedScene(preview: true);
+                    ActorScene = CreateOwnedScene();
                     Assert.That(ActorPhysics.IsValid(), Is.True, "Fixture requires a valid owning PhysicsScene. " + PhysicsDiagnostic());
                     Root = new GameObject("native armored foot actor"); Root.SetActive(false);
                     EditorSceneManager.MoveGameObjectToScene(Root, ActorScene);
@@ -187,6 +188,15 @@ namespace DesertRV.Tests
                         KeyRotation(Upper[i], RawUpper[i]); KeyRotation(Lower[i], RawLower[i]); KeyRotation(Foot[i], RawFoot[i]);
                     }
                     clip.EnsureQuaternionContinuity();
+                    var rotationBindings = AnimationUtility.GetCurveBindings(clip);
+                    Assert.That(rotationBindings.Length, Is.EqualTo(4 * 3 * 4), "All twelve leg bones need four quaternion channels.");
+                    foreach (var binding in rotationBindings)
+                    {
+                        var curve = AnimationUtility.GetEditorCurve(clip, binding);
+                        Assert.That(curve.length, Is.EqualTo(5), binding.path + "/" + binding.propertyName);
+                        Assert.That(Mathf.Abs(curve.Evaluate(0) - curve.Evaluate(.25f)), Is.GreaterThan(.0001f),
+                            "Each channel must be animated, not optimized into a constant: " + binding.path + "/" + binding.propertyName);
+                    }
                     AssetDatabase.AddObjectToAsset(clip, controller);
                     var state = controller.layers[0].stateMachine.AddState("Idle");
                     state.motion = clip; state.writeDefaultValues = false;
@@ -214,13 +224,11 @@ namespace DesertRV.Tests
                 }
                 catch { Dispose(); throw; }
             }
-            public Scene CreateOwnedScene(bool preview)
+            public Scene CreateOwnedScene()
             {
-                // Runtime SceneManager.CreateScene is not an EditMode creation API. A preview scene
-                // is a genuine scene owner, but its PhysicsScene is not assumed to differ from default.
-                // Native assertions below check actual collider visibility and scene ownership.
-                var scene = preview ? EditorSceneManager.NewPreviewScene()
-                    : EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Additive);
+                // Preview scenes avoid changing/saving the caller's untitled active scene.
+                // Both owners contain real colliders; neither PhysicsScene handle is assumed.
+                var scene = EditorSceneManager.NewPreviewScene();
                 ownedScenes.Add(scene);
                 return scene;
             }
@@ -236,9 +244,13 @@ namespace DesertRV.Tests
                 string path = AnimationUtility.CalculateTransformPath(bone, Root.transform);
                 string[] channels = { "x", "y", "z", "w" };
                 float[] values = { rotation.x, rotation.y, rotation.z, rotation.w };
+                var moving = rotation * Quaternion.Euler(7, 9, 11);
+                float[] movingValues = { moving.x, moving.y, moving.z, moving.w };
                 for (int i = 0; i < channels.Length; i++)
                     AnimationUtility.SetEditorCurve(clip, EditorCurveBinding.FloatCurve(path, typeof(Transform), "m_LocalRotation." + channels[i]),
-                        AnimationCurve.Constant(0, 1, values[i]));
+                        new AnimationCurve(new Keyframe(0, movingValues[i]), new Keyframe(.25f, values[i]),
+                            new Keyframe(.5f, movingValues[i]), new Keyframe(.75f, values[i]),
+                            new Keyframe(1, movingValues[i])));
             }
             void BuildActualMesh()
             {
@@ -301,7 +313,13 @@ namespace DesertRV.Tests
             public void RewriteRawPose()
             {
                 Animator.speed = 1;
-                Animator.Play("Idle", 0, .25f); Animator.Update(0);
+                // Vary every quaternion channel and advance real Animator time. Constant curves
+                // plus repeatedly evaluating the same time can retain a post-animation edit.
+                float targetTime = (++rawPoseEvaluation % 2 == 1) ? .25f : .75f;
+                const float frameDelta = 1f / 60f;
+                Animator.Play("Idle", 0, targetTime - frameDelta); Animator.Update(frameDelta);
+                Assert.That(Animator.GetCurrentAnimatorStateInfo(0).normalizedTime,
+                    Is.EqualTo(targetTime).Within(.00001f), "Animator must advance to the keyed raw pose.");
                 Assert.That(Animator.GetCurrentAnimatorStateInfo(0).shortNameHash, Is.EqualTo(UnityEngine.Animator.StringToHash("Idle")),
                     "A genuine Animator state must be evaluated, not a fabricated state label.");
                 Assert.That(Animator.IsInTransition(0), Is.False);
@@ -578,15 +596,15 @@ namespace DesertRV.Tests
         {
             using (var f = new Fixture(withFloor: false))
             {
-                var wrongScene = f.CreateOwnedScene(preview: false);
+                var wrongScene = f.CreateOwnedScene();
                 string physicsDiagnostic = f.PhysicsDiagnostic(wrongScene);
                 Assert.That(wrongScene.handle, Is.Not.EqualTo(f.ActorScene.handle), physicsDiagnostic);
                 Assert.That(wrongScene.GetPhysicsScene().IsValid(), Is.True, physicsDiagnostic);
                 var wrongFloor = f.AddFloor(wrongScene, .15f, "wrong-scene higher floor");
                 var origin = f.Foot[0].position + Vector3.up * .5f;
-                Assert.That(Physics.Raycast(origin, Vector3.down, out var wrongHit, 1.5f, 1 << GroundLayer, QueryTriggerInteraction.Ignore),
-                    Is.True, "The default-physics decoy must be physically queryable. " + physicsDiagnostic);
-                Assert.That(wrongHit.collider, Is.SameAs(wrongFloor), "The default scene must contain a real tempting hit. " + physicsDiagnostic);
+                Assert.That(wrongScene.GetPhysicsScene().Raycast(origin, Vector3.down, out var wrongHit, 1.5f, 1 << GroundLayer, QueryTriggerInteraction.Ignore),
+                    Is.True, "The foreign-scene decoy must be physically queryable. " + physicsDiagnostic);
+                Assert.That(wrongHit.collider, Is.SameAs(wrongFloor), "The foreign scene must contain a real tempting hit. " + physicsDiagnostic);
                 var actorHits = new RaycastHit[32];
                 int actorCount = f.ActorPhysics.Raycast(origin, Vector3.down, actorHits, 1.5f, 1 << GroundLayer, QueryTriggerInteraction.Ignore);
                 Assert.That(actorCount, Is.LessThan(actorHits.Length), physicsDiagnostic);
@@ -602,7 +620,7 @@ namespace DesertRV.Tests
                 raw.AssertWholePoseUnchanged();
                 f.Floor = f.AddFloor(f.ActorScene, 0, "actual actor-scene floor");
                 f.AssertOwnFloorIsQueryable(); f.Reset(); f.RewriteRawPose();
-                Assert.That(Physics.Raycast(origin, Vector3.down, out wrongHit, 1.5f, 1 << GroundLayer, QueryTriggerInteraction.Ignore), Is.True, physicsDiagnostic);
+                Assert.That(wrongScene.GetPhysicsScene().Raycast(origin, Vector3.down, out wrongHit, 1.5f, 1 << GroundLayer, QueryTriggerInteraction.Ignore), Is.True, physicsDiagnostic);
                 Assert.That(wrongHit.collider, Is.SameAs(wrongFloor), "Keep the wrong higher ground present while the actor-scene solve succeeds. " + physicsDiagnostic);
                 Assert.That(f.Apply(out var ownGround), Is.True, Diagnostic(ownGround) + "; " + physicsDiagnostic); AssertCorrected(f, ownGround);
                 raw.AssertImmutableTransformsAndLengths();

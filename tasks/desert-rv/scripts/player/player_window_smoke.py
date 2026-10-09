@@ -4,6 +4,8 @@ import datetime,hashlib,json,math,os,pathlib,re,shutil,subprocess,sys,tempfile,t
 sys.path.insert(0,str(pathlib.Path(__file__).resolve().parents[1]))
 from capture_game_window import identity,finish_encoder,atomic,stamp
 from prepare_safe_diagnostic_export import safe,sha,read_json,inspect_png,probe_video,require
+sys.path.insert(0,str(pathlib.Path(__file__).resolve().parents[1]/'rendered'))
+import startup_diagnostic as startup
 TITLE='DESERTRV_REFERENCE_PLAYER'
 MODE='BODY_STUDY_LINUX_PLAYER_CANDIDATE_ONLY'
 SCENE='tasks/desert-rv/unity/Assets/DesertRV/Scenes/BodyStudy.unity'
@@ -11,6 +13,53 @@ ROOT=pathlib.Path(__file__).resolve().parents[4]
 TASK=ROOT/'tasks/desert-rv'
 EVIDENCE=TASK/'player-private-evidence'
 PUBLIC=TASK/'player-public-export'
+
+BUILD_STAGES={'NOT_OBSERVED','EXECUTE_METHOD_ENTERED','TARGET_CHECKED','SCENE_VALIDATED','BUILD_PLAYER_ENTERED','BUILD_PLAYER_RETURNED','BUILD_RECEIPT_WRITTEN'}
+BUILD_FAILURES={'NONE','LINUX_TARGET_UNSUPPORTED','PROJECT_COMPILE_ERRORS','REFERENCE_BUILD_FAILED','BUILD_DIAGNOSTIC_UNAVAILABLE'}
+PLAYER_FAILURES={'PLAYER_STARTUP_FAILED','PLAYER_WINDOW_FAILED','PLAYER_CAPTURE_FAILED'}
+def empty_build_native():
+    return dict(mode='BODY_STUDY_BUILD_FIXED_DIAGNOSTIC',stage='NOT_OBSERVED',exceptionKind='NONE',buildResult='UNAVAILABLE',targetChecked=False,targetSupported=False,buildReportAvailable=False,settingsRestored=False,totalErrors=0,totalWarnings=0)
+def validate_build_native(value):
+    require(isinstance(value,dict) and set(value)==set(empty_build_native()))
+    require(value['mode']=='BODY_STUDY_BUILD_FIXED_DIAGNOSTIC' and value['stage'] in BUILD_STAGES)
+    require(value['exceptionKind'] in {'NONE','FILE_NOT_FOUND','UNAUTHORIZED_ACCESS','IO','INVALID_OPERATION','OTHER'})
+    require(value['buildResult'] in {'UNAVAILABLE','SUCCEEDED','FAILED','CANCELLED','UNKNOWN'})
+    for k in ('targetChecked','targetSupported','buildReportAvailable','settingsRestored'):require(type(value[k]) is bool)
+    for k in ('totalErrors','totalWarnings'):require(type(value[k]) is int and 0<=value[k]<=2147483647)
+    require(value['targetChecked'] or value['targetSupported'] is False)
+    require(value['buildReportAvailable']==(value['buildResult']!='UNAVAILABLE'))
+    if not value['buildReportAvailable']:require(value['totalErrors']==value['totalWarnings']==0)
+    return value
+def empty_build():return dict(native=empty_build_native(),logClassification=startup.empty_report(),failureCode='BUILD_DIAGNOSTIC_UNAVAILABLE')
+def validate_build(value):
+    require(isinstance(value,dict) and set(value)=={'native','logClassification','failureCode'} and value['failureCode'] in BUILD_FAILURES)
+    native=validate_build_native(value['native']);startup.validate(value['logClassification'],set(startup.source_map(TASK/'unity').values()))
+    if value['failureCode']=='NONE':require(native['stage']=='BUILD_RECEIPT_WRITTEN' and native['buildResult']=='SUCCEEDED' and native['targetChecked'] and native['targetSupported'] and native['settingsRestored'] and native['exceptionKind']=='NONE' and not value['logClassification']['compileErrors'])
+    if value['failureCode']=='LINUX_TARGET_UNSUPPORTED':require(native['targetChecked'] and not native['targetSupported'])
+    if value['failureCode']=='PROJECT_COMPILE_ERRORS':require(value['logClassification']['compileErrors'])
+    return value
+def record_build(logs):
+    logs=safe(logs,False);native=empty_build_native()
+    if (logs/'build-diagnostic-native.json').exists():native=validate_build_native(read_json(logs/'build-diagnostic-native.json'))
+    classified=startup.classify(logs,TASK/'unity')
+    failure='REFERENCE_BUILD_FAILED'
+    if native['targetChecked'] and not native['targetSupported']:failure='LINUX_TARGET_UNSUPPORTED'
+    elif classified['compileErrors']:failure='PROJECT_COMPILE_ERRORS'
+    elif native['stage']=='BUILD_RECEIPT_WRITTEN' and native['buildResult']=='SUCCEEDED' and native['settingsRestored']:failure='NONE'
+    value=validate_build(dict(native=native,logClassification=classified,failureCode=failure))
+    EVIDENCE.mkdir(exist_ok=True);atomic(EVIDENCE/'build-diagnostic.json',value)
+def fixed_control(values):
+    require(len(values)==5 and all(v in {'NOT_ATTEMPTED','SUCCEEDED','FAILED'} for v in values))
+    result=dict(zip(('activation','build','player','licenseReturn','privateCleanup'),values))
+    result['buildDiagnostic']=validate_build(read_json(EVIDENCE/'build-diagnostic.json')) if (EVIDENCE/'build-diagnostic.json').exists() else empty_build()
+    result['captureFailureCode']='NONE'
+    if (EVIDENCE/'failure.json').exists():
+        detail=read_json(EVIDENCE/'failure.json');require(set(detail)=={'failureCode'} and detail['failureCode'] in PLAYER_FAILURES);result['captureFailureCode']=detail['failureCode']
+    # Only fixed-schema control is made readable. Private logs, build, handshake stay private.
+    atomic(TASK/'player-control.json',result);os.chmod(safe(TASK/'player-control.json'),0o644)
+    if result['player']=='SUCCEEDED':
+        for name in ('summary.json','real-time.mp4','frame-0.png','frame-1.png','frame-2.png'):os.chmod(safe(EVIDENCE/name),0o644)
+        os.chmod(safe(EVIDENCE,False),0o755)
 
 def tracked():
     names=subprocess.check_output(['git','-c','safe.directory='+str(ROOT),'ls-files','-z'],cwd=ROOT).decode().split('\0')
@@ -109,10 +158,14 @@ def export():
     require(not PUBLIC.exists());stage=pathlib.Path(tempfile.mkdtemp(prefix='player-export-',dir=TASK));success=False
     try:
         c=read_json(TASK/'player-control.json')
-        require(set(c)=={'activation','build','player','licenseReturn','privateCleanup'})
-        allowed={'NOT_ATTEMPTED','SUCCEEDED','FAILED'};require(all(v in allowed for v in c.values()))
-        ok=os.environ.get('NATIVE_OUTCOME')=='success' and all(v=='SUCCEEDED' for v in c.values())
-        source_unchanged()
+        require(set(c)=={'activation','build','player','licenseReturn','privateCleanup','buildDiagnostic','captureFailureCode'})
+        validate_build(c['buildDiagnostic']);require(c['captureFailureCode'] in PLAYER_FAILURES|{'NONE'})
+        states=[c[k] for k in ('activation','build','player','licenseReturn','privateCleanup')]
+        allowed={'NOT_ATTEMPTED','SUCCEEDED','FAILED'};require(all(v in allowed for v in states))
+        ok=os.environ.get('NATIVE_OUTCOME')=='success' and all(v=='SUCCEEDED' for v in states) and c['captureFailureCode']=='NONE' and c['buildDiagnostic']['failureCode']=='NONE'
+        try:source_unchanged();preserved=True
+        except Exception:preserved=False
+        ok=ok and preserved
         if ok:
             s=read_json(EVIDENCE/'summary.json');require(s['mode']==MODE and s['sourceCommit']==os.environ['GITHUB_SHA'] and s['sourceVerified'] is True)
             # Output schema is exact; no unknown producer fields can become public.
@@ -138,10 +191,10 @@ def export():
             atomic(stage/'sha256.json',{p.name:sha(p) for p in stage.iterdir()})
         else:
             failure='NATIVE_PROCESS_NOT_SUCCESS'
-            if (EVIDENCE/'failure.json').exists():
-                f=read_json(EVIDENCE/'failure.json')
-                if set(f)=={'failureCode'} and f['failureCode'] in {'PLAYER_STARTUP_FAILED','PLAYER_WINDOW_FAILED','PLAYER_CAPTURE_FAILED','LINUX_TARGET_UNSUPPORTED','REFERENCE_BUILD_FAILED'}:failure=f['failureCode']
-            atomic(stage/'status.json',dict(mode=MODE,status='FAILED_NOT_ACCEPTED',failureCode=failure,videoExported=False,control=c))
+            if c['buildDiagnostic']['failureCode']!='NONE':failure=c['buildDiagnostic']['failureCode']
+            if c['captureFailureCode']!='NONE':failure=c['captureFailureCode']
+            if not preserved:failure='SOURCE_PRESERVATION_FAILED'
+            atomic(stage/'status.json',dict(mode=MODE,status='FAILED_NOT_ACCEPTED',failureCode=failure,videoExported=False,sourcePreserved=preserved,control=c))
         os.replace(stage,PUBLIC);success=True
     finally:
         if not success:shutil.rmtree(stage)
@@ -152,13 +205,10 @@ def main():
         command=sys.argv[1]
         if command=='before':
             require(not PUBLIC.exists() and not EVIDENCE.exists() and not (TASK/'player-control.json').exists());atomic(TASK/'player-source-before.json',tracked())
-        elif command=='build-failure':
-            EVIDENCE.mkdir(exist_ok=True);data=safe(sys.argv[2]).read_bytes()[:16*1024*1024]
-            code='LINUX_TARGET_UNSUPPORTED' if b'LINUX_TARGET_UNSUPPORTED' in data else 'REFERENCE_BUILD_FAILED'
-            atomic(EVIDENCE/'failure.json',{'failureCode':code})
+        elif command=='build-diagnostic':record_build(pathlib.Path(sys.argv[2]))
         elif command=='capture':return capture(pathlib.Path(sys.argv[2]),pathlib.Path(sys.argv[3]))
         elif command=='control':
-            values=sys.argv[2:];require(len(values)==5 and all(v in {'NOT_ATTEMPTED','SUCCEEDED','FAILED'} for v in values));atomic(TASK/'player-control.json',dict(zip(('activation','build','player','licenseReturn','privateCleanup'),values)))
+            fixed_control(sys.argv[2:])
         elif command=='export':export()
         else:raise ValueError()
     except Exception:print('PLAYER_SMOKE_FIXED_VALIDATION_FAILED');return 1

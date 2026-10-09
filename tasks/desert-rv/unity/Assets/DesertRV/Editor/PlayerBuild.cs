@@ -15,10 +15,33 @@ namespace DesertRV.Editor
 
         // This is the retained art/control reference, not the completed game.
         // Never call BodyBuild.Initialize or WebBuild.Prepare here: both rebuild scenes.
-        public static void BuildLinuxReference() => BuildReference(false);
+        public static void BuildLinuxReference() => BuildReference(false, null);
 
         // Candidate-only standalone rendering proof, never Journey or Android approval.
-        public static void BuildLinuxWindowSmoke() => BuildReference(true);
+        public static void BuildLinuxWindowSmoke()
+        {
+            var diagnostic = new SmokeBuildDiagnostic();
+            try { BuildReference(true, diagnostic); }
+            catch (Exception exception)
+            {
+                diagnostic.exceptionKind = exception is FileNotFoundException ? "FILE_NOT_FOUND" :
+                    exception is UnauthorizedAccessException ? "UNAUTHORIZED_ACCESS" :
+                    exception is IOException ? "IO" : exception is InvalidOperationException ? "INVALID_OPERATION" : "OTHER";
+                throw;
+            }
+            finally
+            {
+                string destination = Environment.GetEnvironmentVariable("DESERTRV_PLAYER_DIAGNOSTIC");
+                if (!string.IsNullOrEmpty(destination)) File.WriteAllText(destination, JsonUtility.ToJson(diagnostic));
+            }
+        }
+        [Serializable] sealed class SmokeBuildDiagnostic
+        {
+            public string mode = "BODY_STUDY_BUILD_FIXED_DIAGNOSTIC";
+            public string stage = "EXECUTE_METHOD_ENTERED", exceptionKind = "NONE", buildResult = "UNAVAILABLE";
+            public bool targetChecked, targetSupported, buildReportAvailable, settingsRestored;
+            public int totalErrors, totalWarnings;
+        }
 
         [Serializable] sealed class SmokeReceipt
         {
@@ -37,10 +60,11 @@ namespace DesertRV.Editor
             using (var input = File.OpenRead(file))
                 return BitConverter.ToString(hash.ComputeHash(input)).Replace("-", "").ToLowerInvariant();
         }
-        static void BuildReference(bool smoke)
+        static void BuildReference(bool smoke, SmokeBuildDiagnostic diagnostic)
         {
-            if (!BuildPipeline.IsBuildTargetSupported(BuildTargetGroup.Standalone, BuildTarget.StandaloneLinux64))
-                throw new InvalidOperationException("LINUX_TARGET_UNSUPPORTED");
+            bool supported = BuildPipeline.IsBuildTargetSupported(BuildTargetGroup.Standalone, BuildTarget.StandaloneLinux64);
+            if (diagnostic != null) { diagnostic.targetChecked = true; diagnostic.targetSupported = supported; diagnostic.stage = "TARGET_CHECKED"; }
+            if (!supported) throw new InvalidOperationException("LINUX_TARGET_UNSUPPORTED");
             if (!File.Exists(ReferenceScene)) throw new FileNotFoundException("Saved reference scene missing", ReferenceScene);
             var scene = EditorSceneManager.OpenScene(ReferenceScene, OpenSceneMode.Single);
             int cameras = 0, renderers = 0;
@@ -59,6 +83,7 @@ namespace DesertRV.Editor
                 }
             }
             if (cameras == 0 || renderers == 0) throw new Exception("Reference has no renderable camera/world");
+            if (diagnostic != null) diagnostic.stage = "SCENE_VALIDATED";
             Debug.Log($"DESERT_RV_REFERENCE_VALIDATED cameras={cameras} renderers={renderers}");
             string settingsPath = Path.GetFullPath("ProjectSettings/ProjectSettings.asset");
             byte[] originalSettings = File.ReadAllBytes(settingsPath);
@@ -80,12 +105,22 @@ namespace DesertRV.Editor
                 PlayerSettings.resizableWindow = !smoke;
                 if (smoke) PlayerSettings.productName = "DESERTRV_REFERENCE_PLAYER";
                 Directory.CreateDirectory(Path.GetDirectoryName(path));
+                if (diagnostic != null) diagnostic.stage = "BUILD_PLAYER_ENTERED";
                 report = BuildPipeline.BuildPlayer(new BuildPlayerOptions
                 {
                     scenes = new[] { ReferenceScene }, target = BuildTarget.StandaloneLinux64,
                     locationPathName = path, options = BuildOptions.Development,
                     extraScriptingDefines = smoke ? new[] { "DESERTRV_REFERENCE_WINDOW_PROBE" } : Array.Empty<string>()
                 });
+                if (diagnostic != null)
+                {
+                    diagnostic.stage = "BUILD_PLAYER_RETURNED";
+                    diagnostic.buildReportAvailable = true;
+                    diagnostic.buildResult = report.summary.result == BuildResult.Succeeded ? "SUCCEEDED" :
+                        report.summary.result == BuildResult.Failed ? "FAILED" : report.summary.result == BuildResult.Cancelled ? "CANCELLED" : "UNKNOWN";
+                    diagnostic.totalErrors = (int)Math.Min(report.summary.totalErrors, (uint)int.MaxValue);
+                    diagnostic.totalWarnings = (int)Math.Min(report.summary.totalWarnings, (uint)int.MaxValue);
+                }
                 if (report.summary.result != BuildResult.Succeeded)
                     throw new InvalidOperationException("REFERENCE_BUILD_FAILED");
             }
@@ -100,6 +135,7 @@ namespace DesertRV.Editor
                 AssetDatabase.SaveAssets();
                 // Restore exact original serialization; the external full-source guard still rejects other changes.
                 File.WriteAllBytes(settingsPath, originalSettings);
+                if (diagnostic != null) diagnostic.settingsRestored = true;
             }
             if (smoke)
             {
@@ -108,6 +144,7 @@ namespace DesertRV.Editor
                     targetSupported = true, buildSucceeded = true, settingsRestored = true };
                 File.WriteAllText(Path.Combine(Path.GetDirectoryName(path), "build-receipt.json"), JsonUtility.ToJson(receipt));
             }
+            if (diagnostic != null) diagnostic.stage = "BUILD_RECEIPT_WRITTEN";
             Debug.Log("DESERT_RV_LINUX_REFERENCE_BUILT bytes=" + report.summary.totalSize);
         }
     }

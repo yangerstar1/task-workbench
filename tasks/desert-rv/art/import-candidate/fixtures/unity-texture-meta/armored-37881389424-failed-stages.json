@@ -1,0 +1,12 @@
+{
+  "runId": 37881389424,
+  "head": "d2b7251",
+  "logSha256": "c09806d208d9aa895484b8b92547b77121082eb091a97fe5678b1c5d3e7ddcc6",
+  "stages": [
+    "GUARD",
+    "FREEZE",
+    "NATIVE",
+    "IMPORT",
+    "GENERATED"
+  ]
+}
