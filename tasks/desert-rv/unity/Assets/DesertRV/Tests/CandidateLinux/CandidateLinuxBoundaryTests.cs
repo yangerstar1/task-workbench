@@ -77,6 +77,11 @@ namespace DesertRV.Tests
             try { string path=Path.Combine(root,"receipt.json");Call("PersistJson",path,"{\"phase\":1}");Call("PersistJson",path,"{\"phase\":2}");Assert.AreEqual("{\"phase\":2}",File.ReadAllText(path));Assert.IsFalse(File.Exists(path+".tmp")); }
             finally { Directory.Delete(root,true); }
             // Exercise the exact official package identity without building a player or changing the package.
+            Assert.AreEqual("MISSING",Call("PerformanceIdentityKind",false,"",""));
+            Assert.AreEqual("NAME_MISMATCH",Call("PerformanceIdentityKind",true,"other","3.5.0"));
+            Assert.AreEqual("REGISTERED_3_0_3",Call("PerformanceIdentityKind",true,"com.unity.test-framework.performance","3.0.3"));
+            Assert.AreEqual("OTHER_VERSION",Call("PerformanceIdentityKind",true,"com.unity.test-framework.performance","99.0.0"));
+            Assert.AreEqual("REGISTERED_3_5_0",Call("PerformanceIdentityKind",true,"com.unity.test-framework.performance","3.5.0"));
             Call("VerifyPerformancePackage");
             const string preference="PT_ResourcesCleanup";bool originallyPresent=EditorPrefs.HasKey(preference),originalValue=EditorPrefs.GetBool(preference);
             try

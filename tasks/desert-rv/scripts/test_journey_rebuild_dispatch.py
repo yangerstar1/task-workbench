@@ -24,6 +24,8 @@ class PushIdentityTests(unittest.TestCase):
  def test_array_json_rejected(self):self.reject('REQUEST_KEYS',raw=b'[]')
  def test_nonfinite_json_rejected(self):self.reject('JSON_CONSTANT',raw=b'{"schema":NaN}')
  def test_boolean_schema_rejected(self):self.request['schema']=True;self.reject('REQUEST_IDENTITY')
+ def test_consumed_first_request_cannot_authorize_new_run(self):
+  self.request['requestId']='desert-rv-rebuild-performance-20261009-once';self.request['baseCommit']='9abf31160845852d6b1eaffcf432522f60258a0a';self.reject('REQUEST_IDENTITY')
  def test_wrong_nonce_rejected(self):self.request['requestId']='other';self.reject('REQUEST_IDENTITY')
  def test_wrong_request_base_rejected(self):self.request['baseCommit']='c'*40;self.reject('REQUEST_IDENTITY')
  def test_wrong_policy_rejected(self):self.request['policySha256']='c'*64;self.reject('REQUEST_POLICY')

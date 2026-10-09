@@ -59,8 +59,8 @@
     },
     {
       "path": ".github/workflows/desert-rv-journey-rebuild.yml",
-      "sha256": "d4f244a9bba6921179fcd76261232bbc7ed7b760090805a29c08ab1ec03f43a3",
-      "size": 9153
+      "sha256": "1cb6397c58fcbfb1d8ba8ba52b64915074594ab5b84fc68151cdd00902f0210d",
+      "size": 9162
     },
     {
       "path": ".github/workflows/desert-rv-player-observe.yml",
@@ -384,7 +384,7 @@
     },
     {
       "path": "tasks/desert-rv/art/journey-preparation/restoration-transition.json",
-      "sha256": "a0d6a0d3dab4c62e94a978c26da247c35528f293b60846071798ba6019c3f103",
+      "sha256": "568887d4921833a448903c549d9ee5b526eb3dff45aa53129c7aa9a521479777",
       "size": 8159
     },
     {
@@ -464,8 +464,8 @@
     },
     {
       "path": "tasks/desert-rv/scripts/journey_rebuild_dispatch.py",
-      "sha256": "8f73ea5a3a1156a43cb1fcf4df2fef7e63a42d4a4ee50cc1527e596dd2dd3c67",
-      "size": 5216
+      "sha256": "9f906ef9ce1b4664ec5dc5c5b756afc78f78a90fd834b54a87cce565eba33101",
+      "size": 5222
     },
     {
       "path": "tasks/desert-rv/scripts/player/container_entry.sh",
@@ -479,8 +479,8 @@
     },
     {
       "path": "tasks/desert-rv/scripts/player/journey_linux_export.py",
-      "sha256": "9e67a7820c847c33022a5493c1e4d79b35713de3254330d3abefe21725f936e8",
-      "size": 31224
+      "sha256": "84326c53bf5c3c9c02f71bfcbf1d1ed5b56d560effd5673c8098297690d8c805",
+      "size": 31582
     },
     {
       "path": "tasks/desert-rv/scripts/player/observe_journey_player.py",
@@ -494,8 +494,8 @@
     },
     {
       "path": "tasks/desert-rv/scripts/player/test_journey_linux_export.py",
-      "sha256": "312245cfe51f68403c705b5c4cdc98325978f621a77483cf28714c70d645bb45",
-      "size": 22494
+      "sha256": "b7317b5c48ff6af81b8e9515c802ede0af8e275f86c42593bd788dc34cccf83b",
+      "size": 23831
     },
     {
       "path": "tasks/desert-rv/scripts/player/test_observe_journey_player.py",
@@ -629,8 +629,8 @@
     },
     {
       "path": "tasks/desert-rv/scripts/test_journey_rebuild_dispatch.py",
-      "sha256": "e89936f1ab27eb94107dc7b63489592b74d7e4a334c99c6083528bd4853703fc",
-      "size": 7283
+      "sha256": "2bfd238b54e9c62744d3daa1aa935c08e13ccf9dab67a838cd05c723b39d0bd2",
+      "size": 7524
     },
     {
       "path": "tasks/desert-rv/scripts/test_safe_diagnostic_export.py",
@@ -4119,8 +4119,8 @@
     },
     {
       "path": "tasks/desert-rv/unity/Assets/DesertRV/Editor/JourneyCandidateLinuxBuild.cs",
-      "sha256": "cd434b44943b1ce40450fdde0d0097b587107f53d0f9b2f6991dcd40968f64f1",
-      "size": 58829
+      "sha256": "7955281d1583683275b3eacf9836a213a7ee21f8f68d5afb667a681efe8b05d8",
+      "size": 59915
     },
     {
       "path": "tasks/desert-rv/unity/Assets/DesertRV/Editor/JourneyCandidateLinuxBuild.cs.meta",
@@ -5069,8 +5069,8 @@
     },
     {
       "path": "tasks/desert-rv/unity/Assets/DesertRV/Tests/CandidateLinux/CandidateLinuxBoundaryTests.cs",
-      "sha256": "595b6984003a87c9ae3723aa787f117c7fa036d574875bd5ac1837304081f3f8",
-      "size": 18921
+      "sha256": "76eb3847b1a3bb25525d017005cabdeef5d55b5700f6b4ef27a76c6dea1f9ded",
+      "size": 19501
     },
     {
       "path": "tasks/desert-rv/unity/Assets/DesertRV/Tests/CandidateLinux/CandidateLinuxBoundaryTests.cs.meta",

@@ -2,7 +2,7 @@ name: Desert RV restore verified Journey and rebuild candidate Linux
 on:
   push:
     branches: [main]
-    paths: [.github/dispatch/desert-rv-rebuild-performance-20261009.json]
+    paths: [.github/dispatch/desert-rv-rebuild-performance350-20261009.json]
   workflow_dispatch:
     inputs:
       transition_sha256:
@@ -30,7 +30,7 @@ jobs:
           persist-credentials: false
           lfs: false
           fetch-depth: 2
-      - name: Verify explicit manual input or the single reviewed performance push
+      - name: Verify explicit manual input or the single reviewed performance 3.5.0 push
         id: dispatch_identity
         env:
           MANUAL_TRANSITION_SHA: ${{ inputs.transition_sha256 }}

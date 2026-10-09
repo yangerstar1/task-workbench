@@ -31,9 +31,25 @@ class JourneyLinuxExportTests(unittest.TestCase):
   shell=pathlib.Path(__file__).with_name('journey_linux_container.sh').read_text()
   self.assertLess(shell.index('export DESERTRV_PERFORMANCE_PRIVATE="$private"'),shell.index('65m unity-editor'))
   self.assertIn('rm -rf "$private" "$build"',shell)
+ def test_exact_performance_version_uses_resolved_lock_node(self):
+  root=pathlib.Path(__file__).resolve().parents[2]
+  lock=json.loads((root/'unity/Packages/packages-lock.json').read_text())
+  resolved=lock['dependencies']['com.unity.test-framework.performance']['version']
+  requirement=lock['dependencies']['com.unity.collections']['dependencies']['com.unity.test-framework.performance']
+  self.assertEqual(resolved,'3.5.0');self.assertEqual(requirement,'3.0.3');self.assertNotEqual(resolved,requirement)
+  source=(root/'unity/Assets/DesertRV/Editor/JourneyCandidateLinuxBuild.cs').read_text()
+  self.assertIn('const string PerformanceVersion = "'+resolved+'";',source)
+  self.assertIn('Check(info.version==PerformanceVersion,"PERFORMANCE_PACKAGE_VERSION")',source)
+ def test_performance_identity_observation_is_fixed_and_version_fail_closed(self):
+  good=self.performance()
+  for identity in ('REGISTERED_3_0_3','MISSING','NAME_MISMATCH','OTHER_VERSION','/tmp/private','3.5.1'):
+   value=dict(good,packageIdentity=identity)
+   with self.assertRaises(ValueError):x.performance_observation(value)
+  for code in ('PERFORMANCE_PACKAGE_MISSING','PERFORMANCE_PACKAGE_NAME','PERFORMANCE_PACKAGE_VERSION','PERFORMANCE_PACKAGE_SOURCE'):
+   self.assertIn(code,x.FAILURE_CODES)
  def performance(self):
   rows=[dict(path='Assets/Resources',change='ADDED',kind='DIRECTORY',sha256='',bytes=0,measurement='NOT_APPLICABLE')]+[dict(path=p,change='ADDED',kind='FILE',sha256='e'*64,bytes=23,measurement='ACTUAL_BYTES') for p in x.PERFORMANCE_FILES]
-  return dict(status='PACKED_VERIFIED',packageVerified=True,baselineAbsent=True,preferenceRestored=True,synchronousImportCompleted=True,exactInventoryRestored=True,packedReportAvailable=True,packedContainers=4,packedObjects=100,packedSourceObjects=80,packedJsonHits=0,packedScenePaths=[],callbackScenePaths=sorted(x.SCENES),jsonGuids=['a'*32,'b'*32],generated=dict(observed=True,truncated=False,totalChanges=6,addedFiles=5,removedFiles=0,addedDirectories=1,removedDirectories=0,unsafePathsOmitted=0,entries=sorted(rows,key=lambda r:r['path'])))
+  return dict(status='PACKED_VERIFIED',packageIdentity='REGISTERED_3_5_0',packageVerified=True,baselineAbsent=True,preferenceRestored=True,synchronousImportCompleted=True,exactInventoryRestored=True,packedReportAvailable=True,packedContainers=4,packedObjects=100,packedSourceObjects=80,packedJsonHits=0,packedScenePaths=[],callbackScenePaths=sorted(x.SCENES),jsonGuids=['a'*32,'b'*32],generated=dict(observed=True,truncated=False,totalChanges=6,addedFiles=5,removedFiles=0,addedDirectories=1,removedDirectories=0,unsafePathsOmitted=0,entries=sorted(rows,key=lambda r:r['path'])))
  def test_performance_proof_requires_real_report_coverage_and_exact_closure(self):
   import copy
   good=self.performance();x.performance_observation(good);self.assertTrue(x.performance_success(good))
@@ -45,7 +61,7 @@ class JourneyLinuxExportTests(unittest.TestCase):
    with self.assertRaises(ValueError):x.performance_observation(value)
   value=copy.deepcopy(good);value['preferenceRestored']=False;x.performance_observation(value);self.assertFalse(x.performance_success(value))
  def test_performance_proof_unavailable_is_not_exclusion(self):
-  value=dict(status='NOT_ARMED',packageVerified=False,baselineAbsent=False,preferenceRestored=False,synchronousImportCompleted=False,exactInventoryRestored=False,packedReportAvailable=False,packedContainers=0,packedObjects=0,packedSourceObjects=0,packedJsonHits=0,packedScenePaths=[],callbackScenePaths=[],jsonGuids=[],generated=self.inventory())
+  value=dict(status='NOT_ARMED',packageIdentity='NOT_OBSERVED',packageVerified=False,baselineAbsent=False,preferenceRestored=False,synchronousImportCompleted=False,exactInventoryRestored=False,packedReportAvailable=False,packedContainers=0,packedObjects=0,packedSourceObjects=0,packedJsonHits=0,packedScenePaths=[],callbackScenePaths=[],jsonGuids=[],generated=self.inventory())
   x.performance_observation(value);self.assertFalse(x.performance_success(value))
  def inventory(self):return dict(observed=False,truncated=False,totalChanges=0,addedFiles=0,removedFiles=0,addedDirectories=0,removedDirectories=0,unsafePathsOmitted=0,entries=[])
  def inventory_change(self):

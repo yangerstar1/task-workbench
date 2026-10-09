@@ -18,21 +18,22 @@ namespace DesertRV.Editor
     {
         const BuildOptions CandidateOptions = BuildOptions.Development | BuildOptions.DetailedBuildReport;
         const string PerformancePackage = "com.unity.test-framework.performance";
+        const string PerformanceVersion = "3.5.0";
         const string PerformancePreferenceKey = "PT_ResourcesCleanup";
         static readonly string[] PerformanceJson = { "Assets/Resources/PerformanceTestRunInfo.json", "Assets/Resources/PerformanceTestRunSettings.json" };
         static readonly string[] PerformanceFiles = { "Assets/Resources.meta", "Assets/Resources/PerformanceTestRunInfo.json", "Assets/Resources/PerformanceTestRunInfo.json.meta", "Assets/Resources/PerformanceTestRunSettings.json", "Assets/Resources/PerformanceTestRunSettings.json.meta" };
         static readonly Dictionary<string,string> PerformanceSourcePins = new Dictionary<string,string> {
-            { "Editor/TestRunBuilder.cs", "baa8f8478290b233c7a54ffbd3d1f83d9be24e3be564cc2136a7f8ab8a8c7ae8" },
-            { "Runtime/Utils.cs", "7362b6b0897557200509c194bce33b55dbda639fb9bb2fd83ea20249f5e54d15" },
-            { "Runtime/Data/Run.cs", "06049b74dbf11e9161142d7f625b3982633e4c2ff668831654e3c36adf1e3aec" },
-            { "Runtime/Data/RunSettings.cs", "702022eaff2a23ab20024582c6569b9f0bba0c854610dc7c32f2b018d5567e41" },
-            { "Runtime/Data/Player.cs", "9ec9e9e80f7d5db2a1ce6dc545970265652c0bd0ee74613cf7dffa33f7b8f933" },
-            { "Runtime/Data/Editor.cs", "e4133a3c3084b78f619af00b706b5c5d72c60cab32361e01c635ed2ae28e37b5" },
-            { "Runtime/Data/Hardware.cs", "31dddfd3b99df4d89dc7cfe5f9639c3e364187db74d491218efda3d6dac5e09c" }
+            { "Editor/TestRunBuilder.cs", "a4c7da5e73122b4483d5decd26fd4752af6fbfd1f1f3230f6b1e10cc077f98b4" },
+            { "Runtime/Utils.cs", "f9cbc12cec868d511fa1716d8fd0aa1b9d11146b194ca5aa6d0e39f016792e30" },
+            { "Runtime/Data/Run.cs", "b4df5c92a3294f1d218244178498490ec132c34fa70ab89ee7444a5606051d4b" },
+            { "Runtime/Data/RunSettings.cs", "28b66c615a25b7cb5655c7831eaf31ec7a6350148056cc0addd22152842da986" },
+            { "Runtime/Data/Player.cs", "30eb5220d1609a33bcabddf8a143bd2acaa7e22dacb1ebebd6b0b2fa91dde1b5" },
+            { "Runtime/Data/Editor.cs", "1948fc8baadee77bb45266e3736e760958163ebc70a50d7d533bfc533c596701" },
+            { "Runtime/Data/Hardware.cs", "c6103bbfca3f0df090de5a5ea7447e1e26504faab7640b0d7a78532cbfb43778" }
         };
         [Serializable] sealed class PerformanceObservation
         {
-            public string status="NOT_ARMED";
+            public string status="NOT_ARMED", packageIdentity="NOT_OBSERVED";
             public bool packageVerified, baselineAbsent, preferenceRestored, synchronousImportCompleted, exactInventoryRestored, packedReportAvailable;
             public int packedContainers, packedObjects, packedSourceObjects, packedJsonHits;
             public string[] packedScenePaths=Array.Empty<string>(), callbackScenePaths=Array.Empty<string>(), jsonGuids=Array.Empty<string>();
@@ -53,14 +54,29 @@ namespace DesertRV.Editor
             for(var current=new FileInfo(Path.GetFullPath(path)) as FileSystemInfo;current!=null;current=current is FileInfo file ? file.Directory : ((DirectoryInfo)current).Parent)
                 Check((current.Attributes & FileAttributes.ReparsePoint)==0,"PERFORMANCE_LINK");
         }
+        static string PerformanceIdentityKind(bool found,string name,string version)
+        {
+            if(!found)return "MISSING";
+            if(name!=PerformancePackage)return "NAME_MISMATCH";
+            if(version==PerformanceVersion)return "REGISTERED_3_5_0";
+            if(version=="3.0.3")return "REGISTERED_3_0_3";
+            return "OTHER_VERSION";
+        }
         static void VerifyPerformancePackage()
         {
             var info=UnityEditor.PackageManager.PackageInfo.FindForAssetPath("Packages/"+PerformancePackage+"/Editor/TestRunBuilder.cs");
-            Check(info!=null && info.name==PerformancePackage && info.version=="3.0.3","PERFORMANCE_PACKAGE");
+            string identity=PerformanceIdentityKind(info!=null,info?.name,info?.version);
+            if(currentDiagnostic!=null)currentDiagnostic.performanceResources.packageIdentity=identity;
+            Debug.Log("CANDIDATE_PERFORMANCE_PACKAGE_IDENTITY="+identity);
+            Check(info!=null,"PERFORMANCE_PACKAGE_MISSING");
+            Check(info.name==PerformancePackage,"PERFORMANCE_PACKAGE_NAME");
+            Check(info.version==PerformanceVersion,"PERFORMANCE_PACKAGE_VERSION");
             foreach(var pin in PerformanceSourcePins)
             {
                 string path=Path.Combine(info.resolvedPath,pin.Key);NoLinks(path);
-                Check(File.Exists(path) && Hash(path)==pin.Value,"PERFORMANCE_PACKAGE");
+                bool matches=File.Exists(path) && Hash(path)==pin.Value;
+                if(!matches)Debug.Log("CANDIDATE_PERFORMANCE_SOURCE_MISMATCH="+pin.Key);
+                Check(matches,"PERFORMANCE_PACKAGE_SOURCE");
             }
         }
         static void RequirePerformanceBaselineAbsent(string root=".")
@@ -330,7 +346,7 @@ namespace DesertRV.Editor
             public readonly HashSet<string> processed = new HashSet<string>(StringComparer.Ordinal);
         }
         static readonly HashSet<string> CompilerCodes = new HashSet<string>(new[] { "CS0006","CS0012","CS0016","CS0029","CS0030","CS0101","CS0103","CS0104","CS0106","CS0111","CS0117","CS0118","CS0120","CS0121","CS0122","CS0136","CS0161","CS0200","CS0234","CS0246","CS0266","CS0535","CS0619","CS1001","CS1002","CS1003","CS1022","CS1026","CS1061","CS1068","CS1069","CS1501","CS1502","CS1503","CS1513","CS1519","CS1525","CS1617","CS1705","UNKNOWN_CSHARP_ERROR" },StringComparer.Ordinal);
-        static readonly HashSet<string> FailureCodes = new HashSet<string>(new[] { "PERFORMANCE_PREFERENCE","PERFORMANCE_LINK","PERFORMANCE_PACKAGE","PERFORMANCE_BASELINE","PERFORMANCE_INVENTORY","PERFORMANCE_PAYLOAD","PERFORMANCE_META","PERFORMANCE_MOVE","PERFORMANCE_PACKED_REPORT","PERFORMANCE_PACKED_CONTENT","PERFORMANCE_PRIVATE","BOOTSTRAP_BINDING","BOOTSTRAP_OWNER","BUILD_OR_SCENE_FAILED","BUILD_PROFILE","BUILTIN_DEPENDENCY","DEPENDENCY_BYTES","DEPENDENCY_KIND","DEPENDENCY_PATH","DIRTY_SCENE","ENTRY_PROFILE","IMPORT_FINGERPRINT","INVENTORY_DIRECTORY","INVENTORY_LINK","INVENTORY_NONREGULAR","INVENTORY_SET","LEASE_PROFILE","PACKAGE_IDENTITY","PIN_BYTES","PIN_LINK","PIN_MISSING","PIN_PATH","REGION_BINDING","REGION_IDENTITY","REGION_OWNER","REQUEST_HASH","REQUEST_IDENTITY","REQUEST_RECEIPT_HASH","RESTORATION_PROOF","RESTORATION_XML","ROOT_BYTES","ROOT_DEPENDENCY","ROOT_DEPENDENCY_BYTES","ROOT_IMPORT_HASH","SAVED_RUNTIME_IDENTITY","SCENE_COMPONENT","SCENE_SEQUENCE","TARGET_OUTPUT","UNCLASSIFIED_EXCEPTION" },StringComparer.Ordinal);
+        static readonly HashSet<string> FailureCodes = new HashSet<string>(new[] { "PERFORMANCE_PACKAGE_MISSING","PERFORMANCE_PACKAGE_NAME","PERFORMANCE_PACKAGE_VERSION","PERFORMANCE_PACKAGE_SOURCE","PERFORMANCE_PREFERENCE","PERFORMANCE_LINK","PERFORMANCE_PACKAGE","PERFORMANCE_BASELINE","PERFORMANCE_INVENTORY","PERFORMANCE_PAYLOAD","PERFORMANCE_META","PERFORMANCE_MOVE","PERFORMANCE_PACKED_REPORT","PERFORMANCE_PACKED_CONTENT","PERFORMANCE_PRIVATE","BOOTSTRAP_BINDING","BOOTSTRAP_OWNER","BUILD_OR_SCENE_FAILED","BUILD_PROFILE","BUILTIN_DEPENDENCY","DEPENDENCY_BYTES","DEPENDENCY_KIND","DEPENDENCY_PATH","DIRTY_SCENE","ENTRY_PROFILE","IMPORT_FINGERPRINT","INVENTORY_DIRECTORY","INVENTORY_LINK","INVENTORY_NONREGULAR","INVENTORY_SET","LEASE_PROFILE","PACKAGE_IDENTITY","PIN_BYTES","PIN_LINK","PIN_MISSING","PIN_PATH","REGION_BINDING","REGION_IDENTITY","REGION_OWNER","REQUEST_HASH","REQUEST_IDENTITY","REQUEST_RECEIPT_HASH","RESTORATION_PROOF","RESTORATION_XML","ROOT_BYTES","ROOT_DEPENDENCY","ROOT_DEPENDENCY_BYTES","ROOT_IMPORT_HASH","SAVED_RUNTIME_IDENTITY","SCENE_COMPONENT","SCENE_SEQUENCE","TARGET_OUTPUT","UNCLASSIFIED_EXCEPTION" },StringComparer.Ordinal);
         static Lease active;
         static JourneyCandidateLinuxBuild() { AssemblyReloadEvents.beforeAssemblyReload += () => Close("ASSEMBLY_RELOAD"); EditorApplication.quitting += () => Close("EDITOR_QUIT"); }
         static void Close(string reason = "EXPLICIT")

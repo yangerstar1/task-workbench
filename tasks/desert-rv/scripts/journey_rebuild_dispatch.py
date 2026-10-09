@@ -3,11 +3,11 @@ import hashlib,json,os,re,subprocess,sys
 from pathlib import Path
 
 ROOT=Path(__file__).resolve().parents[3]
-BASE='9abf31160845852d6b1eaffcf432522f60258a0a'
+BASE='be129aef52363202d7d3cbb51c28281075bef0b5'
 REPOSITORY='yangerstar1/task-workbench'
 OWNER='yangerstar1'
-REQUEST='.github/dispatch/desert-rv-rebuild-performance-20261009.json'
-REQUEST_ID='desert-rv-rebuild-performance-20261009-once'
+REQUEST='.github/dispatch/desert-rv-rebuild-performance350-20261009.json'
+REQUEST_ID='desert-rv-rebuild-performance350-20261009-once'
 POLICY='tasks/desert-rv/art/journey-preparation/restoration-transition.json'
 
 def require(ok,code):
