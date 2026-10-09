@@ -5,7 +5,11 @@ test "${RUNNER_ENVIRONMENT:-}" = github-hosted
 test "${RUNNER_OS:-}" = Linux
 test "${GITHUB_ACTIONS:-}" = true
 if [[ "${GITHUB_EVENT_NAME:-}" != workflow_dispatch ]]; then
-  /usr/bin/python3 "$(dirname "${BASH_SOURCE[0]}")/journey_rebuild_dispatch.py" --verify-only
+  if [[ "${GITHUB_WORKFLOW_REF:-}" == 'yangerstar1/task-workbench/.github/workflows/desert-rv-environment-v4.yml@refs/heads/main' ]]; then
+    /usr/bin/python3 "$(dirname "${BASH_SOURCE[0]}")/environment_v4_dispatch.py" --verify-only
+  else
+    /usr/bin/python3 "$(dirname "${BASH_SOURCE[0]}")/journey_rebuild_dispatch.py" --verify-only
+  fi
 fi
 test -n "${UNITY_LICENSE:-}" || { echo '::error::UNITY_LICENSE is missing; native proof cannot run.'; exit 1; }
 test -n "${UNITY_EMAIL:-}" || { echo '::error::UNITY_EMAIL is missing; native proof cannot run.'; exit 1; }

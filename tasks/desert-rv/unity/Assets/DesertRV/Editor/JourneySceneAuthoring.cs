@@ -306,6 +306,7 @@ namespace DesertRV.Editor
             if(b.region==1) {DressStation(source,b);DressRamGate(b);}
             else if(b.region==2) {DressScrapyard(source,b);DressScrapWork(source,b,motor);}
             else {DressBeacon(source,b);DressSignalEquipment(source,b);}
+            AuthorEnvironmentPolish(source,b,motor);
             AuthorOptionalSupplies(source,b,motor);
         }
         static void ExtendSceneryRoad(RegionBinding b)

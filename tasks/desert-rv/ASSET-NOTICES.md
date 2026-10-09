@@ -21,3 +21,13 @@ No font glyphs or names were modified.
 ## Unity dependencies
 
 Unity packages are declared by pinned versions in `unity/Packages/manifest.json` and `packages-lock.json` and are obtained from Unity's package registry. The Unity Editor and package distributions are not bundled in this export and retain their own applicable licenses.
+
+
+## Environment V4 independent candidate (2026-10-09)
+
+New scenery resources in `unity/Assets/DesertRV/Art/EnvironmentV4` are CC0 1.0. This addition does not change the original RV or any earlier resource's license. These files are candidates, not an assertion of visual acceptance.
+
+- Poly Haven: aerial_sand (Rob Tuytel; 15 m), asphalt_02 (Rob Tuytel; 3 m), concrete_floor_worn_001 (Dimitrios Savva / Rico Cilliers; 3 m), rusty_metal_02 (Rob Tuytel; 1 m), sand_03 (Charlotte Baglioni; 2 m), painted_plaster_wall (Amal Kumar; 2 m), corrugated_iron_03 (Charlotte Baglioni; 2 m). Per-asset source: https://polyhaven.com/a/ followed by the exact asset ID. License: https://polyhaven.com/license and https://creativecommons.org/publicdomain/zero/1.0/. Commercial use, modification, and raw redistribution permitted; attribution voluntary.
+- Kenney Factory Kit 3.0: https://kenney.nl/assets/factory-kit ; CC0 1.0. Seven original FBX files and the original atlas. The archive's original license is preserved at `EnvironmentV4/Factory/LICENSE.txt`.
+
+`EnvironmentV4/asset-provenance.json` records every copied asset hash and the exact roughness-to-URP mask derivation. `art/environment-v4/upstream-download-evidence.json` retains verified original download identities, and `license-evidence.json` the license-page verification. No web preview image, Quaternius QAL resource, paywalled model, or unverified candidate is included.

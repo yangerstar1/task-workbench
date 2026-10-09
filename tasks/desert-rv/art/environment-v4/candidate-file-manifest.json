@@ -1,0 +1,506 @@
+{
+  "schema": 1,
+  "base_commit": "8b45b3c40e0752eed65ede5f3136a50761bd1a38",
+  "status": "SOURCE_CANDIDATE_NOT_NATIVE_OR_VISUAL_ACCEPTANCE",
+  "files": [
+    {
+      "path": "tasks/desert-rv/ASSET-NOTICES.md",
+      "change": "modified",
+      "bytes": 2963,
+      "sha256": "8fa1abb8dd8ee042128cdf58dd4aba6a3eefa47acf00312aa497f359bb67fdf3"
+    },
+    {
+      "path": "tasks/desert-rv/art/environment-v4/HANDOFF.md",
+      "change": "added",
+      "bytes": 5496,
+      "sha256": "34c5523aafd66bcbeabbd6d7126343620c0ea5eef4e26b7d1872ce9e68257ed8"
+    },
+    {
+      "path": "tasks/desert-rv/art/environment-v4/README.md",
+      "change": "added",
+      "bytes": 1789,
+      "sha256": "5587f7ee360899840df0852f6d16bce1fdd2bc08e685fe936312dd386f885599"
+    },
+    {
+      "path": "tasks/desert-rv/art/environment-v4/generated-contract.json",
+      "change": "added",
+      "bytes": 18819,
+      "sha256": "bf3f7cb99e77c37b5a2788342d6aed756b6d420d25bc833b494958d74c7205f6"
+    },
+    {
+      "path": "tasks/desert-rv/art/environment-v4/import_assets.py",
+      "change": "added",
+      "bytes": 6135,
+      "sha256": "09d2c7964b603340c400701d31942fde64f22bb4d2bfda659ca09c53bf877641"
+    },
+    {
+      "path": "tasks/desert-rv/art/environment-v4/license-evidence.json",
+      "change": "added",
+      "bytes": 1211,
+      "sha256": "9702a5b921f86f26fffe817f9ae3a4c2029461096fde187035b212ded939c66e"
+    },
+    {
+      "path": "tasks/desert-rv/art/environment-v4/make_contract.py",
+      "change": "added",
+      "bytes": 3624,
+      "sha256": "6695191b25e211eae291b9d9fd53d4fec68fba70cc1144691ef1ee1222199afe"
+    },
+    {
+      "path": "tasks/desert-rv/art/environment-v4/preservation-check.json",
+      "change": "added",
+      "bytes": 458,
+      "sha256": "119a8b10b4efebfe3cef44e3db3d7c7f3fb80e2b0bb58a26e7c7733cdb33f7fd"
+    },
+    {
+      "path": "tasks/desert-rv/art/environment-v4/test_candidate.py",
+      "change": "added",
+      "bytes": 6255,
+      "sha256": "f1d29b0558cf862817802dd12812cb0075ba68dfd16d61af2b8f341efc0e6fc8"
+    },
+    {
+      "path": "tasks/desert-rv/art/environment-v4/upstream-download-evidence.json",
+      "change": "added",
+      "bytes": 15280,
+      "sha256": "2c54a07a1fb6b4574cb9a99a5ea578589cb5525872ae153b3eb8074edf23fd4d"
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/EnvironmentV4/Factory/LICENSE.txt",
+      "change": "added",
+      "bytes": 700,
+      "sha256": "61e86565dd297e143ad631594980eda0a17fc81a4cd7c6d71acf2f5e0cad30b6"
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/EnvironmentV4/Factory/LICENSE.txt.meta",
+      "change": "added",
+      "bytes": 155,
+      "sha256": "a4b8582be1ad7cb7bac16a16ca0668f9cca8c38fa21a74c079960273cb963b75"
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/EnvironmentV4/Factory/catwalk-stairs.fbx",
+      "change": "added",
+      "bytes": 50816,
+      "sha256": "9fa7ff96dcc3737435400394b27138c99b59522d5d8b5715d2e8546d3a54ff73"
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/EnvironmentV4/Factory/catwalk-stairs.fbx.meta",
+      "change": "added",
+      "bytes": 2891,
+      "sha256": "9bbd277e4b76295429d67aa45dcc0f90359c0a05e1f536ac437cb6b61bcfac93"
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/EnvironmentV4/Factory/catwalk-straight.fbx",
+      "change": "added",
+      "bytes": 38992,
+      "sha256": "0e8bbf0519012e9be5952cf91b244cf47c5fe5c30df26f2e3eeee8071e10a5db"
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/EnvironmentV4/Factory/catwalk-straight.fbx.meta",
+      "change": "added",
+      "bytes": 2891,
+      "sha256": "f03010390d4111056e6d9e0b6d572a7afe47ec9a642625ebe89381aff5247763"
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/EnvironmentV4/Factory/colormap.png",
+      "change": "added",
+      "bytes": 11813,
+      "sha256": "35d7bd6900dde0208429eeaec87fa17fbf024ed59f3f4eab54bc92802eba9dd7"
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/EnvironmentV4/Factory/colormap.png.meta",
+      "change": "added",
+      "bytes": 3009,
+      "sha256": "3f299b353b2061060136d3deb133c53da627e8311a99facbeb3635a24da63b66"
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/EnvironmentV4/Factory/crane-magnet.fbx",
+      "change": "added",
+      "bytes": 29072,
+      "sha256": "a00b0c48bc1d406f66c8e5b3f6fa81e2935a688fc2ff871e854068e2b361b66a"
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/EnvironmentV4/Factory/crane-magnet.fbx.meta",
+      "change": "added",
+      "bytes": 2891,
+      "sha256": "113812ba7e06616e3106c13d3534954536855d0bbaef97b89b74fecb163b0180"
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/EnvironmentV4/Factory/hopper-square.fbx",
+      "change": "added",
+      "bytes": 26208,
+      "sha256": "235962414352e1abca78d803a029ee7b15727cf13375d77bb53a365914f73c2b"
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/EnvironmentV4/Factory/hopper-square.fbx.meta",
+      "change": "added",
+      "bytes": 2891,
+      "sha256": "61c9220b8551ea2c72589aed48a7d5e738c18812af6e087caccaf8bef3f9a668"
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/EnvironmentV4/Factory/machine-bed.fbx",
+      "change": "added",
+      "bytes": 49104,
+      "sha256": "781cc2faa1531f056266e42650cceb3dd6dd855570fd05fc7af93afc8160a52d"
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/EnvironmentV4/Factory/machine-bed.fbx.meta",
+      "change": "added",
+      "bytes": 2891,
+      "sha256": "00b1e96f486225f35721a59ace20c50eb63b3f001c750c8c678973e541c4a2d3"
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/EnvironmentV4/Factory/pipe-large-bend.fbx",
+      "change": "added",
+      "bytes": 45728,
+      "sha256": "9acaf425b7d65655289123012237c388cdbe78fbd840b537b5c54055fc1e4e1d"
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/EnvironmentV4/Factory/pipe-large-bend.fbx.meta",
+      "change": "added",
+      "bytes": 2891,
+      "sha256": "f3ef9d3bf80e85c6d25321fefb2375e2b88c1b0fdb369ceacfb9d0412fb97a39"
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/EnvironmentV4/Factory/pipe-large-valve.fbx",
+      "change": "added",
+      "bytes": 41152,
+      "sha256": "6d40576d8b5a9503e30efd029d8a63a20783ba54429a09580001c433c4a8a10e"
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/EnvironmentV4/Factory/pipe-large-valve.fbx.meta",
+      "change": "added",
+      "bytes": 2891,
+      "sha256": "1de39ed111fa0ad23f8fe262997d386b3efeccc5e27dfba0c614396e1dabd740"
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/EnvironmentV4/Factory.meta",
+      "change": "added",
+      "bytes": 172,
+      "sha256": "bbd273575f02de7d69adc4063da87a9081a874c58536a2a61a261178b64dbe50"
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/EnvironmentV4/LICENSES.md",
+      "change": "added",
+      "bytes": 548,
+      "sha256": "49626ee0e63c6d437acc0a4535add3a23bc1793eb6396c9965a97e17c8096b67"
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/EnvironmentV4/LICENSES.md.meta",
+      "change": "added",
+      "bytes": 155,
+      "sha256": "40df41d15ad87cacd46deca2cd45a10398462d190923b409a55e1d61ea27fcfb"
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/EnvironmentV4/aerial_sand_diff_1k.jpg",
+      "change": "added",
+      "bytes": 490916,
+      "sha256": "d5195c44aec087d2a30d3ca3a3fa3458a1898986e0572e9a8043f8245598557a"
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/EnvironmentV4/aerial_sand_diff_1k.jpg.meta",
+      "change": "added",
+      "bytes": 3009,
+      "sha256": "137dbba7755ea547df8576fa1d49d7de161f28e90dec6c042776533d9c525f99"
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/EnvironmentV4/aerial_sand_metallic_smoothness_1k.png",
+      "change": "added",
+      "bytes": 608757,
+      "sha256": "b25da0b8d49e77e16cab58190138500d4c352af3e10f187113d08578baef2d08"
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/EnvironmentV4/aerial_sand_metallic_smoothness_1k.png.meta",
+      "change": "added",
+      "bytes": 3009,
+      "sha256": "8c1b34e30394cb2ea06daf3a8ee4fa80c08c73e9e10457fd0a8550d381a22c95"
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/EnvironmentV4/aerial_sand_nor_gl_1k.jpg",
+      "change": "added",
+      "bytes": 665488,
+      "sha256": "cba74d670a681dfcdd72db72afbcb9879c7ec9f5854adae24cac8da2c432ad99"
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/EnvironmentV4/aerial_sand_nor_gl_1k.jpg.meta",
+      "change": "added",
+      "bytes": 3009,
+      "sha256": "ca7357b2cb24970270aadcce6c252490d06d701d433acbca2c7e105ae12f4031"
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/EnvironmentV4/asphalt_02_diff_1k.jpg",
+      "change": "added",
+      "bytes": 731707,
+      "sha256": "1aa5ce99f58a625c71d48cfc3e68b65ca85ccb00f39e045c0a928608a0ea25ed"
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/EnvironmentV4/asphalt_02_diff_1k.jpg.meta",
+      "change": "added",
+      "bytes": 3009,
+      "sha256": "43d48d5c1bb9a0b64478495aacb013c56804e10a5b9d28bd70d8e54fe3ec8295"
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/EnvironmentV4/asphalt_02_metallic_smoothness_1k.png",
+      "change": "added",
+      "bytes": 1163724,
+      "sha256": "fb87d8c72651ee79e9ebbcd1afa9cfbe524e8c00d2f001684be34a2aecf42766"
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/EnvironmentV4/asphalt_02_metallic_smoothness_1k.png.meta",
+      "change": "added",
+      "bytes": 3009,
+      "sha256": "8b45860b1bad00639a98914e6c0f053d9850ddb06688033ab44e6fa126b46bfa"
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/EnvironmentV4/asphalt_02_nor_gl_1k.jpg",
+      "change": "added",
+      "bytes": 1240122,
+      "sha256": "42a1c381b53204e83a982db2864479a30bc127bbdeebb1006f8ee51bff099df3"
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/EnvironmentV4/asphalt_02_nor_gl_1k.jpg.meta",
+      "change": "added",
+      "bytes": 3009,
+      "sha256": "ae6aa40c19b85ea2dc35caacbf1614feccbca3a09116387ec4ddfb31c3d52078"
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/EnvironmentV4/asset-provenance.json",
+      "change": "added",
+      "bytes": 13600,
+      "sha256": "c55124af714c5387077c0c2d9e683548436cf2d3e85a1c5e577c3e8ee0e1c3ed"
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/EnvironmentV4/asset-provenance.json.meta",
+      "change": "added",
+      "bytes": 155,
+      "sha256": "72e1c06c40a3b4f06e915cb2d70f360e706c012a762ca05bee8e573020ef2b07"
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/EnvironmentV4/concrete_floor_worn_001_diff_1k.jpg",
+      "change": "added",
+      "bytes": 118806,
+      "sha256": "6e40c0fc908f4d66431836f5abe203f3a4eb064e88824378a91a46a26e2f464c"
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/EnvironmentV4/concrete_floor_worn_001_diff_1k.jpg.meta",
+      "change": "added",
+      "bytes": 3009,
+      "sha256": "4438f434e5b5dccfbd3613cf944b2a8f670df16ef17a03b29878661f92c5dce4"
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/EnvironmentV4/concrete_floor_worn_001_metallic_smoothness_1k.png",
+      "change": "added",
+      "bytes": 851371,
+      "sha256": "5b3adffcb38fe42c6529de9557315695c1003796bb55e5a0d9109a5a421afb3d"
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/EnvironmentV4/concrete_floor_worn_001_metallic_smoothness_1k.png.meta",
+      "change": "added",
+      "bytes": 3009,
+      "sha256": "0e5f3a35156a7f1cd12b77d6d6d45b97773bf24f097a4c77193a2c19aa96220c"
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/EnvironmentV4/concrete_floor_worn_001_nor_gl_1k.jpg",
+      "change": "added",
+      "bytes": 110906,
+      "sha256": "523bd94a1be5dd2f11c2ae2b7d7c77445cf5bd9e41604db515a7c8364dcba067"
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/EnvironmentV4/concrete_floor_worn_001_nor_gl_1k.jpg.meta",
+      "change": "added",
+      "bytes": 3009,
+      "sha256": "92b9f6affc796d662a018d0c44704077914b39b0fae087e74ea08892bbb302be"
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/EnvironmentV4/corrugated_iron_03_diff_1k.jpg",
+      "change": "added",
+      "bytes": 479372,
+      "sha256": "d1378cbe96c625f79180147873c586bfc653ef5a66ea7a4a58cd5b18701f2bb4"
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/EnvironmentV4/corrugated_iron_03_diff_1k.jpg.meta",
+      "change": "added",
+      "bytes": 3009,
+      "sha256": "12d12a2868adff687a7ebf64acba9341a389ded533f431d7cfcb825dfe636339"
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/EnvironmentV4/corrugated_iron_03_metallic_smoothness_1k.png",
+      "change": "added",
+      "bytes": 295857,
+      "sha256": "6cb2b9b29f072133129be2c3b686f931e6b996216c02553f9d1c7fa9896ff65d"
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/EnvironmentV4/corrugated_iron_03_metallic_smoothness_1k.png.meta",
+      "change": "added",
+      "bytes": 3009,
+      "sha256": "09657cd80edb346feef0f5f8b76ed4343208f20dc75fd416dfec722b54ffde2a"
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/EnvironmentV4/corrugated_iron_03_nor_gl_1k.jpg",
+      "change": "added",
+      "bytes": 524530,
+      "sha256": "4d53371c5d615b0c60a6eb5c1944d85fc640c433d1468490bd01c4caa6a80bae"
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/EnvironmentV4/corrugated_iron_03_nor_gl_1k.jpg.meta",
+      "change": "added",
+      "bytes": 3009,
+      "sha256": "814923bfc5a65de7db60b7a0ed7daa293daf95ea46a4419f2ecf5439949eee3a"
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/EnvironmentV4/painted_plaster_wall_diff_1k.jpg",
+      "change": "added",
+      "bytes": 686726,
+      "sha256": "440310f05af089f2c93353167573403cbc3f805948203237b5d26431eeb9e19c"
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/EnvironmentV4/painted_plaster_wall_diff_1k.jpg.meta",
+      "change": "added",
+      "bytes": 3009,
+      "sha256": "edaa964e3ce6439beba421a8d7081fb056d041bfe5a83cd8c9d4ac9df7de80bd"
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/EnvironmentV4/painted_plaster_wall_metallic_smoothness_1k.png",
+      "change": "added",
+      "bytes": 641912,
+      "sha256": "14e41e20d534d922f029fd0e4b207dc321bd4d84a8134294ccb2bb9e89ce8cc9"
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/EnvironmentV4/painted_plaster_wall_metallic_smoothness_1k.png.meta",
+      "change": "added",
+      "bytes": 3009,
+      "sha256": "598183721903f47d50ffab68ecf80c084b01422bcf1e4d5e35b07aea841bf7ae"
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/EnvironmentV4/painted_plaster_wall_nor_gl_1k.jpg",
+      "change": "added",
+      "bytes": 900461,
+      "sha256": "8eb01647d126eb5341e2c325821ad48c8ca11349dbef53447c95422c5d91cc9d"
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/EnvironmentV4/painted_plaster_wall_nor_gl_1k.jpg.meta",
+      "change": "added",
+      "bytes": 3009,
+      "sha256": "0a3e3e473b1970b3a40c50fbebf01b2d7120a6d05d8a5cd8d8d9f1bbacbc2c3c"
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/EnvironmentV4/rusty_metal_02_diff_1k.jpg",
+      "change": "added",
+      "bytes": 564932,
+      "sha256": "adaf094391518b6afe787a123942110aa88ef521c844f970b124420f5ed5d3d9"
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/EnvironmentV4/rusty_metal_02_diff_1k.jpg.meta",
+      "change": "added",
+      "bytes": 3009,
+      "sha256": "366aec70c922a5c81ed0cd52c9f26f7f9d78558ceb617e840f326ea6a1b3d04d"
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/EnvironmentV4/rusty_metal_02_metallic_smoothness_1k.png",
+      "change": "added",
+      "bytes": 406580,
+      "sha256": "5166aa7662a0f4a6b83165fe8f02ba119fa5e0bab9e3908863b83f1604916f3b"
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/EnvironmentV4/rusty_metal_02_metallic_smoothness_1k.png.meta",
+      "change": "added",
+      "bytes": 3009,
+      "sha256": "7ea0bd4d80250c6e7190153dc55e10f7c5c995d5d4d662051e119aabde04bba1"
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/EnvironmentV4/rusty_metal_02_nor_gl_1k.jpg",
+      "change": "added",
+      "bytes": 403156,
+      "sha256": "995197a62cac6fbb000e6e6591a3330a3b77ef069c4ac58f505b586b9bdbd97b"
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/EnvironmentV4/rusty_metal_02_nor_gl_1k.jpg.meta",
+      "change": "added",
+      "bytes": 3009,
+      "sha256": "8fbad3c0980fa48fb19cd66e7788e3a3aa59da19185db76c3de2ae626686334c"
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/EnvironmentV4/sand_03_diff_1k.jpg",
+      "change": "added",
+      "bytes": 703132,
+      "sha256": "e72144f9d7b81bdb7bbdb34222b53431738dcef79346dd89412d2abd541e4d30"
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/EnvironmentV4/sand_03_diff_1k.jpg.meta",
+      "change": "added",
+      "bytes": 3009,
+      "sha256": "4f002c7945cbd5ce1bbcc67ef9cc6aaacbb20560169fbb92f08fc92edf041bcf"
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/EnvironmentV4/sand_03_metallic_smoothness_1k.png",
+      "change": "added",
+      "bytes": 568942,
+      "sha256": "40d294a41ed4d0e11662ddac7bbdfa1f6d711dc2bac4a543e35253538642602f"
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/EnvironmentV4/sand_03_metallic_smoothness_1k.png.meta",
+      "change": "added",
+      "bytes": 3009,
+      "sha256": "3225e791fd78ded488c6e07e1b75f84a7e3b8c0cd835f844cea7961a23adfb52"
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/EnvironmentV4/sand_03_nor_gl_1k.jpg",
+      "change": "added",
+      "bytes": 884706,
+      "sha256": "1bde5f49ea78f94bcad73592696bf3949711c4ac197133b710c0c8521b6e996b"
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/EnvironmentV4/sand_03_nor_gl_1k.jpg.meta",
+      "change": "added",
+      "bytes": 3009,
+      "sha256": "33cdf8256ca458fc8e9f790a5808dcc9c68ecaf011e3764365935467c0da576a"
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/EnvironmentV4.meta",
+      "change": "added",
+      "bytes": 172,
+      "sha256": "270c067f6324be7ff1bb4f61362c543bf9d181adc63bf3c99bcf8c75af66c195"
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Editor/JourneySceneAuthoring.EnvironmentPolish.cs",
+      "change": "added",
+      "bytes": 43116,
+      "sha256": "85be3ae4f073b9bb36c86cd1c8bed021e2a9c163aab7ebe300cd42d0599e63ff"
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Editor/JourneySceneAuthoring.EnvironmentPolish.cs.meta",
+      "change": "added",
+      "bytes": 243,
+      "sha256": "58438f35d3012c3b11e26bfa877f4722eb714b2a6a3ed3625c9d41927ff098c2"
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Editor/JourneySceneAuthoring.EnvironmentPolishCapture.cs",
+      "change": "added",
+      "bytes": 5592,
+      "sha256": "fa6cbe1f1252801ec1b0f62b864104d715f781dc01567b50ec82c9a0b30f097e"
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Editor/JourneySceneAuthoring.EnvironmentPolishCapture.cs.meta",
+      "change": "added",
+      "bytes": 243,
+      "sha256": "f35a59a0b8e5db985c977b7902c2de20f7f43e63032fd7f0b4fe2f2344a62a05"
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Editor/JourneySceneAuthoring.cs",
+      "change": "modified",
+      "bytes": 66434,
+      "sha256": "ea031595cb47287eeac3b727579609769247178c48728a2ac9b0a94c2350242a"
+    }
+  ],
+  "excludes": [
+    "candidate-file-manifest.json (self-hash)",
+    "Python __pycache__"
+  ],
+  "total_payload_bytes": 13614738,
+  "source_text_revision": {
+    "previous_manifest_sha256": "931ea1c2568351fc26c0d30973cef5937de18aa4cc0deaa0f6560ba062032fee",
+    "changed_only": [
+      "tasks/desert-rv/art/environment-v4/HANDOFF.md",
+      "tasks/desert-rv/art/environment-v4/import_assets.py"
+    ],
+    "reason": "Publish only repository-relative documentation and require an explicit caller-provided asset input directory. All 29 resource payload hashes unchanged."
+  }
+}

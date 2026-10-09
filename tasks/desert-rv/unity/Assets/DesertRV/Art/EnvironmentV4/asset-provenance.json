@@ -1,0 +1,311 @@
+{
+  "schema": 1,
+  "copied_on": "2026-10-09",
+  "verification": "License pages reviewed and originals downloaded by asset researcher; individual bytes hashed here. Unity import and visual suitability remain pending.",
+  "assets": [
+    {
+      "path": "unity/Assets/DesertRV/Art/EnvironmentV4/aerial_sand_diff_1k.jpg",
+      "sha256": "d5195c44aec087d2a30d3ca3a3fa3458a1898986e0572e9a8043f8245598557a",
+      "bytes": 490916,
+      "license": "CC0-1.0",
+      "source_url": "https://polyhaven.com/a/aerial_sand",
+      "author": "Rob Tuytel",
+      "source_filename": "aerial_sand_diff_1k.jpg",
+      "modified": false
+    },
+    {
+      "path": "unity/Assets/DesertRV/Art/EnvironmentV4/aerial_sand_nor_gl_1k.jpg",
+      "sha256": "cba74d670a681dfcdd72db72afbcb9879c7ec9f5854adae24cac8da2c432ad99",
+      "bytes": 665488,
+      "license": "CC0-1.0",
+      "source_url": "https://polyhaven.com/a/aerial_sand",
+      "author": "Rob Tuytel",
+      "source_filename": "aerial_sand_nor_gl_1k.jpg",
+      "modified": false
+    },
+    {
+      "path": "unity/Assets/DesertRV/Art/EnvironmentV4/aerial_sand_metallic_smoothness_1k.png",
+      "sha256": "b25da0b8d49e77e16cab58190138500d4c352af3e10f187113d08578baef2d08",
+      "bytes": 608757,
+      "license": "CC0-1.0",
+      "source_url": "https://polyhaven.com/a/aerial_sand",
+      "author": "Rob Tuytel",
+      "source_filename": "aerial_sand_rough_1k.jpg",
+      "source_sha256": "7cccecb1d8d35a5404e1006688e3bd2b6675abe3c95ff26312a872a41d792897",
+      "modified": true,
+      "derivation": "R=0, G=B=255, A=255-roughness. No color transform; stored linear. All oxidation treated as dielectric."
+    },
+    {
+      "path": "unity/Assets/DesertRV/Art/EnvironmentV4/asphalt_02_diff_1k.jpg",
+      "sha256": "1aa5ce99f58a625c71d48cfc3e68b65ca85ccb00f39e045c0a928608a0ea25ed",
+      "bytes": 731707,
+      "license": "CC0-1.0",
+      "source_url": "https://polyhaven.com/a/asphalt_02",
+      "author": "Rob Tuytel",
+      "source_filename": "asphalt_02_diff_1k.jpg",
+      "modified": false
+    },
+    {
+      "path": "unity/Assets/DesertRV/Art/EnvironmentV4/asphalt_02_nor_gl_1k.jpg",
+      "sha256": "42a1c381b53204e83a982db2864479a30bc127bbdeebb1006f8ee51bff099df3",
+      "bytes": 1240122,
+      "license": "CC0-1.0",
+      "source_url": "https://polyhaven.com/a/asphalt_02",
+      "author": "Rob Tuytel",
+      "source_filename": "asphalt_02_nor_gl_1k.jpg",
+      "modified": false
+    },
+    {
+      "path": "unity/Assets/DesertRV/Art/EnvironmentV4/asphalt_02_metallic_smoothness_1k.png",
+      "sha256": "fb87d8c72651ee79e9ebbcd1afa9cfbe524e8c00d2f001684be34a2aecf42766",
+      "bytes": 1163724,
+      "license": "CC0-1.0",
+      "source_url": "https://polyhaven.com/a/asphalt_02",
+      "author": "Rob Tuytel",
+      "source_filename": "asphalt_02_rough_1k.jpg",
+      "source_sha256": "70ba3edc65525eb4dc366cf010ca7ae0bd34e0251ff0225c2dad627a873d0712",
+      "modified": true,
+      "derivation": "R=0, G=B=255, A=255-roughness. No color transform; stored linear. All oxidation treated as dielectric."
+    },
+    {
+      "path": "unity/Assets/DesertRV/Art/EnvironmentV4/concrete_floor_worn_001_diff_1k.jpg",
+      "sha256": "6e40c0fc908f4d66431836f5abe203f3a4eb064e88824378a91a46a26e2f464c",
+      "bytes": 118806,
+      "license": "CC0-1.0",
+      "source_url": "https://polyhaven.com/a/concrete_floor_worn_001",
+      "author": "Dimitrios Savva / Rico Cilliers",
+      "source_filename": "concrete_floor_worn_001_diff_1k.jpg",
+      "modified": false
+    },
+    {
+      "path": "unity/Assets/DesertRV/Art/EnvironmentV4/concrete_floor_worn_001_nor_gl_1k.jpg",
+      "sha256": "523bd94a1be5dd2f11c2ae2b7d7c77445cf5bd9e41604db515a7c8364dcba067",
+      "bytes": 110906,
+      "license": "CC0-1.0",
+      "source_url": "https://polyhaven.com/a/concrete_floor_worn_001",
+      "author": "Dimitrios Savva / Rico Cilliers",
+      "source_filename": "concrete_floor_worn_001_nor_gl_1k.jpg",
+      "modified": false
+    },
+    {
+      "path": "unity/Assets/DesertRV/Art/EnvironmentV4/concrete_floor_worn_001_metallic_smoothness_1k.png",
+      "sha256": "5b3adffcb38fe42c6529de9557315695c1003796bb55e5a0d9109a5a421afb3d",
+      "bytes": 851371,
+      "license": "CC0-1.0",
+      "source_url": "https://polyhaven.com/a/concrete_floor_worn_001",
+      "author": "Dimitrios Savva / Rico Cilliers",
+      "source_filename": "concrete_floor_worn_001_rough_1k.jpg",
+      "source_sha256": "069efe4ca018e0ef61fd8cc9964395ba8272284ae239da68d7f87988e2e9f488",
+      "modified": true,
+      "derivation": "R=0, G=B=255, A=255-roughness. No color transform; stored linear. All oxidation treated as dielectric."
+    },
+    {
+      "path": "unity/Assets/DesertRV/Art/EnvironmentV4/rusty_metal_02_diff_1k.jpg",
+      "sha256": "adaf094391518b6afe787a123942110aa88ef521c844f970b124420f5ed5d3d9",
+      "bytes": 564932,
+      "license": "CC0-1.0",
+      "source_url": "https://polyhaven.com/a/rusty_metal_02",
+      "author": "Rob Tuytel",
+      "source_filename": "rusty_metal_02_diff_1k.jpg",
+      "modified": false
+    },
+    {
+      "path": "unity/Assets/DesertRV/Art/EnvironmentV4/rusty_metal_02_nor_gl_1k.jpg",
+      "sha256": "995197a62cac6fbb000e6e6591a3330a3b77ef069c4ac58f505b586b9bdbd97b",
+      "bytes": 403156,
+      "license": "CC0-1.0",
+      "source_url": "https://polyhaven.com/a/rusty_metal_02",
+      "author": "Rob Tuytel",
+      "source_filename": "rusty_metal_02_nor_gl_1k.jpg",
+      "modified": false
+    },
+    {
+      "path": "unity/Assets/DesertRV/Art/EnvironmentV4/rusty_metal_02_metallic_smoothness_1k.png",
+      "sha256": "5166aa7662a0f4a6b83165fe8f02ba119fa5e0bab9e3908863b83f1604916f3b",
+      "bytes": 406580,
+      "license": "CC0-1.0",
+      "source_url": "https://polyhaven.com/a/rusty_metal_02",
+      "author": "Rob Tuytel",
+      "source_filename": "rusty_metal_02_rough_1k.jpg",
+      "source_sha256": "178deb5896232f0498555676e55a3be1d6d197e2211d8d17cb8386a868bfd54a",
+      "modified": true,
+      "derivation": "R=0, G=B=255, A=255-roughness. No color transform; stored linear. All oxidation treated as dielectric."
+    },
+    {
+      "path": "unity/Assets/DesertRV/Art/EnvironmentV4/sand_03_diff_1k.jpg",
+      "sha256": "e72144f9d7b81bdb7bbdb34222b53431738dcef79346dd89412d2abd541e4d30",
+      "bytes": 703132,
+      "license": "CC0-1.0",
+      "source_url": "https://polyhaven.com/a/sand_03",
+      "author": "Charlotte Baglioni",
+      "source_filename": "sand_03_diff_1k.jpg",
+      "modified": false
+    },
+    {
+      "path": "unity/Assets/DesertRV/Art/EnvironmentV4/sand_03_nor_gl_1k.jpg",
+      "sha256": "1bde5f49ea78f94bcad73592696bf3949711c4ac197133b710c0c8521b6e996b",
+      "bytes": 884706,
+      "license": "CC0-1.0",
+      "source_url": "https://polyhaven.com/a/sand_03",
+      "author": "Charlotte Baglioni",
+      "source_filename": "sand_03_nor_gl_1k.jpg",
+      "modified": false
+    },
+    {
+      "path": "unity/Assets/DesertRV/Art/EnvironmentV4/sand_03_metallic_smoothness_1k.png",
+      "sha256": "40d294a41ed4d0e11662ddac7bbdfa1f6d711dc2bac4a543e35253538642602f",
+      "bytes": 568942,
+      "license": "CC0-1.0",
+      "source_url": "https://polyhaven.com/a/sand_03",
+      "author": "Charlotte Baglioni",
+      "source_filename": "sand_03_rough_1k.jpg",
+      "source_sha256": "5c9ead290a94913cfa2d0452a576ba527b50301fe208f2ffc4861e42a8fea45b",
+      "modified": true,
+      "derivation": "R=0, G=B=255, A=255-roughness. No color transform; stored linear. All oxidation treated as dielectric."
+    },
+    {
+      "path": "unity/Assets/DesertRV/Art/EnvironmentV4/painted_plaster_wall_diff_1k.jpg",
+      "sha256": "440310f05af089f2c93353167573403cbc3f805948203237b5d26431eeb9e19c",
+      "bytes": 686726,
+      "license": "CC0-1.0",
+      "source_url": "https://polyhaven.com/a/painted_plaster_wall",
+      "author": "Amal Kumar",
+      "source_filename": "painted_plaster_wall_diff_1k.jpg",
+      "modified": false
+    },
+    {
+      "path": "unity/Assets/DesertRV/Art/EnvironmentV4/painted_plaster_wall_nor_gl_1k.jpg",
+      "sha256": "8eb01647d126eb5341e2c325821ad48c8ca11349dbef53447c95422c5d91cc9d",
+      "bytes": 900461,
+      "license": "CC0-1.0",
+      "source_url": "https://polyhaven.com/a/painted_plaster_wall",
+      "author": "Amal Kumar",
+      "source_filename": "painted_plaster_wall_nor_gl_1k.jpg",
+      "modified": false
+    },
+    {
+      "path": "unity/Assets/DesertRV/Art/EnvironmentV4/painted_plaster_wall_metallic_smoothness_1k.png",
+      "sha256": "14e41e20d534d922f029fd0e4b207dc321bd4d84a8134294ccb2bb9e89ce8cc9",
+      "bytes": 641912,
+      "license": "CC0-1.0",
+      "source_url": "https://polyhaven.com/a/painted_plaster_wall",
+      "author": "Amal Kumar",
+      "source_filename": "painted_plaster_wall_rough_1k.jpg",
+      "source_sha256": "e0564c297b22ab1cf4ef02a82157b84ce3b92eb4fd49d9c64b7256a8b300af82",
+      "modified": true,
+      "derivation": "R=0, G=B=255, A=255-roughness. No color transform; stored linear. All oxidation treated as dielectric."
+    },
+    {
+      "path": "unity/Assets/DesertRV/Art/EnvironmentV4/corrugated_iron_03_diff_1k.jpg",
+      "sha256": "d1378cbe96c625f79180147873c586bfc653ef5a66ea7a4a58cd5b18701f2bb4",
+      "bytes": 479372,
+      "license": "CC0-1.0",
+      "source_url": "https://polyhaven.com/a/corrugated_iron_03",
+      "author": "Charlotte Baglioni",
+      "source_filename": "corrugated_iron_03_diff_1k.jpg",
+      "modified": false
+    },
+    {
+      "path": "unity/Assets/DesertRV/Art/EnvironmentV4/corrugated_iron_03_nor_gl_1k.jpg",
+      "sha256": "4d53371c5d615b0c60a6eb5c1944d85fc640c433d1468490bd01c4caa6a80bae",
+      "bytes": 524530,
+      "license": "CC0-1.0",
+      "source_url": "https://polyhaven.com/a/corrugated_iron_03",
+      "author": "Charlotte Baglioni",
+      "source_filename": "corrugated_iron_03_nor_gl_1k.jpg",
+      "modified": false
+    },
+    {
+      "path": "unity/Assets/DesertRV/Art/EnvironmentV4/corrugated_iron_03_metallic_smoothness_1k.png",
+      "sha256": "6cb2b9b29f072133129be2c3b686f931e6b996216c02553f9d1c7fa9896ff65d",
+      "bytes": 295857,
+      "license": "CC0-1.0",
+      "source_url": "https://polyhaven.com/a/corrugated_iron_03",
+      "author": "Charlotte Baglioni",
+      "source_filename": "corrugated_iron_03_rough_1k.jpg",
+      "source_sha256": "d708d5756decc80bf48abc2de2ced089053ee0d3f1ebff31202e284c2eeaed39",
+      "modified": true,
+      "derivation": "R=0, G=B=255, A=255-roughness. No color transform; stored linear. All oxidation treated as dielectric."
+    },
+    {
+      "path": "unity/Assets/DesertRV/Art/EnvironmentV4/Factory/pipe-large-valve.fbx",
+      "sha256": "6d40576d8b5a9503e30efd029d8a63a20783ba54429a09580001c433c4a8a10e",
+      "bytes": 41152,
+      "license": "CC0-1.0",
+      "source_url": "https://kenney.nl/assets/factory-kit",
+      "author": "Kenney",
+      "source_filename": "pipe-large-valve.fbx",
+      "modified": false
+    },
+    {
+      "path": "unity/Assets/DesertRV/Art/EnvironmentV4/Factory/pipe-large-bend.fbx",
+      "sha256": "9acaf425b7d65655289123012237c388cdbe78fbd840b537b5c54055fc1e4e1d",
+      "bytes": 45728,
+      "license": "CC0-1.0",
+      "source_url": "https://kenney.nl/assets/factory-kit",
+      "author": "Kenney",
+      "source_filename": "pipe-large-bend.fbx",
+      "modified": false
+    },
+    {
+      "path": "unity/Assets/DesertRV/Art/EnvironmentV4/Factory/machine-bed.fbx",
+      "sha256": "781cc2faa1531f056266e42650cceb3dd6dd855570fd05fc7af93afc8160a52d",
+      "bytes": 49104,
+      "license": "CC0-1.0",
+      "source_url": "https://kenney.nl/assets/factory-kit",
+      "author": "Kenney",
+      "source_filename": "machine-bed.fbx",
+      "modified": false
+    },
+    {
+      "path": "unity/Assets/DesertRV/Art/EnvironmentV4/Factory/catwalk-stairs.fbx",
+      "sha256": "9fa7ff96dcc3737435400394b27138c99b59522d5d8b5715d2e8546d3a54ff73",
+      "bytes": 50816,
+      "license": "CC0-1.0",
+      "source_url": "https://kenney.nl/assets/factory-kit",
+      "author": "Kenney",
+      "source_filename": "catwalk-stairs.fbx",
+      "modified": false
+    },
+    {
+      "path": "unity/Assets/DesertRV/Art/EnvironmentV4/Factory/catwalk-straight.fbx",
+      "sha256": "0e8bbf0519012e9be5952cf91b244cf47c5fe5c30df26f2e3eeee8071e10a5db",
+      "bytes": 38992,
+      "license": "CC0-1.0",
+      "source_url": "https://kenney.nl/assets/factory-kit",
+      "author": "Kenney",
+      "source_filename": "catwalk-straight.fbx",
+      "modified": false
+    },
+    {
+      "path": "unity/Assets/DesertRV/Art/EnvironmentV4/Factory/hopper-square.fbx",
+      "sha256": "235962414352e1abca78d803a029ee7b15727cf13375d77bb53a365914f73c2b",
+      "bytes": 26208,
+      "license": "CC0-1.0",
+      "source_url": "https://kenney.nl/assets/factory-kit",
+      "author": "Kenney",
+      "source_filename": "hopper-square.fbx",
+      "modified": false
+    },
+    {
+      "path": "unity/Assets/DesertRV/Art/EnvironmentV4/Factory/crane-magnet.fbx",
+      "sha256": "a00b0c48bc1d406f66c8e5b3f6fa81e2935a688fc2ff871e854068e2b361b66a",
+      "bytes": 29072,
+      "license": "CC0-1.0",
+      "source_url": "https://kenney.nl/assets/factory-kit",
+      "author": "Kenney",
+      "source_filename": "crane-magnet.fbx",
+      "modified": false
+    },
+    {
+      "path": "unity/Assets/DesertRV/Art/EnvironmentV4/Factory/colormap.png",
+      "sha256": "35d7bd6900dde0208429eeaec87fa17fbf024ed59f3f4eab54bc92802eba9dd7",
+      "bytes": 11813,
+      "license": "CC0-1.0",
+      "source_url": "https://kenney.nl/assets/factory-kit",
+      "author": "Kenney",
+      "source_filename": "colormap.png",
+      "modified": false
+    }
+  ]
+}

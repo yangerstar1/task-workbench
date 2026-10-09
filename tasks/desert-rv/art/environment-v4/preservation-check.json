@@ -1,0 +1,9 @@
+{
+  "base_commit": "8b45b3c40e0752eed65ede5f3136a50761bd1a38",
+  "changed_existing_files": [
+    "tasks/desert-rv/ASSET-NOTICES.md",
+    "tasks/desert-rv/unity/Assets/DesertRV/Editor/JourneySceneAuthoring.cs"
+  ],
+  "unchanged": "All other base payloads compared byte-for-byte, excluding only .git and Python cache. This includes every RV asset/material, Runtime file, original scene, ProjectSettings and Packages.",
+  "native_verification": "not yet run"
+}

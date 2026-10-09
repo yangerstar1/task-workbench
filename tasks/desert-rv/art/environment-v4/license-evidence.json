@@ -1,0 +1,27 @@
+{
+  "verified_date_utc": "2026-10-09",
+  "scope": "Production candidates downloaded from official author or publisher links; this does not license site branding or arbitrary web previews.",
+  "evidence": [
+    {
+      "provider": "Poly Haven",
+      "asset_license": "CC0-1.0",
+      "page": "https://polyhaven.com/license",
+      "commercial_use": true,
+      "raw_redistribution": true,
+      "attribution_required": false,
+      "evidence": "The official page explicitly permits commercial use and redistribution, including sharing assets as part of own work or sold products.",
+      "api_terms": "https://polyhaven.com/our-api",
+      "api_note": "Live API free including commercial use as of 2026-07-18; unique User-Agent used. Live API integration requires visible source attribution; downloaded assets remain CC0."
+    },
+    {
+      "asset": "Kenney Factory Kit 3.0",
+      "asset_license": "CC0-1.0",
+      "page": "https://kenney.nl/assets/factory-kit",
+      "embedded_license": "kenney_factory/License.txt",
+      "commercial_use": true,
+      "raw_redistribution": true,
+      "attribution_required": false
+    }
+  ],
+  "license_definition": "https://creativecommons.org/publicdomain/zero/1.0/"
+}
