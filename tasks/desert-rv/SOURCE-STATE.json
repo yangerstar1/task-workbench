@@ -20,7 +20,8 @@
     ".github/actions/desert-rv-rendered/action.yml",
     ".github/workflows/desert-rv-rendered-smoke.yml",
     ".github/workflows/desert-rv-player-smoke.yml",
-    ".github/workflows/desert-rv-journey-prepare.yml"
+    ".github/workflows/desert-rv-journey-prepare.yml",
+    ".github/workflows/desert-rv-player-observe.yml"
   ],
   "restoredFiles": [
     {
@@ -54,6 +55,11 @@
       "path": ".github/workflows/desert-rv-journey-prepare.yml",
       "sha256": "367eec8a8c17bcaaa00dedd117e119b48bd24fa3b0df85d75f798895581c37d8",
       "size": 13097
+    },
+    {
+      "path": ".github/workflows/desert-rv-player-observe.yml",
+      "sha256": "92dd8519f828b291ae638e88431d376d358ba7bca89abc2f4df0251b7ace944b",
+      "size": 4062
     },
     {
       "path": ".github/workflows/desert-rv-player-smoke.yml",
@@ -446,6 +452,11 @@
       "size": 17390
     },
     {
+      "path": "tasks/desert-rv/scripts/player/observe_journey_player.py",
+      "sha256": "c7b7079363067601b1455b870874a9aee8a514df9cc506a4ae99e82c68cd3b94",
+      "size": 22343
+    },
+    {
       "path": "tasks/desert-rv/scripts/player/player_window_smoke.py",
       "sha256": "aaf268e5486a29c71872adc2a731978928354ced59d19aef40988e0dbab678aa",
       "size": 29973
@@ -454,6 +465,11 @@
       "path": "tasks/desert-rv/scripts/player/test_journey_linux_export.py",
       "sha256": "76f1becbfa0a76afceb057d6f8c695b4144cf7fb544e42cbd2ef5b3505c399d5",
       "size": 10516
+    },
+    {
+      "path": "tasks/desert-rv/scripts/player/test_observe_journey_player.py",
+      "sha256": "c10d3585dd4b1f74c1a3e9b8950ffdec62349392988f9c2473c9bfe207a16be3",
+      "size": 13273
     },
     {
       "path": "tasks/desert-rv/scripts/player/test_player_window_smoke.py",
@@ -612,8 +628,8 @@
     },
     {
       "path": "tasks/desert-rv/scripts/verify_evidence.py",
-      "sha256": "eebf12eae92d3fe23b5428ca4fa2cc71371d48b6a8100581602db0180c1f3411",
-      "size": 16239
+      "sha256": "bbb0f601cb00ec9699a5aa2204ccf5d84652f259a88580800d3a674077d09ec8",
+      "size": 16289
     },
     {
       "path": "tasks/desert-rv/unity/Assets/DefaultVolumeProfile.asset",

@@ -1,0 +1,82 @@
+name: Desert RV verified candidate player observation
+on:
+  workflow_dispatch:
+    inputs:
+      producer_run_id:
+        description: Actual successful same-job Journey producer run ID
+        required: true
+        type: string
+      producer_commit:
+        description: Exact original producer commit SHA
+        required: true
+        type: string
+      producer_artifact_id:
+        description: Actual successful reusable Linux artifact ID
+        required: true
+        type: string
+      producer_zip_sha256:
+        description: Reviewed actual artifact ZIP SHA256
+        required: true
+        type: string
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: desert-rv-player-observe
+  cancel-in-progress: false
+jobs:
+  observe:
+    if: >-
+      github.repository == 'yangerstar1/task-workbench' && github.ref == 'refs/heads/main' &&
+      github.actor == 'yangerstar1' && github.triggering_actor == 'yangerstar1' && github.event.repository.visibility == 'public'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    env:
+      PRODUCER_RUN_ID: ${{ inputs.producer_run_id }}
+      PRODUCER_COMMIT: ${{ inputs.producer_commit }}
+      PRODUCER_ARTIFACT_ID: ${{ inputs.producer_artifact_id }}
+      PRODUCER_ZIP_SHA256: ${{ inputs.producer_zip_sha256 }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+          lfs: false
+      - name: Validate observer source and offline byte fixtures
+        run: |
+          python3 tasks/desert-rv/scripts/verify_evidence.py guard
+          sudo apt-get update && sudo apt-get install -y --no-install-recommends python3-pil
+          python3 tasks/desert-rv/scripts/player/test_observe_journey_player.py
+      - name: Obtain only the pinned successful producer package
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 tasks/desert-rv/scripts/player/observe_journey_player.py stage
+      - name: Prepare existing fixed rendering image without Editor activation
+        run: |
+          docker build --build-arg BASE_IMAGE=unityci/editor@sha256:17406791cf1e438bea2dac20671668e05d83db5ed38c916744815db4584a8264 --file tasks/desert-rv/scripts/Environment.Dockerfile --tag desert-rv-environment:local tasks/desert-rv/scripts
+          docker build --build-arg BASE_IMAGE=desert-rv-environment:local --file tasks/desert-rv/scripts/rendered/Rendered.Dockerfile --tag desert-rv-observer:local tasks/desert-rv/scripts/rendered
+      - name: Observe only the owned candidate player window for fifteen seconds
+        id: native
+        run: |
+          mkdir -p tasks/desert-rv/player-observer-work
+          docker run --rm --init --cpus=2 --memory=12g --stop-timeout=30 \
+            --workdir /github/workspace \
+            --volume "$GITHUB_WORKSPACE:/github/workspace:ro" \
+            --volume "$GITHUB_WORKSPACE/tasks/desert-rv/player-observer-work:/github/workspace/tasks/desert-rv/player-observer-work:rw" \
+            --env GITHUB_SHA --env GITHUB_RUN_ID \
+            --env PRODUCER_RUN_ID --env PRODUCER_COMMIT --env PRODUCER_ARTIFACT_ID --env PRODUCER_ZIP_SHA256 \
+            --entrypoint /usr/bin/timeout desert-rv-observer:local \
+            --signal=TERM --kill-after=15s 180s python3 /github/workspace/tasks/desert-rv/scripts/player/observe_journey_player.py capture
+      - name: Gate media on actual observer process success
+        id: public
+        if: always()
+        env:
+          NATIVE_OUTCOME: ${{ steps.native.outcome }}
+        run: python3 tasks/desert-rv/scripts/player/observe_journey_player.py export
+      - name: Upload fixed safe status and verified game-only media
+        if: always() && steps.public.outputs.export_ready == 'true' 
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: journey-player-OBSERVED-NOT-PLAYTESTED-${{ github.run_id }}-${{ github.run_attempt }}
+          path: tasks/desert-rv/player-observer-work/public/
+          if-no-files-found: warn
+          retention-days: 7
