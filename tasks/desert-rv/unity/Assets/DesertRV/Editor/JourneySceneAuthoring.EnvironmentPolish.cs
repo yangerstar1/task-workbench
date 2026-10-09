@@ -53,14 +53,18 @@ namespace DesertRV.Editor
             var m = AssetDatabase.LoadAssetAtPath<Material>(path);
             if (!m)
             {
-                bool groundSurface = kind == "Sand" || kind == "Dune" || kind == "Dust" || kind == "Oil" || kind == "TrackSand";
-                var shader = Shader.Find(groundSurface ? "DesertRV/EnvironmentSurface" : "Universal Render Pipeline/Lit");
+                // Opaque terrain must use the retained URP Lit depth/normal/shadow passes.
+                // Only feathered surface decals use the small vertex-alpha forward shader.
+                bool terrain = kind == "Sand" || kind == "Dune";
+                bool overlay = kind == "Dust" || kind == "Oil" || kind == "TrackSand";
+                var shader = Shader.Find(overlay ? "DesertRV/EnvironmentSurface" : "Universal Render Pipeline/Lit");
                 if (!shader || !shader.isSupported || ShaderUtil.ShaderHasError(shader)) throw new InvalidOperationException("EnvironmentV4 requires supported URP Lit.");
                 m = new Material(shader) { name = "EnvironmentV4 " + kind, enableInstancing = true };
                 string tile = null; Color tint = Color.white; float smooth = .19f, metal = 0, normal = .35f;
                 switch (kind)
                 {
-                    case "Sand": case "Dune": case "Dust": tile = "sand_03"; tint = new Color(1.75f, 1.52f, 1.16f); normal = 0; break;
+                    case "Sand": case "Dune": tile = "sand_03"; tint = new Color(1.75f, 1.52f, 1.16f); normal = .035f; smooth = .04f; break;
+                    case "Dust": tile = "sand_03"; tint = new Color(1.75f, 1.52f, 1.16f); normal = 0; break;
                     case "TrackSand": tile = "aerial_sand"; tint = new Color(.96f, .82f, .64f, .26f); normal = 0; break;
                     case "Sheet": tile = "corrugated_iron_03"; tint = new Color(.90f, .88f, .80f); normal = .22f; break;
                     case "Asphalt": tile = "asphalt_02"; tint = new Color(.76f, .77f, .76f); normal = .3f; break;
@@ -77,25 +81,28 @@ namespace DesertRV.Editor
                 }
                 if (kind == "Dust") tint.a = .7f;
                 m.SetColor("_BaseColor", tint);
-                if (!groundSurface) { m.SetFloat("_Smoothness", smooth); m.SetFloat("_Metallic", metal); }
+                if (!overlay) { m.SetFloat("_Smoothness", smooth); m.SetFloat("_Metallic", metal); }
                 if (tile != null)
                 {
                     m.SetTexture("_BaseMap", RequiredPolishTexture(tile + "_diff_1k.jpg"));
-                    if (!groundSurface) {
+                    if (!overlay) {
                     m.SetTexture("_BumpMap", RequiredPolishTexture(tile + "_nor_gl_1k.jpg"));
-                    m.SetTexture("_MetallicGlossMap", RequiredPolishTexture(tile + "_metallic_smoothness_1k.png"));
-                    m.SetFloat("_BumpScale", normal); m.SetFloat("_Smoothness", .70f);
-                    m.EnableKeyword("_NORMALMAP"); m.EnableKeyword("_METALLICSPECGLOSSMAP"); }
+                    m.SetFloat("_BumpScale", normal); m.EnableKeyword("_NORMALMAP");
+                    // One shared opaque sand BRDF: no dune-specific average mip, fade or roughness.
+                    // Very matte scalar roughness avoids a repeating specular mask at low viewing angles.
+                    if (!terrain) {
+                        m.SetTexture("_MetallicGlossMap", RequiredPolishTexture(tile + "_metallic_smoothness_1k.png"));
+                        m.SetFloat("_Smoothness", .70f); m.EnableKeyword("_METALLICSPECGLOSSMAP"); }
+                    }
                 }
-                if (groundSurface)
+                if (overlay)
                 {
-                    m.SetFloat("_DetailContrast", kind == "Dune" ? .08f : kind == "TrackSand" ? .5f : .65f);
-                    m.SetFloat("_DetailStart", kind == "Dune" ? 12 : 24); m.SetFloat("_DetailEnd", kind == "Dune" ? 40 : 80);
-                    bool overlay = kind == "Oil" || kind == "Dust" || kind == "TrackSand";
-                    m.SetFloat("_SrcBlend", (float)(overlay ? BlendMode.SrcAlpha : BlendMode.One));
-                    m.SetFloat("_DstBlend", (float)(overlay ? BlendMode.OneMinusSrcAlpha : BlendMode.Zero));
-                    m.SetFloat("_ZWrite", overlay ? 0 : 1); m.renderQueue = overlay ? 2501 : 2000;
-                    m.SetOverrideTag("RenderType", overlay ? "Transparent" : "Opaque");
+                    m.SetFloat("_DetailContrast", kind == "TrackSand" ? .5f : .65f);
+                    m.SetFloat("_DetailStart", 24); m.SetFloat("_DetailEnd", 80);
+                    m.SetFloat("_SrcBlend", (float)BlendMode.SrcAlpha);
+                    m.SetFloat("_DstBlend", (float)BlendMode.OneMinusSrcAlpha);
+                    m.SetFloat("_ZWrite", 0); m.renderQueue = 2501;
+                    m.SetOverrideTag("RenderType", "Transparent");
                 }
                 if (kind == "Factory") m.SetTexture("_BaseMap", RequiredPolishTexture("Factory/colormap.png"));
                 if (kind == "Lamp") { m.EnableKeyword("_EMISSION"); m.SetColor("_EmissionColor", new Color(2.8f, 1.6f, .55f)); }
@@ -453,16 +460,19 @@ namespace DesertRV.Editor
                 p.Cylinder("TowerUpper","Steel",q,q+Vector3.up*1.0f,.07f,10);
             }
             // Hero lighting is attached to actual visible housings; no global darkness concealing geometry.
-            foreach(Vector3 at in new[]{new Vector3(11,3.2f,29),new Vector3(-11,3.6f,31.8f)})
+            foreach(Vector3 at in new[]{new Vector3(11,3.2f,29),new Vector3(-9.55f,.68f,30.9f)})
             {
                 string group=at.x<0?"TowerFixtures":"RelayCanopy";
-                Vector3 target=at.x<0?new Vector3(-7.0f,.10f,26.0f):new Vector3(7.2f,.10f,23.0f);
+                // Keep the useful workshop pool. Re-aim the existing tower fixture onto its body,
+                // with a visible low support, instead of another overlapping road fill.
+                Vector3 target=at.x<0?new Vector3(-11.0f,6.1f,33.0f):new Vector3(7.2f,.10f,23.0f);
+                if(at.x<0)p.Beam(group,"Steel",new Vector3(at.x,.10f,at.z),at,.09f,.09f);
                 Vector3 direction=(target-at).normalized;
                 Vector3 right=Vector3.Cross(Vector3.up,direction).normalized*.27f,up=Vector3.Cross(direction,right).normalized*.145f;
                 p.Beam(group,"Steel",at-direction*.07f,at+direction*.07f,.64f,.36f);
                 Vector3 lens=at+direction*.09f;
                 p.Quad(group,"Lamp",lens-right-up,lens+right-up,lens+right+up,lens-right+up);
-                var flood=PolishSpot(b.transform,"Beacon shielded service flood",at+direction*.13f,22.0f,15,90);
+                var flood=PolishSpot(b.transform,"Beacon shielded service flood",at+direction*.13f,at.x<0?16.0f:22.0f,15,at.x<0?65:90);
                 flood.transform.rotation=Quaternion.LookRotation(target-flood.transform.position);
             }
             int activeLocal=b.GetComponentsInChildren<Light>(true).Count(l=>l.enabled&&l.gameObject.activeInHierarchy&&l.type!=LightType.Directional);
@@ -470,7 +480,7 @@ namespace DesertRV.Editor
             var pipeline=new SerializedObject(GraphicsSettings.currentRenderPipeline);
             if(pipeline.FindProperty("m_AdditionalLightsRenderingMode").intValue!=1||pipeline.FindProperty("m_AdditionalLightsPerObjectLimit").intValue<8)
                 throw new InvalidOperationException("Expected retained per-pixel URP additional lights and eight-light per-object limit.");
-            Debug.Log("ENVIRONMENT_V4_R2_LIGHTING seven-local-fixtures per-pixel-limit=8");
+            Debug.Log("ENVIRONMENT_V4_R3_LIGHTING seven-local-fixtures per-pixel-limit=8");
         }
 
         static Light PolishSpot(Transform parent,string name,Vector3 at,float intensity,float range,float angle)
@@ -656,7 +666,7 @@ namespace DesertRV.Editor
             }
             public void Berm(string group,string mat,Vector3 at,Vector2 radius,float height,int seed,bool collide)
             {
-                var m=Get(group,mat,collide);m.smoothNormals=true;const int rings=6,sides=28;
+                var m=Get(group,mat,collide);m.smoothNormals=true;m.groundJoin=true;const int rings=6,sides=28;
                 Func<int,int,Vector3> point=(r,i)=>
                 {
                     float angle=i*Mathf.PI*2/sides,f=(float)r/rings;
@@ -686,7 +696,7 @@ namespace DesertRV.Editor
         }
         sealed class PolishMesh
         {
-            public readonly string material;public bool collide,smoothNormals;
+            public readonly string material;public bool collide,smoothNormals,groundJoin;
             readonly List<Vector3> vertices=new List<Vector3>();readonly List<Vector2> uv=new List<Vector2>();readonly List<int> indices=new List<int>();readonly List<Color> colors=new List<Color>();
             public PolishMesh(string mat){material=mat;}
             public void Tri(Vector3 a,Vector3 b,Vector3 c,float alphaA=1,float alphaB=1,float alphaC=1)
@@ -694,7 +704,8 @@ namespace DesertRV.Editor
                 Vector3 normal=Vector3.Cross(b-a,c-a);if(normal.sqrMagnitude<.00000001f)return;
                 int first=vertices.Count;vertices.Add(a);vertices.Add(b);vertices.Add(c);
                 colors.Add(new Color(1,1,1,alphaA));colors.Add(new Color(1,1,1,alphaB));colors.Add(new Color(1,1,1,alphaC));
-                foreach(var p in new[]{a,b,c})uv.Add(Project(p,normal.normalized)/TextureMetres(material));
+                // Sand and dunes share continuous world XZ coordinates, including steep triangles.
+                foreach(var p in new[]{a,b,c})uv.Add((material=="Sand"||material=="Dune"?new Vector2(p.x,p.z):Project(p,normal.normalized))/TextureMetres(material));
                 indices.Add(first);indices.Add(first+1);indices.Add(first+2);
             }
             public void Quad(Vector3 a,Vector3 b,Vector3 c,Vector3 d){Tri(a,b,c);Tri(a,c,d);}
@@ -709,7 +720,15 @@ namespace DesertRV.Editor
                     var normals=mesh.normals;var sums=new Dictionary<Vector3Int,Vector3>();
                     Func<Vector3,Vector3Int> key=v=>new Vector3Int(Mathf.RoundToInt(v.x*10000),Mathf.RoundToInt(v.y*10000),Mathf.RoundToInt(v.z*10000));
                     for(int i=0;i<vertices.Count;i++){var k=key(vertices[i]);if(sums.TryGetValue(k,out var n))sums[k]=n+normals[i];else sums[k]=normals[i];}
-                    for(int i=0;i<vertices.Count;i++)normals[i]=sums[key(vertices[i])].normalized;
+                    for(int i=0;i<vertices.Count;i++)
+                    {
+                        Vector3 n=sums[key(vertices[i])].normalized;
+                        // The analytic berm has zero slope at its base, but the last coarse ring
+                        // previously inherited a sloping face normal. Join that skirt to the flat
+                        // ground normal continuously; do not alter vertices, collision or UV scale.
+                        float blend=Mathf.SmoothStep(0,1,Mathf.InverseLerp(-.03f,.32f,vertices[i].y));
+                        normals[i]=groundJoin?Vector3.Slerp(Vector3.up,n,blend).normalized:n;
+                    }
                     mesh.normals=normals;
                 }
                 mesh.RecalculateTangents();mesh.RecalculateBounds();return mesh;

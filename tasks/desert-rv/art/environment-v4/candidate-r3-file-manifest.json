@@ -1,0 +1,44 @@
+{
+  "schema": 1,
+  "base_commit": "e0bd572526df46b6997e70a338d4a36db4f8568f",
+  "status": "SOURCE_REVISION_PENDING_NATIVE_AND_VISUAL_REVIEW",
+  "binary_payloads_unchanged": 29,
+  "generated_contract_unchanged": true,
+  "files": [
+    {
+      "path": "tasks/desert-rv/art/environment-v4/REVISION-R3.md",
+      "change": "added",
+      "bytes": 3842,
+      "sha256": "ecbbdd1bea2cd88b5fcb84d6c73ec447bc469dd7ef5e0ce1e4b21d883c8b1c0f",
+      "before_sha256": null
+    },
+    {
+      "path": "tasks/desert-rv/art/environment-v4/test_candidate.py",
+      "change": "modified",
+      "bytes": 10535,
+      "sha256": "78a0c14330d81c9f1778e1467fca2769d293c1458861d24aea295fd1922658c3",
+      "before_sha256": "195234d835d4c6efeda5240878b8bbba519e6c807df07a080d7f7459744d2431"
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/EnvironmentV4/sand_03_nor_gl_1k.jpg.meta",
+      "change": "modified",
+      "bytes": 3009,
+      "sha256": "4200b06e5527ba14194b9afde1e1eb2113cb29c1f4620bf030f94176421f4201",
+      "before_sha256": "33cdf8256ca458fc8e9f790a5808dcc9c68ecaf011e3764365935467c0da576a"
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Editor/JourneySceneAuthoring.EnvironmentPolish.cs",
+      "change": "modified",
+      "bytes": 58366,
+      "sha256": "b829eda4869721b7956cb279b53e0a6b7e1194ef91880c80e2d712110a8366d9",
+      "before_sha256": "9bf7f3f4bc939baa5298e207c9f9297c18d72208048e3a7c1ae6b01ee7274272"
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Tests/EditorRender/JourneyEnvironmentRenderTests.cs",
+      "change": "modified",
+      "bytes": 5272,
+      "sha256": "f5b8d102ce5debf111805742fa300bf3ded062b02f4d53856e429e057e0097f2",
+      "before_sha256": "70eae4ea3cecd22bbe81308492b274dd6b423381b3d1152d0b24176be11689d7"
+    }
+  ]
+}

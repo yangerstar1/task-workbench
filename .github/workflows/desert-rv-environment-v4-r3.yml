@@ -1,0 +1,137 @@
+name: Desert RV Environment V4 R3 actual camera evidence
+run-name: Desert RV V4 R3 renderer-only, no combat integration · ${{ github.sha }}
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/dispatch/desert-rv-environment-v4-r3-20261009.json
+
+permissions:
+  contents: read
+
+concurrency:
+  group: desert-rv-environment-v4-r3-evidence
+  cancel-in-progress: false
+
+jobs:
+  environment:
+    name: Author V4 regions and capture twenty actual Unity views
+    if: >-
+      github.event_name == 'push' &&
+      github.event.before == 'e0bd572526df46b6997e70a338d4a36db4f8568f' &&
+      github.repository == 'yangerstar1/task-workbench' &&
+      github.ref == 'refs/heads/main' &&
+      github.actor == 'yangerstar1' &&
+      github.triggering_actor == 'yangerstar1'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 55
+    env:
+      GITHUB_REPOSITORY_VISIBILITY: ${{ github.event.repository.visibility }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+          fetch-depth: 2
+          lfs: false
+      - name: Verify this exact independent V4 fixed-push request
+        run: /usr/bin/python3 tasks/desert-rv/scripts/environment_v4_r3_dispatch.py
+      - name: Install bounded image validator from official Ubuntu packages
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends python3-pil
+      - name: Validate guards and safety contracts
+        run: |
+          /usr/bin/python3 tasks/desert-rv/scripts/verify_evidence.py guard
+          /usr/bin/python3 tasks/desert-rv/scripts/test_verify_evidence.py
+          /usr/bin/python3 tasks/desert-rv/scripts/test_environment_evidence.py
+          /usr/bin/python3 tasks/desert-rv/scripts/test_environment_v4_evidence.py
+          /usr/bin/python3 tasks/desert-rv/scripts/test_environment_v4_dispatch.py
+          /usr/bin/python3 tasks/desert-rv/scripts/test_environment_v4_runner_prefix.py
+          /usr/bin/python3 tasks/desert-rv/scripts/test_journey_rebuild_dispatch.py
+          /usr/bin/python3 tasks/desert-rv/scripts/test_environment_v4_r2_dispatch.py
+          /usr/bin/python3 tasks/desert-rv/scripts/test_environment_v4_r2_runner_prefix.py
+          /usr/bin/python3 tasks/desert-rv/scripts/test_armored_v004_discovery_dispatch.py
+          /usr/bin/python3 tasks/desert-rv/scripts/test_environment_v4_r3_dispatch.py
+          /usr/bin/python3 tasks/desert-rv/scripts/test_environment_v4_r3_runner_prefix.py
+          /usr/bin/python3 tasks/desert-rv/art/environment-v4/test_candidate.py
+      - name: Restore exact checkpoint font
+        run: |
+          /usr/bin/python3 tasks/desert-rv/scripts/backup/restore_unity_font.py
+          /usr/bin/python3 tasks/desert-rv/scripts/backup/restore_unity_font.py --verify-only
+      - name: Snapshot protected source before native execution
+        id: snapshot
+        run: /usr/bin/python3 tasks/desert-rv/scripts/environment_v4_evidence.py before
+      - name: Prepare disposable standard runner
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+        run: bash tasks/desert-rv/scripts/prepare_runner.sh
+      - name: Prepare software OpenGL on pinned official GameCI editor
+        run: >-
+          docker build
+          --build-arg BASE_IMAGE=unityci/editor@sha256:17406791cf1e438bea2dac20671668e05d83db5ed38c916744815db4584a8264
+          --file tasks/desert-rv/scripts/Environment.Dockerfile
+          --tag desert-rv-environment:local
+          tasks/desert-rv/scripts
+      - name: Execute separate native EditorRender author and capture entry
+        id: native
+        uses: game-ci/unity-test-runner@0ff419b913a3630032cbe0de48a0099b5a9f0ed9 # v4.3.1
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+        with:
+          unityVersion: 6000.3.19f1
+          customImage: desert-rv-environment:local
+          projectPath: tasks/desert-rv/unity
+          testMode: editmode
+          artifactsPath: tasks/desert-rv/artifacts/environment
+          customParameters: -assemblyNames DesertRV.EditorRenderTests -force-glcore -job-worker-count 2
+          dockerCpuLimit: 2
+          dockerMemoryLimit: 12g
+      - name: Reject altered originals, missing or blank captures; package allowlist only
+        id: package
+        run: /usr/bin/python3 tasks/desert-rv/scripts/environment_v4_evidence.py package
+      - name: Upload only sanitized environmental evidence
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: desert-rv-environment-v4-r3-${{ github.run_id }}-${{ github.run_attempt }}
+          path: tasks/desert-rv/evidence/environment-v4/
+          if-no-files-found: error
+          retention-days: 7
+      - name: Diagnose protected source independently of image validation
+        id: source_diag
+        if: failure() && steps.snapshot.outcome == 'success'
+        run: /usr/bin/python3 tasks/desert-rv/scripts/environment_evidence.py diagnose
+      - name: Upload only independent source hash diagnosis
+        if: failure() && steps.source_diag.outputs.present == 'true'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: desert-rv-source-FAILED-NOT-ACCEPTED-${{ github.run_id }}-${{ github.run_attempt }}
+          path: tasks/desert-rv/evidence/environment-source-diagnostic/protected-source-failure.json
+          if-no-files-found: error
+          retention-days: 7
+      - name: Diagnose official Unity package resolution without raw files
+        id: package_diag
+        if: failure() && steps.source_diag.outputs.present == 'true'
+        run: /usr/bin/python3 tasks/desert-rv/scripts/environment_evidence.py diagnose-packages
+      - name: Upload only allowlisted Unity package metadata
+        if: failure() && steps.package_diag.outcome == 'success'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: desert-rv-packages-FAILED-NOT-ACCEPTED-${{ github.run_id }}-${{ github.run_attempt }}
+          path: tasks/desert-rv/evidence/environment-package-diagnostic/unity-package-resolution.json
+          if-no-files-found: error
+          retention-days: 7
+      - name: Preserve unaccepted pixels only after a protected-source failure
+        id: partial
+        if: failure() && steps.native.outcome == 'success' && steps.package.outcome == 'failure'
+        run: /usr/bin/python3 tasks/desert-rv/scripts/environment_v4_evidence.py partial
+      - name: Upload strictly unaccepted diagnostic evidence
+        if: failure() && steps.partial.outcome == 'success'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: desert-rv-environment-v4-r3-FAILED-NOT-ACCEPTED-${{ github.run_id }}-${{ github.run_attempt }}
+          path: tasks/desert-rv/evidence/environment-v4-unaccepted/
+          if-no-files-found: error
+          retention-days: 7

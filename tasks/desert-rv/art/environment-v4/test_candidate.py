@@ -46,10 +46,10 @@ class CandidateTests(unittest.TestCase):
   self.assertIn('material == "TrackSand" ? 15',CODE)
   self.assertIn('material == "Sand" || material == "Dune" || material == "Dust" || material == "Plaster" || material == "Sheet" ? 2',CODE)
   self.assertIn('material == "Asphalt" || material == "Concrete" ? 3 : 1',CODE)
-  self.assertIn('Project(p,normal.normalized)/TextureMetres(material)',CODE)
+  self.assertIn('(material=="Sand"||material=="Dune"?new Vector2(p.x,p.z):Project(p,normal.normalized))/TextureMetres(material)',CODE)
   self.assertIn('p.SourceMesh("StationWallLeft", "Plaster", r)',CODE)
   # Photographed tire tracks must not texture the open desert itself.
-  self.assertIn('case "Sand": case "Dune": case "Dust": tile = "sand_03"',CODE);self.assertIn('case "TrackSand": tile = "aerial_sand"',CODE)
+  self.assertIn('case "Sand": case "Dune": tile = "sand_03"',CODE);self.assertIn('case "TrackSand": tile = "aerial_sand"',CODE)
  def test_shared_material_budget_and_importer_safety(self):
   self.assertEqual(len(CONTRACT['material_names']),16)
   self.assertNotIn('SaveAndReimport',CODE);self.assertNotIn('AssetImporter.GetAtPath',CODE)
@@ -89,13 +89,29 @@ class CandidateTests(unittest.TestCase):
    meta=p.with_name(p.name+'.meta');self.assertTrue(meta.is_file(),str(p))
    guid=re.search(r'^guid: ([a-f0-9]{32})$',meta.read_text(),re.M).group(1);guids.append(guid)
   self.assertEqual(len(guids),len(set(guids)))
- def test_far_sand_has_separate_macro_material_and_no_periodic_normal(self):
-  shader=(ART/'EnvironmentSurface.shader').read_text()
-  self.assertIn('p.Berm(group, "Dune"',CODE)
-  self.assertIn('SAMPLE_TEXTURE2D_LOD(_BaseMap,sampler_BaseMap,float2(.5,.5),10)',shader)
-  self.assertIn('distance(input.world,_WorldSpaceCameraPos)',shader)
-  self.assertNotIn('Noise(',shader);self.assertNotIn('_BumpMap',shader)
-  self.assertIn('filterMode: 2',(ART/'sand_03_diff_1k.jpg.meta').read_text())
+ def test_opaque_terrain_has_one_standard_lit_brdf(self):
+  self.assertIn('bool terrain = kind == "Sand" || kind == "Dune";',CODE)
+  self.assertIn('bool overlay = kind == "Dust" || kind == "Oil" || kind == "TrackSand";',CODE)
+  self.assertIn('Shader.Find(overlay ? "DesertRV/EnvironmentSurface" : "Universal Render Pipeline/Lit")',CODE)
+  self.assertIn('normal = .035f; smooth = .04f;',CODE)
+  self.assertNotIn('kind == "Dune" ?',CODE)
+  self.assertIn('if (!terrain) {',CODE)
+  for suffix in ['diff','nor_gl']:
+   self.assertIn('filterMode: 2',(ART/f'sand_03_{suffix}_1k.jpg.meta').read_text())
+ def test_terrain_skirt_join_is_continuous_without_geometry_growth(self):
+  self.assertIn('m.smoothNormals=true;m.groundJoin=true;const int rings=6,sides=28;',CODE)
+  self.assertIn('Mathf.InverseLerp(-.03f,.32f,vertices[i].y)',CODE)
+  self.assertIn('Vector3.Slerp(Vector3.up,n,blend).normalized',CODE)
+  def blend(y):
+   t=max(0,min(1,(y+.03)/.35));return t*t*(3-2*t)
+  self.assertEqual(blend(-.047),0);self.assertEqual(blend(-.05),0)
+  self.assertEqual(blend(.32),1)
+  self.assertTrue(all(blend(a)<=blend(b) for a,b in zip([-.05,0,.1,.2],[0,.1,.2,.32])))
+ def test_native_case_checks_opaque_passes_and_world_uv(self):
+  test=(ROOT/'unity/Assets/DesertRV/Tests/EditorRender/JourneyEnvironmentRenderTests.cs').read_text()
+  self.assertEqual(test.count('[Test,'),1);self.assertIn('Timeout(600000)',test)
+  for expected in ['"DepthOnly","DepthNormals","ShadowCaster"','vertices[i].x/2','vertices[i].z/2','Vector3.Dot(normals[i],Vector3.up)']:
+   self.assertIn(expected,test)
  def test_overlay_has_explicit_vertex_fade_and_zero_outer_alpha(self):
   shader=(ART/'EnvironmentSurface.shader').read_text()
   self.assertIn('Blend [_SrcBlend] [_DstBlend]',shader);self.assertIn('_BaseColor.a*input.color.a',shader)
@@ -105,9 +121,12 @@ class CandidateTests(unittest.TestCase):
   self.assertIn('Bounds meter=geom.Single',CODE);self.assertIn('head.extents',CODE)
   self.assertIn('j<=18',CODE);self.assertIn('p.Cylinder("PumpDetails","Rubber"',CODE)
   self.assertIn('PumpDetails-Ivory',CODE);self.assertIn('PumpDetails-Rubber',CODE)
- def test_night_pixel_lights_are_bounded_and_aimed_to_approach(self):
+ def test_night_pixel_lights_keep_work_pool_and_retarget_existing_tower_fixture(self):
   self.assertIn('activeLocal!=7',CODE);self.assertIn('m_AdditionalLightsRenderingMode',CODE)
   self.assertIn('Quaternion.LookRotation(target-flood.transform.position)',CODE)
+  self.assertIn('new Vector3(-9.55f,.68f,30.9f)',CODE)
+  self.assertIn('new Vector3(-11.0f,6.1f,33.0f)',CODE)
+  self.assertIn('at.x<0?16.0f:22.0f',CODE)
   main=(ROOT/'unity/Assets/DesertRV/Editor/JourneySceneAuthoring.cs').read_text()
   self.assertIn('light.intensity=region==3?.48f',main)
  def test_added_yard_midforms_leave_road_clear(self):

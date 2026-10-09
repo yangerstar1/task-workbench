@@ -1,0 +1,19 @@
+# V4 R3: continuous opaque terrain and a focused tower light
+
+Baseline: public commit `f144b37f84a759d4dd796b897aa819a78938dfb5`, actual Actions run `37956920292`. The run passed one native test, all twenty captures, protected-source and original clearance gates, and exact asset export. Visual review nevertheless rejected its paper-like dune patches and flat gray night ground. The pump structure and softened oil patches improved and are retained. The existing night workshop landmark has a real warm pool; it is not described as unlit.
+
+## Narrow correction
+
+- Both opaque `Sand` and `Dune` return to the retained standard `Universal Render Pipeline/Lit` shader. They use the same original 1K `sand_03` diffuse and normal maps, identical base tint, metallic zero, scalar smoothness 0.04, and weak normal strength 0.035. There is no separate mean-mip sample, diffuse contrast, distance fade, or BRDF for dunes. Ordinary trilinear mip filtering provides a continuous near-to-far transition. The normal importer changes only bilinear to trilinear; no image bytes change.
+- Both terrain meshes use the same world X/Z divided by 2 m, regardless of triangle slope. Existing dune vertices, ring count, triangle topology, collision and placement remain unchanged. The smooth analytic berm's outer skirt now has an explicitly upward normal, blended continuously into the existing averaged interior normals between world heights -0.03 and 0.32 m. This removes the coarse outer ring's residual slope discontinuity without adding geometry.
+- Standard Lit supplies its built-in depth, depth-normal, shadow-caster and SSAO-compatible forward paths. R2's forward-only shader is retained only for the three feathered overlays (`Dust`, `Oil`, `TrackSand`) that already improved the actual images. No shader source or render-pipeline asset is modified in this revision.
+- The useful workshop light pool, total seven regional local lights, per-pixel mode, eight-light per-object limit, night fill and exposure stay unchanged. One existing tower fixture is moved to a visible low support on its foundation and aimed at the tower body instead of duplicating a road wash. Its spot is 16 intensity / 15 m range / 65 degrees. The support adds one small 12-triangle beam inside the existing `TowerFixtures-Steel` batch, with no new collider, renderer, material or light.
+- Original RV materials and geometry, improved pump detail, soft oil and roadside ingress, yard processing structures, gameplay/interaction logic, all original clearance checks and all twenty camera positions remain unchanged.
+
+## Finite output and evidence gates
+
+The generated contract remains byte-identical: 121 payloads plus 122 metadata files, comprising 105 meshes and 16 shared materials. All 29 CC0 binary source payloads and all provenance/license records remain byte-identical. No new external source or license is introduced. Triangle counts are unchanged in regions 1 and 2; region 3 adds only the 12-triangle lamp support.
+
+The existing single native case retains its explicit 600000 ms timeout. After the original twenty renders, it additionally verifies both generated opaque terrain materials use standard Lit, expose forward/depth/depth-normal/shadow passes, have matching maps/tint and weak normal parameters, and that all three regions' ground/dune meshes retain exact 2 m world UVs and upward skirt normals. This confirms authoring/import state, not attractive rendering.
+
+Review the original-resolution same-camera frames against run `37956920292` for ground/dune continuity, near/mid/far surface detail, shadow contact, absence of grid repetition, preserved pump/oil improvements, and readable tower emphasis. Native test success does not establish visual acceptance, integrated gameplay or Android performance. This candidate remains pending native and visual review.

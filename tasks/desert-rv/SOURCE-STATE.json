@@ -28,7 +28,9 @@
     ".github/dispatch/desert-rv-environment-v4-20261009-files.json",
     ".github/workflows/desert-rv-environment-v4-r2.yml",
     ".github/dispatch/desert-rv-environment-v4-r2-20261009-files.json",
-    ".github/workflows/desert-rv-armored-v004-r1-discovery.yml"
+    ".github/workflows/desert-rv-armored-v004-r1-discovery.yml",
+    ".github/workflows/desert-rv-environment-v4-r3.yml",
+    ".github/dispatch/desert-rv-environment-v4-r3-20261009-files.json"
   ],
   "restoredFiles": [
     {
@@ -54,6 +56,11 @@
       "size": 4666
     },
     {
+      "path": ".github/dispatch/desert-rv-environment-v4-r3-20261009-files.json",
+      "sha256": "375f75e87efe7c6db0b3be09a73c396ca66da94d2c434d81f8d353f9c2cd0628",
+      "size": 2892
+    },
+    {
       "path": ".github/workflows/desert-rv-android.yml",
       "sha256": "a921a22d3bafd4b736575ceb48a44e302a4c31104b77fc8d341ec83162b0d4cd",
       "size": 11242
@@ -72,6 +79,11 @@
       "path": ".github/workflows/desert-rv-environment-v4-r2.yml",
       "sha256": "886ef6b433bdaf8e8aba3b426641ac8182c84c57655a6b42b25ac4e5e0d4c1bd",
       "size": 6780
+    },
+    {
+      "path": ".github/workflows/desert-rv-environment-v4-r3.yml",
+      "sha256": "8929745c359c96f1a6fc7ddf90850e77f71e75d1884de8f2e33165a1c35631a7",
+      "size": 7220
     },
     {
       "path": ".github/workflows/desert-rv-environment-v4.yml",
@@ -134,6 +146,11 @@
       "size": 4746
     },
     {
+      "path": "tasks/desert-rv/art/environment-v4/REVISION-R3.md",
+      "sha256": "ecbbdd1bea2cd88b5fcb84d6c73ec447bc469dd7ef5e0ce1e4b21d883c8b1c0f",
+      "size": 3842
+    },
+    {
       "path": "tasks/desert-rv/art/environment-v4/candidate-file-manifest.json",
       "sha256": "e30c0d17c54735ecbceac325b067f6f560fb7216c137762cfd70d3fbfe7d16c2",
       "size": 20437
@@ -142,6 +159,11 @@
       "path": "tasks/desert-rv/art/environment-v4/candidate-r2-file-manifest.json",
       "sha256": "74e0f061bb5e3b716245e984f37c0ac6800768736bd2f180a999cf9f49dd3c6c",
       "size": 4173
+    },
+    {
+      "path": "tasks/desert-rv/art/environment-v4/candidate-r3-file-manifest.json",
+      "sha256": "54c73926bcaf40f5261cc673dbba30f6c8cd1eeabafabd6203f5bc89221a4b80",
+      "size": 1801
     },
     {
       "path": "tasks/desert-rv/art/environment-v4/generated-contract.json",
@@ -170,8 +192,8 @@
     },
     {
       "path": "tasks/desert-rv/art/environment-v4/test_candidate.py",
-      "sha256": "195234d835d4c6efeda5240878b8bbba519e6c807df07a080d7f7459744d2431",
-      "size": 9239
+      "sha256": "78a0c14330d81c9f1778e1467fca2769d293c1458861d24aea295fd1922658c3",
+      "size": 10535
     },
     {
       "path": "tasks/desert-rv/art/environment-v4/upstream-download-evidence.json",
@@ -569,6 +591,11 @@
       "size": 7921
     },
     {
+      "path": "tasks/desert-rv/scripts/environment_v4_r3_dispatch.py",
+      "sha256": "0427d2d8db05bbb94acd45bada987c44b4211b4dec4f2113968edf0a7ffeed62",
+      "size": 7924
+    },
+    {
       "path": "tasks/desert-rv/scripts/expected_playmode_test_cases.json",
       "sha256": "b30d8b087c2aab60ccf6372b7aee8f9798579ff9afdc6469871dab3445f94da4",
       "size": 929
@@ -625,8 +652,8 @@
     },
     {
       "path": "tasks/desert-rv/scripts/prepare_runner.sh",
-      "sha256": "5d79c12cb53746ec560ecc7417f22c1f99d07f5c25b609f44a522c5e29f2aefb",
-      "size": 1983
+      "sha256": "ac861230348f1261dbba2dc41819174e5ca88b7a178d16dc9254a8e1a1803eee",
+      "size": 2225
     },
     {
       "path": "tasks/desert-rv/scripts/prepare_safe_diagnostic_export.py",
@@ -769,6 +796,16 @@
       "size": 3064
     },
     {
+      "path": "tasks/desert-rv/scripts/test_environment_v4_r3_dispatch.py",
+      "sha256": "4af06c0d5c7a184c12c6bba3f0610d6510d61692351553d907b940673599bfe2",
+      "size": 19397
+    },
+    {
+      "path": "tasks/desert-rv/scripts/test_environment_v4_r3_runner_prefix.py",
+      "sha256": "3271b92b4b6ebd2d426349229deb083f1437a5a2cdcbc0d6fbc32a1ab1b32fe6",
+      "size": 5297
+    },
+    {
       "path": "tasks/desert-rv/scripts/test_environment_v4_runner_prefix.py",
       "sha256": "f5070f9badcf9d22b0a9549d4d316624021a2bf5396134fe58e6a20c522d3ae9",
       "size": 2711
@@ -810,8 +847,8 @@
     },
     {
       "path": "tasks/desert-rv/scripts/verify_evidence.py",
-      "sha256": "4959ff84aec962358f05170cd79c52e95ca278f717966337e5c5136728843847",
-      "size": 17738
+      "sha256": "cf3101352ff104cf98e995579c03fc0d84c91f0771380443e3366283b1c70b82",
+      "size": 18156
     },
     {
       "path": "tasks/desert-rv/unity/Assets/DefaultVolumeProfile.asset",
@@ -1765,7 +1802,7 @@
     },
     {
       "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/EnvironmentV4/sand_03_nor_gl_1k.jpg.meta",
-      "sha256": "33cdf8256ca458fc8e9f790a5808dcc9c68ecaf011e3764365935467c0da576a",
+      "sha256": "4200b06e5527ba14194b9afde1e1eb2113cb29c1f4620bf030f94176421f4201",
       "size": 3009
     },
     {
@@ -4665,8 +4702,8 @@
     },
     {
       "path": "tasks/desert-rv/unity/Assets/DesertRV/Editor/JourneySceneAuthoring.EnvironmentPolish.cs",
-      "sha256": "9bf7f3f4bc939baa5298e207c9f9297c18d72208048e3a7c1ae6b01ee7274272",
-      "size": 57007
+      "sha256": "b829eda4869721b7956cb279b53e0a6b7e1194ef91880c80e2d712110a8366d9",
+      "size": 58366
     },
     {
       "path": "tasks/desert-rv/unity/Assets/DesertRV/Editor/JourneySceneAuthoring.EnvironmentPolish.cs.meta",
@@ -5835,8 +5872,8 @@
     },
     {
       "path": "tasks/desert-rv/unity/Assets/DesertRV/Tests/EditorRender/JourneyEnvironmentRenderTests.cs",
-      "sha256": "70eae4ea3cecd22bbe81308492b274dd6b423381b3d1152d0b24176be11689d7",
-      "size": 2407
+      "sha256": "f5b8d102ce5debf111805742fa300bf3ded062b02f4d53856e429e057e0097f2",
+      "size": 5272
     },
     {
       "path": "tasks/desert-rv/unity/Assets/DesertRV/Tests/EditorRender/JourneyEnvironmentRenderTests.cs.meta",
