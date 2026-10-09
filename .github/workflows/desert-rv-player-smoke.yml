@@ -1,0 +1,80 @@
+name: Desert RV Linux reference player window proof (not gameplay)
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: desert-rv-reference-player-window
+  cancel-in-progress: false
+jobs:
+  reference:
+    if: >-
+      github.repository == 'yangerstar1/task-workbench' && github.ref == 'refs/heads/main' &&
+      github.actor == 'yangerstar1' && github.triggering_actor == 'yangerstar1' &&
+      github.event.repository.visibility == 'public'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 55
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+          lfs: false
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          repository: game-ci/unity-test-runner
+          ref: 0ff419b913a3630032cbe0de48a0099b5a9f0ed9
+          path: _ci/gameci-rendered
+          persist-credentials: false
+          lfs: false
+      - name: Validate fixed source and official batch implementation
+        env:
+          GITHUB_REPOSITORY_VISIBILITY: ${{ github.event.repository.visibility }}
+          GITHUB_TRIGGERING_ACTOR: ${{ github.triggering_actor }}
+        run: |
+          python3 tasks/desert-rv/scripts/verify_evidence.py guard
+          python3 tasks/desert-rv/scripts/rendered/verify_inputs.py --mode window-smoke --gameci _ci/gameci-rendered
+          sudo apt-get update && sudo apt-get install -y --no-install-recommends python3-pil ffmpeg
+          python3 tasks/desert-rv/scripts/player/test_player_window_smoke.py
+          python3 tasks/desert-rv/scripts/backup/restore_unity_font.py
+          python3 tasks/desert-rv/scripts/player/player_window_smoke.py before
+      - name: Prepare existing disposable runner with bounded secret scope
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+        run: bash tasks/desert-rv/scripts/prepare_runner.sh
+      - name: Prepare unchanged pinned rendering image
+        run: |
+          docker build --build-arg BASE_IMAGE=unityci/editor@sha256:17406791cf1e438bea2dac20671668e05d83db5ed38c916744815db4584a8264 --file tasks/desert-rv/scripts/Environment.Dockerfile --tag desert-rv-environment:local tasks/desert-rv/scripts
+          docker build --build-arg BASE_IMAGE=desert-rv-environment:local --file tasks/desert-rv/scripts/rendered/Rendered.Dockerfile --tag desert-rv-rendered:local tasks/desert-rv/scripts/rendered
+      - name: Official batch build then fifteen-second standalone player
+        id: native
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+          GITHUB_REPOSITORY_VISIBILITY: ${{ github.event.repository.visibility }}
+        run: |
+          set +x
+          docker run --rm --init --cpus=2 --memory=12g --stop-timeout=210 \
+            --workdir /github/workspace \
+            --volume "$GITHUB_WORKSPACE:/github/workspace" \
+            --volume "$GITHUB_WORKSPACE/_ci/gameci-rendered/dist:/gameci:ro" \
+            --env UNITY_LICENSE --env UNITY_EMAIL --env UNITY_PASSWORD \
+            --env GITHUB_ACTIONS --env GITHUB_SHA --env GITHUB_REPOSITORY_VISIBILITY \
+            --entrypoint /bin/bash desert-rv-rendered:local \
+            /github/workspace/tasks/desert-rv/scripts/player/container_entry.sh
+      - name: Enforce source preservation and game-window-only export
+        id: public
+        if: always()
+        env:
+          NATIVE_OUTCOME: ${{ steps.native.outcome }}
+        run: python3 tasks/desert-rv/scripts/player/player_window_smoke.py export
+      - name: Upload guarded reference proof or fixed failure status
+        if: always() && steps.public.outputs.export_ready == 'true'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: desert-rv-REFERENCE-PLAYER-NOT-GAMEPLAY-${{ github.run_id }}-${{ github.run_attempt }}
+          path: tasks/desert-rv/player-public-export/
+          if-no-files-found: error
+          retention-days: 7

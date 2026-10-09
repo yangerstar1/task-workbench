@@ -17,7 +17,8 @@
     ".github/workflows/desert-rv-supplies.yml",
     "tasks/desert-rv/art/reload-audio/generated-candidate.json",
     ".github/actions/desert-rv-rendered/action.yml",
-    ".github/workflows/desert-rv-rendered-smoke.yml"
+    ".github/workflows/desert-rv-rendered-smoke.yml",
+    ".github/workflows/desert-rv-player-smoke.yml"
   ],
   "restoredFiles": [
     {
@@ -46,6 +47,11 @@
       "path": ".github/workflows/desert-rv-environment.yml",
       "sha256": "172633338212febf86e7044d516b5db77b35718e461c7f51113879ef97f1a4aa",
       "size": 5840
+    },
+    {
+      "path": ".github/workflows/desert-rv-player-smoke.yml",
+      "sha256": "5e4666814c354260eebd1c2fa5e1d09325f64b2deee2881311bcb0d3438f2445",
+      "size": 4181
     },
     {
       "path": ".github/workflows/desert-rv-rendered-smoke.yml",
@@ -363,6 +369,21 @@
       "size": 19377
     },
     {
+      "path": "tasks/desert-rv/scripts/player/container_entry.sh",
+      "sha256": "1eb772ca4df7effd7492c6084163b78b7ed8caad41d9db477a983ff70305a6af",
+      "size": 3195
+    },
+    {
+      "path": "tasks/desert-rv/scripts/player/player_window_smoke.py",
+      "sha256": "eb2f50e6e4e6df5da5cd7f264a569e4eb9aafc90fe4f2290b6850e2d58abbeb2",
+      "size": 13371
+    },
+    {
+      "path": "tasks/desert-rv/scripts/player/test_player_window_smoke.py",
+      "sha256": "ebc98abdea2224e02efbfe70cd55024fde80a1492ace1e3a5f691b5b19d1de11",
+      "size": 8335
+    },
+    {
       "path": "tasks/desert-rv/scripts/prepare_runner.sh",
       "sha256": "157c081f227d7783fda9fd4186422804dfad225ff94d451e58dcfc6e42370a40",
       "size": 1130
@@ -504,8 +525,8 @@
     },
     {
       "path": "tasks/desert-rv/scripts/verify_evidence.py",
-      "sha256": "7ba2bf5685558a7f4a57ae0ccca8049db0ff803c1e82e9d869681bdb1a2c1b56",
-      "size": 16054
+      "sha256": "beff5fade032b1a9f935090ad807b89d5421042feb8aeefd00b9b3892c3ab555",
+      "size": 16102
     },
     {
       "path": "tasks/desert-rv/unity/Assets/DefaultVolumeProfile.asset",
@@ -4019,8 +4040,8 @@
     },
     {
       "path": "tasks/desert-rv/unity/Assets/DesertRV/Editor/PlayerBuild.cs",
-      "sha256": "0fa249683e2c48a886ef9b2d718192e898af03051054500498f7238b4ac47cda",
-      "size": 2944
+      "sha256": "0c54d0e32df3a08908dc7ad527e26acaa17a1eb3be90a55df9d34ab80613cb02",
+      "size": 6498
     },
     {
       "path": "tasks/desert-rv/unity/Assets/DesertRV/Editor/PlayerBuild.cs.meta",
@@ -4266,6 +4287,16 @@
       "path": "tasks/desert-rv/unity/Assets/DesertRV/Runtime/Diagnostics/JourneyWindowSmokeEvidence.cs.meta",
       "sha256": "52e6541d31ab6a46c4e6770e21725472593b753b0b8ec0c078fc51f07fd16c7c",
       "size": 60
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Runtime/Diagnostics/ReferencePlayerWindowProbe.cs",
+      "sha256": "7cc84a5df81c39dac5bd3834b99ebca4ef77a14256abc0894f662f947b8ad005",
+      "size": 3474
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Runtime/Diagnostics/ReferencePlayerWindowProbe.cs.meta",
+      "sha256": "406c902302f9e42f2234f852dee6b2a23606fe8b5cc80549eaecf8bcc9f3b66a",
+      "size": 240
     },
     {
       "path": "tasks/desert-rv/unity/Assets/DesertRV/Runtime/FirstStationJourney.cs",
