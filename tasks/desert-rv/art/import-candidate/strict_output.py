@@ -120,20 +120,162 @@ def inspect_png(path,size=(960,540)):
   require(im.format=='PNG' and im.size==size,'STRICT_IMAGE_DIMENSIONS');im.load();rgb=im.convert('RGB');ranges=rgb.getextrema()
   require(max(v[1] for v in ranges)>=26 and max(v[1]-v[0] for v in ranges)>=16 and max(ImageStat.Stat(rgb).stddev)>=2,'STRICT_BLANK_IMAGE')
 
-def dependency_digest(project,dependencies,trace=False):
- require(isinstance(dependencies,list) and 1<=len(dependencies)<=300 and len(dependencies)==len(set(dependencies)),'STRICT_DEPENDENCY_LIST');h=hashlib.sha256();rows=[]
- subjects=[n for n in dependencies if isinstance(n,str) and n.startswith('Assets/DesertRV/CandidateArtImports/') and n.endswith('/Candidate.prefab')];subject=subjects[0] if len(subjects)==1 else ''
- for name in sorted(dependencies):
-  require(rel(name) and (name.startswith('Assets/DesertRV/') or re.match(r'Packages/com\.unity\.[a-z0-9_.-]+/',name) or name in ('Resources/unity_builtin_extra','Library/unity default resources')),'STRICT_DEPENDENCY_PATH')
-  if name.startswith('Assets/DesertRV/'):
-   safe(project/name);safe(project/(name+'.meta'))
+# The only package bytes accepted by the strict candidate pipeline. These pins
+# were compared with the Unity 6000.3.19f1 builtin URP 17.3.0 resolved package.
+PROJECT_MANIFEST_SHA = '1a7b8e1c8005e0e9b8255908ae502b4474cfce05331ed3952221b60ee967a485'
+PROJECT_LOCK_SHA = 'e7ed5ba93dacba63a07b0ba5f2751ace24e249edad4b0d96fe9ee5920945be36'
+PACKAGE_NAME = 'com.unity.render-pipelines.universal'
+PACKAGE_PREFIX = 'Packages/' + PACKAGE_NAME + '/'
+PACKAGE_SHADER = PACKAGE_PREFIX + 'Shaders/Lit.shader'
+PACKAGE_ASSET_VERSION = PACKAGE_PREFIX + 'Editor/AssetVersion.cs'
+PACKAGE_FILES = {
+ PACKAGE_ASSET_VERSION: (148, '96ed27e15286cda1fdada6923e804887b6447a905b38360e0f5561f79cd0344c', None),
+ PACKAGE_ASSET_VERSION+'.meta': (243, 'e7ec88783b56ae3a5adbe60d3ab71fd3b6fe269932af20218d4cc00eb3879868', 'd0353a89b1f911e48b9e16bdc9f2e058'),
+ PACKAGE_SHADER: (22877, '6f4648b6b5271132cfed1d7d7c771ba0a73ef7972470d6694047804d259c0997', None),
+ PACKAGE_SHADER+'.meta': (217, 'f0db005307ffe5480c40a402ca5bfb0b3726259031a86e255e49626228ceb008', '933532a4fcc9baf4fa0491de14d08ed7'),
+}
+PACKAGE_ASSET_VERSION_GUID = PACKAGE_FILES[PACKAGE_ASSET_VERSION+'.meta'][2]
+PACKAGE_ASSETS = frozenset((PACKAGE_SHADER, PACKAGE_ASSET_VERSION))
+BUILTIN_DEPENDENCIES = frozenset(('Resources/unity_builtin_extra', 'Library/unity default resources'))
+DEPENDENCY_HASH_SCOPE = ('Original Unity dependency digest with canonical UTF-8 paths; pinned URP 17.3.0 '
+ 'builtin bytes resolved from verified project files or the private four-file package snapshot.')
+
+
+def dependency_names(dependencies):
+ require(isinstance(dependencies,list) and 1<=len(dependencies)<=300
+  and all(isinstance(n,str) for n in dependencies) and len(dependencies)==len(set(dependencies)), 'STRICT_DEPENDENCY_LIST')
+ require(all(rel(n) and (n.startswith('Assets/DesertRV/') or n in PACKAGE_ASSETS or n in BUILTIN_DEPENDENCIES)
+  for n in dependencies), 'STRICT_DEPENDENCY_PATH')
+ return sorted(dependencies)
+
+
+def _package_file(path, name):
+ expected_size, expected_sha, guid = PACKAGE_FILES[name]
+ p=safe(path);require(p.stat().st_size==expected_size,'STRICT_PACKAGE_FILE_SIZE')
+ data=p.read_bytes()
+ require(len(data)==expected_size and hashlib.sha256(data).hexdigest()==expected_sha,'STRICT_PACKAGE_FILE_HASH')
+ if guid is not None:
+  require(re.findall(rb'^guid: ([a-f0-9]{32})$',data,re.M)==[guid.encode()], 'STRICT_PACKAGE_FILE_GUID')
+ return p
+
+
+def _package_context(project):
+ """Validate private provenance; never let a snapshot hide bad direct files."""
+ project=Path(project)
+ controls={project/'Packages/manifest.json', project/'Packages/packages-lock.json', project/'ProjectSettings/ProjectVersion.txt'}
+ for path in controls:require(safe(path).stat().st_size<=1024*1024,'STRICT_PACKAGE_CONTROL_SIZE')
+ manifest=read(project/'Packages/manifest.json');lock=read(project/'Packages/packages-lock.json')
+ require(isinstance(manifest,dict) and isinstance(manifest.get('dependencies'),dict)
+  and manifest['dependencies'].get(PACKAGE_NAME)=='17.3.0','STRICT_PACKAGE_MANIFEST_PIN')
+ require(isinstance(lock,dict) and isinstance(lock.get('dependencies'),dict),'STRICT_PACKAGE_LOCK_PIN')
+ entry=lock['dependencies'].get(PACKAGE_NAME)
+ require(isinstance(entry,dict) and entry.get('version')=='17.3.0' and entry.get('source')=='builtin','STRICT_PACKAGE_LOCK_PIN')
+ version=safe(project/'ProjectSettings/ProjectVersion.txt')
+ require(version.stat().st_size<=4096 and re.findall(r'^m_EditorVersion: (.+)$',version.read_text(),re.M)==['6000.3.19f1'], 'STRICT_PACKAGE_EDITOR_PIN')
+ snapshot=project/'CandidatePackageSnapshot'; copies={}
+ require(not snapshot.is_symlink() and all(not x.is_symlink() for x in snapshot.parents),'STRICT_PACKAGE_SNAPSHOT_UNSAFE')
+ if snapshot.exists():
+  require(snapshot.is_dir(),'STRICT_PACKAGE_SNAPSHOT_UNSAFE')
+  expected={'manifest.json'}|set(PACKAGE_FILES)
+  directories={p.as_posix() for name in expected for p in Path(name).parents if p!=Path('.')}
+  files=set();actual_dirs=set()
+  # Walk a fixed tree without following links and bound it before reading bytes.
+  pending=[snapshot];count=0
+  while pending:
+   folder=pending.pop()
+   for path in folder.iterdir():
+    count+=1;require(count<=len(expected)+len(directories),'STRICT_PACKAGE_SNAPSHOT_ALLOWLIST')
+    require(not path.is_symlink(),'STRICT_PACKAGE_SNAPSHOT_UNSAFE')
+    name=path.relative_to(snapshot).as_posix()
+    if path.is_dir():
+     require(name in directories,'STRICT_PACKAGE_SNAPSHOT_ALLOWLIST');actual_dirs.add(name);pending.append(path)
+    else:
+     require(path.is_file() and name in expected,'STRICT_PACKAGE_SNAPSHOT_ALLOWLIST');files.add(name)
+  require(files==expected and actual_dirs==directories,'STRICT_PACKAGE_SNAPSHOT_ALLOWLIST')
+  metadata=safe(snapshot/'manifest.json');require(metadata.stat().st_size<=16384,'STRICT_PACKAGE_SNAPSHOT_MANIFEST_SIZE')
+  report=read(metadata)
+  keys(report,('schema','editorVersion','packageName','packageVersion','packageSource','manifestSha256','lockSha256','files'))
+  require(type(report['schema']) is int and report['schema']==1 and report['editorVersion']=='6000.3.19f1'
+   and report['packageName']==PACKAGE_NAME and report['packageVersion']=='17.3.0'
+   and report['packageSource']=='builtin','STRICT_PACKAGE_SNAPSHOT_IDENTITY')
+  require(report['manifestSha256']==sha(project/'Packages/manifest.json')
+   and report['lockSha256']==sha(project/'Packages/packages-lock.json'),'STRICT_PACKAGE_SNAPSHOT_STALE')
+  require(isinstance(report['files'],list) and len(report['files'])==4,'STRICT_PACKAGE_SNAPSHOT_FILES')
+  seen=set()
+  for row in report['files']:
+   keys(row,('path','bytes','sha256'))
+   name=row['path'];require(isinstance(name,str) and name in PACKAGE_FILES and name not in seen,'STRICT_PACKAGE_SNAPSHOT_FILES');seen.add(name)
+   size,expected_sha,_=PACKAGE_FILES[name]
+   require(type(row['bytes']) is int and row['bytes']==size and row['sha256']==expected_sha,'STRICT_PACKAGE_SNAPSHOT_FILE_PIN')
+   copies[name]=_package_file(snapshot/name,name)
+  require(seen==set(PACKAGE_FILES),'STRICT_PACKAGE_SNAPSHOT_FILES')
+  controls.update(copies.values());controls.add(metadata)
+ require(sha(project/'Packages/manifest.json')==PROJECT_MANIFEST_SHA
+  and sha(project/'Packages/packages-lock.json')==PROJECT_LOCK_SHA,'STRICT_PACKAGE_CONTROL_PIN')
+ # Inspect each direct approved file, including an unexpected broken link or
+ # invalid unused companion. An existing bad file cannot trigger fallback.
+ for name in PACKAGE_FILES:
+  direct=project/name
+  require(not direct.is_symlink() and all(not x.is_symlink() for x in direct.parents),'STRICT_PACKAGE_DIRECT_UNSAFE')
+  if direct.exists():copies[name]=_package_file(direct,name)
+ return copies,controls
+
+
+def dependency_inputs(project,dependencies):
+ """Canonical hash names -> physical files, plus private verification inputs."""
+ project=Path(project);names=dependency_names(dependencies);package_paths={};controls=set()
+ if any(name in PACKAGE_ASSETS for name in names):package_paths,controls=_package_context(project)
+ result={}
+ for name in names:
   for item in (name,name+'.meta'):
-   p=project/item
-   if not p.exists():
+   if item in PACKAGE_FILES:
+    require(item in package_paths,'STRICT_PACKAGE_SNAPSHOT_REQUIRED');p=package_paths[item]
+   else:
+    p=project/item
+    require(not p.is_symlink() and all(not x.is_symlink() for x in p.parents),'STRICT_UNSAFE_FILE')
+    if not p.exists() and name in BUILTIN_DEPENDENCIES:p=None
+    else:safe(p)
+   result[item]=p
+ return result,controls
+
+
+def dependency_input_paths(project,dependencies):
+ paths,controls=dependency_inputs(project,dependencies)
+ return set(p for p in paths.values() if p is not None)|controls
+
+
+def dependency_snapshot(project,dependencies):
+ return {path:sha(path) for path in dependency_input_paths(project,dependencies)}
+
+
+def verify_dependency_snapshot(project,dependencies,snapshot):
+ require(dependency_input_paths(project,dependencies)==set(snapshot)
+  and all(sha(path)==expected for path,expected in snapshot.items()),'STRICT_DEPENDENCY_INPUT_CHANGED')
+
+
+def dependency_meta_guid(project,name):
+ paths,_=dependency_inputs(project,[name]);p=paths[name+'.meta']
+ if p is None:return None
+ require(safe(p).stat().st_size<1000000,'STRICT_META_SIZE')
+ guids=re.findall(r'^guid: ([a-f0-9]{32})$',p.read_text(),re.M)
+ require(len(guids)==1,'STRICT_META_GUID');return guids[0]
+
+
+def dependency_digest(project,dependencies,trace=False):
+ paths,_=dependency_inputs(project,dependencies);h=hashlib.sha256();rows=[]
+ subjects=[n for n in dependencies if n.startswith('Assets/DesertRV/CandidateArtImports/') and n.endswith('/Candidate.prefab')];subject=subjects[0] if len(subjects)==1 else ''
+ for name in sorted(dependencies):
+  for item in (name,name+'.meta'):
+   p=paths[item]
+   if p is None:
     if trace:rows.append(dict(side='host',subject=subject,phase='host-mismatch',file=item,exists=False,projectExists=False,bytes=-1,sha256=''))
     continue
-   data=safe(p).read_bytes();encoded=item.encode();h.update(str(len(encoded)).encode()+b':'+encoded+str(len(data)).encode()+b':'+data)
-   if trace:rows.append(dict(side='host',subject=subject,phase='host-mismatch',file=item,exists=True,projectExists=True,bytes=len(data),sha256=hashlib.sha256(data).hexdigest()))
+   data=safe(p).read_bytes()
+   if item in PACKAGE_FILES:
+    size,expected_sha,_=PACKAGE_FILES[item]
+    require(len(data)==size and hashlib.sha256(data).hexdigest()==expected_sha,'STRICT_PACKAGE_FILE_HASH')
+   encoded=item.encode('utf-8');h.update(str(len(encoded)).encode()+b':'+encoded+str(len(data)).encode()+b':'+data)
+   if trace:rows.append(dict(side='host',subject=subject,phase='host-mismatch',file=item,exists=True,projectExists=(Path(project)/item).is_file(),bytes=len(data),sha256=hashlib.sha256(data).hexdigest()))
  result=h.hexdigest()
  if trace:
   print('CANDIDATE_DEPENDENCY_HEADER '+json.dumps(dict(side='host',subject=subject,phase='host-mismatch',aggregateSha256=result,aggregateValid=True,dependencyCount=len(dependencies),hashedFileCount=sum(r['exists'] for r in rows),missingFileCount=sum(not r['exists'] for r in rows),omittedItems=0),sort_keys=True))
@@ -175,13 +317,7 @@ def derived_record(project,prefix,record,m,index,files):
  return dst
 
 
-def validate_import(project,c,contract_path,report):
- required=('mode','scope','kind','status','contractSha256','prefab','dependencyHash','dependencySha256','dependencies','runUrl','sourceCommit','artifactName','artifactSha256','candidateOnly','visualReviewed','gameplayReviewed','derivedTextures','rootCurves','clips','failures','stillRequired','importedAnimatorPaths')
- keys(report,required,('muzzle','weaponCalibration'))
- require(report['mode']=='STRICT_BINDING' and report['scope']=='FULL_CANDIDATE' and report['kind']=='armored' and report['status']=='candidate-structure-imported-unreviewed' and report['failures']==[],'STRICT_IMPORT_STATUS')
- require(report['candidateOnly'] is True and report['visualReviewed'] is False and report['gameplayReviewed'] is False,'STRICT_APPROVAL_FORBIDDEN')
- for k in ('runUrl','sourceCommit','artifactName','artifactSha256'):require(report[k]==c[k],'STRICT_IMPORT_SOURCE_MISMATCH')
- prefix='Assets/DesertRV/CandidateArtImports/'+c['id'];require(report['prefab']==prefix+'/Candidate.prefab' and report['contractSha256']==sha(contract_path),'STRICT_IMPORT_CONTRACT')
+def require_armored_dependencies(c,prefix,dependencies):
  needed={prefix+'/Candidate.prefab',prefix+'/Candidate.controller',prefix+'/Source/'+c['modelFile'],prefix+'/Materials/Core_Open.mat'}
  needed.update(prefix+'/Source/'+x['file'] for x in c['clips'])
  for i,m in enumerate(c['materials']):
@@ -189,7 +325,17 @@ def validate_import(project,c,contract_path,report):
   for k in ('baseColorFile','normalFile','metallicSmoothnessFile','occlusionFile'):
    if m.get(k):needed.add(prefix+'/Source/'+m[k])
   if m.get('ormFile'):needed.add(prefix+f'/Derived/ORM_{i:02}.png')
- require(isinstance(report['dependencies'],list) and needed<=set(report['dependencies']),'STRICT_REQUIRED_DEPENDENCIES')
+ require(isinstance(dependencies,list) and needed<=set(dependencies),'STRICT_REQUIRED_DEPENDENCIES')
+
+
+def validate_import(project,c,contract_path,report):
+ required=('mode','scope','kind','status','contractSha256','prefab','dependencyHash','dependencySha256','dependencies','runUrl','sourceCommit','artifactName','artifactSha256','candidateOnly','visualReviewed','gameplayReviewed','derivedTextures','rootCurves','clips','failures','stillRequired','importedAnimatorPaths')
+ keys(report,required,('muzzle','weaponCalibration'))
+ require(report['mode']=='STRICT_BINDING' and report['scope']=='FULL_CANDIDATE' and report['kind']=='armored' and report['status']=='candidate-structure-imported-unreviewed' and report['failures']==[],'STRICT_IMPORT_STATUS')
+ require(report['candidateOnly'] is True and report['visualReviewed'] is False and report['gameplayReviewed'] is False,'STRICT_APPROVAL_FORBIDDEN')
+ for k in ('runUrl','sourceCommit','artifactName','artifactSha256'):require(report[k]==c[k],'STRICT_IMPORT_SOURCE_MISMATCH')
+ prefix='Assets/DesertRV/CandidateArtImports/'+c['id'];require(report['prefab']==prefix+'/Candidate.prefab' and report['contractSha256']==sha(contract_path),'STRICT_IMPORT_CONTRACT')
+ require_armored_dependencies(c,prefix,report['dependencies'])
  actual_dependency_sha256=dependency_digest(project,report['dependencies'])
  valid_dependency_identity=digest(report['dependencyHash'],32) and digest(report['dependencySha256'])
  if not valid_dependency_identity or report['dependencySha256']!=actual_dependency_sha256:
@@ -336,6 +482,8 @@ def export_strict(root,output,c,summary,native,protected):
  require(digest(summary.get('importCommit'),40) and re.fullmatch(r'[1-9][0-9]*',summary.get('importRunUrl','').rsplit('/',1)[-1]),'STRICT_CURRENT_RUN_IDENTITY')
  native_hash=native_report(root);project=root/'unity';evidence=project/'JourneyEvidence/CandidateArt'
  imp=read(evidence/'import-report.json');capture=read(evidence/'capture-report.json');weak=read(evidence/'weakpoint-fixture-report.json')
+ require_armored_dependencies(c,'Assets/DesertRV/CandidateArtImports/'+c['id'],imp['dependencies'])
+ dependency_frozen=dependency_snapshot(project,imp['dependencies'])
  prefix=validate_import(project,c,contract_path,imp);frames=validate_capture(evidence,prefix,imp,capture,c['bindings']['neutralBaseline']);validate_weakpoint(weak,prefix,frames,c['bindings']['openEuler'])
  payload=generated_files(project,c,prefix,imp,files)
  require({p.name for p in evidence.iterdir()}=={'import-report.json','capture-report.json','weakpoint-fixture-report.json'}|{f['image'] for f in capture['frames']},'STRICT_EVIDENCE_ALLOWLIST')
@@ -346,6 +494,7 @@ def export_strict(root,output,c,summary,native,protected):
  capture.pop('weapon',None)
  require(imp['stillRequired']==['Actual Unity camera rendering and human visual review','Interrupted/repeated runtime flows','Full three-region playthrough','Android device acceptance','Explicit production review and unchanged production gate'],'STRICT_IMPORT_LIMITATIONS')
  require(sum(safe(p).stat().st_size for p,_ in payload)<512*1024**2,'STRICT_EXPORT_SIZE')
+ verify_dependency_snapshot(project,imp['dependencies'],dependency_frozen)
  staged=Path(tempfile.mkdtemp(prefix='.strict-safe-',dir=output.parent))
  try:
   records=[]
@@ -357,6 +506,7 @@ def export_strict(root,output,c,summary,native,protected):
   receipt_bytes=(json.dumps(result,indent=2)+'\n').encode()
   (staged/'receipt.json').write_bytes(receipt_bytes)
   verify_staged_inventory(staged,records,hashlib.sha256(receipt_bytes).hexdigest())
+  verify_dependency_snapshot(project,imp['dependencies'],dependency_frozen)
   require(not any(output.iterdir()),'STRICT_EXPORT_NOT_EMPTY')
   # Linux atomically replaces the empty runner-owned directory. No payload is visible before this commit.
   staged.replace(output)

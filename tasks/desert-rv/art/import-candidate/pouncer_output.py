@@ -13,10 +13,12 @@ import shutil
 import tempfile
 import xml.etree.ElementTree as ET
 from strict_output import observe_dependency_mismatch
+from urp_material_metadata import read_material_asset
 
 from strict_output import (StrictError, require, safe, sha, read, keys, finite,
     digest, vec, rel, native_report, inspect_png, dependency_digest, distance,
-    angle, mesh_dimensions, ROOT_PROPERTIES)
+    angle, mesh_dimensions, ROOT_PROPERTIES, PACKAGE_SHADER, PACKAGE_ASSET_VERSION, PACKAGE_ASSET_VERSION_GUID,
+    DEPENDENCY_HASH_SCOPE, dependency_meta_guid, dependency_input_paths)
 
 CONTRACT_SHA = '863d2d87052f02bb9315db1e5f1129d5ca43dbf8978f1bf680cf8e344c4eb735'
 CONTRACT_CANONICAL_SHA = 'f9eeb203052101001ac3e8336f5c995c3ed70b8927f5b7dfe532b52af84f156d'
@@ -26,7 +28,6 @@ STATES = {'Idle': 2., 'Walk': .4, 'Windup': .78, 'Attack': .8,
 MATERIALS = ('AmberEye', 'Keratin', 'MouthAndPupil', 'Sandstone_BaseColorTexture',
              'ToothL-1.08', 'ToothL-1.23', 'ToothR-1.08', 'ToothR-1.23', 'VentralJaw')
 TEXTURES = ('baseColorFile', 'normalFile', 'metallicSmoothnessFile', 'occlusionFile', 'ormFile')
-PACKAGE_SHADER = 'Packages/com.unity.render-pipelines.universal/Shaders/Lit.shader'
 URP_LIT_GUID = '933532a4fcc9baf4fa0491de14d08ed7'
 ACTOR_SCRIPT = 'Assets/DesertRV/Runtime/BeastActor.cs'
 BUILTINS = {'Resources/unity_builtin_extra', 'Library/unity default resources'}
@@ -158,10 +159,9 @@ def _meta_guid(path):
 
 def material_file(project, prefix, spec, index):
     """Independently read the saved assets; Pouncer has no weapon readback."""
-    docs = _unity_yaml(project/f'{prefix}/Materials/Material_{index:02}.mat')
-    require(len(docs) == 1 and isinstance(docs[0], dict) and set(docs[0]) == {'Material'}, 'POUNCER_MATERIAL_ASSET')
-    asset = docs[0]['Material']; props = asset.get('m_SavedProperties', {})
-    require(asset.get('m_Name') == spec['sourceName']+'_Candidate'
+    asset = read_material_asset(project/f'{prefix}/Materials/Material_{index:02}.mat')
+    props = asset.get('m_SavedProperties', {})
+    require(asset.get('m_Name') == f'Material_{index:02}'
         and asset.get('m_Shader', {}).get('guid') == URP_LIT_GUID, 'POUNCER_MATERIAL_ASSET')
     def properties(name):
         rows = props.get(name, [])
@@ -194,7 +194,7 @@ def material_file(project, prefix, spec, index):
 
 
 def required_dependencies(c, prefix):
-    return {prefix+'/Candidate.prefab', prefix+'/Candidate.controller', PACKAGE_SHADER, ACTOR_SCRIPT,
+    return {prefix+'/Candidate.prefab', prefix+'/Candidate.controller', PACKAGE_SHADER, PACKAGE_ASSET_VERSION, ACTOR_SCRIPT,
         *(prefix+'/Source/'+f['file'] for f in c['files']),
         *(prefix+f'/Materials/Material_{i:02}.mat' for i in range(9))}
 
@@ -264,15 +264,16 @@ def validate_import(project, c, contract_path, report):
     require(valid_dependency_identity and report['dependencySha256']==actual_dependency_sha256, 'POUNCER_DEPENDENCY_HASH')
     guid_set = {URP_LIT_GUID}
     for path in deps:
-        if path.startswith('Assets/') or (project/(path+'.meta')).exists():
-            guid = _meta_guid(project/path)
+        guid = dependency_meta_guid(project, path)
+        if guid is not None:
             require(guid not in guid_set or path == PACKAGE_SHADER, 'POUNCER_DEPENDENCY_GUID_DUPLICATE')
             guid_set.add(guid)
     for path in deps:
         if path.startswith(prefix+'/') and Path(path).suffix in ('.mat', '.prefab', '.controller'):
             docs = _unity_yaml(project/path)
             require(docs and all(isinstance(d, dict) for d in docs), 'POUNCER_UNITY_YAML')
-            _require_guids(docs, guid_set)
+            allowed = guid_set if Path(path).suffix == '.mat' else guid_set - {PACKAGE_ASSET_VERSION_GUID}
+            _require_guids(docs, allowed)
     for i, spec in enumerate(c['materials']): material_file(project, prefix, spec, i)
     return prefix
 
@@ -393,7 +394,7 @@ def generated_files(project, c, prefix, imp, files):
         safe(path)
         if path.suffix == '.meta':
             guid = _meta_guid(Path(str(path)[:-5]))
-            require(guid not in guids and guid != URP_LIT_GUID, 'POUNCER_META_GUID_DUPLICATE'); guids.add(guid)
+            require(guid not in guids and guid not in {URP_LIT_GUID, PACKAGE_ASSET_VERSION_GUID}, 'POUNCER_META_GUID_DUPLICATE'); guids.add(guid)
             document = _meta_yaml(path)
             require(document.get('guid') == guid, 'POUNCER_META_GUID')
             meta_documents.append(document)
@@ -403,8 +404,9 @@ def generated_files(project, c, prefix, imp, files):
     # dependency/export closure. Folder and copied-contract metas count too.
     known = guids | {URP_LIT_GUID}
     for name in imp['dependencies']:
-        if name.startswith('Assets/') or (project/(name+'.meta')).exists(): known.add(_meta_guid(project/name))
-    for document in meta_documents: _require_guids(document, known)
+        guid = dependency_meta_guid(project, name)
+        if guid is not None: known.add(guid)
+    for document in meta_documents: _require_guids(document, known - {PACKAGE_ASSET_VERSION_GUID})
     return result
 
 
@@ -437,10 +439,7 @@ def snapshot_paths(root, c, deps):
             require(not p.is_symlink(), 'POUNCER_SYMLINK_FORBIDDEN')
             if p.is_file() and (folder != root/'artifacts/candidate-art' or p.suffix == '.xml'): paths.add(p)
             else: require(p.is_dir() or (folder == root/'artifacts/candidate-art' and p.is_file()), 'POUNCER_UNSAFE_INPUT_NODE')
-    for dep in deps:
-        for name in (dep, dep+'.meta'):
-            path = project/name
-            if path.exists() or path.is_symlink(): paths.add(path)
+    paths.update(dependency_input_paths(project, deps))
     require(len(paths) <= 600 and sum(safe(p).stat().st_size for p in paths) < 544*1024**2,
         'POUNCER_INPUT_SNAPSHOT_SIZE')
     return paths
@@ -541,7 +540,7 @@ def export_pouncer(root, output, c, summary, native, protected):
             protectedSource='UNCHANGED', calibratedForScene=False, visualApproved=False, gameplayAccepted=False,
             rawReportSha256=raw_hashes, discoverySha256=DISCOVERY_SHA,
             normalizedAwayFields=['import-report.json:muzzle', 'import-report.json:weaponCalibration', 'capture-report.json:weapon'],
-            dependencyHashScope='Existing Unity dependency digest: available dependency files and meta bytes; virtual Packages contents are not asserted hashed.')
+            dependencyHashScope=DEPENDENCY_HASH_SCOPE)
         receipt = (json.dumps(result, indent=2, allow_nan=False)+'\n').encode()
         (staged/'receipt.json').write_bytes(receipt)
         # Require the whole staging tree, not merely hashes of listed files.
@@ -564,7 +563,7 @@ def export(root, output, native='success', protected='success'):
         return export_pouncer(root, output, read(root/'unity/CandidateImportInput/contract.json'), summary, native, protected)
     except StrictError as error:
         code = str(error)
-        summary['errorCode'] = code if re.fullmatch(r'(?:STRICT|POUNCER)_[A-Z0-9_]{1,100}', code) else 'INVALID_EVIDENCE'
+        summary['errorCode'] = code if re.fullmatch(r'(?:STRICT|POUNCER|URP)_[A-Z0-9_]{1,100}', code) else 'INVALID_EVIDENCE'
         raise StrictError(summary['errorCode']) from None
     except Exception:
         summary['errorCode'] = 'INVALID_EVIDENCE'

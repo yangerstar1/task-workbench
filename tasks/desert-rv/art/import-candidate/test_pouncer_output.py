@@ -13,8 +13,10 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
+from package_test_fixture import install_package_snapshot
 from PIL import Image, ImageDraw
 import yaml
+from test_urp_material_metadata import ASSET_VERSION_YAML
 import pouncer_output as p
 
 LOCAL_CONTRACT = Path(__file__).parent/'contracts/pouncer-full-strict-37856618820.json'
@@ -62,11 +64,11 @@ class PouncerExportTests(unittest.TestCase):
             texture = {'fileID': 0}
             if spec['baseColorFile']:
                 texture = dict(fileID=2800000, guid=p._meta_guid(self.folder/'Source'/spec['baseColorFile']), type=3)
-            asset = dict(m_Name=spec['sourceName']+'_Candidate', m_Shader=dict(fileID=4800000, guid=p.URP_LIT_GUID, type=3),
+            asset = dict(m_Name=f'Material_{i:02}', m_Shader=dict(fileID=4800000, guid=p.URP_LIT_GUID, type=3),
                 m_ValidKeywords=[], m_SavedProperties=dict(m_Floats=[{'_Metallic': spec['metallic']},
                 {'_Smoothness': spec['smoothness']}, {'_Cull': 2}], m_Colors=[{'_BaseColor': spec['baseColor']},
                 {'_EmissionColor': dict(r=0, g=0, b=0, a=1)}], m_TexEnvs=[{'_BaseMap': {'m_Texture': texture}}]))
-            path = self.write(self.prefix+f'/Materials/Material_{i:02}.mat', '%YAML 1.1\n--- !u!21 &2100000\n'+yaml.safe_dump({'Material': asset}, sort_keys=False))
+            path = self.write(self.prefix+f'/Materials/Material_{i:02}.mat', '%YAML 1.1\n--- !u!21 &2100000\n'+yaml.safe_dump({'Material': asset}, sort_keys=False)+ASSET_VERSION_YAML)
             self.meta(path)
         self.imp = dict(mode='STRICT_BINDING', scope='FULL_CANDIDATE', kind='pouncer',
             status='candidate-structure-imported-unreviewed', contractSha256=p.CONTRACT_SHA,
@@ -108,6 +110,7 @@ class PouncerExportTests(unittest.TestCase):
         self.native = self.root/'artifacts/candidate-art/results.xml'; self.native.parent.mkdir(parents=True)
         self.native.write_text('<test-run result="Passed">'+''.join('<test-case fullname="'+name+'" result="Passed"/>'
             for name in sorted(p.NATIVE_NAMES))+'</test-run>')
+        install_package_snapshot(self.project)
         self.rehash(); self.flush()
 
     def tearDown(self): self.tmp.cleanup()
@@ -145,7 +148,7 @@ class PouncerExportTests(unittest.TestCase):
     def change_material(self, index, edit):
         path = self.folder/f'Materials/Material_{index:02}.mat'
         value = p._unity_yaml(path)[0]; edit(value['Material'])
-        path.write_text('%YAML 1.1\n--- !u!21 &2100000\n'+yaml.safe_dump(value, sort_keys=False)); self.rehash()
+        path.write_text('%YAML 1.1\n--- !u!21 &2100000\n'+yaml.safe_dump(value, sort_keys=False)+ASSET_VERSION_YAML); self.rehash()
 
     def test_valid_unreviewed_export_rehashes_every_file(self):
         result = self.run_export()
@@ -257,7 +260,7 @@ class PouncerExportTests(unittest.TestCase):
         self.change_material(3,lambda m:m['m_SavedProperties']['m_TexEnvs'][0]['_BaseMap'].update(m_Texture={'fileID':0}))
         self.rejected('POUNCER_MATERIAL_TEXTURE_BINDING')
     def test_material_unlisted_texture_role_rejected(self):
-        self.change_material(0,lambda m:m['m_SavedProperties']['m_TexEnvs'].append({'_UnexpectedMap':{'m_Texture':{'fileID':2800000,'guid':p._meta_guid(self.folder/'Source/pouncer-basecolor.png')}}}))
+        self.change_material(0,lambda m:m['m_SavedProperties']['m_TexEnvs'].append({'_UnexpectedMap':{'m_Texture':{'fileID':2800000,'guid':p._meta_guid(self.folder/'Source/pouncer-basecolor.png'),'type':3}}}))
         self.rejected('POUNCER_UNDECLARED_TEXTURE')
     def test_material_emission_forbidden(self):
         self.change_material(0,lambda m:m['m_SavedProperties']['m_Colors'][1]['_EmissionColor'].update(r=1))

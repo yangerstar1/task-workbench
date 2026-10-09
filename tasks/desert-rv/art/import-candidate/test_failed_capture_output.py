@@ -170,6 +170,26 @@ class FailedCaptureTests(unittest.TestCase):
         row['meshWorldSize']['y'] = 2-value
         row['meshSizeRatioToNeutral']['y'] = (2-value)/2
 
+    def test_import_rejection_summary_is_closed_and_keeps_original_failure(self):
+        from contextlib import redirect_stdout
+        output=io.StringIO()
+        self.imp['dependencies']=['SECRET_PRIVATE_PATH']
+        self.imp['prefab']='SECRET_PRIVATE_PATH'
+        self.imp['status']='SECRET_PRIVATE_STATUS'
+        self.imp['dependencyHash']='SECRET_HASH'
+        self.imp['dependencySha256']='SECRET_HASH'
+        with redirect_stdout(output):
+            f.import_rejection_summary(self.c,self.imp,strict_output.StrictError('SECRET_EXCEPTION'))
+        value=json.loads(output.getvalue().split(' ',1)[1])
+        self.assertEqual(value['code'],'UNCLASSIFIED_IMPORT_REJECTION')
+        self.assertEqual(value['prefab'],'UNEXPECTED_PREFAB')
+        self.assertFalse(value['dependencySha256Valid'])
+        self.assertNotIn('SECRET',output.getvalue())
+        output=io.StringIO()
+        with redirect_stdout(output):
+            f.import_rejection_summary(self.c,self.imp,strict_output.StrictError('POUNCER_DEPENDENCY_INVENTORY'))
+        self.assertEqual(json.loads(output.getvalue().split(' ',1)[1])['code'],'POUNCER_DEPENDENCY_INVENTORY')
+
     def test_collection_stage_reports_only_fixed_allowlisted_labels(self):
         from contextlib import redirect_stdout
         output=io.StringIO()

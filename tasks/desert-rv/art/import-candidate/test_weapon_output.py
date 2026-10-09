@@ -14,8 +14,10 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
+from package_test_fixture import install_package_snapshot
 from PIL import Image, ImageDraw
 import yaml
+from test_urp_material_metadata import ASSET_VERSION_YAML
 import strict_output as strict
 import weapon_output as w
 
@@ -51,7 +53,7 @@ class WeaponExportTests(unittest.TestCase):
             importedAnimatorPaths=[''],rootCurves=[],derivedTextures=[],failures=[],stillRequired=w.IMPORT_LIMITS.copy(),
             clips=[dict(row,frameRate=60,floatBindings=100,objectBindings=0) for row in self.c['clips']])
         self.imp['dependencies']=[self.prefix+'/'+name for name in ['Candidate.prefab','Candidate.controller','Source/weapon_hands.fbx']
-            +[f'Materials/Material_{i:02}.mat' for i in range(7)]]+sorted(w.ORIGINAL_SCRIPTS)+[w.PACKAGE_SHADER]
+            +[f'Materials/Material_{i:02}.mat' for i in range(7)]]+sorted(w.ORIGINAL_SCRIPTS)+[w.PACKAGE_SHADER, w.PACKAGE_ASSET_VERSION]
         self.imp['weaponCalibration']=self.calibration()
         self.imp['muzzle']=dict(calibratedForScene=False,sourceAxisDerived=True,forwardAdapterPath=self.c['bindings']['muzzle']+'/CandidateShotMuzzleAxis',
             forwardAdapterWorld=dict(x=0,y=0,z=-1),sourceBoneLocalForwardAxis='+Y',sourceHead=dict(x=0,y=.35,z=.072),
@@ -92,6 +94,7 @@ class WeaponExportTests(unittest.TestCase):
                     transitioning=False,groundDiagnosticApplicable=False,rootLocalPosition=w.ZERO.copy(),rootLocalScale=w.ONE.copy(),
                     rootLocalRotation=dict(x=0,y=0,z=0,w=1),meshWorldMin=w.ZERO.copy(),meshWorldMax=dict(x=.8,y=1,z=1.2),
                     meshWorldSize=dict(x=.8,y=1,z=1.2),meshSizeRatioToNeutral=w.ONE.copy()))
+        install_package_snapshot(self.project)
         self.rehash_dependencies()
         self.native=self.root/'artifacts/candidate-art/results.xml';self.native.parent.mkdir(parents=True)
         self.names=[strict.NATIVE,'DesertRV.Tests.CandidateAnimationPolicyTests.OnlyArmoredAttackGetsTheSourceLoopException',
@@ -121,7 +124,7 @@ class WeaponExportTests(unittest.TestCase):
         if texture_guid:
             asset['m_SavedProperties']['m_TexEnvs']=[{key:dict(m_Texture=dict(fileID=2800000,guid=texture_guid,type=3))}
                 for key in ('_MetallicGlossMap','_OcclusionMap')]
-        self.write(self.prefix+f'/Materials/Material_{index:02}.mat','%YAML 1.1\n--- !u!21 &2100000\n'+yaml.safe_dump({'Material':asset},sort_keys=False))
+        self.write(self.prefix+f'/Materials/Material_{index:02}.mat','%YAML 1.1\n--- !u!21 &2100000\n'+yaml.safe_dump({'Material':asset},sort_keys=False)+ASSET_VERSION_YAML)
 
     def calibration(self):
         source_hash=self.c['files'][0]['sha256']

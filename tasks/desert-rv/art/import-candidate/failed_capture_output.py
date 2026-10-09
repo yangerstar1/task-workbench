@@ -120,6 +120,7 @@ class Snapshot:
         self.data = {}
         self.missing = set()
         self.total = 0
+        self.dependency_context = None
 
     def add(self, path, limit=512 * 1024**2, missing=False):
         path = Path(path).absolute()
@@ -151,6 +152,9 @@ class Snapshot:
             out.write_bytes(data)
 
     def verify(self):
+        if self.dependency_context is not None:
+            project, deps, paths = self.dependency_context
+            require(strict.dependency_input_paths(project, deps) == paths)
         for path, data in self.data.items():
             safe_node(path)
             require(path.stat().st_size == len(data) and digest(path.read_bytes()) == digest(data))
@@ -174,14 +178,17 @@ def freeze(root):
         if path.is_dir():
             continue
         snap.add(path)
-    require(type(imp) is dict and type(imp.get('dependencies')) is list
-            and len(imp['dependencies']) <= 300)
-    for name in imp['dependencies']:
-        require(strict.rel(name) and (name.startswith('Assets/DesertRV/')
-                or re.fullmatch(r'Packages/com\.unity\.[a-z0-9_.-]+/.+', name)
-                or name in ('Resources/unity_builtin_extra', 'Library/unity default resources')))
-        for item in (name, name + '.meta'):
-            snap.add(project / item, missing=not name.startswith('Assets/'))
+    require(type(imp) is dict and type(imp.get('dependencies')) is list)
+    deps = imp['dependencies']
+    resolved, controls = strict.dependency_inputs(project, deps)
+    dependency_paths = {path for path in resolved.values() if path is not None} | controls
+    for path in dependency_paths:
+        snap.add(path)
+    # Preserve absence of virtual/direct inputs while retaining the real private
+    # snapshot tree for the existing validators in the isolated frozen project.
+    for item in resolved:
+        if not (project/item).exists(): snap.add(project/item, missing=True)
+    snap.dependency_context = (project, list(deps), dependency_paths)
     require(type(capture) is dict and type(capture.get('frames')) is list
             and len(capture['frames']) <= 202)
     for frame in capture['frames']:
@@ -524,6 +531,144 @@ def collection_stage(stage):
     print('FAILED_CAPTURE_COLLECTION_STAGE=' + stage)
 
 
+IMPORT_REJECT_CODES = frozenset((
+    'POUNCER_ANIMATOR_ROOT',
+    'POUNCER_APPROVAL_FORBIDDEN',
+    'POUNCER_DEPENDENCY_GUID_CLOSURE',
+    'POUNCER_DEPENDENCY_GUID_DUPLICATE',
+    'POUNCER_DEPENDENCY_HASH',
+    'POUNCER_DEPENDENCY_INVENTORY',
+    'POUNCER_DERIVED_FORBIDDEN',
+    'POUNCER_DUPLICATE_YAML_KEY',
+    'POUNCER_IMPORTED_CLIPS',
+    'POUNCER_IMPORTED_CLIP_MISMATCH',
+    'POUNCER_IMPORT_CONTRACT',
+    'POUNCER_IMPORT_LIMITATIONS',
+    'POUNCER_IMPORT_SOURCE_MISMATCH',
+    'POUNCER_IMPORT_STATUS',
+    'POUNCER_MATERIAL_ASSET',
+    'POUNCER_MATERIAL_PROPERTIES',
+    'POUNCER_MATERIAL_TEXTURE_BINDING',
+    'POUNCER_MATERIAL_VALUES',
+    'POUNCER_META_GUID',
+    'POUNCER_META_SIZE',
+    'POUNCER_RIG_CURVE_BASELINE',
+    'POUNCER_RIG_CURVE_INVENTORY',
+    'POUNCER_RIG_CURVE_MOTION',
+    'POUNCER_UNDECLARED_EMISSION',
+    'POUNCER_UNDECLARED_TEXTURE',
+    'POUNCER_UNITY_YAML',
+    'POUNCER_YAML_NODE_LIMIT',
+    'STRICT_ANIMATOR_PATHS',
+    'STRICT_ANIMATOR_ROOT_MISMATCH',
+    'STRICT_APPROVAL_FORBIDDEN',
+    'STRICT_CLIP_CURVES',
+    'STRICT_DEPENDENCY_HASH',
+    'STRICT_DEPENDENCY_LIST',
+    'STRICT_DEPENDENCY_PATH',
+    'STRICT_IMPORTED_CLIPS',
+    'STRICT_IMPORTED_CLIP_MISMATCH',
+    'STRICT_IMPORT_CONTRACT',
+    'STRICT_IMPORT_SOURCE_MISMATCH',
+    'STRICT_IMPORT_STATUS',
+    'STRICT_INVALID_QUATERNION',
+    'STRICT_INVALID_VECTOR',
+    'STRICT_NOT_COVERED_FIELDS',
+    'STRICT_OVERSIZED_FILE',
+    'STRICT_PACKAGE_CONTROL_PIN',
+    'STRICT_PACKAGE_CONTROL_SIZE',
+    'STRICT_PACKAGE_DIRECT_UNSAFE',
+    'STRICT_PACKAGE_EDITOR_PIN',
+    'STRICT_PACKAGE_FILE_GUID',
+    'STRICT_PACKAGE_FILE_HASH',
+    'STRICT_PACKAGE_FILE_SIZE',
+    'STRICT_PACKAGE_LOCK_PIN',
+    'STRICT_PACKAGE_MANIFEST_PIN',
+    'STRICT_PACKAGE_SNAPSHOT_ALLOWLIST',
+    'STRICT_PACKAGE_SNAPSHOT_FILES',
+    'STRICT_PACKAGE_SNAPSHOT_FILE_PIN',
+    'STRICT_PACKAGE_SNAPSHOT_IDENTITY',
+    'STRICT_PACKAGE_SNAPSHOT_MANIFEST_SIZE',
+    'STRICT_PACKAGE_SNAPSHOT_REQUIRED',
+    'STRICT_PACKAGE_SNAPSHOT_STALE',
+    'STRICT_PACKAGE_SNAPSHOT_UNSAFE',
+    'STRICT_REQUIRED_DEPENDENCIES',
+    'STRICT_ROOT_CURVE_INVENTORY',
+    'STRICT_ROOT_CURVE_MOTION',
+    'STRICT_ROOT_CURVE_NEUTRAL_MISMATCH',
+    'STRICT_SCHEMA_MISMATCH',
+    'STRICT_UNSAFE_FILE',
+    'WEAPON_ANIMATOR_ROOT',
+    'WEAPON_APPROVAL_FORBIDDEN',
+    'WEAPON_ARM_AXIS',
+    'WEAPON_ARM_SCALE',
+    'WEAPON_CALIBRATION_IDENTITY',
+    'WEAPON_CALIBRATION_LENGTH',
+    'WEAPON_CALIBRATION_PATHS',
+    'WEAPON_CALIBRATION_UNITS',
+    'WEAPON_COLOR',
+    'WEAPON_DEPENDENCY_GUID_CLOSURE',
+    'WEAPON_DEPENDENCY_HASH',
+    'WEAPON_IMPORTED_CLIPS',
+    'WEAPON_IMPORTED_CLIP_MISMATCH',
+    'WEAPON_IMPORT_CONTRACT',
+    'WEAPON_IMPORT_LIMITATIONS',
+    'WEAPON_IMPORT_SOURCE_MISMATCH',
+    'WEAPON_IMPORT_STATUS',
+    'WEAPON_MATERIAL_ASSET',
+    'WEAPON_MATERIAL_ASSET_VALUES',
+    'WEAPON_MATERIAL_COLOR',
+    'WEAPON_MATERIAL_CULL',
+    'WEAPON_MATERIAL_LOCAL_ID',
+    'WEAPON_MATERIAL_NAME_OBSERVATION',
+    'WEAPON_MATERIAL_PERSISTENT_IDENTITY',
+    'WEAPON_MATERIAL_READBACK',
+    'WEAPON_MATERIAL_READBACK_COUNT',
+    'WEAPON_MATERIAL_SCALAR',
+    'WEAPON_MATERIAL_TEXTURE_BINDING',
+    'WEAPON_MATH_CALIBRATION',
+    'WEAPON_META_GUID',
+    'WEAPON_META_SIZE',
+    'WEAPON_MUZZLE_ADAPTER_PATH',
+    'WEAPON_MUZZLE_APPROVAL_OR_AXIS',
+    'WEAPON_MUZZLE_FORWARD',
+    'WEAPON_MUZZLE_SOURCE_OBSERVATION',
+    'WEAPON_REQUIRED_DEPENDENCIES',
+    'WEAPON_RIG_SCALE',
+    'WEAPON_UNDECLARED_TEXTURE',
+    'WEAPON_UNITY_YAML',
+    'WEAPON_UNIT_VECTOR',
+    'WEAPON_WORLD_TOLERANCE',
+
+))
+
+
+def import_rejection_summary(contract, report, error):
+    # Closed metadata only; no raw exception, arbitrary status, path or report content.
+    try:
+        code = str(error) if isinstance(error, strict.StrictError) and str(error) in IMPORT_REJECT_CODES else 'UNCLASSIFIED_IMPORT_REJECTION'
+        kind = contract.get('kind')
+        candidate = contract.get('id')
+        valid_id = isinstance(candidate, str) and re.fullmatch(r'[a-z0-9][a-z0-9-]{3,79}', candidate)
+        expected = 'Assets/DesertRV/CandidateArtImports/' + candidate + '/Candidate.prefab' if valid_id else ''
+        dependency_hash = report.get('dependencyHash')
+        dependency_sha = report.get('dependencySha256')
+        status = report.get('status')
+        dependencies = report.get('dependencies')
+        summary = dict(code=code, kind=kind if kind in ('armored','pouncer','weapon') else 'UNEXPECTED',
+            candidateId=candidate if valid_id else 'UNVERIFIED_ID',
+            status=status if status in ('candidate-structure-imported-unreviewed','failed-candidate-import') else 'UNEXPECTED_STATUS',
+            prefab=expected if expected and report.get('prefab') == expected else 'UNEXPECTED_PREFAB',
+            dependencyCount=len(dependencies) if type(dependencies) is list and len(dependencies)<=300 else -1,
+            dependencyHashValid=bool(strict.digest(dependency_hash,32)),
+            dependencySha256Valid=bool(strict.digest(dependency_sha)),
+            dependencyHash=dependency_hash if strict.digest(dependency_hash,32) else '',
+            dependencySha256=dependency_sha if strict.digest(dependency_sha) else '')
+        print('CANDIDATE_IMPORT_REJECTION ' + json.dumps(summary, sort_keys=True))
+    except Exception:
+        print('CANDIDATE_IMPORT_REJECTION UNAVAILABLE')
+
+
 def _export(root, output, c, summary, native, protected):
     collection_stage('GUARD')
     code = summary.get('errorCode')
@@ -567,7 +712,11 @@ def _export(root, output, c, summary, native, protected):
         snap.materialize(frozen)
         project = frozen / 'unity'
         collection_stage('IMPORT')
-        prefix = validator.validate_import(project, c, project / 'CandidateImportInput/contract.json', imp)
+        try:
+            prefix = validator.validate_import(project, c, project / 'CandidateImportInput/contract.json', imp)
+        except Exception as import_error:
+            import_rejection_summary(c, imp, import_error)
+            raise
         collection_stage('GENERATED')
         validator.generated_files(project, c, prefix, imp, files)
         collection_stage('CAPTURE')

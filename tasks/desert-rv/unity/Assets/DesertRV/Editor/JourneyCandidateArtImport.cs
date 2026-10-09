@@ -118,6 +118,7 @@ namespace DesertRV.Editor
                 Check(PrefabUtility.SaveAsPrefabAsset(instance,report.prefab),"Prefab save failed.");
                 AssetDatabase.SaveAssets(); AssetDatabase.Refresh(ImportAssetOptions.ForceSynchronousImport);
                 var dependencies=AssetDatabase.GetDependencies(report.prefab,true);report.dependencies=dependencies;
+                CandidatePackageSnapshot.Capture(dependencies);
                 foreach(string file in c.clips.Select(clip=>clip.file).Concat(new[]{c.modelFile}).Distinct())
                     Check(dependencies.Contains(destination+"/Source/"+file),"Prefab lost actual model/animation FBX dependency: "+file);
                 report.dependencyHash=AssetDatabase.GetAssetDependencyHash(report.prefab).ToString();

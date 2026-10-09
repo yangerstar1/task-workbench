@@ -131,3 +131,32 @@ A failed native/quality run may retain a separate FAILED_DIAGNOSTICS packet afte
 Pouncer has its own pinned FULL strict contract and exact 184-frame validator. The model root remains scale1; the independent Pouncer_Rig anchor remains scale100 with seventy static TRS curves. Its 27 renderer neutral bounds and nine material mappings come from the new real Discovery. It has no Armored weakpoint/overrun/Core_Open outputs. Pouncer export tests use the already-verified staged source bytes after input staging. Failed Pouncer capture uses the same bounded numeric/at-most-eight-PNG diagnostics without exporting assets or changing the failed outcome.
 
 The exporter threat boundary is the trusted owner/main sequential hosted job with private random staging. Original bytes, declared paths, exact tree and final hashes are checked before atomic commit. This does not claim resistance to an already-compromised host process with the same UID.
+
+## Private URP dependency byte snapshot
+
+The strict host digest retains Unity's original canonical UTF-8 path/byte framing.
+It resolves exactly four pinned builtin URP 17.3.0 files for Unity 6000.3.19f1:
+`Editor/AssetVersion.cs`, its `.meta`, `Shaders/Lit.shader`, and its `.meta`, under
+`Packages/com.unity.render-pipelines.universal/`. Missing package bytes are no
+longer silently omitted. Other package paths are rejected rather than searched.
+
+The native importer writes `unity/CandidatePackageSnapshot/manifest.json` and
+those four files at their canonical relative paths. The host independently
+checks exact file/directory inventory, schema, fixed SHA256/size/GUID pins,
+current manifest and lock byte hashes AND their independently reviewed fixed
+control SHA256 pins, builtin package version, and editor
+version. A bad direct project package file is rejected even if a good snapshot
+exists. Links, extra empty directories, stale controls and arbitrary package
+scripts are rejected. The snapshot stays private and is never an export payload.
+
+Weapon, Pouncer, Armored and failed-capture exports use the same resolver. Their
+dependency verification inputs are frozen and checked again before publication;
+failed-capture checks materialize the private tree only inside the isolated
+validation directory. Pouncer's exact dependency inventory additionally requires
+the official `Editor/AssetVersion.cs` asset (its meta is paired by the digest).
+
+Run host-only regressions beside this file with
+`python -m unittest discover -p 'test_*.py'`. Provide `POUNCER_SOURCE_DIR` pointing to the genuine pinned Pouncer
+source fixtures. The checked-in four-file package fixtures match observed native
+SHA256 values; generated test reports/assets remain synthetic. These tests do
+not run Unity, establish capture quality, or grant scene/gameplay acceptance.

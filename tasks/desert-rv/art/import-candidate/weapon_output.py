@@ -13,9 +13,12 @@ import shutil
 import tempfile
 import xml.etree.ElementTree as ET
 
+from urp_material_metadata import read_material_asset
+
 from strict_output import (StrictError, require, safe, sha, read, keys, finite,
     digest, vec, rel, payload_name, native_report, inspect_png, dependency_digest,
-    derived_record, distance, angle, unity_euler, mesh_dimensions, observe_dependency_mismatch)
+    derived_record, distance, angle, unity_euler, mesh_dimensions, observe_dependency_mismatch,
+    PACKAGE_SHADER, PACKAGE_ASSET_VERSION, PACKAGE_ASSET_VERSION_GUID, DEPENDENCY_HASH_SCOPE, dependency_meta_guid, dependency_snapshot, verify_dependency_snapshot)
 
 STATES = {'Idle': 2.0, 'Fire': .22, 'Reload': 1.65}
 MATERIALS = ('Graphite_Parkerized', 'Brushed_Steel', 'Glove_Graphite',
@@ -39,8 +42,7 @@ MUZZLE_GATE = ('BLOCKED: source-axis-derived adapter only; verify actual barrel 
 LOOP_INTENT = ('Only source-authored Armored Attack loops to cover attackClock>1.2 and normalized CrossFade overrun. '
                'Gameplay clock/movement/damage unchanged.')
 ORIGINAL_SCRIPTS = {'Assets/DesertRV/Runtime/WeaponPresentation.cs', 'Assets/DesertRV/Runtime/WeaponArmReach.cs'}
-PACKAGE_SHADER = 'Packages/com.unity.render-pipelines.universal/Shaders/Lit.shader'
-# URP's stable Lit shader asset GUID; virtual Packages are deliberately not byte-hash claims.
+# Matched to the pinned official Lit.shader.meta by the shared resolver.
 URP_LIT_GUID = '933532a4fcc9baf4fa0491de14d08ed7'
 NATIVE_CASES = 10
 EMISSION_CASE = 'DesertRV.Tests.CandidateAnimationPolicyTests.OpenCoreEmissionSurvivesRealSaveReimportAndReload'
@@ -157,6 +159,34 @@ def _unity_yaml(path):
     return list(yaml.safe_load_all(data))
 
 
+def _reject_package_script_reference(path):
+    """The URP editor script is legal only in its verified .mat peer document.
+
+    Compose retains duplicate mapping entries and decodes quoted/escaped scalar
+    values without constructing objects. Keep the older general closure intact.
+    """
+    import yaml
+    path=safe(path);require(path.stat().st_size<32*1024**2,'WEAPON_PACKAGE_SCRIPT_SCOPE')
+    data=path.read_text(encoding='utf-8')
+    data=re.sub(r'^%.*\n','',data,flags=re.M)
+    data=re.sub(r'^--- !u!\d+ &-?\d+(?: stripped)?$','---',data,flags=re.M)
+    visited={}
+    try:
+        for document in yaml.compose_all(data,Loader=yaml.SafeLoader):
+            pending=[document]
+            while pending:
+                node=pending.pop()
+                if node is None or id(node) in visited:continue
+                visited[id(node)]=node;require(len(visited)<=100000,'WEAPON_PACKAGE_SCRIPT_SCOPE')
+                if isinstance(node,yaml.ScalarNode):
+                    require(node.value.strip().lower()!=PACKAGE_ASSET_VERSION_GUID,'WEAPON_PACKAGE_SCRIPT_SCOPE')
+                elif isinstance(node,yaml.MappingNode):
+                    pending.extend(child for pair in node.value for child in pair)
+                elif isinstance(node,yaml.SequenceNode):pending.extend(node.value)
+    except yaml.YAMLError as error:
+        raise StrictError('WEAPON_PACKAGE_SCRIPT_SCOPE') from error
+
+
 def _meta_guid(path):
     p = safe(Path(str(path)+'.meta'))
     require(p.stat().st_size < 1000000, 'WEAPON_META_SIZE')
@@ -183,9 +213,8 @@ def material_file(project, prefix, m, index, readback):
         and type(readback['materialLocalId']) is int and readback['materialLocalId']!=0, 'WEAPON_MATERIAL_PERSISTENT_IDENTITY')
     material_headers=re.findall(r'^--- !u!21 &(-?[0-9]+)$',safe(project/path).read_text(),re.M)
     require(len(material_headers)==1 and int(material_headers[0])==readback['materialLocalId'], 'WEAPON_MATERIAL_LOCAL_ID')
-    docs = _unity_yaml(project/path)
-    require(len(docs) == 1 and isinstance(docs[0], dict) and set(docs[0]) == {'Material'}, 'WEAPON_MATERIAL_ASSET')
-    asset = docs[0]['Material']; props = asset.get('m_SavedProperties', {})
+    asset = read_material_asset(project/path, expected_local_id=readback['materialLocalId'])
+    props = asset.get('m_SavedProperties', {})
     require(asset.get('m_Name') == readback['actualName']
         and asset.get('m_Shader', {}).get('guid') == URP_LIT_GUID, 'WEAPON_MATERIAL_ASSET')
     def properties(name):
@@ -312,13 +341,15 @@ def validate_import(project, c, contract_path, report):
     # Check all serialized GUID references of candidate YAML against declared dependencies.
     guid_set = {URP_LIT_GUID}
     for path in deps:
-        if path.startswith('Assets/') or (project/(path+'.meta')).exists(): guid_set.add(_meta_guid(project/path))
+        guid = dependency_meta_guid(project, path)
+        if guid is not None: guid_set.add(guid)
     for path in deps:
         if path.startswith(prefix+'/') and Path(path).suffix in ('.prefab','.controller','.mat'):
             data = safe(project/path).read_text()
             require(all(g in guid_set or g in {'00000000000000000000000000000000',
                 '0000000000000000e000000000000000','0000000000000000f000000000000000'}
                 for g in re.findall(r'\bguid: ([a-f0-9]{32})\b', data)), 'WEAPON_DEPENDENCY_GUID_CLOSURE')
+            if Path(path).suffix != '.mat': _reject_package_script_reference(project/path)
     calibration_shape(report['weaponCalibration'], c, prefix, project)
     muzzle_shape(report['muzzle'], c)
     return prefix
@@ -513,7 +544,8 @@ def generated_files(project,c,prefix,imp,files):
     for p,_ in result:
         safe(p)
         if p.suffix == '.meta':
-            guid = _meta_guid(Path(str(p)[:-5])); require(guid not in guids,'WEAPON_META_GUID_DUPLICATE');guids.add(guid)
+            _reject_package_script_reference(p)
+            guid = _meta_guid(Path(str(p)[:-5])); require(guid not in guids and guid not in {URP_LIT_GUID, PACKAGE_ASSET_VERSION_GUID},'WEAPON_META_GUID_DUPLICATE');guids.add(guid)
         elif p.suffix in ('.mat','.prefab','.controller'): _unity_yaml(p)
     return result
 
@@ -597,6 +629,7 @@ def export_weapon(root,output,c,summary,native,protected):
     imp,import_hash=frozen_read(evidence/'import-report.json')
     capture,capture_hash=frozen_read(evidence/'capture-report.json',read_capture)
     raw_hashes={'import-report.json':import_hash,'capture-report.json':capture_hash}
+    dependency_frozen=dependency_snapshot(project,imp['dependencies'])
     snapshot=input_snapshot(project,evidence,contract_path,raw_hashes)
     require(snapshot[contract_path]==contract_hash,'WEAPON_INPUT_CHANGED_DURING_VALIDATION')
     prefix = validate_import(project,c,contract_path,imp)
@@ -608,6 +641,7 @@ def export_weapon(root,output,c,summary,native,protected):
     payload.extend((evidence/f['image'],Path('frames')/f['image']) for f in frames)
     require(sum(safe(p).stat().st_size for p,_ in payload)<512*1024**2,'WEAPON_EXPORT_SIZE')
     verify_snapshot(snapshot)
+    verify_dependency_snapshot(project,imp['dependencies'],dependency_frozen)
     # Use the BEFORE-validation hashes; never bless newly changed bytes here.
     source_records = [(p,dest,snapshot[p]) for p,dest in payload]
     staged = Path(tempfile.mkdtemp(prefix='.weapon-safe-',dir=output.parent))
@@ -632,9 +666,10 @@ def export_weapon(root,output,c,summary,native,protected):
             files=records,nativeXmlSha256=native_hash,nativeCases=NATIVE_CASES,images=25,weaponSamples=4463,
             denseSamples=4303,worldSamples=135,imageSamples=25,protectedSource='UNCHANGED',
             calibratedForScene=False,visualApproved=False,gameplayAccepted=False,rawReportSha256=raw_hashes,
-            dependencyHashScope='Existing Unity dependency digest: available dependency files and meta bytes; virtual Packages contents are not asserted hashed.')
+            dependencyHashScope=DEPENDENCY_HASH_SCOPE)
         require(weapon_native_report(root)==native_hash,'WEAPON_NATIVE_CHANGED_DURING_EXPORT')
         verify_snapshot(snapshot)
+        verify_dependency_snapshot(project,imp['dependencies'],dependency_frozen)
         receipt_bytes=(json.dumps(result,indent=2,allow_nan=False)+'\n').encode()
         (staged/'receipt.json').write_bytes(receipt_bytes)
         import strict_output
@@ -658,7 +693,7 @@ def export(root,output,native='success',protected='success'):
         return export_weapon(root,output,read(root/'unity/CandidateImportInput/contract.json'),summary,native,protected)
     except StrictError as error:
         code=str(error)
-        summary['errorCode']=code if re.fullmatch(r'(?:STRICT|WEAPON)_[A-Z0-9_]{1,100}',code) else 'INVALID_EVIDENCE'
+        summary['errorCode']=code if re.fullmatch(r'(?:STRICT|WEAPON|URP)_[A-Z0-9_]{1,100}',code) else 'INVALID_EVIDENCE'
         raise StrictError(summary['errorCode']) from None
     except Exception:
         summary['errorCode']='INVALID_EVIDENCE'

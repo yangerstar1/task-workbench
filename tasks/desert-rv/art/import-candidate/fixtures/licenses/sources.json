@@ -1,0 +1,22 @@
+[
+  {
+    "name": "URP-LICENSE.md",
+    "url": "https://api.github.com/repos/Unity-Technologies/Graphics/contents/Packages/com.unity.render-pipelines.universal/LICENSE.md?ref=6000.3%2Fstaging"
+  },
+  {
+    "name": "ShaderGraph-LICENSE.md",
+    "url": "https://api.github.com/repos/Unity-Technologies/Graphics/contents/Packages/com.unity.shadergraph/LICENSE.md?ref=6000.3%2Fstaging"
+  },
+  {
+    "name": "URP-Third-Party-Notices.md",
+    "url": "https://api.github.com/repos/Unity-Technologies/Graphics/contents/Packages/com.unity.render-pipelines.universal/Third%20Party%20Notices.md?ref=6000.3%2Fstaging"
+  },
+  {
+    "name": "Unity-Companion-License-v1.4.txt",
+    "url": "https://unity.com/legal/licenses/unity-companion-license",
+    "version": "1.4",
+    "effectiveDate": "2024-10-29",
+    "retrievedDate": "2026-10-09",
+    "representation": "Complete official terms, excluding website navigation; hyperlink expanded and whitespace normalized only."
+  }
+]
