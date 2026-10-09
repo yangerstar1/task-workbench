@@ -10,7 +10,7 @@ class PlayerWindowTests(unittest.TestCase):
  def tearDown(self):self.root.stop();self.env.stop();self.t.cleanup()
  def control(self,**changes):
   native=p.empty_build_native();native.update(stage='BUILD_RECEIPT_WRITTEN',targetChecked=True,targetSupported=True,buildReportAvailable=True,settingsRestored=True,buildResult='SUCCEEDED')
-  result=dict(activation='SUCCEEDED',build='SUCCEEDED',player='SUCCEEDED',licenseReturn='SUCCEEDED',privateCleanup='SUCCEEDED',buildDiagnostic=dict(native=native,logClassification=p.startup.empty_report(),failureCode='NONE'),captureFailureCode='NONE');result.update(changes);return result
+  result=dict(activation='SUCCEEDED',build='SUCCEEDED',player='SUCCEEDED',licenseReturn='SUCCEEDED',privateCleanup='SUCCEEDED',buildDiagnostic=dict(native=native,logClassification=p.startup.empty_report(),failureCode='NONE'),captureFailureCode='NONE',containerSource=p.empty_source());result.update(changes);return result
  def write(self): (self.build/'build-receipt.json').write_text(json.dumps(self.receipt))
  def test_valid_exact_receipt(self):self.write();self.assertEqual(p.verify_build(self.build)[0],self.exe)
  def test_executable_hash_mismatch(self):
@@ -116,6 +116,32 @@ class PlayerWindowTests(unittest.TestCase):
   scripts=pathlib.Path(__file__).resolve().parent;shell=(scripts/'container_entry.sh').read_text();builder=(scripts.parents[1]/'unity/Assets/DesertRV/Editor/PlayerBuild.cs').read_text()
   self.assertIn('build-diagnostic "$private"',shell);self.assertIn('export DESERTRV_PLAYER_DIAGNOSTIC=',shell)
   self.assertIn('finally\n            {\n                string destination',builder);self.assertIn('report.summary.totalErrors',builder);self.assertIn('diagnostic.targetSupported = supported',builder)
+ def test_probe_uses_compatible_atomic_replace_not_move_overwrite(self):
+  runtime=pathlib.Path(__file__).resolve().parents[4]/'tasks/desert-rv/unity/Assets/DesertRV/Runtime/Diagnostics/ReferencePlayerWindowProbe.cs'
+  text=runtime.read_text();self.assertNotIn('File.Move(path + ".tmp", path, true)',text)
+  self.assertIn('if (File.Exists(path)) File.Replace(temporary, path, null);',text);self.assertIn('else File.Move(temporary, path);',text)
+ def source_fixture(self):
+  task=self.r/'task';task.mkdir();name='ProjectSettings.asset';file=self.r/name;file.write_bytes(b'before');before=p.sha(file)
+  (task/'player-source-before.json').write_text(json.dumps({name:before,'outside.txt':'d'*64}))
+  (task/'SOURCE-STATE.json').write_text(json.dumps({'schema':'desert-rv-source-state/v1','files':[{'path':name,'sha256':before}]}))
+  return task,name,file,before
+ def test_source_diagnostic_reports_only_declared_path_and_hash_difference(self):
+  task,name,file,before=self.source_fixture();file.write_bytes(b'after PRIVATE_CONTENT')
+  with patch.object(p,'TASK',task),patch.object(p,'tracked_names',return_value=[name,'outside.txt']):result=p.source_diagnostic()
+  self.assertEqual(result['status'],'DIFFERENCES');self.assertEqual(result['files'],[dict(path=name,status='CHANGED',beforeSha256=before,afterSha256=p.sha(file))]);self.assertNotIn('PRIVATE_CONTENT',json.dumps(result));self.assertNotIn('outside.txt',json.dumps(result))
+ def test_source_diagnostic_distinguishes_missing_and_unreadable(self):
+  task,name,file,before=self.source_fixture()
+  with patch.object(p,'TASK',task),patch.object(p,'tracked_names',return_value=[name,'outside.txt']),patch.object(p,'sha',side_effect=PermissionError()):result=p.source_diagnostic()
+  self.assertEqual(result['files'][0]['status'],'UNREADABLE');self.assertIsNone(result['files'][0]['afterSha256'])
+  file.unlink()
+  with patch.object(p,'TASK',task),patch.object(p,'tracked_names',return_value=[name,'outside.txt']):result=p.source_diagnostic()
+  self.assertEqual(result['files'][0]['status'],'MISSING')
+ def test_source_diagnostic_rejects_non_declared_names_and_raw_bytes(self):
+  task,name,file,before=self.source_fixture();value=dict(scope='SOURCE_STATE_DECLARED_FILES_ONLY',status='DIFFERENCES',changedCount=1,truncated=False,files=[dict(path='outside.txt',status='CHANGED',beforeSha256='a'*64,afterSha256='b'*64)])
+  with patch.object(p,'TASK',task),patch.object(p,'tracked_names',return_value=[name,'outside.txt']):
+   with self.assertRaises(ValueError):p.validate_source(value)
+   value['files'][0]['path']=name;value['files'][0]['raw']='private'
+   with self.assertRaises(ValueError):p.validate_source(value)
  def test_source_guards_runtime_and_batch_only(self):
   root=pathlib.Path(__file__).resolve().parents[4];base=root/'tasks/desert-rv';shell=(base/'scripts/player/container_entry.sh').read_text();cs=(base/'unity/Assets/DesertRV/Runtime/Diagnostics/ReferencePlayerWindowProbe.cs').read_text();builder=(base/'unity/Assets/DesertRV/Editor/PlayerBuild.cs').read_text()
   self.assertTrue(cs.startswith('#if DESERTRV_REFERENCE_WINDOW_PROBE && !UNITY_EDITOR'))

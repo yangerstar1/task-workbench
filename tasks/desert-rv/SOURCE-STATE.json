@@ -395,13 +395,13 @@
     },
     {
       "path": "tasks/desert-rv/scripts/player/player_window_smoke.py",
-      "sha256": "f1a6d4dd6d4b4ef660255c2a0c0928d7eca6cc6415f7c0049d880caec2c2f870",
-      "size": 17818
+      "sha256": "efddc50451711fdac5e572fdd850c55bed5bc74b004789cff1eb4d19592c4c43",
+      "size": 21253
     },
     {
       "path": "tasks/desert-rv/scripts/player/test_player_window_smoke.py",
-      "sha256": "7ae9a57040851e60c65a94bf7edafebb8c11586b7ce327a22996f7906992010f",
-      "size": 12704
+      "sha256": "8d72744ce5820c4922b0b78b6ae4f788e998563542f0fb706e4ff9b9aa61bb2a",
+      "size": 15399
     },
     {
       "path": "tasks/desert-rv/scripts/prepare_runner.sh",
@@ -4310,8 +4310,8 @@
     },
     {
       "path": "tasks/desert-rv/unity/Assets/DesertRV/Runtime/Diagnostics/ReferencePlayerWindowProbe.cs",
-      "sha256": "7cc84a5df81c39dac5bd3834b99ebca4ef77a14256abc0894f662f947b8ad005",
-      "size": 3474
+      "sha256": "cea012b66200e53a65edaf8118e957d98a924e47bdd944eede6615d3625d8748",
+      "size": 3623
     },
     {
       "path": "tasks/desert-rv/unity/Assets/DesertRV/Runtime/Diagnostics/ReferencePlayerWindowProbe.cs.meta",

@@ -14,7 +14,13 @@ namespace DesertRV
         [Serializable] sealed class Beat { public int frame; public double wall; public bool focused; }
         string directory;
         readonly Stopwatch elapsed = new Stopwatch();
-        static void Write(string path, string text) { File.WriteAllText(path + ".tmp", text); File.Move(path + ".tmp", path, true); }
+        static void Write(string path, string text)
+        {
+            string temporary = path + ".tmp";
+            File.WriteAllText(temporary, text);
+            if (File.Exists(path)) File.Replace(temporary, path, null);
+            else File.Move(temporary, path);
+        }
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
         static void StartProbe()
         {

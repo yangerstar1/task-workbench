@@ -53,6 +53,7 @@ def fixed_control(values):
     result=dict(zip(('activation','build','player','licenseReturn','privateCleanup'),values))
     result['buildDiagnostic']=validate_build(read_json(EVIDENCE/'build-diagnostic.json')) if (EVIDENCE/'build-diagnostic.json').exists() else empty_build()
     result['captureFailureCode']='NONE'
+    result['containerSource']=source_diagnostic()
     if (EVIDENCE/'failure.json').exists():
         detail=read_json(EVIDENCE/'failure.json');require(set(detail)=={'failureCode'} and detail['failureCode'] in PLAYER_FAILURES);result['captureFailureCode']=detail['failureCode']
     # Only fixed-schema control is made readable. Private logs, build, handshake stay private.
@@ -61,9 +62,50 @@ def fixed_control(values):
         for name in ('summary.json','real-time.mp4','frame-0.png','frame-1.png','frame-2.png'):os.chmod(safe(EVIDENCE/name),0o644)
         os.chmod(safe(EVIDENCE,False),0o755)
 
-def tracked():
+def tracked_names():
     names=subprocess.check_output(['git','-c','safe.directory='+str(ROOT),'ls-files','-z'],cwd=ROOT).decode().split('\0')
-    return {n:sha(ROOT/n) for n in names if n}
+    return [n for n in names if n]
+def tracked():return {n:sha(ROOT/n) for n in tracked_names()}
+def declared_names():
+    manifest=read_json(TASK/'SOURCE-STATE.json');require(manifest.get('schema')=='desert-rv-source-state/v1' and isinstance(manifest.get('files'),list))
+    tracked_set=set(tracked_names());result=set()
+    for row in manifest['files']:
+        require(isinstance(row,dict) and isinstance(row.get('path'),str) and row['path'] in tracked_set and re.fullmatch('[a-f0-9]{64}',row.get('sha256','')))
+        result.add(row['path'])
+    return result
+def empty_source():return dict(scope='SOURCE_STATE_DECLARED_FILES_ONLY',status='UNAVAILABLE',changedCount=0,truncated=False,files=[])
+def validate_source(value):
+    require(isinstance(value,dict) and set(value)=={'scope','status','changedCount','truncated','files'} and value['scope']=='SOURCE_STATE_DECLARED_FILES_ONLY')
+    require(value['status'] in {'UNCHANGED','DIFFERENCES','UNAVAILABLE'})
+    require(type(value['changedCount']) is int and value['changedCount']>=0 and type(value['truncated']) is bool and isinstance(value['files'],list) and len(value['files'])<=32)
+    require(value['truncated']==(value['changedCount']>len(value['files'])))
+    if value['status']!='DIFFERENCES':require(value['changedCount']==0 and value['files']==[])
+    else:require(value['changedCount']>0)
+    known=declared_names() if value['files'] else set();previous=''
+    for row in value['files']:
+        require(isinstance(row,dict) and set(row)=={'path','status','beforeSha256','afterSha256'})
+        name=row['path'];require(name in known and name>previous and not pathlib.PurePosixPath(name).is_absolute() and '..' not in pathlib.PurePosixPath(name).parts);previous=name
+        require(row['status'] in {'CHANGED','MISSING','UNREADABLE','ADDED'})
+        for key in ('beforeSha256','afterSha256'):require(row[key] is None or isinstance(row[key],str) and re.fullmatch('[a-f0-9]{64}',row[key]))
+        if row['status'] in {'MISSING','UNREADABLE'}:require(row['afterSha256'] is None)
+        if row['status']=='CHANGED':require(row['beforeSha256'] is not None and row['afterSha256'] is not None and row['beforeSha256']!=row['afterSha256'])
+        if row['status']=='ADDED':require(row['beforeSha256'] is None and row['afterSha256'] is not None)
+    return value
+def source_diagnostic():
+    try:
+        before=read_json(TASK/'player-source-before.json');names=sorted(declared_names());require(isinstance(before,dict) and set(before)<=set(tracked_names()))
+        require(all(isinstance(v,str) and re.fullmatch('[a-f0-9]{64}',v) for v in before.values()));changes=[]
+        for name in names:
+            expected=before.get(name);actual=None;status=None
+            try:
+                file=ROOT/name
+                if not file.exists():status='MISSING'
+                else:actual=sha(file);status='ADDED' if expected is None else 'CHANGED' if actual!=expected else None
+            except Exception:status='UNREADABLE'
+            if status:changes.append(dict(path=name,status=status,beforeSha256=expected,afterSha256=actual))
+        return validate_source(dict(scope='SOURCE_STATE_DECLARED_FILES_ONLY',status='DIFFERENCES' if changes else 'UNCHANGED',changedCount=len(changes),truncated=len(changes)>32,files=changes[:32]))
+    except Exception:return empty_source()
+
 def source_unchanged():require(read_json(TASK/'player-source-before.json')==tracked())
 def tree_hash(root):
     records=[]
@@ -158,8 +200,8 @@ def export():
     require(not PUBLIC.exists());stage=pathlib.Path(tempfile.mkdtemp(prefix='player-export-',dir=TASK));success=False
     try:
         c=read_json(TASK/'player-control.json')
-        require(set(c)=={'activation','build','player','licenseReturn','privateCleanup','buildDiagnostic','captureFailureCode'})
-        validate_build(c['buildDiagnostic']);require(c['captureFailureCode'] in PLAYER_FAILURES|{'NONE'})
+        require(set(c)=={'activation','build','player','licenseReturn','privateCleanup','buildDiagnostic','captureFailureCode','containerSource'})
+        validate_build(c['buildDiagnostic']);validate_source(c['containerSource']);require(c['captureFailureCode'] in PLAYER_FAILURES|{'NONE'})
         states=[c[k] for k in ('activation','build','player','licenseReturn','privateCleanup')]
         allowed={'NOT_ATTEMPTED','SUCCEEDED','FAILED'};require(all(v in allowed for v in states))
         ok=os.environ.get('NATIVE_OUTCOME')=='success' and all(v=='SUCCEEDED' for v in states) and c['captureFailureCode']=='NONE' and c['buildDiagnostic']['failureCode']=='NONE'
@@ -194,7 +236,7 @@ def export():
             if c['buildDiagnostic']['failureCode']!='NONE':failure=c['buildDiagnostic']['failureCode']
             if c['captureFailureCode']!='NONE':failure=c['captureFailureCode']
             if not preserved:failure='SOURCE_PRESERVATION_FAILED'
-            atomic(stage/'status.json',dict(mode=MODE,status='FAILED_NOT_ACCEPTED',failureCode=failure,videoExported=False,sourcePreserved=preserved,control=c))
+            atomic(stage/'status.json',dict(mode=MODE,status='FAILED_NOT_ACCEPTED',failureCode=failure,videoExported=False,sourcePreserved=preserved,hostSource=source_diagnostic(),control=c))
         os.replace(stage,PUBLIC);success=True
     finally:
         if not success:shutil.rmtree(stage)
