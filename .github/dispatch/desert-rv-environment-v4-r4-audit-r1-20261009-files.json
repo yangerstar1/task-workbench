@@ -1,0 +1,92 @@
+{
+  "schema": 1,
+  "requestId": "desert-rv-environment-v4-r4-audit-r1-20261009-once-6b40e912",
+  "baseCommit": "fa18f21620028e04145be9026ab3c333fa9cadd4",
+  "candidateManifestSha256": "c366b7b4012e096eb8ebf24402f7dac86eab4c2f339199e53532cd8557140376",
+  "files": [
+    {
+      "path": ".github/workflows/desert-rv-environment-v4-r4-audit-r1.yml",
+      "sha256": "7a7cc9cac385ddb9741106c929e9459f99bdc2b34b6bcf7f353c4f2578adcd5c",
+      "size": 9207,
+      "mode": "100644"
+    },
+    {
+      "path": "tasks/desert-rv/art/environment-v4/candidate-r4-audit-r1-file-manifest.json",
+      "sha256": "c366b7b4012e096eb8ebf24402f7dac86eab4c2f339199e53532cd8557140376",
+      "size": 788,
+      "mode": "100644"
+    },
+    {
+      "path": "tasks/desert-rv/scripts/environment_v4_r4_audit.py",
+      "sha256": "80423e814c8dc03d19e875effde1887a5ff4de134c27bb99a3f228c478002923",
+      "size": 23014,
+      "mode": "100644"
+    },
+    {
+      "path": "tasks/desert-rv/scripts/environment_v4_r4_audit_r1_dispatch.py",
+      "sha256": "d766479454bae0f058222042a220134f516c437caf40e84ea18cef68671daf8e",
+      "size": 9199,
+      "mode": "100644"
+    },
+    {
+      "path": "tasks/desert-rv/scripts/fixtures/environment-v4-r4-audit-published-fa18f216.json",
+      "sha256": "2b92cd3a940a81892d3b342371e5c875248265f8c7e9925e0a9030f90b4ce359",
+      "size": 164477,
+      "mode": "100644"
+    },
+    {
+      "path": "tasks/desert-rv/scripts/prepare_runner.sh",
+      "sha256": "b10537d9a5a70e77b0746fc0797572bcf0c2c65bed22997b0650a5b1b9e69746",
+      "size": 4030,
+      "mode": "100644"
+    },
+    {
+      "path": "tasks/desert-rv/scripts/test_environment_diffuse_comparison_dispatch.py",
+      "sha256": "1b4696aeb8286607caa61a6397ff049705c51a32630ab8c838c6490fb4530e3f",
+      "size": 37959,
+      "mode": "100644"
+    },
+    {
+      "path": "tasks/desert-rv/scripts/test_environment_diffuse_comparison_r1_dispatch.py",
+      "sha256": "532745602509cd2980423b792020f3343879b3cbb96916a5c1e0e65099ab055c",
+      "size": 37905,
+      "mode": "100644"
+    },
+    {
+      "path": "tasks/desert-rv/scripts/test_environment_v4_r4_audit.py",
+      "sha256": "a51d4b0c3f770dfe725f1e2e78a4b11ebeb44e19675197cff9aa9be97cfbb832",
+      "size": 28653,
+      "mode": "100644"
+    },
+    {
+      "path": "tasks/desert-rv/scripts/test_environment_v4_r4_audit_dispatch.py",
+      "sha256": "22cad8231c8ffcd9b8ad75db55335927832b485e40a459aab7d974c451bc8133",
+      "size": 47049,
+      "mode": "100644"
+    },
+    {
+      "path": "tasks/desert-rv/scripts/test_environment_v4_r4_audit_r1_dispatch.py",
+      "sha256": "5f9961099fa52b1b64ff60b0c822b4f39454892b2653280bb734edbda01c0a00",
+      "size": 50854,
+      "mode": "100644"
+    },
+    {
+      "path": "tasks/desert-rv/scripts/test_environment_v4_r4_audit_r1_runner_prefix.py",
+      "sha256": "e39bd74e1b40ab765255397cd566320603777c1d8c2e8d61a388d7e90ca6056d",
+      "size": 6041,
+      "mode": "100644"
+    },
+    {
+      "path": "tasks/desert-rv/scripts/test_environment_v4_r4_dispatch.py",
+      "sha256": "436647846efe711e03b641910c4d669ce0fbaac5553824a709cd68986ec080d4",
+      "size": 54890,
+      "mode": "100644"
+    },
+    {
+      "path": "tasks/desert-rv/scripts/verify_evidence.py",
+      "sha256": "0f35eff674c3087ac4add221e9464f6f81306b5394fa372e8aa201a8a0a4ebae",
+      "size": 21329,
+      "mode": "100644"
+    }
+  ]
+}

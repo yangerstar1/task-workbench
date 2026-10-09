@@ -19,6 +19,8 @@ require=source.require
 CAPTURE='JourneyEvidence/environment-v4-r4-audit'
 PROJECT_REPO_PATH='tasks/desert-rv/unity'
 OUT=source.TASK/'evidence/environment-v4-r4-audit'
+# Host-owned sibling, never write into the root-owned native project/capture tree.
+HOST=source.TASK/'evidence/.environment-v4-r4-audit-host'
 POLICY='ENUMERATE_ALREADY_LOADED_NO_LOAD_ALL_ASSETS_NO_SAVE'
 SHA=re.compile('[0-9a-f]{64}')
 GUID=re.compile('[0-9a-f]{32}')
@@ -89,15 +91,24 @@ def native_phase(project,phase,frozen):
     return record
 
 
+def host_root(project):
+    root=HOST
+    require(root.is_absolute() and not root.is_symlink() and not any(p.is_symlink() for p in root.parents),'Linked or relative host audit root')
+    require(root!=project and project not in root.parents and root not in project.parents,'Host audit storage overlaps native project')
+    require(not root.exists() or root.is_dir(),'Host audit root must be a directory')
+    return root
+
+
 def capture_postexit(project):
-    root=project/CAPTURE;target=root/'postexit.json'
-    require(not target.exists() and not (root/'internal/postexit').exists(),'Refuse overwriting earliest postexit observation')
+    root=host_root(project);target=root/'postexit.json'
+    require(not root.exists(),'Refuse overwriting earliest postexit observation')
     frozen=frozen_report(project)
     native_phase(project,'freeze',frozen);last=native_phase(project,'postcapture',frozen)
     actual_names={p.relative_to(project).as_posix() for p in (project/legacy.GENERATED).rglob('*') if p.is_file() or p.is_symlink()}
     if (project/(legacy.GENERATED+'.meta')).exists():actual_names.add(legacy.GENERATED+'.meta')
     # New non-frozen names are counted, never echoed or copied. Only the original closed set is read.
     records=[];total=0;copies=root/'internal/postexit'
+    copies.mkdir(parents=True)
     for name in sorted(frozen):
         path=project/name
         if not path.exists():records.append(dict(path=name,present=False,sha256=None,size=None));continue
@@ -114,7 +125,7 @@ def capture_postexit(project):
 
 
 def read_postexit(project,frozen):
-    root=project/CAPTURE;record=source.read_json(root/'postexit.json')
+    root=host_root(project);record=source.read_json(root/'postexit.json')
     require(isinstance(record,dict) and set(record)=={'schema','phase','loadedObjectsAvailable','unapprovedGeneratedEntryCount','files'} and
             type(record['schema']) is int and record['schema']==1 and record['phase']=='postexit' and record['loadedObjectsAvailable'] is False,'Postexit schema')
     count=record['unapprovedGeneratedEntryCount'];require(type(count) is int and 0<=count<1000,'Postexit unknown count')
@@ -198,9 +209,9 @@ def sanitized_audit(project,outcome):
             for earlier,later in (('freeze','postcapture'),('postcapture','postexit')):
                 a,b=stages[earlier],stages[later]
                 if (a['present'],a['sha256'],a['size'])==(b['present'],b['sha256'],b['size']):continue
-                root=project/CAPTURE/'internal'
-                before=source.safe(root/earlier/name).read_bytes() if a['present'] else None
-                after=source.safe(root/later/name).read_bytes() if b['present'] else None
+                def copy_root(phase):return (host_root(project) if phase=='postexit' else project/CAPTURE)/'internal'/phase
+                before=source.safe(copy_root(earlier)/name).read_bytes() if a['present'] else None
+                after=source.safe(copy_root(later)/name).read_bytes() if b['present'] else None
                 transitions.append(dict(beforePhase=earlier,afterPhase=later,semantic=semantics_diff(name,before,after)))
             changes.append(dict(path=name,repoPath=PROJECT_REPO_PATH+'/'+name,stages=stages,transitions=transitions))
     if outcome=='success':require(not changes and post['unapprovedGeneratedEntryCount']==0,'Successful package cannot have lifecycle byte differences')
@@ -211,6 +222,39 @@ def sanitized_audit(project,outcome):
                 loadedObjects=dict(freeze=[dict(row,repoPath=PROJECT_REPO_PATH+'/'+row['path']) for row in first['loadedObjects']],
                                    postcapture=[dict(row,repoPath=PROJECT_REPO_PATH+'/'+row['path']) for row in last['loadedObjects']],postexit=None),
                 postexitLoadedObjectsObservable=False,unapprovedGeneratedEntryCount=post['unapprovedGeneratedEntryCount'])
+
+
+
+def diagnostic_error(error):
+    # Fixed vocabulary only. Exception text may contain arbitrary native paths/content.
+    if isinstance(error,PermissionError):return 'READ_PERMISSION_DENIED'
+    if isinstance(error,FileNotFoundError):return 'MISSING_PHASE'
+    if isinstance(error,OSError):return 'IO_ERROR'
+    return 'LIFECYCLE_VALIDATION_FAILED'
+
+
+def pixels_only_report(project,error):
+    """Independent preservation route: no fabricated phase bytes or inferred differences."""
+    availability={};reference='VERIFIED'
+    try:frozen=frozen_report(project)
+    except (ValueError,OSError):frozen=None;reference='UNAVAILABLE_OR_INVALID'
+    for phase in ('freeze','postcapture','postexit'):
+        if frozen is None:
+            availability[phase]=dict(status='NOT_VALIDATED',errorCode='FROZEN_REFERENCE_INVALID');continue
+        try:
+            root=host_root(project) if phase=='postexit' else project/CAPTURE
+            path=root/(phase+'.json')
+            if not path.exists():raise FileNotFoundError()
+            if phase=='postexit':read_postexit(project,frozen)
+            else:native_phase(project,phase,frozen)
+            availability[phase]=dict(status='VERIFIED',errorCode=None)
+        except (ValueError,OSError) as phase_error:
+            availability[phase]=dict(status='UNAVAILABLE_OR_INVALID',errorCode=diagnostic_error(phase_error))
+    return dict(schema='desert-rv-environment-v4-r4-native-pixels-diagnostic/v1',
+                scope='NATIVE_PIXELS_ONLY_LIFECYCLE_NOT_VALIDATED',packageOutcome='failure',
+                status='NATIVE_RENDERED_DIAGNOSTIC_ONLY',lifecycleValidated=False,
+                frozenHashesReplaced=False,unityProjectRepoPath=PROJECT_REPO_PATH,
+                frozenReference=reference,phaseAvailability=availability,errorCode=diagnostic_error(error))
 
 
 def package():
@@ -225,7 +269,10 @@ def diagnose(outcome):
     native=legacy.inspect_native_report(source.TASK/'artifacts/environment')
     saved=source.read_json(legacy.SNAPSHOT);legacy.assert_preserved(saved,legacy.tracked_snapshot(source.ROOT))
     r4.inspect_input(source.PROJECT)
-    report=sanitized_audit(source.PROJECT,outcome)
+    try:report=sanitized_audit(source.PROJECT,outcome)
+    except (ValueError,OSError) as error:
+        if outcome!='failure':raise
+        report=pixels_only_report(source.PROJECT,error)
     identity=source.identity();require(identity['runAttempt']=='1','Lifecycle audit replay')
     if outcome=='success':
         r4.verify_manifest(r4.OUT);accepted=source.read_json(r4.OUT/'receipt.json')
@@ -255,7 +302,8 @@ def diagnose(outcome):
         v4.write_manifest(stage);r4.verify_manifest(stage)
         require({p.name for p in stage.iterdir()}==set(images)|{'lifecycle-audit.json','SHA256SUMS.json'},'Audit sanitized export closed set')
         require(not OUT.exists() and not OUT.is_symlink(),'Audit output appeared during packaging');stage.rename(OUT)
-    print('Read-only lifecycle audit exported: '+report['status']+'; changed authorized paths='+str(len(report['differences'])))
+    print('Read-only lifecycle audit exported: '+report['status']+'; changed authorized paths='+
+          (str(len(report['differences'])) if 'differences' in report else 'UNAVAILABLE'))
 
 
 if __name__=='__main__':

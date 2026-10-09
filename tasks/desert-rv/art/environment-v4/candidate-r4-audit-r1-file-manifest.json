@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "base_commit": "fa18f21620028e04145be9026ab3c333fa9cadd4",
+  "scope": "HOST_OWNED_POSTEXIT_SNAPSHOT_AND_INDEPENDENT_UNACCEPTED_PIXELS",
+  "files": [
+    {
+      "path": "tasks/desert-rv/scripts/environment_v4_r4_audit.py",
+      "change": "modified",
+      "sha256": "80423e814c8dc03d19e875effde1887a5ff4de134c27bb99a3f228c478002923",
+      "bytes": 23014,
+      "before_sha256": "fad617d770119f1f0a7db3bb30034e3c877959a3a83ec7f6974fd8eb85844668"
+    },
+    {
+      "path": "tasks/desert-rv/scripts/test_environment_v4_r4_audit.py",
+      "change": "modified",
+      "sha256": "a51d4b0c3f770dfe725f1e2e78a4b11ebeb44e19675197cff9aa9be97cfbb832",
+      "bytes": 28653,
+      "before_sha256": "c4a52408bf1ca1530d2c0453cd09a43b8fc2b4b963540313504bef7f4bec883b"
+    }
+  ]
+}
