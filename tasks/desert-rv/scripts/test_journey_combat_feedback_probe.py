@@ -67,11 +67,20 @@ class FeedbackProbeTests(unittest.TestCase):
             git('config', 'user.email', 'fixture@example.invalid')
             original = root / 'tasks/desert-rv/unity/Assets/fixture.cs'
             original.parent.mkdir(parents=True); original.write_text('unchanged fixture source\n')
+            fixture_after = (probe.ROOT / probe.TEST_SOURCE).read_bytes()
+            driving = b'            Production.Call(state, "SetControl", Production.Enum("ControlMode", "Driving"));\n'
+            advance = b'            Production.Advance(state, "RamPart", "test-ram");\n'
+            fixture_before = fixture_after.replace(driving + advance, advance, 1)
+            fixture_source = root / probe.TEST_SOURCE
+            fixture_source.parent.mkdir(parents=True); fixture_source.write_bytes(fixture_before)
+            runner = root / 'tasks/desert-rv/scripts/prepare_runner.sh'
+            runner.parent.mkdir(parents=True); runner.write_text('unchanged runner fixture\n')
             git('add', '.'); git('commit', '-qm', 'Synthetic parent')
             base = git('rev-parse', 'HEAD')
             state = b'{}\n'
             for name in probe.CHANGED:
-                path = root / name; path.parent.mkdir(parents=True, exist_ok=True); path.write_bytes(state)
+                path = root / name; path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_bytes(fixture_after if name == probe.TEST_SOURCE else state)
             request = dict(schema=1, requestId=probe.REQUEST_ID, baseCommit=base, sourceStateSha256=probe.pin(state))
             (root / probe.REQUEST).write_text(json.dumps(request))
             git('add', '.'); git('commit', '-qm', 'Synthetic gate')
@@ -84,6 +93,24 @@ class FeedbackProbeTests(unittest.TestCase):
                 self.assertEqual(probe.verify_dispatch(fixture['env']), request)
                 (root / probe.WORKFLOW).write_text('untracked workflow modification')
                 with self.assertRaises(ValueError): probe.verify_dispatch(fixture['env'])
+
+    def test_only_missing_driving_fixture_transition_is_allowed(self):
+        after = (probe.ROOT / probe.TEST_SOURCE).read_bytes()
+        driving = b'            Production.Call(state, "SetControl", Production.Enum("ControlMode", "Driving"));\n'
+        advance = b'            Production.Advance(state, "RamPart", "test-ram");\n'
+        before = after.replace(driving + advance, advance, 1)
+        probe.verify_fixture_change(before, after)
+        for other in (before, after + b'// extra change\n', after.replace(b'Is.EqualTo(85)', b'Is.EqualTo(86)', 1),
+                      after.replace(driving + advance, advance + driving, 1)):
+            with self.assertRaises(ValueError): probe.verify_fixture_change(before, other)
+        with self.assertRaises(ValueError): probe.verify_fixture_change(before + b' ', after)
+
+    def test_r2_request_leaves_original_request_unchanged(self):
+        old = probe.ROOT / '.github/dispatch/desert-rv-combat-feedback-r1-20261010.json'
+        self.assertEqual(probe.pin(old.read_bytes()), 'c4d3a104c7160f1d349393d8d60696168fe021f466a8319158ed340f1ad8655f')
+        self.assertNotIn(old.relative_to(probe.ROOT).as_posix(), probe.CHANGED)
+        self.assertEqual(probe.BASE, 'ec4d6329d9ef372d3d4518b9fcc113c1c5e0c877')
+        self.assertEqual(probe.REQUEST_ID, 'desert-rv-combat-feedback-r2-20261010-once')
 
     def test_request_shape_duplicates_and_replay_rejected(self):
         original = self.identity_fixture()['request_raw']

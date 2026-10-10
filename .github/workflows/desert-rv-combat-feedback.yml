@@ -2,11 +2,11 @@ name: Desert RV combat feedback exact seven native tests
 on:
   push:
     branches: [wip/combat-feedback-20261010]
-    paths: [.github/dispatch/desert-rv-combat-feedback-r1-20261010.json]
+    paths: [.github/dispatch/desert-rv-combat-feedback-r2-20261010.json]
 permissions:
   contents: read
 concurrency:
-  group: desert-rv-combat-feedback-r1
+  group: desert-rv-combat-feedback-r2
   cancel-in-progress: false
 jobs:
   validate:

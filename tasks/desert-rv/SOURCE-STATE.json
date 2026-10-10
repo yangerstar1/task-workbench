@@ -485,8 +485,8 @@
     },
     {
       "path": "tasks/desert-rv/scripts/journey_combat_feedback_probe.py",
-      "sha256": "f26286413b51fe8579ceb289f1116b461228423b0216a7f4088a721bb724f457",
-      "size": 13613
+      "sha256": "9d3531771571d517f6545686b48eda6c68e8ce8a86e74452e2d28841dc7de1fb",
+      "size": 14419
     },
     {
       "path": "tasks/desert-rv/scripts/journey_keyboard_look_native.py",
@@ -715,8 +715,8 @@
     },
     {
       "path": "tasks/desert-rv/scripts/test_journey_combat_feedback_probe.py",
-      "sha256": "88589ea876f0d9c1ecfc0560f73f056303302f16160f375f087ed078b49ea1c5",
-      "size": 12646
+      "sha256": "b3de78dd93573f6d035540926929f476f6c5583230596ec8698d57c75e945b52",
+      "size": 14748
     },
     {
       "path": "tasks/desert-rv/scripts/test_journey_keyboard_look_native.py",
@@ -5280,8 +5280,8 @@
     },
     {
       "path": "tasks/desert-rv/unity/Assets/DesertRV/Tests/EditMode/JourneyCombatFeedbackTests.cs",
-      "sha256": "ae5bb28fe470bf88f4736d7b0917e8da607ef0e64832017ce3492bb43a2bf1d3",
-      "size": 13727
+      "sha256": "6e2affe3c389ec11036c9d3cb3b15184df0065cda1733d5b1b8769cd69ddd7a8",
+      "size": 13820
     },
     {
       "path": "tasks/desert-rv/unity/Assets/DesertRV/Tests/EditMode/JourneyCombatFeedbackTests.cs.meta",

@@ -26,18 +26,17 @@ else:
 
 ROOT = Path(__file__).resolve().parents[3]
 TASK = ROOT / 'tasks/desert-rv'
-BASE = 'c754c4bdae5433aa6c50a707fd4b84670006bcc1'
+BASE = 'ec4d6329d9ef372d3d4518b9fcc113c1c5e0c877'
 BRANCH = 'wip/combat-feedback-20261010'
 REF = 'refs/heads/' + BRANCH
 WORKFLOW = '.github/workflows/desert-rv-combat-feedback.yml'
-REQUEST = '.github/dispatch/desert-rv-combat-feedback-r1-20261010.json'
-REQUEST_ID = 'desert-rv-combat-feedback-r1-20261010-once'
+REQUEST = '.github/dispatch/desert-rv-combat-feedback-r2-20261010.json'
+REQUEST_ID = 'desert-rv-combat-feedback-r2-20261010-once'
 SOURCE = 'tasks/desert-rv/SOURCE-STATE.json'
 SCRIPT = 'tasks/desert-rv/scripts/journey_combat_feedback_probe.py'
-CHANGED = {WORKFLOW, REQUEST, SOURCE, SCRIPT,
-           'tasks/desert-rv/scripts/test_journey_combat_feedback_probe.py',
-           'tasks/desert-rv/scripts/prepare_runner.sh'}
 TEST_SOURCE = 'tasks/desert-rv/unity/Assets/DesertRV/Tests/EditMode/JourneyCombatFeedbackTests.cs'
+CHANGED = {WORKFLOW, REQUEST, SOURCE, SCRIPT, TEST_SOURCE,
+           'tasks/desert-rv/scripts/test_journey_combat_feedback_probe.py'}
 PREFIX = 'DesertRV.Tests.JourneyCombatFeedbackTests.'
 EXPECTED = tuple(sorted(PREFIX + name for name in (
     'ContactUsesActualDamageAndCameraRelativeBearing',
@@ -103,6 +102,15 @@ def validate_identity(env, event, head, parents, request_raw, tracked_raw, prese
     return value
 
 
+def verify_fixture_change(before, after):
+    # The first native run proved six passes. Its seventh fixture tried to leave
+    # a region while on foot. Permit only this exact missing setup transition.
+    require(pin(before) == 'ae5bb28fe470bf88f4736d7b0917e8da607ef0e64832017ce3492bb43a2bf1d3', 'FIXTURE_PARENT')
+    advance = b'            Production.Advance(state, "RamPart", "test-ram");\n'
+    driving = b'            Production.Call(state, "SetControl", Production.Enum("ControlMode", "Driving"));\n'
+    require(before.count(advance) == 1 and after == before.replace(advance, driving + advance, 1), 'FIXTURE_CHANGE')
+
+
 def verify_dispatch(env):
     head = git('rev-parse', 'HEAD').decode().strip()
     parents = [line[7:] for line in git('cat-file', '-p', 'HEAD').decode().split('\n\n', 1)[0].splitlines() if line.startswith('parent ')]
@@ -113,8 +121,10 @@ def verify_dispatch(env):
         admission.tracked_input(ROOT, name, 1024**2)
     event = admission.parse(read(Path(env.get('GITHUB_EVENT_PATH', '')), 4 * 1024**2))
     value = validate_identity(env, event, head, parents, read(ROOT / REQUEST, 2048), git('show', 'HEAD:' + REQUEST), present, changed, pin(state))
-    # Every Unity/project/asset byte must equal the published WIP source parent.
-    require(not git('diff', '--name-only', BASE, 'HEAD', '--', 'tasks/desert-rv/unity').strip(), 'GAME_SOURCE_CHANGED')
+    # Production/project/asset bytes stay equal to the native-tested parent.
+    # The only Unity change is the exact one-line test-fixture correction above.
+    require(git('diff', '--name-only', BASE, 'HEAD', '--', 'tasks/desert-rv/unity').decode().splitlines() == [TEST_SOURCE], 'GAME_SOURCE_CHANGED')
+    verify_fixture_change(git('show', BASE + ':' + TEST_SOURCE), admission.tracked_input(ROOT, TEST_SOURCE, 1024**2))
     return value
 
 

@@ -154,6 +154,7 @@ namespace DesertRV.Tests
         }
         [Test] public void DisconnectExplainsChargePauseWhileExistingWaveAndThreatRemain()
         {
+            Production.Call(state, "SetControl", Production.Enum("ControlMode", "Driving"));
             Production.Advance(state, "RamPart", "test-ram");
             Set(region, "region", 2); Production.Call(state, "SetControl", Production.Enum("ControlMode", "OnFoot"));
             Set(region, "powerPoint", Child("socket", Origin));
