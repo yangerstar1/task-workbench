@@ -24,14 +24,16 @@ from journey_keyboard_look_native import file_bytes, raw_pin, safe_path, protect
 from strict_output import verify_staged_inventory
 import generated_export as generated
 
-BASE = 'ecd3fd411802e498ff21d14626cae5e4bde4333c'
+BASE = 'b0cba9406e0df3b4465cbc255f37db96b168fb96'
+# Runtime dependency substitutions remain based on the verified ecd3 source.
+PRODUCTION_BASE = 'ecd3fd411802e498ff21d14626cae5e4bde4333c'
 BRANCH = 'journey-interaction-reachability-ecd3'
 REF = 'refs/heads/' + BRANCH
 REPOSITORY = 'yangerstar1/task-workbench'
 OWNER_NAME = 'yangerstar1'
 WORKFLOW = '.github/workflows/desert-rv-interaction-reachability.yml'
-REQUEST = '.github/dispatch/desert-rv-interaction-reachability-r1-20261010.json'
-NONCE = 'desert-rv-interaction-reachability-ecd3-r1-20261010-once'
+REQUEST = '.github/dispatch/desert-rv-power-anchor-reachability-r2-20261010.json'
+NONCE = 'desert-rv-power-anchor-reachability-b0cba-r2-20261010-once'
 PRODUCER = dict(commit='2c64f9b5a8cb86ea9a0beb6de582b7209e6f136c', runId=38034314713,
     artifactId=11665232715, artifactName='journey-preparation-UNREVIEWED-38034314713-1',
     artifactBytes=15844619, artifactSha256='3b1af69279a23fb049d009d37bba7f2b52f078276a12c9445403d883bf5f3894',
@@ -272,7 +274,7 @@ def consumer_input(assets, receipt, before, after, consumer_commit):
     require(all((n[:-5] if n.endswith('.meta') else n + '.meta') in seen for n in seen), 'DEPENDENCY_META_PAIR')
     return dict(schema=1, status='VERIFIED_HISTORICAL_ASSETS_CURRENT_CONSUMER_NOT_APPROVED',
         producerCommit=PRODUCER['commit'], producerRunId=str(PRODUCER['runId']),
-        producerArtifactSha256=PRODUCER['artifactSha256'], consumerCommit=consumer_commit, currentProductionCommit=BASE,
+        producerArtifactSha256=PRODUCER['artifactSha256'], consumerCommit=consumer_commit, currentProductionCommit=PRODUCTION_BASE,
         dependencies=sorted(rows, key=lambda r:r['path']), dependencyChanges=sorted(changes, key=lambda r:r['path']))
 
 
@@ -375,9 +377,14 @@ def differences(expected, actual):
     return rows
 
 
+def validate_native_outcome(public, outcome, xml):
+    if not public['summary']['diagnosticComplete']:
+        require(outcome in {'failure','cancelled'} and (xml is None or xml['result']=='Failed'), 'INCOMPLETE_NATIVE_OUTCOME')
+
+
 def finish():
     value = dict(schema=1, status='INCOMPLETE_NOT_GAMEPLAY_ACCEPTANCE', **owner_identity(),
-        currentProductionCommit=BASE, producer=PRODUCER, approved=False, gameplayReviewed=False, scopeReusable=False,
+        currentProductionCommit=PRODUCTION_BASE, consumerParentCommit=BASE, producer=PRODUCER, approved=False, gameplayReviewed=False, scopeReusable=False,
         nativeOutcome=os.environ.get('NATIVE_OUTCOME','unknown'), sourceUnchanged=False, isolatedUnionUnchanged=False,
         inputUnchanged=False, xml=None, nativeReport=None, changes=[], checks=[])
     require(value['nativeOutcome'] in {'success','failure','cancelled','skipped','unknown'}, 'OUTCOME')
@@ -425,7 +432,7 @@ def finish():
             mandatory.update('Assets/DesertRV/Runtime/' + name + '.cs' for name in ('JourneyRaycast','JourneyActions','JourneyMotor'))
             mandatory.update('Assets/DesertRV/Editor/' + name + '.cs' for name in ('JourneySceneAuthoring','JourneySceneAuthoring.Supplies'))
             require(mandatory <= {r['path'] for r in native['sourceFiles']}, 'NATIVE_REQUIRED_SOURCE_PINS')
-        for sample in native['samples']:
+        for sample in native['samples'] + native['powerAnchorRegression']['samples']:
             surfaces = [sample.get(k) for k in ('acceptedSurface','firstHit','support','driverLinecastHit')] + sample['standingBlockers']
             for surface in surfaces:
                 if surface and surface.get('meshSha256'):
@@ -438,7 +445,9 @@ def finish():
                 require(raw_pin(raw) == owner['union'][name], 'SCENE_IDENTITY_CHANGED')
                 for node in re.findall(r'^  m_Name: (.+)$', raw.decode('utf-8'), re.M):
                     names.add(json.loads(node) if node.startswith('"') else node)
-        value['nativeReport'] = public_report(native, read(COPY / INPUT_REL), owner['inputSha256'], names)
+        public = public_report(native, read(COPY / INPUT_REL), owner['inputSha256'], names)
+        validate_native_outcome(public, value['nativeOutcome'], value['xml'])
+        value['nativeReport'] = public
     except Exception:
         value['checks'].append('BOUNDED_NATIVE_REPORT_UNAVAILABLE')
     complete = (value['sourceUnchanged'] and value['isolatedUnionUnchanged'] and value['inputUnchanged'] and

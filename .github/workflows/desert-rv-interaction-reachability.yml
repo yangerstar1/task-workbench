@@ -1,13 +1,13 @@
-name: Desert RV single saved-scene interaction reachability diagnosis
+name: Desert RV production power endpoint against historical saved geometry
 on:
   push:
     branches: [journey-interaction-reachability-ecd3]
-    paths: [.github/dispatch/desert-rv-interaction-reachability-r1-20261010.json]
+    paths: [.github/dispatch/desert-rv-power-anchor-reachability-r2-20261010.json]
 permissions:
   contents: read
   actions: read
 concurrency:
-  group: desert-rv-interaction-reachability-ecd3-r1
+  group: desert-rv-power-anchor-reachability-b0cba-r2
   cancel-in-progress: false
 jobs:
   diagnose:
@@ -97,7 +97,7 @@ jobs:
         run: |
           bash tasks/desert-rv/scripts/prepare_runner.sh
           docker build --build-arg BASE_IMAGE=unityci/editor@sha256:17406791cf1e438bea2dac20671668e05d83db5ed38c916744815db4584a8264 --file tasks/desert-rv/scripts/Environment.Dockerfile --tag desert-rv-environment:local tasks/desert-rv/scripts
-      - name: Native one-case saved-scene dependency and reachability diagnosis
+      - name: Native one-case historical geometry and production endpoint regression
         id: native
         if: success() && steps.stage.outputs.copy_ready == 'true'
         uses: game-ci/unity-test-runner@0ff419b913a3630032cbe0de48a0099b5a9f0ed9

@@ -56,8 +56,8 @@
     },
     {
       "path": ".github/workflows/desert-rv-interaction-reachability.yml",
-      "sha256": "5cb2a45c7fe3de4dc57b68ba60beb82b57a2a9fceda844ed00da279b670843ab",
-      "size": 8577
+      "sha256": "82ed2d4ebf8fd040f08febdd42f2c7daf0c2d4f8da8b3a065e28fd1ca01a769f",
+      "size": 8591
     },
     {
       "path": ".github/workflows/desert-rv-journey-prepare.yml",
@@ -486,13 +486,13 @@
     },
     {
       "path": "tasks/desert-rv/scripts/journey_interaction_reachability.py",
-      "sha256": "56182affdcdacb042f7b429c9b2767d9b5b20ba8a311ed74326f0391f32e535c",
-      "size": 29915
+      "sha256": "79019cee1597106d91379b27c00f241fbf3c929aae6b64db025a3160b953217c",
+      "size": 30483
     },
     {
       "path": "tasks/desert-rv/scripts/journey_interaction_report.py",
-      "sha256": "142902f162d0b9d9c9d0f6ef520fcbdae4519d14f6ee2b3ab67450b243a820c4",
-      "size": 18112
+      "sha256": "e9e93b922c7da8dcf9bf28646fa1620970e8fd30d7599701aae9b6582e58dd82",
+      "size": 22683
     },
     {
       "path": "tasks/desert-rv/scripts/journey_keyboard_look_native.py",
@@ -716,8 +716,8 @@
     },
     {
       "path": "tasks/desert-rv/scripts/test_journey_interaction_reachability.py",
-      "sha256": "b274588c60deda1f228f21b781584b4560c85424e49103d7ee54b22cd3050ce0",
-      "size": 11778
+      "sha256": "37fbc29e0ab4746d7a75ffef9b86640cd9f32565eb1002d9db772166aaee1aa1",
+      "size": 17899
     },
     {
       "path": "tasks/desert-rv/scripts/test_journey_keyboard_look_native.py",
@@ -4321,8 +4321,8 @@
     },
     {
       "path": "tasks/desert-rv/unity/Assets/DesertRV/Editor/JourneySceneAuthoring.cs",
-      "sha256": "f5a3ecc89119a4a19189a869d1bfb0b506b41d5a08faea408ceb818aa5e8506b",
-      "size": 66690
+      "sha256": "066b7358383d05216168f39561790aed01ac70be4367db003f3d59d93710820f",
+      "size": 66885
     },
     {
       "path": "tasks/desert-rv/unity/Assets/DesertRV/Editor/JourneySceneAuthoring.cs.meta",
@@ -5496,8 +5496,8 @@
     },
     {
       "path": "tasks/desert-rv/unity/Assets/DesertRV/Tests/InteractionReachability/JourneyInteractionReachabilityTests.cs",
-      "sha256": "752f21eec49761015cc0591d6d31cd6f15db743b68a1ab255976ae2a428d08d2",
-      "size": 32235
+      "sha256": "4da00fcca05dea5fd2ac97eee6daa6e3427d423e168606f5935f044480ad7eb0",
+      "size": 36929
     },
     {
       "path": "tasks/desert-rv/unity/Assets/DesertRV/Tests/InteractionReachability/JourneyInteractionReachabilityTests.cs.meta",

@@ -64,9 +64,21 @@ namespace DesertRV.Tests
             public Surface acceptedSurface, firstHit, support, driverLinecastHit;
             public Surface[] standingBlockers;
         }
+        [Serializable] public sealed class PowerAnchorEndpoint
+        { public int region; public Vector3 savedPoint, authoringHelperPoint; }
+        [Serializable] public sealed class PowerAnchorRegression
+        {
+            public string scope = "current-production-authoring-helper-endpoint-against-historical-prepared-geometry; no scene or player transform is changed; no fresh scene/producer/player acceptance";
+            public string helper = "DesertRV.Editor.JourneySceneAuthoring.PowerInteractionPosition";
+            public FilePin authoringSource;
+            public string endpointConsumerCommit;
+            public bool passed;
+            public List<PowerAnchorEndpoint> endpoints = new List<PowerAnchorEndpoint>();
+            public List<Sample> samples = new List<Sample>();
+        }
         [Serializable] public sealed class Report
         {
-            public int schemaVersion = 2;
+            public int schemaVersion = 3;
             public string status = "incomplete", unityVersion;
             public string scope = "saved-scene-static-native-physics; no runtime progression or input";
             public string driverScope = "distance prompt predicate and native Linecast geometry only; FindInteraction/TryEnterDriver not invoked; door remains saved-closed";
@@ -75,6 +87,7 @@ namespace DesertRV.Tests
             public DependencyCheck dependencyCheck = new DependencyCheck();
             public List<FilePin> sourceFiles = new List<FilePin>();
             public List<Sample> samples = new List<Sample>();
+            public PowerAnchorRegression powerAnchorRegression = new PowerAnchorRegression();
             public List<string> cleanupErrors = new List<string>();
         }
         Report report;
@@ -193,9 +206,11 @@ namespace DesertRV.Tests
             Assert.That(Application.isPlaying, Is.False, "This is an EditMode geometry diagnostic.");
             Assert.That(Application.unityVersion, Is.EqualTo("6000.3.19f1"));
             VerifyDependencyClosure(); // Fail closed BEFORE any saved-scene replacement or physics query.
+            report.powerAnchorRegression.endpointConsumerCommit = Environment.GetEnvironmentVariable("GITHUB_SHA");
             foreach (string name in Names) { Pin(Folder + name + ".unity"); Pin(Folder + name + ".unity.meta"); }
             foreach (string name in new[] { "JourneyRaycast", "JourneyActions", "JourneyMotor" }) Pin("Assets/DesertRV/Runtime/" + name + ".cs");
             Pin("Assets/DesertRV/Editor/JourneySceneAuthoring.cs");
+            report.powerAnchorRegression.authoringSource = report.sourceFiles.Single(p => p.path == "Assets/DesertRV/Editor/JourneySceneAuthoring.cs");
             Pin("Assets/DesertRV/Editor/JourneySceneAuthoring.Supplies.cs");
             Write();
             var fixture = new SavedSceneFixture(report);
@@ -239,11 +254,30 @@ namespace DesertRV.Tests
                     }
                     if (region >= 2)
                     {
-                        var point = Field<Transform>(binding, "powerPoint").position;
+                        var savedAnchor = Field<Transform>(binding, "powerPoint");
+                        var point = savedAnchor.position;
+                        var surface = Field<Collider>(binding, "powerSurface");
+                        var helper = author.GetMethod("PowerInteractionPosition", BindingFlags.Static | BindingFlags.NonPublic);
+                        Assert.That(helper, Is.Not.Null);
+                        // Execute the same pure function PopulateLayout uses. Never copy
+                        // its offset into this test or overwrite the historical scene point.
+                        var authored = (Vector3)helper.Invoke(null, new object[] { surface });
+                        Assert.That(Field<Transform>(binding, "powerPoint"), Is.SameAs(savedAnchor));
+                        Assert.That(savedAnchor.position, Is.EqualTo(point));
+                        Assert.That(Field<Collider>(binding, "powerSurface"), Is.SameAs(surface));
+                        report.powerAnchorRegression.endpoints.Add(new PowerAnchorEndpoint {
+                            region = region, savedPoint = point, authoringHelperPoint = authored });
                         foreach (float lateral in new[] { -.45f, 0f, .45f })
-                            Observe(region, "power-connect-and-disconnect", "cabinet-front-lateral-" + lateral.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture),
-                                new Vector3(point.x + lateral, .025f, point.z - 1.15f), point,
-                                Field<Collider>(binding, "powerSurface"), 2.5f, false, vehicle.position);
+                        {
+                            string approach = "cabinet-front-lateral-" + lateral.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture);
+                            // Use the ORIGINAL feet for both endpoints: moving the stand
+                            // position with the new endpoint would confound the regression.
+                            var foot = new Vector3(point.x + lateral, .025f, point.z - 1.15f);
+                            Observe(region, "power-connect-and-disconnect", approach,
+                                foot, point, surface, 2.5f, false, vehicle.position);
+                            Observe(region, "power-connect-and-disconnect", approach,
+                                foot, authored, surface, 2.5f, false, vehicle.position, report.powerAnchorRegression.samples);
+                        }
                     }
                     // The retained cabin floor, bench, and closed door are never rebuilt.
                     var floor = vehicle.GetComponentsInChildren<Collider>(true).Single(c => c.name == "GEO-interior_floor");
@@ -283,6 +317,28 @@ namespace DesertRV.Tests
                     Write(); // Retain all completed regions even if a later fixture fails.
                 }
                 Assert.That(report.samples.Count, Is.EqualTo(48));
+                var controls = report.samples.Where(s => s.purpose == "power-connect-and-disconnect").ToArray();
+                var regression = report.powerAnchorRegression;
+                Assert.That(controls.Length, Is.EqualTo(6));
+                Assert.That(regression.endpoints.Select(e => e.region), Is.EqualTo(new[] { 2, 3 }));
+                Assert.That(regression.samples.Count, Is.EqualTo(6));
+                foreach (var sample in regression.samples)
+                {
+                    var control = controls.Single(s => s.region == sample.region && s.approach == sample.approach);
+                    var endpoint = regression.endpoints.Single(e => e.region == sample.region);
+                    Assert.That(control.target, Is.EqualTo(endpoint.savedPoint));
+                    Assert.That(sample.target, Is.EqualTo(endpoint.authoringHelperPoint));
+                    Assert.That(sample.foot, Is.EqualTo(control.foot));
+                    Assert.That(sample.eye, Is.EqualTo(control.eye));
+                    Assert.That(sample.acceptedSurface.objectId, Is.EqualTo(control.acceptedSurface.objectId));
+                    Assert.That(control.productionCanReachPoint, Is.False, "Historical endpoint must reproduce the confirmed blockage.");
+                    Assert.That(control.hasFirstHit && !control.acceptedSurfaceIsFirstHit, Is.True);
+                    Assert.That(control.firstHit.hierarchy, Does.Contain("/Power cabinet face["));
+                    Assert.That(sample.withinRange && sample.productionCanReachPoint, Is.True,
+                        "Production-authored endpoint is still blocked in region " + sample.region + " at " + sample.approach);
+                    Assert.That(sample.supported && sample.standingCapsuleClear, Is.True);
+                }
+                regression.passed = true;
                 report.status = "observations-complete-not-gameplay-acceptance";
             }
             finally
@@ -293,12 +349,13 @@ namespace DesertRV.Tests
             }
             Assert.That(report.cleanupErrors, Is.Empty, "See native-reachability.json for cleanup failures.");
             Assert.That(report.sourceUnchanged && report.copiesDeleted && report.setupRestored, Is.True);
-            // Deliberately no all-reachable assertion: this test collects blockers,
-            // including expected failures, and does not turn diagnostics into acceptance.
+            // The original 48 observations remain diagnostics, including expected
+            // failures. Six assertions establish only the authoring-endpoint fix on
+            // historical geometry, never fresh-scene or runtime/gameplay acceptance.
         }
 
         Sample Observe(int region, string purpose, string approach, Vector3 foot, Vector3 target,
-            Collider surface, float limit, bool inclusive, Vector3 vehicle)
+            Collider surface, float limit, bool inclusive, Vector3 vehicle, List<Sample> destination = null)
         {
             var eye = foot + Vector3.up * 1.52f; var delta = target - eye;
             var sample = new Sample { region = region, purpose = purpose, approach = approach, foot = foot, eye = eye,
@@ -322,7 +379,7 @@ namespace DesertRV.Tests
             sample.standingCapsuleClear = sample.standingBlockers.Length == 0;
             sample.supported = Physics.Raycast(foot + Vector3.up * .08f, Vector3.down, out var support, .20f, ~0, QueryTriggerInteraction.Ignore);
             if (sample.supported) sample.support = Describe(support.collider);
-            report.samples.Add(sample); return sample;
+            (destination ?? report.samples).Add(sample); return sample;
         }
 
         // Adapted from JourneyTracerMaterialTests' already-used ordinary saved-scene

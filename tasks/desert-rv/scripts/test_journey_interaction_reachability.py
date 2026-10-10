@@ -102,9 +102,10 @@ class ReportValidationTests(unittest.TestCase):
     def setUp(self):
         self.rows=[dict(path=f'Assets/Fixture/{i:04}.asset',sha256='a'*64,bytes=1,kind='asset',packageName='',packageVersion='') for i in range(772)]
         self.rows += [dict(path=f'Packages/com.unity.render-pipelines.universal/Fixture/{i:04}.shader',sha256='a'*64,bytes=1,kind='package',packageName='com.unity.render-pipelines.universal',packageVersion='17.3.0') for i in range(24)]
-        self.input={'dependencies':self.rows}; self.sha='b'*64
-        self.report=dict(schemaVersion=2,status='incomplete',unityVersion='6000.3.19f1',**v.SCOPES,
+        self.input={'dependencies':self.rows,'consumerCommit':'c'*40}; self.sha='b'*64
+        self.report=dict(schemaVersion=3,status='incomplete',unityVersion='6000.3.19f1',**v.SCOPES,
             sourceUnchanged=False,copiesDeleted=False,setupRestored=False,sourceFiles=[],samples=[],cleanupErrors=[],
+            powerAnchorRegression=dict(scope=v.POWER_SCOPE,helper=v.POWER_HELPER,authoringSource=None,endpointConsumerCommit=None,passed=False,endpoints=[],samples=[]),
             dependencyCheck=dict(status='verified-native-closure',inputPath=v.INPUT_PATH,inputSha256=self.sha,snapshotError='',snapshotFailureCode='',snapshotFailurePath='',
                 expectedCount=796,actualCount=796,passed=True,actualDependencies=copy.deepcopy(self.rows),mismatches=[]))
     def check(self): return v.verify_native_report(self.report,self.input,self.sha)
@@ -163,6 +164,90 @@ class ReportValidationTests(unittest.TestCase):
         v.surface(surface)
         surface['objectId']='/private/invalid';
         with self.assertRaises(ValueError): v.surface(surface)
+
+
+class PowerEndpointValidationTests(unittest.TestCase):
+    def check(self): return v.verify_native_report(self.report,self.input,self.sha)
+    def setUp(self):
+        ReportValidationTests.setUp(self)
+        pin=dict(path=v.AUTHORING_SOURCE,sha256='d'*64)
+        self.report['sourceFiles']=[pin]
+        regression=self.report['powerAnchorRegression']
+        regression.update(authoringSource=pin,endpointConsumerCommit=self.input['consumerCommit'],passed=True)
+        vec=lambda x=0,y=0,z=0:dict(x=x,y=y,z=z)
+        def collider(name,identity):
+            return dict(hierarchy='Root[0]/'+name+'['+str(identity)+']',type='BoxCollider',
+                objectId='GlobalObjectId_V1-2-'+'a'*32+'-'+str(identity)+'-0',mesh='',meshSha256='',
+                enabled=True,active=True,trigger=False,min=vec(),max=vec(1,1,1))
+        vectors={'foot','eye','target','hitPoint','hitNormal','driverLinecastPoint','driverLinecastNormal'}
+        numbers={'distance','limit','hitDistance','endpointDistance','savedVehicleDistance','driverEntryDistance','driverLinecastDistance','driverLinecastEndpointDistance'}
+        bools={'withinRange','productionCanReachPoint','hasFirstHit','acceptedSurfaceIsFirstHit','supported','standingCapsuleClear','driverDistancePromptPredicate','driverDistanceEnterPredicate','driverLinecastHasHit','driverLinecastAllowsGeometry'}
+        for region in (2,3):
+            saved=vec(0,1,region);endpoint=vec(0,1,region-.05)
+            regression['endpoints'].append(dict(region=region,savedPoint=saved,authoringHelperPoint=endpoint))
+            for offset,label in ((-.45,'-0.45'),(0,'0'),(.45,'0.45')):
+                row={**{k:vec() for k in vectors},**{k:0 for k in numbers},**{k:False for k in bools},
+                    'region':region,'purpose':'power-connect-and-disconnect','approach':'cabinet-front-lateral-'+label,
+                    'predicate':'JourneyRaycast.CanReachPoint','acceptedSurface':collider('Power cabinet',1),
+                    'firstHit':collider('Power cabinet face',2),'support':collider('Road surface',3),'driverLinecastHit':None,'standingBlockers':[]}
+                row.update(foot=vec(offset,.025,region-1.15),eye=vec(offset,1.545,region-1.15),target=saved,
+                    limit=2.5,distance=1,withinRange=True,hasFirstHit=True,supported=True,standingCapsuleClear=True)
+                self.report['samples'].append(row)
+                revised=copy.deepcopy(row);revised.update(target=endpoint,productionCanReachPoint=True,hasFirstHit=False,firstHit=None)
+                regression['samples'].append(revised)
+
+    def test_six_synthetic_pairs_are_separate_from_original_observations(self):
+        public=v.public_report(self.report,self.input,self.sha)
+        self.assertEqual(len(public['samples']),6)
+        self.assertEqual(len(public['powerAnchorRegression']['samples']),6)
+        self.assertTrue(public['summary']['powerAnchorRegressionPassed'])
+        self.assertFalse(public['summary']['diagnosticComplete'])
+        self.assertFalse(public['summary']['gameplayAccepted'])
+        self.assertIn('historical-prepared-geometry',public['powerAnchorRegression']['scope'])
+
+    def test_same_feet_surface_range_and_targets_are_required(self):
+        for field,value in (('foot',dict(x=7,y=1,z=1)),('eye',dict(x=7,y=1,z=1)),('limit',3),('target',dict(x=7,y=1,z=1))):
+            original=copy.deepcopy(self.report)
+            self.report['powerAnchorRegression']['samples'][0][field]=value
+            with self.assertRaises(ValueError):self.check()
+            self.report=original
+        self.report['powerAnchorRegression']['samples'][0]['acceptedSurface']['objectId']='GlobalObjectId_V1-2-'+'b'*32+'-1-0'
+        with self.assertRaises(ValueError):self.check()
+
+    def test_unreachable_new_endpoint_cannot_claim_pass(self):
+        self.report['powerAnchorRegression']['samples'][0]['productionCanReachPoint']=False
+        with self.assertRaises(ValueError):self.check()
+        self.report['powerAnchorRegression']['passed']=False
+        public=v.public_report(self.report,self.input,self.sha)
+        self.assertFalse(public['powerAnchorRegression']['passed'])
+        self.assertEqual(len(public['powerAnchorRegression']['samples']),6)
+
+    def test_wrong_helper_identity_and_missing_historical_block_fail(self):
+        for key,value in (('endpointConsumerCommit','f'*40),('helper','Other.Helper'),('scope','fresh scene approval')):
+            original=copy.deepcopy(self.report);self.report['powerAnchorRegression'][key]=value
+            with self.assertRaises(ValueError):self.check()
+            self.report=original
+        self.report['samples'][0]['productionCanReachPoint']=True
+        with self.assertRaises(ValueError):self.check()
+
+    def test_unknown_regression_fields_and_incomplete_pass_rejected(self):
+        self.report['powerAnchorRegression']['privateExtra']='untrusted'
+        with self.assertRaises(ValueError):self.check()
+        del self.report['powerAnchorRegression']['privateExtra']
+        self.report['powerAnchorRegression']['samples'].pop()
+        with self.assertRaises(ValueError):self.check()
+
+
+    def test_partial_endpoint_failure_preserves_available_rows(self):
+        value=self.report['powerAnchorRegression']
+        value.update(passed=False,endpoints=value['endpoints'][:1],samples=value['samples'][:2])
+        public=v.public_report(self.report,self.input,self.sha)
+        self.assertEqual(len(public['powerAnchorRegression']['samples']),2)
+        self.assertFalse(public['summary']['diagnosticComplete'])
+        probe.validate_native_outcome(public,'failure',{'result':'Failed'})
+        probe.validate_native_outcome(public,'failure',None)
+        for outcome,xml in (('success',{'result':'Passed'}),('success',{'result':'Failed'}),('failure',{'result':'Passed'}),('skipped',None)):
+            with self.assertRaises(ValueError):probe.validate_native_outcome(public,outcome,xml)
 
 
 if __name__ == '__main__':

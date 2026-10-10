@@ -14,7 +14,7 @@ from pathlib import PurePosixPath
 INPUT_PATH = 'JourneyEvidence/InteractionReachability/consumer-input.json'
 SHA = re.compile(r'[0-9a-f]{64}\Z')
 DEPENDENCY_KEYS = {'path', 'sha256', 'bytes', 'kind', 'packageName', 'packageVersion'}
-REPORT_KEYS = set('schemaVersion status unityVersion scope driverScope powerScope sourceUnchanged copiesDeleted setupRestored dependencyCheck sourceFiles samples cleanupErrors'.split())
+REPORT_KEYS = set('schemaVersion status unityVersion scope driverScope powerScope sourceUnchanged copiesDeleted setupRestored dependencyCheck sourceFiles samples powerAnchorRegression cleanupErrors'.split())
 CHECK_KEYS = set('status inputPath inputSha256 snapshotError snapshotFailureCode snapshotFailurePath expectedCount actualCount passed actualDependencies mismatches'.split())
 SURFACE_KEYS = set('hierarchy type objectId mesh meshSha256 enabled active trigger min max'.split())
 SAMPLE_KEYS = set('region purpose approach predicate foot eye target hitPoint hitNormal driverLinecastPoint driverLinecastNormal distance limit hitDistance endpointDistance savedVehicleDistance driverEntryDistance driverLinecastDistance driverLinecastEndpointDistance withinRange productionCanReachPoint hasFirstHit acceptedSurfaceIsFirstHit supported standingCapsuleClear driverDistancePromptPredicate driverDistanceEnterPredicate driverLinecastHasHit driverLinecastAllowsGeometry acceptedSurface firstHit support driverLinecastHit standingBlockers'.split())
@@ -89,8 +89,26 @@ def surface(value):
         relative(value['mesh']); need(value['mesh'].startswith(('Assets/','Packages/','Resources/','Library/')), 'Unknown mesh root')
     if value.get('meshSha256'): need(SHA.fullmatch(value['meshSha256']), 'Invalid mesh hash')
 
+def sample(row):
+    need(isinstance(row, dict) and row.get('region') in (1,2,3), 'Invalid sample region')
+    need(set(row)==SAMPLE_KEYS,'Unknown/missing sample fields')
+    for key in ('purpose', 'approach', 'predicate'): text(row[key], 512)
+    need(row['approach'] in allowed_approaches(row['region'],row['purpose']),'Unknown purpose or approach')
+    predicate='JourneyActions.FindInteraction: feet-entry < 2.8; JourneyMotor.TryEnterDriver: native Linecast' if row['purpose']=='driver-prompt-and-return-geometry' else 'JourneyRaycast.CanReachPoint'
+    need(row['predicate']==predicate,'Unknown interaction predicate')
+    for key in ('foot','eye','target','hitPoint','hitNormal','driverLinecastPoint','driverLinecastNormal'): vector(row[key])
+    for key in ('distance','limit','hitDistance','endpointDistance','savedVehicleDistance','driverEntryDistance','driverLinecastDistance','driverLinecastEndpointDistance'): number(row[key])
+    for key in ('withinRange','productionCanReachPoint','hasFirstHit','acceptedSurfaceIsFirstHit','supported','standingCapsuleClear','driverDistancePromptPredicate','driverDistanceEnterPredicate','driverLinecastHasHit','driverLinecastAllowsGeometry'): boolean(row[key])
+    if row['hasFirstHit']: surface(row['firstHit'])
+    if row['supported']: surface(row['support'])
+    if row['driverLinecastHasHit']: surface(row['driverLinecastHit'])
+    if row['purpose'] != 'driver-prompt-and-return-geometry': surface(row['acceptedSurface'])
+    blockers=row['standingBlockers']; need(isinstance(blockers,list) and len(blockers)<=2048, 'Unbounded standing blockers')
+    for blocker in blockers: surface(blocker)
+    need(row['standingCapsuleClear'] == (len(blockers)==0), 'Standing-clear flag contradicts evidence')
+
 def verify_native_report(report, consumer_input, input_sha256):
-    need(isinstance(report, dict) and report.get('schemaVersion') == 2, 'Native report schema')
+    need(isinstance(report, dict) and report.get('schemaVersion') == 3, 'Native report schema')
     need(set(report)==REPORT_KEYS, 'Unknown/missing native report fields')
     for key,value in SCOPES.items(): need(report[key]==value, 'Unexpected native scope')
     need(report.get('unityVersion') == '6000.3.19f1', 'Wrong Unity version')
@@ -134,23 +152,7 @@ def verify_native_report(report, consumer_input, input_sha256):
     need(not check['passed'] or closed, 'False native closure pass')
     samples = report.get('samples'); need(isinstance(samples, list) and len(samples) <= 48, 'Unbounded native samples')
     need(closed or not samples, 'Physics observations exist without the closure gate')
-    for row in samples:
-        need(isinstance(row, dict) and row.get('region') in (1,2,3), 'Invalid sample region')
-        need(set(row)==SAMPLE_KEYS,'Unknown/missing sample fields')
-        for key in ('purpose', 'approach', 'predicate'): text(row[key], 512)
-        need(row['approach'] in allowed_approaches(row['region'],row['purpose']),'Unknown purpose or approach')
-        predicate='JourneyActions.FindInteraction: feet-entry < 2.8; JourneyMotor.TryEnterDriver: native Linecast' if row['purpose']=='driver-prompt-and-return-geometry' else 'JourneyRaycast.CanReachPoint'
-        need(row['predicate']==predicate,'Unknown interaction predicate')
-        for key in ('foot','eye','target','hitPoint','hitNormal','driverLinecastPoint','driverLinecastNormal'): vector(row[key])
-        for key in ('distance','limit','hitDistance','endpointDistance','savedVehicleDistance','driverEntryDistance','driverLinecastDistance','driverLinecastEndpointDistance'): number(row[key])
-        for key in ('withinRange','productionCanReachPoint','hasFirstHit','acceptedSurfaceIsFirstHit','supported','standingCapsuleClear','driverDistancePromptPredicate','driverDistanceEnterPredicate','driverLinecastHasHit','driverLinecastAllowsGeometry'): boolean(row[key])
-        if row['hasFirstHit']: surface(row['firstHit'])
-        if row['supported']: surface(row['support'])
-        if row['driverLinecastHasHit']: surface(row['driverLinecastHit'])
-        if row['purpose'] != 'driver-prompt-and-return-geometry': surface(row['acceptedSurface'])
-        blockers=row['standingBlockers']; need(isinstance(blockers,list) and len(blockers)<=2048, 'Unbounded standing blockers')
-        for blocker in blockers: surface(blocker)
-        need(row['standingCapsuleClear'] == (len(blockers)==0), 'Standing-clear flag contradicts evidence')
+    for row in samples: sample(row)
     for key in ('sourceUnchanged','copiesDeleted','setupRestored'): boolean(report[key])
     errors=report['cleanupErrors']; need(isinstance(errors,list) and len(errors)<=32, 'Unbounded cleanup errors')
     for error in errors: text(error,16384)
@@ -170,11 +172,57 @@ def verify_native_report(report, consumer_input, input_sha256):
             if region>=2: expected_counts[(region,'power-connect-and-disconnect')]=3
         need(counts==expected_counts, 'Wrong interaction inventory')
         need(len({(r['region'],r['purpose'],r['approach']) for r in samples})==48, 'Duplicate approach observation')
+    regression = validate_power_regression(report, consumer_input, closed, complete)
     return {'nativeClosureMatched':closed,'diagnosticComplete':complete,'sampleCount':len(samples),
             'dependencyMismatchCount':len(mismatches),
             'interactionRayBlockedCount':sum(row['purpose']!='driver-prompt-and-return-geometry' and not row['productionCanReachPoint'] for row in samples),
             'driverLinecastBlockedCount':sum(row['purpose']=='driver-prompt-and-return-geometry' and not row['driverLinecastAllowsGeometry'] for row in samples) if complete else None,
+            'powerAnchorRegressionPassed':regression['passed'],'powerAnchorSampleCount':len(regression['samples']),
             'gameplayAccepted':False,'scopeReusable':False}
+
+POWER_SCOPE = 'current-production-authoring-helper-endpoint-against-historical-prepared-geometry; no scene or player transform is changed; no fresh scene/producer/player acceptance'
+POWER_HELPER = 'DesertRV.Editor.JourneySceneAuthoring.PowerInteractionPosition'
+AUTHORING_SOURCE = 'Assets/DesertRV/Editor/JourneySceneAuthoring.cs'
+
+def validate_power_regression(report, consumer_input, closed, complete):
+    value=report['powerAnchorRegression']
+    need(isinstance(value,dict) and set(value)=={'scope','helper','authoringSource','endpointConsumerCommit','passed','endpoints','samples'}, 'Unknown power endpoint fields')
+    need(value['scope']==POWER_SCOPE and value['helper']==POWER_HELPER, 'Wrong historical-geometry endpoint scope')
+    boolean(value['passed'])
+    need(value['endpointConsumerCommit'] in ('',None,consumer_input['consumerCommit']), 'Wrong endpoint consumer commit')
+    author=value['authoringSource']
+    if author and author.get('path'):
+        need(set(author)=={'path','sha256'} and author['path']==AUTHORING_SOURCE and SHA.fullmatch(author['sha256'])
+             and author in report['sourceFiles'], 'Unpinned production authoring helper')
+    else:
+        need(author is None or isinstance(author,dict) and set(author)=={'path','sha256'} and
+             author['path'] in ('',None) and author['sha256'] in ('',None), 'Unsafe absent authoring pin')
+    endpoints=value['endpoints']; rows=value['samples']
+    need(isinstance(endpoints,list) and len(endpoints)<=2 and isinstance(rows,list) and len(rows)<=6, 'Unbounded endpoint observations')
+    need(closed or not endpoints and not rows, 'Endpoint physics exists without closure')
+    for index,endpoint in enumerate(endpoints):
+        need(isinstance(endpoint,dict) and set(endpoint)=={'region','savedPoint','authoringHelperPoint'} and endpoint['region']==index+2, 'Wrong endpoint inventory')
+        vector(endpoint['savedPoint']);vector(endpoint['authoringHelperPoint'])
+    controls={(row['region'],row['approach']):row for row in report['samples'] if row['purpose']=='power-connect-and-disconnect'}
+    seen=set()
+    for row in rows:
+        sample(row)
+        key=(row['region'],row['approach']);need(row['purpose']=='power-connect-and-disconnect' and row['region'] in (2,3) and key not in seen and key in controls, 'Unpaired endpoint observation');seen.add(key)
+        endpoint=next((e for e in endpoints if e['region']==row['region']),None);need(endpoint is not None,'Missing endpoint record')
+        control=controls[key]
+        need(row['target']==endpoint['authoringHelperPoint'] and control['target']==endpoint['savedPoint'] and
+             all(row[k]==control[k] for k in ('foot','eye','acceptedSurface','limit')) and row['limit']==2.5, 'Endpoint comparison changed standing geometry or interaction rules')
+    if endpoints or rows or value['passed']:
+        need(author and author.get('path')==AUTHORING_SOURCE and value['endpointConsumerCommit']==consumer_input['consumerCommit'], 'Endpoint observations lack current helper identity')
+    if value['passed']:
+        need(len(endpoints)==2 and len(rows)==6 and Counter(row['region'] for row in rows)=={2:3,3:3}, 'Incomplete endpoint regression claims pass')
+        for row in rows:
+            control=controls[(row['region'],row['approach'])]
+            need(not control['productionCanReachPoint'] and control['hasFirstHit'] and not control['acceptedSurfaceIsFirstHit'] and
+                 '/Power cabinet face[' in control['firstHit']['hierarchy'], 'Historical blocked control was not reproduced')
+            need(row['withinRange'] and row['productionCanReachPoint'] and row['supported'] and row['standingCapsuleClear'], 'Blocked or unsupported endpoint claims pass')
+    need(not complete or value['passed'], 'Completed diagnostic lacks power endpoint pass')
+    return value
 
 def public_report(report, consumer_input, input_sha256, saved_scene_names=None):
     """Reconstruct a whitelisted public object; never copy native error text."""
@@ -188,7 +236,7 @@ def public_report(report, consumer_input, input_sha256, saved_scene_names=None):
             need(parts and parts[0].start()==0 and parts[-1].end()==len(value['hierarchy'])
                  and all(p.group(1) in saved_scene_names for p in parts), 'Collider hierarchy contains a non-scene node')
         return {key:value[key] for key in SURFACE_KEYS}
-    public={'schema':'desert-rv-interaction-reachability-public/v1','nativeSchemaVersion':2,'summary':summary}
+    public={'schema':'desert-rv-interaction-reachability-public/v2','nativeSchemaVersion':3,'summary':summary}
     for key in ('status','unityVersion','scope','driverScope','powerScope','sourceUnchanged','copiesDeleted','setupRestored'):
         public[key]=report[key]
     public['sourceFiles']=[{'path':p['path'],'sha256':p['sha256']} for p in report['sourceFiles']]
@@ -206,14 +254,20 @@ def public_report(report, consumer_input, input_sha256, saved_scene_names=None):
         'expected':{key:p['expected'][key] for key in DEPENDENCY_KEYS} if p['expectedPresent'] else None,
         'actual':{key:p['actual'][key] for key in DEPENDENCY_KEYS} if p['actualPresent'] else None} for p in check['mismatches']]
     public['cleanupErrorDigests']=[error_digest(error) for error in report['cleanupErrors']]
-    public['samples']=[]
-    surface_fields={'acceptedSurface','firstHit','support','driverLinecastHit','standingBlockers'}
-    for row in report['samples']:
+    def clean_sample(row):
+        surface_fields={'acceptedSurface','firstHit','support','driverLinecastHit','standingBlockers'}
         clean={key:row[key] for key in SAMPLE_KEYS-surface_fields}
         for key,present in (('acceptedSurface',row['purpose']!='driver-prompt-and-return-geometry'),('firstHit',row['hasFirstHit']),('support',row['supported']),('driverLinecastHit',row['driverLinecastHasHit'])):
             clean[key]=clean_surface(row[key]) if present else None
         clean['standingBlockers']=[clean_surface(s) for s in row['standingBlockers']]
-        public['samples'].append(clean)
+        return clean
+    public['samples']=[clean_sample(row) for row in report['samples']]
+    regression=report['powerAnchorRegression']
+    author=regression['authoringSource']
+    public['powerAnchorRegression']={key:regression[key] for key in ('scope','helper','endpointConsumerCommit','passed')}
+    public['powerAnchorRegression']['authoringSource']=dict(author) if author and author.get('path') else None
+    public['powerAnchorRegression']['endpoints']=[dict(row) for row in regression['endpoints']]
+    public['powerAnchorRegression']['samples']=[clean_sample(row) for row in regression['samples']]
     return public
 
 def load_bounded(path, maximum=4*1024*1024):
