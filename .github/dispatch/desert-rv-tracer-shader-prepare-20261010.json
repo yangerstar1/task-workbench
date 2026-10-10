@@ -1,0 +1,8 @@
+{
+  "schema": 1,
+  "requestId": "desert-rv-tracer-shader-prepare-20261010-once",
+  "baseCommit": "7d37ca85d13f927d3f6c5c1559380f5b7739f131",
+  "sourceStateSha256": "e0373584cd888402b9937949ee068fe83e6a18d21b0f3ca501a7ec5937bfd6a8",
+  "selection": "tasks/desert-rv/art/journey-preparation/three-strict-candidates.json",
+  "selectionSha256": "dfbc3b9a5959350b69544828ab3e6dbb5cfb7f01895fa985c0eefdb38e051f24"
+}

@@ -51,8 +51,12 @@ def guard():
     require(os.environ.get('GITHUB_REPOSITORY')=='yangerstar1/task-workbench','PREP_REPOSITORY')
     if os.environ.get('GITHUB_REF')!='refs/heads/main':
         sys.path.insert(0,str(ROOT/'scripts'))
-        import journey_rebuild_dispatch
-        journey_rebuild_dispatch.verify(REPO,os.environ) # Exact fixed recovery branch; includes event, single parent, attempt and policy pin.
+        if os.environ.get('GITHUB_REF')=='refs/heads/journey-tracer-shader-fix-6648':
+            import journey_tracer_dispatch
+            journey_tracer_dispatch.verify(REPO,os.environ)
+        else:
+            import journey_rebuild_dispatch
+            journey_rebuild_dispatch.verify(REPO,os.environ) # Existing fixed recovery branch remains unchanged.
     require(os.environ.get('GITHUB_ACTOR')=='yangerstar1' and os.environ.get('GITHUB_TRIGGERING_ACTOR')=='yangerstar1','PREP_ACTOR')
     require(os.environ.get('GITHUB_ACTIONS')=='true' and os.environ.get('RUNNER_ENVIRONMENT')=='github-hosted' and os.environ.get('GITHUB_REPOSITORY_VISIBILITY')=='public','PREP_PUBLIC_HOSTED_ONLY')
     require(digest(os.environ.get('GITHUB_SHA'),40) and re.fullmatch('[1-9][0-9]*',os.environ.get('GITHUB_RUN_ID','')),'PREP_JOB_IDENTITY')

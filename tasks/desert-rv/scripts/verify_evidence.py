@@ -69,7 +69,7 @@ def identity():
 BASELINE_EXPORT_SHA = '003d3ba2c39fc626e85053371a7b454358a35f291d5a82e30ff5be1999aec2f9'
 BASELINE_COMMIT = '6dc675517db262c72dcb8c1507239d4bf10acc5d'
 SOURCE_ROOTS = ('tasks/desert-rv/unity', 'tasks/desert-rv/backup-assets', 'tasks/desert-rv/scripts', 'tasks/desert-rv/art/import-candidate', 'tasks/desert-rv/art/journey-preparation')
-SOURCE_FILES = ('tasks/desert-rv/ASSET-NOTICES.md', '.github/workflows/desert-rv-android.yml', '.github/workflows/desert-rv-environment.yml', '.github/workflows/desert-rv-candidate-art-import.yml', '.github/workflows/desert-rv-supplies.yml', 'tasks/desert-rv/art/reload-audio/generated-candidate.json', '.github/actions/desert-rv-rendered/action.yml', '.github/workflows/desert-rv-rendered-smoke.yml', '.github/workflows/desert-rv-player-smoke.yml', '.github/workflows/desert-rv-journey-prepare.yml', '.github/workflows/desert-rv-player-observe.yml', '.github/workflows/desert-rv-journey-rebuild.yml')
+SOURCE_FILES = ('tasks/desert-rv/ASSET-NOTICES.md', '.github/workflows/desert-rv-android.yml', '.github/workflows/desert-rv-environment.yml', '.github/workflows/desert-rv-candidate-art-import.yml', '.github/workflows/desert-rv-supplies.yml', 'tasks/desert-rv/art/reload-audio/generated-candidate.json', '.github/actions/desert-rv-rendered/action.yml', '.github/workflows/desert-rv-rendered-smoke.yml', '.github/workflows/desert-rv-player-smoke.yml', '.github/workflows/desert-rv-journey-prepare.yml', '.github/workflows/desert-rv-player-observe.yml', '.github/workflows/desert-rv-journey-rebuild.yml', '.github/workflows/desert-rv-tracer-shader-prepare.yml')
 FONT_PATH = 'tasks/desert-rv/unity/Assets/DesertRV/UI/Fonts/NotoSansCJKsc-Regular.otf'
 FONT_SHA = 'a6a530f3e7e7a2c299470c42efff2e109fcc0a5be92686b96d5e84a05f3ecb2b'
 
@@ -123,10 +123,14 @@ def guard():
     require(os.environ.get('GITHUB_ACTIONS') == 'true', 'GitHub Actions required')
     require(os.environ.get('RUNNER_ENVIRONMENT') == 'github-hosted' and os.environ.get('RUNNER_OS') == 'Linux', 'Standard hosted Linux required')
     if os.environ.get('GITHUB_EVENT_NAME') != 'workflow_dispatch':
-        import journey_rebuild_dispatch
-        journey_rebuild_dispatch.verify(ROOT, os.environ)  # Only the fixed single-parent rebuild request can admit push.
+        if os.environ.get('GITHUB_REF') == 'refs/heads/journey-tracer-shader-fix-6648':
+            import journey_tracer_dispatch
+            journey_tracer_dispatch.verify(ROOT, os.environ)
+        else:
+            import journey_rebuild_dispatch
+            journey_rebuild_dispatch.verify(ROOT, os.environ)  # Existing fixed recovery request remains unchanged.
     require(os.environ.get('GITHUB_REPOSITORY') == REPOSITORY and (os.environ.get('GITHUB_REF') == 'refs/heads/main' or
-            os.environ.get('GITHUB_EVENT_NAME') == 'push' and os.environ.get('GITHUB_REF') == 'refs/heads/journey-linux-export-recovery-938'), 'Trusted repository/ref required')
+            os.environ.get('GITHUB_EVENT_NAME') == 'push' and os.environ.get('GITHUB_REF') in ('refs/heads/journey-linux-export-recovery-938', 'refs/heads/journey-tracer-shader-fix-6648')), 'Trusted repository/ref required')
     require(os.environ.get('GITHUB_ACTOR') == OWNER and os.environ.get('GITHUB_TRIGGERING_ACTOR') == OWNER, 'Owner dispatch and owner rerun required')
     repo = read_json(os.environ['GITHUB_EVENT_PATH'])['repository']
     require(repo.get('full_name') == REPOSITORY and repo.get('private') is False and repo.get('fork') is False and repo.get('default_branch') == 'main', 'Public original repository required')
