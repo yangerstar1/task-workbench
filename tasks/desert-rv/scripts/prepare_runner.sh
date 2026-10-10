@@ -5,7 +5,9 @@ test "${RUNNER_ENVIRONMENT:-}" = github-hosted
 test "${RUNNER_OS:-}" = Linux
 test "${GITHUB_ACTIONS:-}" = true
 if [[ "${GITHUB_EVENT_NAME:-}" != workflow_dispatch ]]; then
-  if [[ "${GITHUB_REF:-}" == refs/heads/journey-tracer-shader-fix-6648 ]]; then
+  if [[ "${GITHUB_REF:-}" == refs/heads/wip/combat-feedback-20261010 ]]; then
+    /usr/bin/python3 "$(dirname "${BASH_SOURCE[0]}")/journey_combat_feedback_probe.py" dispatch
+  elif [[ "${GITHUB_REF:-}" == refs/heads/journey-tracer-shader-fix-6648 ]]; then
     /usr/bin/python3 "$(dirname "${BASH_SOURCE[0]}")/journey_tracer_dispatch.py" --verify-only
   else
     /usr/bin/python3 "$(dirname "${BASH_SOURCE[0]}")/journey_rebuild_dispatch.py" --verify-only

@@ -484,6 +484,11 @@
       "size": 27709
     },
     {
+      "path": "tasks/desert-rv/scripts/journey_combat_feedback_probe.py",
+      "sha256": "f26286413b51fe8579ceb289f1116b461228423b0216a7f4088a721bb724f457",
+      "size": 13613
+    },
+    {
       "path": "tasks/desert-rv/scripts/journey_keyboard_look_native.py",
       "sha256": "f14c9b9b231222aadd5d776b33d712f4e828cf865d657168cf5b06937a46e287",
       "size": 35367
@@ -580,8 +585,8 @@
     },
     {
       "path": "tasks/desert-rv/scripts/prepare_runner.sh",
-      "sha256": "243a14295864364d73726374d0d45793f0acb38948b4d8f1b8df8149e4f9ff94",
-      "size": 1427
+      "sha256": "064bc734a56dabd99a199bfeaad0973b06c6f60feb765cca00c9549b2b181a5d",
+      "size": 1603
     },
     {
       "path": "tasks/desert-rv/scripts/prepare_safe_diagnostic_export.py",
@@ -707,6 +712,11 @@
       "path": "tasks/desert-rv/scripts/test_journey_cabin_entry_native.py",
       "sha256": "edd57f79648b06591ed9f5b48c9dea94b0d9178dc1e4e33ee1d019c92599ba12",
       "size": 26808
+    },
+    {
+      "path": "tasks/desert-rv/scripts/test_journey_combat_feedback_probe.py",
+      "sha256": "88589ea876f0d9c1ecfc0560f73f056303302f16160f375f087ed078b49ea1c5",
+      "size": 12646
     },
     {
       "path": "tasks/desert-rv/scripts/test_journey_keyboard_look_native.py",
