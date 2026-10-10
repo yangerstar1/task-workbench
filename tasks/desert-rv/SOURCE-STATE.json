@@ -85,7 +85,7 @@
     },
     {
       "path": ".github/workflows/desert-rv-tracer-shader-prepare.yml",
-      "sha256": "a04727f53b696480f354a0c4406fd47f876601c82b185cab25e9e5d752c85504",
+      "sha256": "5be949be1c0a94ac1d417942c84570efc0d58d0c8ca4456537b5f94824c39bcc",
       "size": 20850
     },
     {
@@ -460,8 +460,8 @@
     },
     {
       "path": "tasks/desert-rv/scripts/environment_image_precheck.py",
-      "sha256": "c561c6ae5347cd94e64ec5917ee1d4964b46fd5929939c969680f33123cfa1cc",
-      "size": 53744
+      "sha256": "08e6acb74aa7a0d523474a016ef292e2779227ce5423c756b9404766206245f2",
+      "size": 57975
     },
     {
       "path": "tasks/desert-rv/scripts/expected_playmode_test_cases.json",
@@ -480,7 +480,7 @@
     },
     {
       "path": "tasks/desert-rv/scripts/journey_tracer_dispatch.py",
-      "sha256": "94f2bc8dd2c22dc241b14333ffdc4020db05f28bc5abb59268083f448a2daffe",
+      "sha256": "601f3bd9b2da54bbf86b0b1e6dd1a304871916cfffa99f1b1b43dadacd72f883",
       "size": 6521
     },
     {
@@ -680,8 +680,8 @@
     },
     {
       "path": "tasks/desert-rv/scripts/test_environment_image_precheck.py",
-      "sha256": "14056956f91bf12de0dec949f9e6ec96b146a353e6a596e922196b2e479c96c1",
-      "size": 70343
+      "sha256": "296c576c682eaefe2d43037797bbc1b0ac7a2c010b37052223c0c50fcba86206",
+      "size": 79839
     },
     {
       "path": "tasks/desert-rv/scripts/test_journey_rebuild_dispatch.py",

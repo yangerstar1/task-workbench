@@ -13,6 +13,7 @@ from pathlib import Path
 import socket
 import subprocess
 import sys
+import time
 import unittest
 from unittest import mock
 import environment_image_precheck as p
@@ -24,6 +25,12 @@ QUOTA_SECRET = "TEST_BEARER_PREVIEW_MUST_NOT_LEAK"
 RAW_SECRET = "203.0.113.99 PRIVATE_ERROR https://forbidden.invalid/secret"
 TARGET_HEADERS = (("Docker-Content-Digest", p.DIGEST),)
 QUOTA_HEADERS = (("RateLimit-Limit", "100;w=21600"), ("RateLimit-Remaining", "20;w=21600"))
+
+
+def ready_daemon(observation):
+    observation.update(attempted=True, commandOutcome="SUCCESS", parseStatus="VALID",
+                       httpProxyEmpty=True, httpsProxyEmpty=True, mirrorsEmpty=True, ready=True)
+    return True
 
 
 class Raw:
@@ -80,7 +87,7 @@ class OfflineCase(unittest.TestCase):
         self.stack.enter_context(mock.patch.object(p.subprocess, "Popen", side_effect=AssertionError("DOCKER_FORBIDDEN")))
         self.stack.enter_context(mock.patch.object(p, "utc_now", side_effect=lambda: self.clock[0]))
         self.stack.enter_context(mock.patch.dict(os.environ, {name: "" for name in p.BLOCKED_ENV}))
-        self.stack.enter_context(mock.patch.object(p, "daemon_ready", return_value=True))
+        self.stack.enter_context(mock.patch.object(p, "daemon_ready", side_effect=ready_daemon))
         self.stack.enter_context(mock.patch.object(p, "cache_hit", return_value=False))
         self.pull_mock = self.stack.enter_context(mock.patch.object(p, "run_fixed_pull", return_value=("NONZERO_EXIT", 1, "UNKNOWN_CLI_FAILURE")))
 
@@ -141,7 +148,7 @@ class FlowTests(OfflineCase):
             def head(self, route, token=None):
                 calls.append(route.value)
                 return p.Response(200, TARGET_HEADERS if route is p.Route.TARGET else QUOTA_HEADERS)
-        with mock.patch.object(p, "daemon_ready", side_effect=lambda: calls.append("daemon") or True), mock.patch.object(p, "cache_hit", side_effect=lambda: calls.append("cache") or False), mock.patch.object(p, "RegistryClient", Client):
+        with mock.patch.object(p, "daemon_ready", side_effect=lambda observation: calls.append("daemon") or ready_daemon(observation)), mock.patch.object(p, "cache_hit", side_effect=lambda: calls.append("cache") or False), mock.patch.object(p, "RegistryClient", Client):
             report = p.probe()
         self.assertEqual(report["status"], "PASS")
         self.assertEqual(calls, ["daemon", "cache", "target", "quota"])
@@ -607,9 +614,12 @@ class CacheDaemonTests(unittest.TestCase):
             return p.cache_hit()
 
     def daemon(self, payload):
-        with mock.patch.object(p, "docker_bytes", return_value=payload) as command:
+        def fake_output(_command, observation):
+            observation.update(attempted=True, commandOutcome="SUCCESS" if payload is not None else "ERROR")
+            return payload
+        with mock.patch.object(p, "docker_bytes", side_effect=fake_output) as command:
             result = p.daemon_ready()
-        command.assert_called_once_with(p.DOCKER_INFO_COMMAND)
+        command.assert_called_once_with(p.DOCKER_INFO_COMMAND, mock.ANY)
         return result
 
     def test_exact_digest_array_only(self):
@@ -647,7 +657,10 @@ class CacheDaemonTests(unittest.TestCase):
             self.assertFalse(p.daemon_ready())
 
     def test_daemon_unknown_stops_before_cache_or_network(self):
-        with mock.patch.dict(os.environ, {name: "" for name in p.BLOCKED_ENV}), mock.patch.object(p, "daemon_ready", return_value=False), mock.patch.object(p, "cache_hit") as cache, mock.patch.object(p.http.client, "HTTPSConnection") as network:
+        def unknown(observation):
+            observation.update(attempted=True, commandOutcome="ERROR")
+            return False
+        with mock.patch.dict(os.environ, {name: "" for name in p.BLOCKED_ENV}), mock.patch.object(p, "daemon_ready", side_effect=unknown), mock.patch.object(p, "cache_hit") as cache, mock.patch.object(p.http.client, "HTTPSConnection") as network:
             report = p.probe()
         self.assertEqual(report["reason"], "DAEMON_UNVERIFIED")
         self.assertTrue(p.validate_report(report))
@@ -670,7 +683,7 @@ class ReportTests(OfflineCase):
     def test_schema_fixed_and_validator_pure(self):
         report, _ = self.exercise([target(), quota()])
         self.assertEqual(set(report), p.REPORT_KEYS)
-        self.assertEqual(report["schemaVersion"], 4)
+        self.assertEqual(report["schemaVersion"], 5)
         with mock.patch.object(p, "utc_now", side_effect=AssertionError("clock")), mock.patch.object(p, "cache_hit", side_effect=AssertionError("I/O")):
             self.assertTrue(p.validate_report(report))
 
@@ -860,7 +873,10 @@ import importlib.util,json,socket,subprocess,sys,time
 spec=importlib.util.spec_from_file_location("environment_image_precheck",sys.argv[1]);p=importlib.util.module_from_spec(spec);sys.modules[spec.name]=p;spec.loader.exec_module(p)
 def forbidden(*a,**k):raise AssertionError("NETWORK_OR_DOCKER_FORBIDDEN")
 socket.create_connection=forbidden;subprocess.Popen=forbidden
-p.daemon_ready=lambda:True
+def ready_daemon(observation):
+    observation.update(attempted=True,commandOutcome="SUCCESS",parseStatus="VALID",httpProxyEmpty=True,httpsProxyEmpty=True,mirrorsEmpty=True,ready=True)
+    return True
+p.daemon_ready=ready_daemon
 mode=sys.argv[2];count=[0]
 def cache():
     count[0]+=1
@@ -1032,6 +1048,7 @@ class RateDiagnosticTests(OfflineCase):
             record = upper[route]
             record.update(complete=False, currentStage=longest(p.STAGES), httpStatus=None, reason=longest(p.CHANNEL_REASONS), headers={key: longest(p.HEADER_STATES) for key in p.HEADER_KEYS}, rateDiagnostics={'firstFailedPredicate': longest(p.FAILED_PREDICATES), 'limit': copy.deepcopy(diagnostic), 'remaining': copy.deepcopy(diagnostic)})
         upper['pull'].update(attempted=False, currentStage=longest(p.PULL_STAGES), outcome=longest(p.PULL_OUTCOMES), exitCode=-128, cacheVerified=False, failureClass=longest(p.PULL_FAILURE_CLASSES))
+        upper['daemon'].update(commandOutcome='STDOUT_LIMIT_EXCEEDED', parseStatus='INVALID_SCHEMA', httpProxyEmpty=False, httpsProxyEmpty=False, mirrorsEmpty=False)
         budget = len(json.dumps(upper, sort_keys=True, separators=(',', ':')).encode()) + 1
         self.assertEqual(budget, SERIALIZED_CONSERVATIVE_MAX)
         self.assertLess(budget, p.MAX_SERIALIZED_REPORT_BYTES)
@@ -1144,7 +1161,140 @@ class ServerWindowTests(OfflineCase):
         self.pull_mock.assert_called_once_with()
 
 
-SERIALIZED_CONSERVATIVE_MAX = 5025
+class DaemonObservationTests(unittest.TestCase):
+    """Actual bounded child and CLI/report flow; no daemon or network access."""
+    VALID = b'{"httpProxyEmpty":true,"httpsProxyEmpty":true,"mirrorsEmpty":true}'
+
+    def observe(self, code, timeout=None, total_timeout=None, cleanup_error=False):
+        real_popen, launched = subprocess.Popen, []
+        def spawn(command, **kwargs):
+            self.assertEqual(command, p.DOCKER_INFO_COMMAND)
+            self.assertEqual(kwargs, {"stdin": subprocess.DEVNULL, "stdout": subprocess.PIPE,
+                                      "stderr": subprocess.DEVNULL, "env": p.DOCKER_ENV})
+            child = real_popen([sys.executable, "-c", code], **kwargs)
+            if cleanup_error:
+                original_close = child.stdout.close
+                def close():
+                    original_close()
+                    raise OSError(RAW_SECRET)
+                child.stdout.close = close
+            launched.append(child)
+            return child
+        out, err = io.StringIO(), io.StringIO()
+        with mock.patch.dict(os.environ, {name: "" for name in p.BLOCKED_ENV}), \
+                mock.patch.object(p.subprocess, "Popen", side_effect=spawn), \
+                mock.patch.object(p, "cache_hit", return_value=True) as cache, \
+                mock.patch.object(p, "RegistryClient", side_effect=AssertionError("NETWORK_FORBIDDEN")), \
+                mock.patch.object(p, "DOCKER_INFO_TIMEOUT", p.DOCKER_INFO_TIMEOUT if timeout is None else timeout), \
+                mock.patch.object(p, "TOTAL_TIMEOUT", p.TOTAL_TIMEOUT if total_timeout is None else total_timeout), \
+                contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+            code = p.main([])
+        self.assertEqual(len(launched), 1)
+        self.assertIsNotNone(launched[0].poll())
+        self.assertEqual(err.getvalue(), "")
+        self.assertEqual(len(out.getvalue().splitlines()), 1)
+        self.assertLessEqual(len(out.getvalue().encode()), 8192)
+        for secret in (SECRET, RAW_SECRET):
+            self.assertNotIn(secret, out.getvalue() + err.getvalue())
+        report = json.loads(out.getvalue())
+        self.assertTrue(p.validate_report(report), out.getvalue())
+        self.assertEqual(code, 0 if report["daemon"]["ready"] else 2)
+        self.assertEqual(cache.call_count, 1 if report["daemon"]["ready"] else 0)
+        self.assertEqual(report["target"], p.blank_channel(p.Route.TARGET))
+        self.assertEqual(report["quota"], p.blank_channel(p.Route.QUOTA))
+        self.assertEqual(report["pull"], p.blank_pull())
+        return report
+
+    def test_real_single_info_accepts_after_old_five_second_limit(self):
+        self.assertEqual((p.DOCKER_INFO_TIMEOUT, p.DOCKER_TIMEOUT, p.TOTAL_TIMEOUT, p.PULL_TIMEOUT), (30, 5, 65, 600))
+        start = time.monotonic()
+        report = self.observe("import time,sys;time.sleep(5.1);sys.stdout.buffer.write(" + repr(self.VALID) + ")")
+        self.assertGreaterEqual(time.monotonic() - start, 5)
+        self.assertEqual((report["status"], report["reason"]), ("PASS", "CACHE_HIT"))
+        self.assertEqual(report["daemon"]["commandOutcome"], "SUCCESS")
+        self.assertEqual(report["daemon"]["parseStatus"], "VALID")
+
+    def test_real_info_timeout_kills_once_and_reports_no_payload(self):
+        report = self.observe("import time,sys;sys.stderr.write(" + repr(RAW_SECRET) + ");time.sleep(10)", timeout=0.05)
+        self.assertEqual(report["reason"], "DAEMON_UNVERIFIED")
+        self.assertEqual(report["daemon"], dict(p.blank_daemon(), attempted=True, commandOutcome="TIMEOUT", timedOut=True))
+
+    def test_real_info_nonzero_and_stdout_bound_are_distinct(self):
+        cases = [("import sys;sys.stderr.write(" + repr(RAW_SECRET) + ");sys.exit(17)", "NONZERO_EXIT"),
+                 ("import os,time;os.write(1,b'x'*1000000);time.sleep(10)", "STDOUT_LIMIT_EXCEEDED")]
+        for code, outcome in cases:
+            with self.subTest(outcome=outcome):
+                report = self.observe(code)
+                self.assertEqual(report["daemon"], dict(p.blank_daemon(), attempted=True, commandOutcome=outcome))
+
+    def test_real_cleanup_error_preserves_first_command_outcome(self):
+        cases = [("import time;time.sleep(10)", 0.05, "TIMEOUT"),
+                 ("import sys;sys.exit(17)", None, "NONZERO_EXIT"),
+                 ("import sys;sys.stdout.buffer.write(" + repr(self.VALID) + ")", None, "SUCCESS")]
+        for code, timeout, outcome in cases:
+            with self.subTest(outcome=outcome):
+                report = self.observe(code, timeout=timeout, cleanup_error=True)
+                self.assertEqual(report["reason"], "DAEMON_UNVERIFIED")
+                self.assertEqual(report["daemon"], dict(p.blank_daemon(), attempted=True, commandOutcome=outcome, timedOut=outcome == "TIMEOUT"))
+
+    def test_real_info_parse_and_schema_failures_never_echo_content(self):
+        cases = [(b'\xff', "INVALID_UTF8"), (SECRET.encode(), "INVALID_JSON"),
+                 (b'{"httpProxyEmpty":true,"httpProxyEmpty":true}', "INVALID_JSON"),
+                 (json.dumps({"httpProxyEmpty": SECRET, "httpsProxyEmpty": True, "mirrorsEmpty": True}).encode(), "INVALID_SCHEMA"),
+                 (json.dumps({SECRET: RAW_SECRET}).encode(), "INVALID_SCHEMA"),
+                 (b'{"httpProxyEmpty":1,"httpsProxyEmpty":true,"mirrorsEmpty":true}', "INVALID_SCHEMA")]
+        for payload, parse in cases:
+            with self.subTest(parse=parse):
+                report = self.observe("import sys;sys.stdout.buffer.write(" + repr(payload) + ")")
+                self.assertEqual(report["daemon"], dict(p.blank_daemon(), attempted=True, commandOutcome="SUCCESS", parseStatus=parse))
+
+    def test_real_info_each_nonempty_configuration_boolean_still_rejected(self):
+        for key in ("httpProxyEmpty", "httpsProxyEmpty", "mirrorsEmpty"):
+            values = json.loads(self.VALID); values[key] = False
+            report = self.observe("import sys;sys.stdout.write(" + repr(json.dumps(values)) + ")")
+            self.assertEqual(report["reason"], "DAEMON_UNVERIFIED")
+            self.assertEqual(report["daemon"][key], False)
+            self.assertEqual(report["daemon"]["parseStatus"], "VALID")
+
+    def test_info_spawn_error_is_fixed_and_never_retried(self):
+        observation = p.blank_daemon()
+        with mock.patch.object(p.subprocess, "Popen", side_effect=OSError(RAW_SECRET)) as spawn:
+            self.assertFalse(p.daemon_ready(observation))
+        spawn.assert_called_once()
+        self.assertEqual(observation, dict(p.blank_daemon(), attempted=True, commandOutcome="ERROR"))
+        self.assertTrue(p.validate_daemon(observation))
+
+    def test_real_outer_watchdog_preserves_daemon_timeout(self):
+        report = self.observe("import time;time.sleep(10)", total_timeout=0.05)
+        self.assertEqual(report["reason"], "DEADLINE")
+        self.assertEqual(report["daemon"]["commandOutcome"], "TIMEOUT")
+        self.assertTrue(report["daemon"]["timedOut"])
+
+    def test_daemon_schema_and_top_level_consistency_are_closed(self):
+        report = self.observe("import sys;sys.stdout.buffer.write(" + repr(self.VALID) + ")")
+        invalid = {"attempted": [False, 1, None], "commandOutcome": [SECRET, "NOT_ATTEMPTED", "ERROR"],
+                   "timeoutSeconds": [5, 31, True, "30"], "timedOut": [True, 0, None],
+                   "parseStatus": [SECRET, "NOT_CHECKED", "INVALID_JSON"], "httpProxyEmpty": [None, 1, SECRET, False],
+                   "httpsProxyEmpty": [None, 1, SECRET], "mirrorsEmpty": [None, 1, SECRET], "ready": [False, 1, None]}
+        for key, values in invalid.items():
+            for value in values:
+                bad = copy.deepcopy(report); bad["daemon"][key] = value
+                self.assertFalse(p.validate_report(bad), key)
+        bad = copy.deepcopy(report); bad["daemon"][SECRET] = RAW_SECRET
+        self.assertFalse(p.validate_report(bad))
+        for key in report["daemon"]:
+            bad = copy.deepcopy(report); del bad["daemon"][key]
+            self.assertFalse(p.validate_report(bad), key)
+        for reason in ("DAEMON_UNVERIFIED", "ENVIRONMENT_OVERRIDE"):
+            bad = copy.deepcopy(report); bad["reason"] = reason
+            self.assertFalse(p.validate_report(bad))
+        bad = copy.deepcopy(report); bad["daemon"] = p.blank_daemon()
+        self.assertFalse(p.validate_report(bad))
+        bad = copy.deepcopy(report); bad["schemaVersion"] = 4
+        self.assertFalse(p.validate_report(bad))
+
+
+SERIALIZED_CONSERVATIVE_MAX = 5245
 
 
 if __name__ == "__main__":

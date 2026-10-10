@@ -2,7 +2,7 @@ name: Desert RV fresh tracer shader producer and Linux candidate
 on:
   push:
     branches: [journey-tracer-shader-fix-6648]
-    paths: [.github/dispatch/desert-rv-tracer-shader-prepare-r1-20261010.json]
+    paths: [.github/dispatch/desert-rv-tracer-shader-prepare-r2-20261010.json]
 permissions:
   contents: read
   actions: read
