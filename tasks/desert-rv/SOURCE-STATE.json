@@ -173,7 +173,7 @@
     },
     {
       "path": ".github/workflows/desert-rv-player-observe.yml",
-      "sha256": "9770e482aeff6cb43006a7c44c3218593322775818a86a04afda17a1d84ae0c8",
+      "sha256": "9f6b3189fb0d5c8d3f7be2d7a4e93b4731715c801d7bc9796e5cb85ca3b65263",
       "size": 10271
     },
     {
@@ -733,8 +733,8 @@
     },
     {
       "path": "tasks/desert-rv/scripts/environment_image_precheck.py",
-      "sha256": "c561c6ae5347cd94e64ec5917ee1d4964b46fd5929939c969680f33123cfa1cc",
-      "size": 53744
+      "sha256": "08e6acb74aa7a0d523474a016ef292e2779227ce5423c756b9404766206245f2",
+      "size": 57975
     },
     {
       "path": "tasks/desert-rv/scripts/environment_terrain_probe_dispatch.py",
@@ -808,8 +808,8 @@
     },
     {
       "path": "tasks/desert-rv/scripts/journey_observer_dispatch.py",
-      "sha256": "f340a31dd43c36ca0ce08d1661f99b49ccad83b6dae2880868a48b75797799f3",
-      "size": 10938
+      "sha256": "89938a38f0037f345782e447bedb3ca9c5043e16820b155dc5a807c3e0d8e6ba",
+      "size": 10290
     },
     {
       "path": "tasks/desert-rv/scripts/journey_rebuild_dispatch.py",
@@ -833,8 +833,8 @@
     },
     {
       "path": "tasks/desert-rv/scripts/player/observe_journey_player.py",
-      "sha256": "d5243fd341e1af5a6f3f645959664f94d2c43708cb69cd75c31d717065b284d0",
-      "size": 24969
+      "sha256": "23f5eeca28fb5a36d6476dc6fe43c9262274cf92f1d8afe8f64e5531b14d3cb1",
+      "size": 25071
     },
     {
       "path": "tasks/desert-rv/scripts/player/player_window_smoke.py",
@@ -848,8 +848,8 @@
     },
     {
       "path": "tasks/desert-rv/scripts/player/test_observe_journey_player.py",
-      "sha256": "0145b71ca1a0eee9148c09ef9ebb0e56e269965bee4fa490ff3304ad6e3478ee",
-      "size": 24739
+      "sha256": "c85b9bc6da999df420e89f495c66af3750c2c6acc83c992683387e53d7473f04",
+      "size": 31806
     },
     {
       "path": "tasks/desert-rv/scripts/player/test_player_window_smoke.py",
@@ -1013,8 +1013,8 @@
     },
     {
       "path": "tasks/desert-rv/scripts/test_environment_image_precheck.py",
-      "sha256": "14056956f91bf12de0dec949f9e6ec96b146a353e6a596e922196b2e479c96c1",
-      "size": 70343
+      "sha256": "296c576c682eaefe2d43037797bbc1b0ac7a2c010b37052223c0c50fcba86206",
+      "size": 79839
     },
     {
       "path": "tasks/desert-rv/scripts/test_environment_terrain_probe_dispatch.py",
@@ -1098,8 +1098,8 @@
     },
     {
       "path": "tasks/desert-rv/scripts/test_journey_observer_dispatch.py",
-      "sha256": "f1a5cebe0c5c96ddae1264ec51a373a6edf51fca6d607275893b006daefaaa7b",
-      "size": 52066
+      "sha256": "a9ced1c7f746ecc1c6251dad58d84bfc8c3e3dfa08588c7d89b007c98db16b65",
+      "size": 52190
     },
     {
       "path": "tasks/desert-rv/scripts/test_journey_rebuild_dispatch.py",

@@ -54,6 +54,7 @@ DOCKER_INFO_COMMAND = ("/usr/bin/docker", "--host=unix:///var/run/docker.sock", 
 PULL_COMMAND = ("/usr/bin/docker", "--host=unix:///var/run/docker.sock", "pull", "--quiet", IMAGE)
 DOCKER_ENV = {"PATH": "/usr/bin:/bin", "HOME": "/nonexistent"}
 DOCKER_TIMEOUT = 5
+DOCKER_INFO_TIMEOUT = 30
 HTTP_TIMEOUT = 8
 TOTAL_TIMEOUT = 65
 PULL_TIMEOUT = 600
@@ -113,49 +114,99 @@ def inspect_cache_bytes():
     return docker_bytes(DOCKER_COMMAND)
 
 
-def daemon_ready():
+def blank_daemon():
+    return {"attempted": False, "commandOutcome": "NOT_ATTEMPTED", "timeoutSeconds": 30,
+            "timedOut": False, "parseStatus": "NOT_CHECKED", "httpProxyEmpty": None,
+            "httpsProxyEmpty": None, "mirrorsEmpty": None, "ready": False}
+
+
+def daemon_ready(observation=None):
     """Observe only proxy/mirror absence; never claim to establish future NAT."""
+    observation = blank_daemon() if observation is None else observation
     try:
-        output = docker_bytes(DOCKER_INFO_COMMAND)
+        output = docker_bytes(DOCKER_INFO_COMMAND, observation)
         if output is None:
             return False
-        value = json.loads(output.decode("utf-8"), object_pairs_hook=unique_object)
-        return (type(value) is dict and set(value) == {"httpProxyEmpty", "httpsProxyEmpty", "mirrorsEmpty"}
-                and all(item is True for item in value.values()))
+        try:
+            decoded = output.decode("utf-8")
+        except UnicodeDecodeError:
+            observation["parseStatus"] = "INVALID_UTF8"
+            return False
+        try:
+            value = json.loads(decoded, object_pairs_hook=unique_object)
+        except (ValueError, RecursionError):
+            observation["parseStatus"] = "INVALID_JSON"
+            return False
+        keys = {"httpProxyEmpty", "httpsProxyEmpty", "mirrorsEmpty"}
+        if type(value) is not dict or set(value) != keys or any(type(item) is not bool for item in value.values()):
+            observation["parseStatus"] = "INVALID_SCHEMA"
+            return False
+        observation.update(value, parseStatus="VALID", ready=all(value.values()))
+        return observation["ready"]
     except Exception:
+        # A later wait/close failure must not erase an already observed timeout,
+        # nonzero exit or stdout bound. No exception text leaves this boundary.
+        if observation["commandOutcome"] == "NOT_ATTEMPTED":
+            observation.update(attempted=True, commandOutcome="ERROR")
         return False
 
 
-def docker_bytes(command):
+def docker_bytes(command, observation=None):
     """Bound both elapsed time and stdout memory even if the local CLI is broken."""
     if command not in (DOCKER_COMMAND, DOCKER_INFO_COMMAND):
         return None
-    process = subprocess.Popen(command, stdin=subprocess.DEVNULL,
-                               stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
-                               env=DOCKER_ENV)
-    deadline = time.monotonic() + DOCKER_TIMEOUT
+    observed = command == DOCKER_INFO_COMMAND and observation is not None
+    def outcome(value):
+        if observed and observation["commandOutcome"] == "NOT_ATTEMPTED":
+            observation.update(commandOutcome=value, timedOut=value == "TIMEOUT")
+    if observed:
+        observation["attempted"] = True
+    process = None
     data = bytearray()
     try:
+        process = subprocess.Popen(command, stdin=subprocess.DEVNULL,
+                                   stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+                                   env=DOCKER_ENV)
+        deadline = time.monotonic() + (DOCKER_INFO_TIMEOUT if command == DOCKER_INFO_COMMAND else DOCKER_TIMEOUT)
         with selectors.DefaultSelector() as selector:
             selector.register(process.stdout, selectors.EVENT_READ)
             while True:
                 left = deadline - time.monotonic()
                 if left <= 0 or not selector.select(left):
+                    outcome("TIMEOUT")
                     return None
                 chunk = os.read(process.stdout.fileno(), MAX_CACHE_BODY + 1 - len(data))
                 if not chunk:
                     left = deadline - time.monotonic()
-                    if left <= 0 or process.wait(timeout=left) != 0:
+                    if left <= 0:
+                        outcome("TIMEOUT")
                         return None
+                    if process.wait(timeout=left) != 0:
+                        outcome("NONZERO_EXIT")
+                        return None
+                    outcome("SUCCESS")
                     return bytes(data)
                 data.extend(chunk)
                 if len(data) > MAX_CACHE_BODY:
+                    outcome("STDOUT_LIMIT_EXCEEDED")
                     return None
+    except subprocess.TimeoutExpired:
+        outcome("TIMEOUT")
+        return None
+    except Exception:
+        outcome("ERROR")
+        return None
+    except BaseException as exc:
+        outcome("TIMEOUT" if isinstance(exc, DeadlineExpired) else "INTERRUPTED")
+        raise
     finally:
-        if process.poll() is None:
-            process.kill()
-        process.wait(timeout=DOCKER_TIMEOUT)
-        process.stdout.close()
+        if process is not None:
+            try:
+                if process.poll() is None:
+                    process.kill()
+                process.wait(timeout=DOCKER_TIMEOUT)
+            finally:
+                process.stdout.close()
 
 
 # One hour is a local finite safety ceiling, not a Docker lifetime guarantee.
@@ -181,7 +232,7 @@ TOP_REASONS = frozenset(("NOT_STARTED", "ENVIRONMENT_OVERRIDE", "DAEMON_UNVERIFI
 TOP_REASONS = TOP_REASONS | {"TARGET_QUOTA_EXHAUSTED", "TARGET_QUOTA_INVALID", "PULL_RATE_LIMITED", "PULL_STDERR_LIMIT_EXCEEDED"}
 HEADER_KEYS = frozenset(("safety", "digest", "limit", "remaining", "challenge"))
 CHANNEL_KEYS = frozenset(("complete", "currentStage", "httpStatus", "reason", "headers", "rateDiagnostics"))
-REPORT_KEYS = frozenset(("schemaVersion", "status", "reason", "image", "digest", "cacheHit", "limit", "remaining", "windowSeconds", "retryAfter", "checkedAt", "target", "quota", "pull"))
+REPORT_KEYS = frozenset(("schemaVersion", "status", "reason", "image", "digest", "cacheHit", "limit", "remaining", "windowSeconds", "retryAfter", "checkedAt", "target", "quota", "pull", "daemon"))
 PULL_KEYS = frozenset(("attempted", "currentStage", "outcome", "exitCode", "cacheVerified", "failureClass"))
 PULL_STAGES = frozenset(("NOT_STARTED", "PULL", "VERIFY_CACHE", "COMPLETE"))
 PULL_OUTCOMES = frozenset(("NOT_ATTEMPTED", "SUCCESS", "NONZERO_EXIT", "TIMEOUT", "INSPECT_MISMATCH", "ERROR", "INTERRUPTED", "STDERR_LIMIT_EXCEEDED"))
@@ -303,11 +354,11 @@ def blank_headers(route):
 
 
 def blank_result():
-    return {"schemaVersion": 4, "status": "UNKNOWN", "reason": "NOT_STARTED",
+    return {"schemaVersion": 5, "status": "UNKNOWN", "reason": "NOT_STARTED",
             "image": IMAGE, "digest": DIGEST, "cacheHit": False,
             "limit": None, "remaining": None, "windowSeconds": None,
             "retryAfter": None, "checkedAt": utc_text(utc_now()),
-            "target": blank_channel(Route.TARGET), "quota": blank_channel(Route.QUOTA), "pull": blank_pull()}
+            "target": blank_channel(Route.TARGET), "quota": blank_channel(Route.QUOTA), "pull": blank_pull(), "daemon": blank_daemon()}
 
 
 def header(response, name):
@@ -712,7 +763,7 @@ def probe(result=None, with_watchdog=False):
     try:
         if any(os.environ.get(name) for name in BLOCKED_ENV):
             result["reason"] = "ENVIRONMENT_OVERRIDE"
-        elif not daemon_ready():
+        elif not daemon_ready(result["daemon"]):
             result["reason"] = "DAEMON_UNVERIFIED"
         elif cache_hit():
             result.update(status="PASS", reason="CACHE_HIT", cacheHit=True)
@@ -848,10 +899,33 @@ def validate_channel(record, route):
     return record["reason"] not in ("TARGET_VERIFIED", "QUOTA_AVAILABLE", "QUOTA_EXHAUSTED")
 
 
+def validate_daemon(record):
+    """Only fixed outcomes and three booleans may leave the local command."""
+    if type(record) is not dict or set(record) != set(blank_daemon()):
+        return False
+    if any(type(record[key]) is not bool for key in ("attempted", "timedOut", "ready")):
+        return False
+    if type(record["timeoutSeconds"]) is not int or record["timeoutSeconds"] != 30:
+        return False
+    if not record["attempted"]:
+        return record == blank_daemon()
+    outcome = record["commandOutcome"]
+    if outcome not in ("SUCCESS", "NONZERO_EXIT", "TIMEOUT", "STDOUT_LIMIT_EXCEEDED", "ERROR", "INTERRUPTED"):
+        return False
+    if record["timedOut"] != (outcome == "TIMEOUT"):
+        return False
+    values = [record[key] for key in ("httpProxyEmpty", "httpsProxyEmpty", "mirrorsEmpty")]
+    if outcome != "SUCCESS":
+        return record["parseStatus"] == "NOT_CHECKED" and all(item is None for item in values) and not record["ready"]
+    if record["parseStatus"] == "VALID":
+        return all(type(item) is bool for item in values) and record["ready"] == all(values)
+    return record["parseStatus"] in ("NOT_CHECKED", "INVALID_UTF8", "INVALID_JSON", "INVALID_SCHEMA") and all(item is None for item in values) and not record["ready"]
+
+
 def validate_report(report):
     """Pure fixed-schema/type/status consistency check; never performs I/O."""
     try:
-        if type(report) is not dict or set(report) != REPORT_KEYS or type(report["schemaVersion"]) is not int or report["schemaVersion"] != 4:
+        if type(report) is not dict or set(report) != REPORT_KEYS or type(report["schemaVersion"]) is not int or report["schemaVersion"] != 5:
             return False
         if len(json.dumps(report, sort_keys=True, separators=(",", ":"), allow_nan=False).encode("utf-8")) + 1 > MAX_SERIALIZED_REPORT_BYTES:
             return False
@@ -861,6 +935,15 @@ def validate_report(report):
             return False
         checked = parse_report_utc(report["checkedAt"])
         if checked is None or any(not validate_channel(report[route.value], route) for route in Route):
+            return False
+        daemon = report["daemon"]
+        if not validate_daemon(daemon):
+            return False
+        if not daemon["ready"] and (report["status"] == "PASS" or report["cacheHit"] or report["target"] != blank_channel(Route.TARGET) or report["quota"] != blank_channel(Route.QUOTA) or report["pull"] != blank_pull()):
+            return False
+        if report["reason"] == "DAEMON_UNVERIFIED" and (not daemon["attempted"] or daemon["ready"] or report["status"] != "UNKNOWN"):
+            return False
+        if report["reason"] == "ENVIRONMENT_OVERRIDE" and daemon != blank_daemon():
             return False
         limit, remaining, window = (report[key] for key in ("limit", "remaining", "windowSeconds"))
         no_quota = limit is None and remaining is None and window is None

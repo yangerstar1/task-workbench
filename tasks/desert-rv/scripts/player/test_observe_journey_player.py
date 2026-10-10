@@ -79,11 +79,13 @@ class ObserveTests(unittest.TestCase):
   original=self.control()
   for done in (['STAGED','STAGED'],['PRIVATE_PHASE'],['NONE']):
    value=copy.deepcopy(original);value['hostDiagnostic']['completedPhases']=done;self.reject_control(value)
- def stage_fixture(self,run_update=None,artifact_update=None):
+ def stage_fixture(self,run_update=None,artifact_update=None,restored=True,native_update=None):
   # A synthetic branch producer ZIP exercises real stage validation, never a download/run.
   manifest=json.loads((self.package/'manifest.json').read_text());native=manifest['nativeReceipt']
-  native.update(restorationProof=dict(path='tasks/desert-rv/unity/JourneyEvidence/JourneyPreparation/restoration-revalidated.json',sha256='d'*64),
-                assetProducerSourceCommit='f'*40,assetProducerRunUrl='https://github.com/yangerstar1/task-workbench/actions/runs/456',restorationNativeXmlSha256='e'*64)
+  if restored:
+   native.update(restorationProof=dict(path='tasks/desert-rv/unity/JourneyEvidence/JourneyPreparation/restoration-revalidated.json',sha256='d'*64),
+                 assetProducerSourceCommit='f'*40,assetProducerRunUrl='https://github.com/yangerstar1/task-workbench/actions/runs/456',restorationNativeXmlSha256='e'*64)
+  native.update(native_update or {})
   raw=(json.dumps(native,indent=2)+'\n').encode();(self.package/'native-build-receipt.json').write_bytes(raw)
   manifest['nativeReceiptSha256']=o.sha(self.package/'native-build-receipt.json');(self.package/'manifest.json').write_text(json.dumps(manifest))
   control=self.control();control['hostDiagnostic']['nativeReceiptPin']=dict(sha256=manifest['nativeReceiptSha256'],bytes=len(raw));self.write_control(control)
@@ -130,8 +132,68 @@ class ObserveTests(unittest.TestCase):
   with patch.dict(os.environ,{'GITHUB_SHA':'e'*40,'GITHUB_RUN_ID':'789'}):
    m=o.validate_package(self.package,self.p);self.assertEqual(m['sourceCommit'],'a'*40);self.assertEqual(os.environ['GITHUB_SHA'],'e'*40)
    with patch.object(o,'SOURCE',self.task):
-    shutil.copytree(self.package,self.task/'package');v=o.metadata(self.p,m)
+    shutil.copytree(self.package,self.task/'package');self.write_verified(self.task,self.p,m,o.PREPARE_WORKFLOW);v=o.metadata(self.p,m)
    self.assertEqual(v['producerSourceCommit'],'a'*40);self.assertEqual(v['observerSourceCommit'],'e'*40)
+ def write_verified(self,source,pins,manifest,workflow):
+  (source/'verified.json').write_text(json.dumps(dict(schema=1,pins=pins,producerWorkflowPath=workflow,manifestSha256=o.sha(source/'package/manifest.json'),executableSha256=manifest['nativeReceipt']['executableSha256'])))
+ def test_tracer_api_workflow_and_fresh_receipt_reach_stage_and_metadata(self):
+  source,pins,download=self.stage_fixture(run_update=dict(path=o.TRACER_WORKFLOW),restored=False);o.stage();download.assert_called_once()
+  manifest=o.validate_package(source/'package',pins)
+  self.assertEqual(o.verify_stage_receipt(pins,manifest),o.TRACER_WORKFLOW)
+  self.assertEqual(o.metadata(pins,manifest)['producerWorkflowPath'],o.TRACER_WORKFLOW)
+  self.assertEqual((source/'package/native-build-receipt.json').read_bytes(),(self.package/'native-build-receipt.json').read_bytes())
+ def test_tracer_null_restoration_proof_is_fresh_same_job(self):
+  source,pins,_=self.stage_fixture(run_update=dict(path=o.TRACER_WORKFLOW),restored=False,native_update=dict(restorationProof=None));o.stage()
+  manifest=o.validate_package(source/'package',pins);self.assertEqual(o.verify_stage_receipt(pins,manifest),o.TRACER_WORKFLOW)
+ def test_prepare_api_workflow_keeps_original_metadata(self):
+  source,pins,_=self.stage_fixture(run_update=dict(path=o.PREPARE_WORKFLOW),restored=False);o.stage()
+  manifest=o.validate_package(source/'package',pins);self.assertEqual(o.metadata(pins,manifest)['producerWorkflowPath'],o.PREPARE_WORKFLOW)
+ def test_rebuild_api_workflow_keeps_original_metadata(self):
+  source,pins,_=self.stage_fixture();o.stage()
+  manifest=o.validate_package(source/'package',pins);self.assertEqual(o.metadata(pins,manifest)['producerWorkflowPath'],o.REBUILD_WORKFLOW)
+ def test_tracer_rejects_restored_package_and_cleans_staging(self):
+  source,_,download=self.stage_fixture(run_update=dict(path=o.TRACER_WORKFLOW))
+  with self.assertRaises(ValueError):o.stage()
+  download.assert_called_once();self.assertFalse(source.exists());self.assertFalse(list(self.root.glob('observer-source-*')))
+ def test_tracer_rejects_other_job_native_receipt(self):
+  source,_,_=self.stage_fixture(run_update=dict(path=o.TRACER_WORKFLOW),restored=False,native_update=dict(producerRunUrl='https://github.com/yangerstar1/task-workbench/actions/runs/999'))
+  with self.assertRaises(ValueError):o.stage()
+  self.assertFalse(source.exists())
+ def test_tracer_rejects_other_commit_native_receipt(self):
+  source,_,_=self.stage_fixture(run_update=dict(path=o.TRACER_WORKFLOW),restored=False,native_update=dict(sourceCommit='f'*40))
+  with self.assertRaises(ValueError):o.stage()
+  self.assertFalse(source.exists())
+ def test_tracer_exact_path_only_is_accepted_by_api_gate(self):
+  source,_,download=self.stage_fixture(run_update=dict(path=o.TRACER_WORKFLOW+'@refs/heads/main'),restored=False)
+  with self.assertRaises(ValueError):o.stage()
+  download.assert_not_called();self.assertFalse(source.exists())
+ def test_tracer_incomplete_run_is_rejected_before_zip(self):
+  source,_,download=self.stage_fixture(run_update=dict(path=o.TRACER_WORKFLOW,status='in_progress',conclusion=None),restored=False)
+  with self.assertRaises(ValueError):o.stage()
+  download.assert_not_called();self.assertFalse(source.exists())
+ def test_tracer_wrong_artifact_run_is_rejected_before_zip(self):
+  source,_,download=self.stage_fixture(run_update=dict(path=o.TRACER_WORKFLOW),artifact_update=dict(workflow_run=dict(id=999,head_sha='a'*40)),restored=False)
+  with self.assertRaises(ValueError):o.stage()
+  download.assert_not_called();self.assertFalse(source.exists())
+ def test_tracer_fresh_receipt_has_no_asset_restoration_identity(self):
+  manifest=o.validate_package(self.package,self.p)
+  for field,value in [('restorationProof',dict(path='',sha256='d'*64)),('assetProducerSourceCommit','f'*40),('assetProducerRunUrl','https://github.com/yangerstar1/task-workbench/actions/runs/999'),('restorationNativeXmlSha256','d'*64),('sourceCommit','f'*40),('producerRunUrl','https://github.com/yangerstar1/task-workbench/actions/runs/999')]:
+   changed=copy.deepcopy(manifest);changed['nativeReceipt'][field]=value
+   with self.subTest(field=field),self.assertRaises(ValueError):o.validate_producer_workflow(o.TRACER_WORKFLOW,changed)
+ def test_metadata_requires_verified_stage_receipt(self):
+  source,pins,_=self.stage_fixture(run_update=dict(path=o.TRACER_WORKFLOW),restored=False);o.stage();manifest=o.validate_package(source/'package',pins)
+  (source/'verified.json').unlink()
+  with self.assertRaises((ValueError,FileNotFoundError)):o.metadata(pins,manifest)
+ def test_metadata_rejects_invalid_stage_identity(self):
+  source,pins,_=self.stage_fixture(run_update=dict(path=o.TRACER_WORKFLOW),restored=False);o.stage();manifest=o.validate_package(source/'package',pins)
+  original=json.loads((source/'verified.json').read_text())
+  for change in [dict(producerWorkflowPath='.github/workflows/other.yml'),dict(producerWorkflowPath=o.REBUILD_WORKFLOW),dict(manifestSha256='f'*64),dict(executableSha256='f'*64),dict(pins=dict(pins,PRODUCER_RUN_ID='999'))]:
+   (source/'verified.json').write_text(json.dumps(dict(original,**change)))
+   with self.subTest(change=change),self.assertRaises(ValueError):o.metadata(pins,manifest)
+ def test_metadata_does_not_infer_prepare_from_empty_restoration(self):
+  source,pins,_=self.stage_fixture(run_update=dict(path=o.TRACER_WORKFLOW),restored=False);o.stage();manifest=o.validate_package(source/'package',pins)
+  self.assertEqual(manifest['nativeReceipt']['restorationProof'],{'path':'','sha256':''})
+  self.assertEqual(o.metadata(pins,manifest)['producerWorkflowPath'],o.TRACER_WORKFLOW)
  def restored_manifest(self):
   m=o.validate_package(self.package,self.p);n=m['nativeReceipt'];n.update(restorationProof=dict(path='tasks/desert-rv/unity/JourneyEvidence/JourneyPreparation/restoration-revalidated.json',sha256='d'*64),assetProducerSourceCommit='f'*40,assetProducerRunUrl='https://github.com/yangerstar1/task-workbench/actions/runs/456',restorationNativeXmlSha256='e'*64);return m
  def test_exact_rebuild_workflow_requires_restoration_receipt(self):
@@ -211,6 +273,20 @@ class ObserveTests(unittest.TestCase):
  def test_verified_success_guard_copies_only_fixed_media(self):
   work,_=self.guarded_success();o.export();self.assertEqual({p.name for p in (work/'public').iterdir()},{'status.json','sha256.json','real-time.mp4','frame-0.png','frame-1.png','frame-2.png'})
   s=json.loads((work/'public/status.json').read_text());self.assertEqual(s['producerSourceCommit'],'a'*40);self.assertEqual(s['observerSourceCommit'],'e'*40);self.assertEqual(s['engineFrameHeartbeat'],'NOT_AVAILABLE')
+ def tracer_export_fixture(self,matching_status=True):
+  work,result=self.guarded_success();manifest=o.validate_package(o.SOURCE/'package',self.p)
+  self.write_verified(o.SOURCE,self.p,manifest,o.TRACER_WORKFLOW)
+  if matching_status:
+   status=json.loads((result/'status.json').read_text());status['producerWorkflowPath']=o.TRACER_WORKFLOW;(result/'status.json').write_text(json.dumps(status))
+   (result/'sha256.json').write_text(json.dumps({p.name:o.sha(p) for p in result.iterdir() if p.name!='sha256.json'}))
+  return work,result
+ def test_tracer_export_retains_api_workflow_and_fixed_media(self):
+  work,_=self.tracer_export_fixture();o.export()
+  status=json.loads((work/'public/status.json').read_text());self.assertTrue(status['success']);self.assertEqual(status['producerWorkflowPath'],o.TRACER_WORKFLOW)
+  self.assertEqual({p.name for p in (work/'public').iterdir()},{'status.json','sha256.json','real-time.mp4','frame-0.png','frame-1.png','frame-2.png'})
+ def test_tracer_export_rejects_status_relabeled_as_prepare(self):
+  work,_=self.tracer_export_fixture(matching_status=False);o.export()
+  self.assertFalse(json.loads((work/'public/status.json').read_text())['success']);self.assertEqual({p.name for p in (work/'public').iterdir()},{'status.json','sha256.json'})
  def test_docker_failure_cannot_export_previous_success_video(self):
   work,_=self.guarded_success('failure');o.export();self.assertEqual({p.name for p in (work/'public').iterdir()},{'status.json','sha256.json'});self.assertEqual(json.loads((work/'public/status.json').read_text())['failureCode'],'OBSERVER_PROCESS_NOT_SUCCESS')
  def test_unrequested_player_exit_prevents_media_export(self):

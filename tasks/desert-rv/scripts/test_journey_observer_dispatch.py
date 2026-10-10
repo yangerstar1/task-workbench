@@ -417,7 +417,7 @@ class ActualWorkflowBranchBoundaryTests(unittest.TestCase):
         self.context={'github.repository':d.REPOSITORY,'github.actor':d.OWNER,'github.triggering_actor':d.OWNER,
                       'github.event.repository.visibility':'public','github.event_name':'push','github.ref':d.PUSH_REF,
                       'github.workflow_ref':d.REPOSITORY+'/'+d.WORKFLOW+'@'+d.PUSH_REF,
-                      'github.run_attempt':1,'github.event.before':'fa18f21620028e04145be9026ab3c333fa9cadd4'}
+                      'github.run_attempt':1,'github.event.before':d.BASE}
     def accepts(self,updates=None):
         context=dict(self.context,**(updates or {}))
         found=re.search(r'^    if: >-\n((?:      .*\n)+)',self.workflow,re.M);self.assertIsNotNone(found)
@@ -454,10 +454,16 @@ class ImageReadinessWorkflowTests(unittest.TestCase):
         self.code=textwrap.dedent(self.step.split("python3 - <<'PY'\n",1)[1].split('\n          PY',1)[0])
         self.temp=tempfile.TemporaryDirectory();self.addCleanup(self.temp.cleanup);self.directory=Path(self.temp.name)
         self.reportpath=self.directory/'desert-rv-player-image-readiness.json';self.outputs=self.directory/'outputs'
+    def ready_daemon(self,observation):
+        observation.update(attempted=True,commandOutcome='SUCCESS',parseStatus='VALID',
+                           httpProxyEmpty=True,httpsProxyEmpty=True,mirrorsEmpty=True,ready=True)
+        return True
     def current_report(self,mode):
         p=self.readiness
         if mode=='UNKNOWN':return p.blank_result()
-        if mode=='CACHE_HIT':return dict(p.blank_result(),status='PASS',reason='CACHE_HIT',cacheHit=True)
+        if mode=='CACHE_HIT':
+            report=dict(p.blank_result(),status='PASS',reason='CACHE_HIT',cacheHit=True)
+            self.ready_daemon(report['daemon']);return report
         class Client:
             def head(self,route,token=None):
                 if route is p.Route.TARGET:
@@ -472,7 +478,7 @@ class ImageReadinessWorkflowTests(unittest.TestCase):
                 return p.Response(200,(('RateLimit-Limit','100;w=21600'),('RateLimit-Remaining','20;w=21600')))
         pull=('SUCCESS',0,'NONE') if mode=='PULL_SUCCEEDED' else ('NONZERO_EXIT',1,'UNKNOWN_CLI_FAILURE')
         with mock.patch.dict(os.environ,{key:'' for key in p.BLOCKED_ENV}),mock.patch.object(p,'RegistryClient',Client), \
-             mock.patch.object(p,'daemon_ready',return_value=True),mock.patch.object(p,'cache_hit',side_effect=[False,mode=='PULL_SUCCEEDED']), \
+             mock.patch.object(p,'daemon_ready',side_effect=self.ready_daemon),mock.patch.object(p,'cache_hit',side_effect=[False,mode=='PULL_SUCCEEDED']), \
              mock.patch.object(p,'run_fixed_pull',return_value=pull),mock.patch.object(p.subprocess,'Popen',side_effect=AssertionError('REAL_DOCKER_FORBIDDEN')):
             report=p.probe()
         self.assertTrue(p.validate_report(report));return report
@@ -500,8 +506,8 @@ class ImageReadinessWorkflowTests(unittest.TestCase):
         return eval(compile(tree,'actual readiness downstream condition','eval'),{'__builtins__':{}},{})
     def test_reviewed_helper_and_tests_are_exact_frozen_bytes(self):
         import hashlib
-        pins={'environment_image_precheck.py':'c561c6ae5347cd94e64ec5917ee1d4964b46fd5929939c969680f33123cfa1cc',
-              'test_environment_image_precheck.py':'14056956f91bf12de0dec949f9e6ec96b146a353e6a596e922196b2e479c96c1'}
+        pins={'environment_image_precheck.py':'08e6acb74aa7a0d523474a016ef292e2779227ce5423c756b9404766206245f2',
+              'test_environment_image_precheck.py':'296c576c682eaefe2d43037797bbc1b0ac7a2c010b37052223c0c50fcba86206'}
         for name,expected in pins.items():self.assertEqual(hashlib.sha256((d.ROOT/'tasks/desert-rv/scripts'/name).read_bytes()).hexdigest(),expected)
     def test_actual_identity_then_readiness_precedes_all_original_work(self):
         identity=self.bridge.step('id: observer_request\n')
@@ -538,7 +544,7 @@ esac
         self.assertFalse(self.condition('id: image_precheck\n',success=False,identity='failure'))
         self.assertFalse(self.condition('id: image_precheck\n',identity='failure'))
     def test_pass_persists_only_validated_report_with_owner_only_mode(self):
-        report=dict(self.readiness.blank_result(),status='PASS',reason='CACHE_HIT',cacheHit=True)
+        report=self.current_report('CACHE_HIT')
         self.assertEqual(self.run_wrapper(report,0),0)
         self.assertEqual(json.loads(self.reportpath.read_text()),report)
         self.assertEqual(self.reportpath.stat().st_mode&0o777,0o600)
@@ -551,43 +557,43 @@ esac
                 self.assertEqual(json.loads(self.reportpath.read_text()),report)
                 self.assertEqual(self.outputs.read_text(),'report_written=true\nreport_ready=true\nimage_ready=false\n')
                 self.reportpath.unlink();self.outputs.unlink()
-    def test_v4_cache_quota_and_pull_pass_preserve_separate_phase_records(self):
+    def test_v5_cache_quota_and_pull_pass_preserve_separate_phase_records(self):
         for mode in ('CACHE_HIT','READY','PULL_SUCCEEDED'):
             report=self.current_report(mode)
             self.assertEqual(self.run_wrapper(report,0),0)
             saved=json.loads(self.reportpath.read_text());self.assertEqual(saved,report)
-            self.assertEqual(saved['schemaVersion'],4);self.assertNotIn('httpStatus',saved)
+            self.assertEqual(saved['schemaVersion'],5);self.assertNotIn('httpStatus',saved)
             self.assertEqual(saved['reason'],mode);self.assertEqual(set(saved)&{'target','quota','pull'},{'target','quota','pull'})
             if mode=='PULL_SUCCEEDED':
                 self.assertIsNone(saved['remaining']);self.assertTrue(saved['pull']['cacheVerified']);self.assertEqual(saved['pull']['exitCode'],0)
             self.reportpath.unlink();self.outputs.unlink()
-    def test_v4_failed_pull_retains_observations_and_cannot_enter_original_route(self):
+    def test_v5_failed_pull_retains_observations_and_cannot_enter_original_route(self):
         report=self.current_report('PULL_FAILED');self.assertEqual(report['target']['httpStatus'],200);self.assertEqual(report['quota']['httpStatus'],200)
         self.assertEqual(self.run_wrapper(report,2),2)
         self.assertEqual(json.loads(self.reportpath.read_text()),report)
         self.assertIn('image_ready=false\n',self.outputs.read_text())
         self.assertFalse(self.condition('id: native\n',success=False,image_ready='false'))
-    def test_v4_actual_declared_windows_remain_distinct_through_wrapper(self):
+    def test_v5_actual_declared_windows_remain_distinct_through_wrapper(self):
         report=self.current_report('DECLARED_WINDOWS');self.assertEqual(report['status'],'PASS')
         self.assertEqual(self.run_wrapper(report,0),0)
-        saved=json.loads(self.reportpath.read_text());self.assertEqual(saved['schemaVersion'],4)
+        saved=json.loads(self.reportpath.read_text());self.assertEqual(saved['schemaVersion'],5)
         self.assertEqual(saved['windowSeconds'],7200);self.assertFalse(saved['pull']['attempted'])
         for channel,window in (('target',3600),('quota',7200)):
             for field in ('limit','remaining'):
                 self.assertEqual(saved[channel]['rateDiagnostics'][field]['policies'][0]['windowSeconds'],window)
-    def test_v4_same_channel_window_conflict_stays_nonpass_after_wrapper(self):
+    def test_v5_same_channel_window_conflict_stays_nonpass_after_wrapper(self):
         report=self.current_report('CHANNEL_CONFLICT');self.assertEqual(report['status'],'UNKNOWN')
         self.assertEqual(report['quota']['rateDiagnostics']['firstFailedPredicate'],'CHANNEL_WINDOWS_MATCH')
         self.assertEqual(self.run_wrapper(report,2),2);self.assertFalse(report['pull']['attempted'])
         self.assertIn('image_ready=false\n',self.outputs.read_text())
     def test_old_schemas_flat_status_or_unverified_pull_cannot_create_ready_report(self):
         good=self.current_report('PULL_SUCCEEDED')
-        cases=[dict(good,schemaVersion=1),dict(good,schemaVersion=2),dict(good,schemaVersion=3),dict(good,httpStatus=200),dict(good,pull=dict(good['pull'],cacheVerified=False)),
+        cases=[dict(good,schemaVersion=1),dict(good,schemaVersion=2),dict(good,schemaVersion=3),dict(good,schemaVersion=4),dict(good,httpStatus=200),dict(good,pull=dict(good['pull'],cacheVerified=False)),
                dict(good,pull=dict(good['pull'],exitCode=1)),dict(good,quota=dict(good['quota'],reason='SECRET'))]
         for report in cases:
             self.assertEqual(self.run_wrapper(report,0),'IMAGE_PRECHECK_REPORT_REJECTED')
             self.assertFalse(self.reportpath.exists());self.assertFalse(self.outputs.exists())
-    def test_v4_rate_diagnostic_survives_wrapper_without_promoting_failure(self):
+    def test_v5_rate_diagnostic_survives_wrapper_without_promoting_failure(self):
         report=self.current_report('RATE_DIAGNOSTIC');self.assertEqual(report['status'],'UNKNOWN')
         self.assertEqual(self.run_wrapper(report,2),2)
         saved=json.loads(self.reportpath.read_text());self.assertEqual(saved,report)
@@ -618,7 +624,7 @@ esac
         self.assertEqual(self.run_wrapper(report,0,raw),'IMAGE_PRECHECK_REPORT_REJECTED')
         self.assertFalse(self.reportpath.exists());self.assertFalse(self.outputs.exists())
     def test_invalid_or_raw_extra_output_never_becomes_uploadable(self):
-        good=dict(self.readiness.blank_result(),status='PASS',reason='CACHE_HIT',cacheHit=True)
+        good=self.current_report('CACHE_HIT')
         cases=[(dict(good,raw='SECRET'),0,None),(good,2,None),(good,False,None),(good,0,json.dumps(good)+'\nSECRET\n'),
                (good,0,'SECRET'),(good,0,'x'*8192+'\n'),(good,0,'{"status":"PASS","status":"PASS"}\n')]
         for report,code,raw in cases:
@@ -626,7 +632,7 @@ esac
                 self.assertEqual(self.run_wrapper(report,code,raw),'IMAGE_PRECHECK_REPORT_REJECTED')
                 self.assertFalse(self.reportpath.exists());self.assertFalse(self.outputs.exists())
     def test_existing_report_or_symlink_is_never_overwritten_or_marked_ready(self):
-        report=dict(self.readiness.blank_result(),status='PASS',reason='CACHE_HIT',cacheHit=True)
+        report=self.current_report('CACHE_HIT')
         old=json.dumps(self.readiness.blank_result())+'\n';self.assertTrue(self.readiness.validate_report(json.loads(old)))
         self.reportpath.write_text(old)
         self.assertEqual(self.run_wrapper(report,0,expected_calls=0),'IMAGE_PRECHECK_REPORT_REJECTED');self.assertEqual(self.reportpath.read_text(),old);self.assertFalse(self.outputs.exists())
@@ -634,7 +640,7 @@ esac
         self.assertEqual(self.run_wrapper(report,0,expected_calls=0),'IMAGE_PRECHECK_REPORT_REJECTED');self.assertEqual(target.read_text(),'TARGET');self.assertFalse(self.outputs.exists())
     def test_symlinked_report_directory_rejected(self):
         real=self.directory/'real';real.mkdir();link=self.directory/'link';link.symlink_to(real,target_is_directory=True)
-        report=dict(self.readiness.blank_result(),status='PASS',reason='CACHE_HIT',cacheHit=True)
+        report=self.current_report('CACHE_HIT')
         self.assertEqual(self.run_wrapper(report,0,directory=link,expected_calls=0),'IMAGE_PRECHECK_REPORT_REJECTED')
         self.assertFalse((real/self.reportpath.name).exists());self.assertFalse(self.outputs.exists())
     def test_actual_original_steps_require_success_and_pass_output(self):

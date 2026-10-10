@@ -11,9 +11,9 @@ ROOT = Path(__file__).resolve().parents[3]
 REPOSITORY = 'yangerstar1/task-workbench'
 OWNER = 'yangerstar1'
 WORKFLOW = '.github/workflows/desert-rv-player-observe.yml'
-REQUEST = '.github/dispatch/desert-rv-player-observe-20261009-2e731b69.json'
-REQUEST_ID = 'desert-rv-player-observe-20261009-once-2e731b69'
-BASE = 'fa18f21620028e04145be9026ab3c333fa9cadd4'
+REQUEST = '.github/dispatch/desert-rv-player-observe-20261010-8d7fe37f.json'
+REQUEST_ID = 'desert-rv-player-observe-20261010-once-8d7fe37f'
+BASE = 'e420b4d3f9ddacbc984f8693d4bba32e6ea76bb5'
 PUSH_REF = 'refs/heads/journey-player-observer-fa18'
 MANUAL_REF = 'refs/heads/main'
 POLICY = 'tasks/desert-rv/art/journey-preparation/restoration-transition.json'
@@ -27,28 +27,19 @@ PIN_FIELDS = {
 }
 # Exact successful producer pins verified from original local artifact bytes; rechecked by API at runtime.
 EXPECTED_PRODUCER = {
-    'PRODUCER_RUN_ID': '37999653419',
-    'PRODUCER_COMMIT': '6648cf7ae3133a6db5e6ec16d1fd8951bed27561',
-    'PRODUCER_ARTIFACT_ID': '11651186549',
-    'PRODUCER_ZIP_SHA256': '82fc193bd27c759283be8d794eda2178fdd5e5da4a843c1c0257f1e2f9ed7701',
+    'PRODUCER_RUN_ID': '38022081522',
+    'PRODUCER_COMMIT': '98565627e6a4fb3e977cfbeebbafac0043616725',
+    'PRODUCER_ARTIFACT_ID': '11660491222',
+    'PRODUCER_ZIP_SHA256': '2d14658fae692f56b3fca61a4e56acc90be96d5737ff9565c79fac2986f7752e',
 }
 CHANGED_PATHS = {
     WORKFLOW, REQUEST, SOURCE_STATE,
-    'tasks/desert-rv/scripts/journey_observer_dispatch.py',
-    'tasks/desert-rv/scripts/test_journey_observer_dispatch.py',
     'tasks/desert-rv/scripts/environment_image_precheck.py',
-    'tasks/desert-rv/scripts/test_environment_image_precheck.py',
-    'tasks/desert-rv/scripts/test_environment_diffuse_comparison_dispatch.py',
-    'tasks/desert-rv/scripts/test_environment_diffuse_comparison_r1_dispatch.py',
-    'tasks/desert-rv/scripts/test_environment_v4_r4_dispatch.py',
-    'tasks/desert-rv/scripts/fixtures/environment-v4-r4-published-d1a57497.json',
-    'tasks/desert-rv/scripts/fixtures/environment-v4-r4-audit-published-fa18f216.json',
-    'tasks/desert-rv/scripts/test_environment_v4_r4_audit_dispatch.py',
-    'tasks/desert-rv/scripts/verify_evidence.py',
+    'tasks/desert-rv/scripts/journey_observer_dispatch.py',
     'tasks/desert-rv/scripts/player/observe_journey_player.py',
-    'tasks/desert-rv/scripts/player/journey_linux_export.py',
-    'tasks/desert-rv/scripts/player/test_journey_linux_export.py',
     'tasks/desert-rv/scripts/player/test_observe_journey_player.py',
+    'tasks/desert-rv/scripts/test_environment_image_precheck.py',
+    'tasks/desert-rv/scripts/test_journey_observer_dispatch.py',
 }
 
 

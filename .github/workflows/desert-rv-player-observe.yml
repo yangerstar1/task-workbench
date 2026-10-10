@@ -2,7 +2,7 @@ name: Desert RV verified candidate player observation
 on:
   push:
     branches: [journey-player-observer-fa18]
-    paths: [.github/dispatch/desert-rv-player-observe-20261009-2e731b69.json]
+    paths: [.github/dispatch/desert-rv-player-observe-20261010-8d7fe37f.json]
   workflow_dispatch:
     inputs:
       producer_run_id:
@@ -36,7 +36,7 @@ jobs:
         github.workflow_ref == 'yangerstar1/task-workbench/.github/workflows/desert-rv-player-observe.yml@refs/heads/main') ||
        (github.event_name == 'push' && github.ref == 'refs/heads/journey-player-observer-fa18' &&
         github.workflow_ref == 'yangerstar1/task-workbench/.github/workflows/desert-rv-player-observe.yml@refs/heads/journey-player-observer-fa18' &&
-        github.run_attempt == 1 && github.event.before == 'fa18f21620028e04145be9026ab3c333fa9cadd4'))
+        github.run_attempt == 1 && github.event.before == 'e420b4d3f9ddacbc984f8693d4bba32e6ea76bb5'))
     runs-on: ubuntu-24.04
     timeout-minutes: 25
     env:
