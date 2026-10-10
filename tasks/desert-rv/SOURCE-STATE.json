@@ -85,8 +85,8 @@
     },
     {
       "path": ".github/workflows/desert-rv-tracer-shader-prepare.yml",
-      "sha256": "17f08b38c2aab968e0f62b54b6d7b6ae7c0cd317e5b670e48f13c59a3a652a71",
-      "size": 13767
+      "sha256": "d73bb07657c40a2d2e1122df152d9eeec6de166e1d8d77f91b46b33105241d1e",
+      "size": 29402
     },
     {
       "path": "tasks/desert-rv/ASSET-NOTICES.md",
@@ -490,8 +490,8 @@
     },
     {
       "path": "tasks/desert-rv/scripts/journey_tracer_dispatch.py",
-      "sha256": "f1fb60d24b343481bfb43139f647387977437a7f482e57d4527f1a5dab5a784e",
-      "size": 6519
+      "sha256": "95908174ba1fbf00be50b7c8f4255367c6d99d81b311b8201f8c03f96762ed42",
+      "size": 6511
     },
     {
       "path": "tasks/desert-rv/scripts/journey_tracer_native.py",
@@ -695,13 +695,13 @@
     },
     {
       "path": "tasks/desert-rv/scripts/test_journey_cabin_entry_native.py",
-      "sha256": "2b5fdbe4eddea5ff89c93bc7def478b96c6a20e7dd3ac6746a67d2054107e5ed",
-      "size": 21551
+      "sha256": "73b83360af584b3f06aa71dd23db9e8bbc1640610b77aff570008c5d6bc04720",
+      "size": 26635
     },
     {
       "path": "tasks/desert-rv/scripts/test_journey_keyboard_look_native.py",
-      "sha256": "73802ee34afdc14afdb9847beeae494491d4bf3d9ee2c1ef810df433b44e157c",
-      "size": 32110
+      "sha256": "c2e6a31173ba5eeacd0b63e147c12db18e2340b6b341284352abaa4febb1e963",
+      "size": 32654
     },
     {
       "path": "tasks/desert-rv/scripts/test_journey_rebuild_dispatch.py",
@@ -710,8 +710,8 @@
     },
     {
       "path": "tasks/desert-rv/scripts/test_journey_tracer_dispatch.py",
-      "sha256": "4995ff9a9b63bd924ab3fd903285dd2a09e2c7d56964393d437293c87360985e",
-      "size": 12886
+      "sha256": "520662e4007ce5c8aed1917dcf773d142fb66829c7032bde7db746209a760006",
+      "size": 13023
     },
     {
       "path": "tasks/desert-rv/scripts/test_journey_tracer_native.py",
@@ -720,8 +720,8 @@
     },
     {
       "path": "tasks/desert-rv/scripts/test_journey_tracer_source_diagnostic.py",
-      "sha256": "5292e84786596011b379900bb056e362b1519889182abe1ee30186c43f3b6dee",
-      "size": 17744
+      "sha256": "03ecc03eb968689a5b2698bb863680c957d55ecd333a3ed2f03c0a6b7a4abac7",
+      "size": 18021
     },
     {
       "path": "tasks/desert-rv/scripts/test_safe_diagnostic_export.py",

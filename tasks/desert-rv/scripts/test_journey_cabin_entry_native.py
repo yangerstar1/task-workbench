@@ -277,14 +277,14 @@ class ExportTests(unittest.TestCase):
 
 
 class WorkflowTests(unittest.TestCase):
-    def test_two_independent_native_invocations_and_diagnostics_before_owned_cleanup(self):
+    def test_full_native_sequence_and_diagnostics_before_owned_cleanup(self):
         import yaml
         raw=(n.ROOT/n.dispatch.WORKFLOW).read_text();workflow=yaml.load(raw,Loader=yaml.BaseLoader)
         self.assertEqual(workflow['on']['push']['paths'],[n.dispatch.REQUEST])
         steps=workflow['jobs']['prepare']['steps'];order=[step.get('id') for step in steps]
         native=[s for s in steps if s.get('uses','').startswith('game-ci/unity-test-runner@')]
-        self.assertEqual([s['id'] for s in native],['keyboard_native','cabin_native'])
-        cabin=native[1];self.assertIn('always()',cabin['if']);self.assertIn("steps.keyboard_copy.outputs.copy_ready == 'true'",cabin['if'])
+        self.assertEqual([s['id'] for s in native],['tracer_native','keyboard_native','cabin_native','armored','pouncer','weapon','linux_boundary','author'])
+        cabin=native[2];self.assertIn('always()',cabin['if']);self.assertIn("steps.keyboard_copy.outputs.copy_ready == 'true'",cabin['if'])
         self.assertNotIn('keyboard_native.outcome',cabin['if']);self.assertEqual(cabin['with']['projectPath'],n.isolated.COPY_REL)
         self.assertEqual(cabin['with']['customParameters'],'-assemblyNames DesertRV.PlayModeTests -testFilter '+n.EXPECTED+' -force-glcore -job-worker-count 2')
         for earlier,later in (('keyboard_native','cabin_native'),('cabin_native','keyboard_isolation'),('keyboard_isolation','cabin_report'),('cabin_report','keyboard_cleanup')):
@@ -293,9 +293,81 @@ class WorkflowTests(unittest.TestCase):
         upload=next(s for s in steps if s.get('with',{}).get('name','').startswith('journey-cabin-entry-native-'))
         self.assertEqual(upload['with']['path'],str(n.REPORT.relative_to(n.ROOT)))
         self.assertLess(steps.index(upload),order.index('keyboard_cleanup'))
-        for forbidden in ('id: stage_armored','id: linux_native','id: shader_registry','journey_linux_container.sh','path: tasks/desert-rv/artifacts/'):
+        for forbidden in ('restore_preparation.py','prepare-restored','continue-on-error:','path: tasks/desert-rv/artifacts/'):
             self.assertNotIn(forbidden,raw)
         self.assertNotIn(n.RAW_REPORT.relative_to(n.ROOT).as_posix(),upload['with']['path'])
+        self.assertLess(order.index('keyboard_cleanup'),order.index('stage_armored'))
+        self.assertLess(order.index('stage_armored'),order.index('linux_native'))
+
+    def test_failed_incomplete_or_skipped_native_gate_cannot_start_producer(self):
+        import re
+        import yaml
+        steps=yaml.load((n.ROOT/n.dispatch.WORKFLOW).read_text(),Loader=yaml.BaseLoader)['jobs']['prepare']['steps']
+        by_id={step['id']:step for step in steps if 'id' in step}
+        condition=by_id['stage_armored']['if']
+        terms=condition.split(' && ')
+        self.assertEqual(terms[0],'success()')
+        expected={
+            'tracer_source.outcome':'success','tracer_source.outputs.source_unchanged':'true',
+            'tracer_verify.outcome':'success','tracer_verify.outputs.native_verified':'true',
+            'keyboard_source.outcome':'success','keyboard_source.outputs.source_unchanged':'true',
+            'keyboard_verify.outcome':'success','keyboard_verify.outputs.native_verified':'true',
+            'keyboard_isolation.outputs.copy_verified':'true','keyboard_cleanup.outcome':'success',
+            'cabin_native.outcome':'success','cabin_report.outcome':'success',
+            'cabin_report.outputs.diagnostic_complete':'true'}
+        parsed=[]
+        for term in terms[1:]:
+            match=re.fullmatch(r"steps\.([a-z_]+\.(?:outcome|outputs\.[a-z_]+)) == '(success|true)'",term)
+            self.assertIsNotNone(match,term);parsed.append(match.groups())
+        self.assertEqual(dict(parsed),expected);self.assertEqual(len(parsed),len(expected))
+        allowed=lambda values,success=True: success and all(values.get(key,'')==value for key,value in parsed)
+        self.assertTrue(allowed(expected));self.assertFalse(allowed(expected,False))
+        for key in expected:
+            for bad in ('','false','failure','skipped','cancelled'):
+                with self.subTest(gate=key,value=bad):
+                    self.assertFalse(allowed(dict(expected,**{key:bad})))
+            absent=dict(expected);absent.pop(key);self.assertFalse(allowed(absent))
+        # A complete failed diagnosis has a valid report, but never authorizes imports.
+        self.assertFalse(allowed(dict(expected,**{'cabin_native.outcome':'failure'})))
+
+    def test_skipped_stage_cannot_fall_through_into_later_native_or_build(self):
+        import re
+        import yaml
+        steps=yaml.load((n.ROOT/n.dispatch.WORKFLOW).read_text(),Loader=yaml.BaseLoader)['jobs']['prepare']['steps']
+        by_id={step['id']:step for step in steps if 'id' in step}
+        predecessors={'armored':'stage_armored','stage_pouncer':'collect_armored',
+            'pouncer':'stage_pouncer','stage_weapon':'collect_pouncer','weapon':'stage_weapon',
+            'ready':'collect_weapon','linux_boundary':'ready','boundary_verify':'linux_boundary',
+            'author':'boundary_verify','linux_input':'finish','linux_native':'linux_input',
+            'linux_verify':'linux_native'}
+        for step,prior in predecessors.items():
+            with self.subTest(step=step):
+                self.assertEqual(by_id[step]['if'],"success() && steps."+prior+".outcome == 'success'")
+                self.assertLess(steps.index(by_id[prior]),steps.index(by_id[step]))
+        for kind in ('armored','pouncer','weapon'):
+            self.assertEqual(by_id['collect_'+kind]['if'],"always() && steps.stage_"+kind+".outcome == 'success'")
+        self.assertEqual(by_id['linux_public']['if'],"always() && steps.linux_native.outcome != 'skipped'")
+        self.assertIn('steps.linux_public.outputs.export_ready',by_id['shader_registry']['if'])
+        chain=['stage_armored','armored','collect_armored','stage_pouncer','pouncer',
+               'collect_pouncer','stage_weapon','weapon','collect_weapon','ready',
+               'linux_boundary','boundary_verify','author','finish','linux_input',
+               'linux_native','linux_verify','linux_public']
+        terms=re.findall(r"steps\.([a-z_.]+) == '(success|true)'",by_id['stage_armored']['if'])
+        for rejected in ('failure','skipped','cancelled',''):
+            # Actions success() stays true when a prior step merely skipped. Evaluate
+            # the actual YAML dependencies with that behavior through the full chain.
+            values=dict(terms);values['cabin_native.outcome']=rejected
+            for ident in chain:
+                allowed=True
+                for term in by_id[ident]['if'].split(' && '):
+                    if term in ('success()','always()'):continue
+                    match=re.fullmatch(r"steps\.([a-z_.]+) (==|!=) '([a-z]+)'",term)
+                    self.assertIsNotNone(match,term)
+                    key,op,wanted=match.groups();equal=values.get(key,'')==wanted
+                    allowed=allowed and (equal if op=='==' else not equal)
+                values[ident+'.outcome']='success' if allowed else 'skipped'
+            with self.subTest(cabinOutcome=rejected):
+                self.assertEqual([values[ident+'.outcome'] for ident in chain],['skipped']*len(chain))
 
 
 if __name__=='__main__':

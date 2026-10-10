@@ -123,7 +123,7 @@ class RealGitAndWorkflowTests(unittest.TestCase):
                 event=root/'event.json';event.write_text(json.dumps(fixture_event(head,parent)));env=fixture_env(head,str(event))
                 workflow=(d.ROOT/d.WORKFLOW).read_text()
                 self.assertIn('bash tasks/desert-rv/scripts/prepare_runner.sh',workflow)
-                self.assertNotIn('journey_linux_container.sh',workflow)
+                self.assertIn('journey_linux_container.sh',workflow)
                 forwarded=dict(env)
                 with mock.patch.object(d,'BASE',parent),mock.patch.dict(os.environ,forwarded,clear=True),mock.patch.object(pipeline,'REPO',root):
                     self.assertEqual(source_sha,d.verify(root,forwarded)['sourceStateSha256'])
@@ -156,16 +156,17 @@ class RealGitAndWorkflowTests(unittest.TestCase):
                          old.split(start,1)[1].split('      - name: Verify fresh source',1)[0])
         order=['id: dispatch_identity','Verify current source before fixed-image readiness','id: image_precheck',
                'pipeline.py init','JOURNEY_HOSTED_ROOT_CACHE_TEST:','UNITY_LICENSE:',
-               'id: keyboard_copy','id: keyboard_native','id: cabin_native','id: keyboard_isolation',
+               'id: tracer_native','id: tracer_source','id: tracer_verify','id: keyboard_copy','id: keyboard_native','id: cabin_native','id: keyboard_isolation',
                'id: keyboard_source','id: keyboard_verify','id: cabin_report','id: keyboard_cleanup',
+               'id: stage_armored','id: stage_pouncer','id: stage_weapon','id: ready',
+               'id: linux_boundary','id: boundary_verify','id: author','id: finish',
+               'id: linux_input','id: linux_native','id: linux_verify','id: linux_public','id: shader_registry',
                'Prove tracked original source was not edited']
         positions=[workflow.index(text) for text in order];self.assertEqual(positions,sorted(positions))
         for forbidden in ('workflow_dispatch:', 'restore_preparation.py', 'prepare-restored',
-                          'restoration-transition', 'id: stage_armored', 'id: linux_native',
-                          'id: shader_registry', 'DesertRV.CandidateArtTests', 'DesertRV.CandidateLinuxTests',
-                          'DesertRV.JourneyPreparationTests', 'journey_linux_container.sh'):
+                          'restoration-transition', 'continue-on-error:', 'workflow_run:'):
             self.assertNotIn(forbidden,workflow)
-        self.assertEqual(workflow.count('uses: game-ci/unity-test-runner@'),2)
+        self.assertEqual(workflow.count('uses: game-ci/unity-test-runner@'),8)
         self.assertIn('DesertRV.Tests.JourneyCabinEntryPhysicsTests.RealRV_StandardExitToCabin_AllTimesteps',workflow)
         runner=(d.ROOT/'tasks/desert-rv/scripts/prepare_runner.sh').read_text()
         self.assertLess(runner.index('journey_tracer_dispatch.py'),runner.index('UNITY_LICENSE'))

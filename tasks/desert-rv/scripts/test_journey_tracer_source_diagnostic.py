@@ -168,7 +168,9 @@ class RealWorkflowFixtureTests(unittest.TestCase):
             run(['/usr/bin/python3','tasks/desert-rv/art/journey-preparation/pipeline.py','init','--selection',dispatch.SELECTION,'--sha256',request['selectionSha256']],env)
             workflow=yaml.load((root/dispatch.WORKFLOW).read_text(),Loader=yaml.BaseLoader);steps=workflow['jobs']['prepare']['steps'];step=next(s for s in steps if s.get('id')=='keyboard_source')
             self.assertEqual(step['if'],"always() && steps.keyboard_copy.outputs.copy_created == 'true'")
-            self.assertNotIn('stage_armored',[s.get('id') for s in steps])
+            stage=next(s for s in steps if s.get('id')=='stage_armored')
+            for gate in ("steps.tracer_source.outcome == 'success'","steps.tracer_source.outputs.source_unchanged == 'true'","steps.keyboard_source.outcome == 'success'","steps.keyboard_source.outputs.source_unchanged == 'true'"):
+                self.assertIn(gate,stage['if'])
             # A failed native outcome must not suppress a genuinely clean source result.
             run(['bash','-e','-c',step['run']],env);report=root/'tasks/desert-rv/journey-keyboard-look-source-report.json';clean=json.loads(report.read_text());self.assertTrue(clean['sourceUnchanged']);self.assertEqual(clean['nativeOutcome'],'failure');report.unlink()
             # The exact HEAD baseline stays unchanged while native output modifies bytes.

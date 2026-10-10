@@ -63,7 +63,7 @@ class KeyboardNativeEvidenceTests(unittest.TestCase):
         for ident in ('keyboard_source', 'keyboard_verify'):
             step = next(s for s in steps if s.get('id') == ident)
             self.assertEqual(step['if'], "always() && steps.keyboard_copy.outputs.copy_created == 'true'" if ident == 'keyboard_source' else "always() && steps.keyboard_native.outcome != 'skipped'")
-        self.assertNotIn('stage_armored', order)
+        self.assertLess(order.index('keyboard_cleanup'), order.index('stage_armored'))
         self.assertIn('cabin_native', order)
         self.assertIn('cabin_report', order)
 
@@ -385,8 +385,14 @@ class IsolatedProjectLifecycleTests(unittest.TestCase):
         cleanup=next(step for step in steps if step.get('id')=='keyboard_cleanup')
         self.assertIn('sudo --preserve-env=GITHUB_SHA,GITHUB_RUN_ID,GITHUB_RUN_ATTEMPT /usr/bin/python3 -I -B tasks/desert-rv/scripts/journey_keyboard_look_native.py cleanup',cleanup['run'])
         self.assertNotIn('rm -rf',cleanup['run']); self.assertNotIn('chmod',cleanup['run']); self.assertNotIn('chown',cleanup['run'])
-        self.assertNotIn('stage_armored',order)
-        self.assertNotIn('linux_native',order)
+        self.assertLess(order.index('keyboard_cleanup'),order.index('stage_armored'))
+        self.assertLess(order.index('stage_armored'),order.index('linux_native'))
+        stage=next(step for step in steps if step.get('id')=='stage_armored')
+        for gate in ("steps.keyboard_source.outputs.source_unchanged == 'true'",
+                     "steps.keyboard_verify.outputs.native_verified == 'true'",
+                     "steps.keyboard_isolation.outputs.copy_verified == 'true'",
+                     "steps.keyboard_cleanup.outcome == 'success'"):
+            self.assertIn(gate,stage['if'])
 
 
 
