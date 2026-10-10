@@ -280,7 +280,7 @@ class TestSeparateModeInventories(unittest.TestCase):
         edits = evidence.expected_cases('editmode')
         plays = evidence.expected_cases('playmode')
         self.assertEqual(len(edits), 203)
-        self.assertEqual(len(plays), 9)
+        self.assertEqual(len(plays), 13)
         self.assertFalse(edits & plays)
 
     def test_unknown_mode_fails(self):

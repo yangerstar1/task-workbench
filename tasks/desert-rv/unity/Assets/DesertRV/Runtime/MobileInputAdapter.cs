@@ -17,6 +17,11 @@ namespace DesertRV
         int screenWidth, screenHeight;
         Rect safeArea;
         bool keyboardArmed;
+        bool keyboardLookEnabled;
+        float keyboardLookSpeed = 60;
+        Vector2 keyboardLookDelta;
+        public bool KeyboardLookEnabled => keyboardLookEnabled;
+        public float KeyboardLookSpeed => keyboardLookSpeed;
         public float StickRadius { get; set; } = 70;
         public Rect SafeArea => Screen.safeArea;
         public bool IsTouch => Application.isMobilePlatform || Input.touchCount > 0;
@@ -24,16 +29,26 @@ namespace DesertRV
         public void SetRegion(TouchControl control, Rect screenPixels) => regions[control] = screenPixels;
         public void ClearRegions() => regions.Clear();
 
+        // Session-local accessibility settings. Mouse and touch retain their own sensitivities.
+        public void ConfigureKeyboardLook(bool enabled, float degreesPerSecond)
+        {
+            float speed = float.IsNaN(degreesPerSecond) || float.IsInfinity(degreesPerSecond) ?
+                60 : Mathf.Clamp(degreesPerSecond, 30, 120);
+            if (keyboardLookEnabled == enabled && keyboardLookSpeed == speed) return;
+            keyboardLookEnabled = enabled; keyboardLookSpeed = speed;
+            ReleaseAll(); // A held key cannot become a fresh input after a setting change.
+        }
+
         public void SetContext(TouchContext context)
         {
             if (State.Context == context) return;
             State.SetContext(context);
-            origins.Clear(); owners.Clear(); keyboardArmed = false;
+            origins.Clear(); owners.Clear(); keyboardArmed = false; keyboardLookDelta = Vector2.zero;
         }
 
         public void ReleaseAll()
         {
-            State.CancelAll(); origins.Clear(); owners.Clear(); keyboardArmed = false;
+            State.CancelAll(); origins.Clear(); owners.Clear(); keyboardArmed = false; keyboardLookDelta = Vector2.zero;
         }
 
         void OnDisable() => ReleaseAll();
@@ -65,6 +80,7 @@ namespace DesertRV
         // Does not own the game's pause policy or consume action edges itself.
         public void Sample()
         {
+            keyboardLookDelta = Vector2.zero;
             if (screenWidth != Screen.width || screenHeight != Screen.height || safeArea != Screen.safeArea)
             {
                 ReleaseAll(); screenWidth = Screen.width; screenHeight = Screen.height; safeArea = Screen.safeArea;
@@ -105,8 +121,10 @@ namespace DesertRV
                 else if (Input.GetMouseButtonUp(0)) End(MouseId, false);
                 else if (Input.GetMouseButton(0)) Move(MouseId, mouse, mouse - lastMouse);
                 lastMouse = mouse;
-                if (!AnyGameplayKeyHeld()) keyboardArmed = true;
+                RearmKeyboardWhenReleased(AnyGameplayKeyHeld());
             }
+            SampleKeyboardLook(Input.GetKey(KeyCode.J), Input.GetKey(KeyCode.L),
+                Input.GetKey(KeyCode.I), Input.GetKey(KeyCode.K), Application.isFocused, IsTouch, Time.deltaTime);
             State.ReconcileFingers(active);
             // Forget a missing-up finger's adapter bookkeeping as well.
             var expired = new List<int>();
@@ -154,7 +172,23 @@ namespace DesertRV
             Input.GetKey(KeyCode.S) || Input.GetKey(KeyCode.D) || Input.GetKey(KeyCode.E) ||
             Input.GetKey(KeyCode.R) || Input.GetKey(KeyCode.Space) || Input.GetMouseButton(0) ||
             Input.GetKey(KeyCode.UpArrow) || Input.GetKey(KeyCode.DownArrow) ||
-            Input.GetKey(KeyCode.LeftArrow) || Input.GetKey(KeyCode.RightArrow);
+            Input.GetKey(KeyCode.LeftArrow) || Input.GetKey(KeyCode.RightArrow) ||
+            (keyboardLookEnabled && (Input.GetKey(KeyCode.I) || Input.GetKey(KeyCode.J) ||
+                Input.GetKey(KeyCode.K) || Input.GetKey(KeyCode.L)));
+
+        void RearmKeyboardWhenReleased(bool anyGameplayKeyHeld)
+        { if (!anyGameplayKeyHeld) keyboardArmed = true; }
+
+        void SampleKeyboardLook(bool left, bool right, bool up, bool down, bool focused, bool touch, float delta)
+        {
+            keyboardLookDelta = Vector2.zero;
+            if (!keyboardLookEnabled || !keyboardArmed || !focused || touch || State.Context != TouchContext.OnFoot ||
+                float.IsNaN(delta) || float.IsInfinity(delta) || delta <= 0) return;
+            var direction = new Vector2((right ? 1 : 0) - (left ? 1 : 0), (up ? 1 : 0) - (down ? 1 : 0));
+            // Look is degrees this frame, not a rate or the touch viewport displacement.
+            // Cap stall catch-up; ordinary frame rates integrate the same angular speed.
+            keyboardLookDelta = Vector2.ClampMagnitude(direction, 1) * keyboardLookSpeed * Mathf.Min(delta, .1f);
+        }
 
         bool KeyboardEnabled => keyboardArmed && !IsTouch && State.Context != TouchContext.Overlay;
         public Vector2 Movement => Vector2.ClampMagnitude(new Vector2(State.MoveX, State.MoveY) +
@@ -162,11 +196,12 @@ namespace DesertRV
         public float Throttle => (State.AccelerateHeld ? 1 : 0) - (State.BrakeHeld ? 1 : 0) +
             (KeyboardEnabled ? Input.GetAxisRaw("Vertical") : 0);
         public Vector2 Look => new Vector2(State.LookX, State.LookY) * 150 +
-            (KeyboardEnabled && Cursor.lockState == CursorLockMode.Locked ? new Vector2(Input.GetAxis("Mouse X"), Input.GetAxis("Mouse Y")) * 1.7f : Vector2.zero);
+            (KeyboardEnabled && Cursor.lockState == CursorLockMode.Locked ? new Vector2(Input.GetAxis("Mouse X"), Input.GetAxis("Mouse Y")) * 1.7f : Vector2.zero) +
+            keyboardLookDelta;
         public bool Fire => State.FirePressed || State.FireHeld ||
             (KeyboardEnabled && Input.GetMouseButton(0) && Cursor.lockState == CursorLockMode.Locked);
         public bool Interact => State.InteractPressed || (KeyboardEnabled && Input.GetKeyDown(KeyCode.E));
         public bool Reload => State.ReloadPressed || (KeyboardEnabled && Input.GetKeyDown(KeyCode.R));
-        public void ConsumeFrame() => State.ConsumeFrame();
+        public void ConsumeFrame() { State.ConsumeFrame(); keyboardLookDelta = Vector2.zero; }
     }
 }

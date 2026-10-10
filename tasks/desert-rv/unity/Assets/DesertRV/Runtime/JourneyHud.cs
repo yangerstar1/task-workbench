@@ -17,6 +17,9 @@ namespace DesertRV
         Image damageEdge;
         Text resources, objective, notice, prompt, menuTitle, menuBody, primaryLabel, storm;
         Button primary;
+        Button keyboardLookToggle, keyboardLookSpeed;
+        Text keyboardLookHelp;
+        bool menuWasVisible;
         Image playerBar, carBar, actionBar;
         readonly Dictionary<TouchControl, RectTransform> controls = new Dictionary<TouchControl, RectTransform>();
         Text interactLabel;
@@ -87,6 +90,25 @@ namespace DesertRV
                 else if (journey.State.Status == SessionStatus.Failed || journey.State.Status == SessionStatus.Completed) { if (director) director.Restart(); else station.Restart(); }
                 else if (journey.ManualPause) journey.TogglePause();
             });
+            keyboardLookToggle = Button("Keyboard look mode", menu, "", new Vector2(.5f,0), new Vector2(.5f,0),
+                new Vector2(-134,122), new Vector2(254,44), paper, ink);
+            keyboardLookSpeed = Button("Keyboard look speed", menu, "", new Vector2(.5f,0), new Vector2(.5f,0),
+                new Vector2(134,122), new Vector2(254,44), paper, ink);
+            keyboardLookToggle.GetComponentInChildren<Text>().fontSize = 22;
+            keyboardLookSpeed.GetComponentInChildren<Text>().fontSize = 22;
+            keyboardLookHelp = Label("Keyboard look help", menu, "I/K 上下看 · J/L 左右转 · WASD/方向键移动", 18,
+                new Vector2(38,-184), new Vector2(524,28), TextAnchor.MiddleLeft);
+            keyboardLookToggle.onClick.AddListener(() => journey.Input.ConfigureKeyboardLook(
+                !journey.Input.KeyboardLookEnabled, journey.Input.KeyboardLookSpeed));
+            keyboardLookSpeed.onClick.AddListener(() =>
+            {
+                float speed = journey.Input.KeyboardLookSpeed;
+                journey.Input.ConfigureKeyboardLook(journey.Input.KeyboardLookEnabled, speed < 60 ? 60 : speed < 120 ? 120 : 30);
+            });
+            keyboardLookToggle.navigation = new Navigation { mode = Navigation.Mode.Explicit,
+                selectOnRight = keyboardLookSpeed, selectOnDown = primary, selectOnUp = primary };
+            keyboardLookSpeed.navigation = new Navigation { mode = Navigation.Mode.Explicit,
+                selectOnLeft = keyboardLookToggle, selectOnDown = primary, selectOnUp = primary };
         }
         void Update()
         {
@@ -137,6 +159,24 @@ namespace DesertRV
                 primaryLabel.text = director && director.CanRetryLoad ? "重试加载" : dead || won ? "整局重新出发" : state.Status == SessionStatus.Menu ? "出发" : "继续";
                 primary.interactable = (director && director.CanRetryLoad) || state.Status == SessionStatus.Menu || dead || won || journey.ManualPause;
             }
+            bool keyboardOptions = !Application.isMobilePlatform &&
+                (state.Status == SessionStatus.Menu || state.Status == SessionStatus.Paused);
+            keyboardLookToggle.gameObject.SetActive(keyboardOptions);
+            keyboardLookSpeed.gameObject.SetActive(keyboardOptions);
+            keyboardLookHelp.gameObject.SetActive(keyboardOptions);
+            // Keep the existing 600 x 380 menu: description, help, options, primary have separate rows.
+            menuBody.rectTransform.sizeDelta = new Vector2(524, keyboardOptions ? 64 : 136);
+            if (keyboardOptions)
+            {
+                keyboardLookToggle.GetComponentInChildren<Text>().text = journey.Input.KeyboardLookEnabled ? "键盘视角：IJKL" : "键盘视角：关闭";
+                keyboardLookSpeed.GetComponentInChildren<Text>().text = $"视角速度：{journey.Input.KeyboardLookSpeed:0}°/秒";
+            }
+            primary.navigation = new Navigation { mode = Navigation.Mode.Explicit,
+                selectOnUp = keyboardOptions ? keyboardLookToggle : null,
+                selectOnDown = keyboardOptions ? keyboardLookToggle : null };
+            if (EventSystem.current && menuWasVisible != !playing)
+                EventSystem.current.SetSelectedGameObject(!playing && primary.interactable ? primary.gameObject : null);
+            menuWasVisible = !playing;
             RegisterRegions();
         }
         void RegisterRegions()

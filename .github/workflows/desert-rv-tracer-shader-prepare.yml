@@ -2,7 +2,7 @@ name: Desert RV fresh tracer shader producer and Linux candidate
 on:
   push:
     branches: [journey-tracer-shader-fix-6648]
-    paths: [.github/dispatch/desert-rv-tracer-shader-prepare-r3-20261010.json]
+    paths: [.github/dispatch/desert-rv-tracer-shader-prepare-keyboard-r1-20261010.json]
 permissions:
   contents: read
   actions: read
@@ -95,6 +95,7 @@ jobs:
         run: |
           /usr/bin/python3 tasks/desert-rv/scripts/test_journey_tracer_source_diagnostic.py
           /usr/bin/python3 tasks/desert-rv/scripts/test_journey_tracer_native.py
+          /usr/bin/python3 tasks/desert-rv/scripts/test_journey_keyboard_look_native.py
           /usr/bin/python3 tasks/desert-rv/scripts/player/test_verify_tracer_shader.py
           /usr/bin/python3 tasks/desert-rv/art/journey-preparation/test_pipeline.py
           /usr/bin/python3 tasks/desert-rv/art/journey-preparation/test_generated_export.py
@@ -158,9 +159,57 @@ jobs:
           path: tasks/desert-rv/journey-tracer-native-report.json
           if-no-files-found: error
           retention-days: 7
+      - name: Native exact four keyboard look PlayMode cases before strict imports
+        id: keyboard_native
+        if: success() && steps.tracer_source.outcome == 'success' && steps.tracer_source.outputs.source_unchanged == 'true' && steps.tracer_verify.outcome == 'success' && steps.tracer_verify.outputs.native_verified == 'true'
+        uses: game-ci/unity-test-runner@0ff419b913a3630032cbe0de48a0099b5a9f0ed9
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+        with:
+          unityVersion: 6000.3.19f1
+          customImage: desert-rv-environment:local
+          projectPath: tasks/desert-rv/unity
+          testMode: playmode
+          artifactsPath: tasks/desert-rv/artifacts/journey-keyboard-look
+          customParameters: -assemblyNames DesertRV.PlayModeTests -testFilter DesertRV.Tests.JourneyReplayInputTests.KeyboardLook_RateAndBounds;DesertRV.Tests.JourneyReplayInputTests.KeyboardLook_ContextAndRelease;DesertRV.Tests.JourneyReplayInputTests.KeyboardLook_PreservesExistingSources;DesertRV.Tests.JourneyReplayInputTests.KeyboardLook_EditorReplayIsExclusive -force-glcore -job-worker-count 2
+          dockerCpuLimit: 2
+          dockerMemoryLimit: 12g
+      - name: Diagnose source and union independently after keyboard look native tests
+        id: keyboard_source
+        if: always() && steps.keyboard_native.outcome != 'skipped'
+        env:
+          NATIVE_OUTCOME: ${{ steps.keyboard_native.outcome }}
+        run: python3 tasks/desert-rv/scripts/journey_keyboard_look_native.py source
+      - name: Upload bounded keyboard look source diagnostics
+        if: always() && steps.keyboard_source.outputs.report_written == 'true' && steps.keyboard_source.outputs.report_valid == 'true'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: journey-keyboard-look-source-${{ github.run_id }}-${{ github.run_attempt }}
+          path: tasks/desert-rv/journey-keyboard-look-source-report.json
+          if-no-files-found: error
+          retention-days: 7
+      - name: Require exact four keyboard look passes and unchanged initial source
+        id: keyboard_verify
+        if: always() && steps.keyboard_native.outcome != 'skipped'
+        env:
+          NATIVE_OUTCOME: ${{ steps.keyboard_native.outcome }}
+        run: python3 tasks/desert-rv/scripts/journey_keyboard_look_native.py native
+      - name: Upload bounded keyboard look native result evidence
+        if: always() && steps.keyboard_verify.outputs.report_written == 'true' && steps.keyboard_verify.outputs.report_valid == 'true'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: journey-keyboard-look-native-${{ github.run_id }}-${{ github.run_attempt }}
+          path: tasks/desert-rv/journey-keyboard-look-native-report.json
+          if-no-files-found: error
+          retention-days: 7
+      - name: Preserve separate keyboard look reports in preparation evidence
+        if: always() && steps.keyboard_source.outputs.report_valid == 'true' && steps.keyboard_verify.outputs.report_valid == 'true'
+        run: python3 tasks/desert-rv/scripts/journey_keyboard_look_native.py preserve
       - name: Stage verified armored source archive
         id: stage_armored
-        if: success() && steps.tracer_source.outcome == 'success' && steps.tracer_source.outputs.source_unchanged == 'true' && steps.tracer_verify.outcome == 'success' && steps.tracer_verify.outputs.native_verified == 'true'
+        if: success() && steps.tracer_source.outcome == 'success' && steps.tracer_source.outputs.source_unchanged == 'true' && steps.tracer_verify.outcome == 'success' && steps.tracer_verify.outputs.native_verified == 'true' && steps.keyboard_source.outcome == 'success' && steps.keyboard_source.outputs.source_unchanged == 'true' && steps.keyboard_verify.outcome == 'success' && steps.keyboard_verify.outputs.native_verified == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         run: python3 tasks/desert-rv/art/journey-preparation/pipeline.py stage --kind armored

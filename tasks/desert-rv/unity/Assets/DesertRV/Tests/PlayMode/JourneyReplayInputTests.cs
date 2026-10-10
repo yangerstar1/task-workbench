@@ -14,6 +14,165 @@ namespace DesertRV.Tests
         static object Call(object obj, string name, params object[] args) => obj.GetType().GetMethod(name).Invoke(obj, args);
         static object Get(object obj, string name) => obj.GetType().GetProperty(name).GetValue(obj);
         static object E(string type, string value) => Enum.Parse(T(type), value);
+
+        const BindingFlags Instance = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance;
+        static object Invoke(object target, string name, params object[] args) => target.GetType().GetMethod(name, Instance).Invoke(target, args);
+        static object Field(object target, string name) => target.GetType().GetField(name, Instance).GetValue(target);
+        static void Field(object target, string name, object value) => target.GetType().GetField(name, Instance).SetValue(target, value);
+
+        // Controlled held-key samples exercise the production adapter and motor in native Unity.
+        // They are not evidence that OS keyboard events or a rendered player were exercised.
+        sealed class KeyboardFixture : IDisposable
+        {
+            public readonly GameObject Root = new GameObject("keyboard look input fixture");
+            public readonly Component Adapter, Session, Motor;
+            public readonly object State, Touch;
+            readonly CursorLockMode cursorLock = Cursor.lockState;
+            readonly bool cursorVisible = Cursor.visible;
+            public KeyboardFixture()
+            {
+                Adapter = Root.AddComponent(T("MobileInputAdapter"));
+                Session = Root.AddComponent(T("JourneySession")); ((Behaviour)Session).enabled = false;
+                State = Get(Session, "State"); Touch = Get(Adapter, "State");
+                Call(Adapter, "Sample"); // Initialize screen/safe-area before fixture input.
+                Call(State, "Start"); Call(State, "SetControl", E("ControlMode", "OnFoot"));
+                Call(Adapter, "SetContext", E("TouchContext", "OnFoot"));
+                var vehicle = Child("fixture vehicle"); vehicle.position = new Vector3(10000,1000,10000);
+                var hinge = Child("fixture door hinge"); hinge.SetParent(vehicle, false);
+                var view = Child("fixture camera").gameObject.AddComponent<Camera>(); view.enabled = false;
+                var motorObject = Child("fixture motor").gameObject; motorObject.SetActive(false);
+                Motor = motorObject.AddComponent(T("JourneyMotor"));
+                Field(Motor, "journey", Session); Field(Motor, "vehicle", vehicle);
+                Field(Motor, "doorHinge", hinge); Field(Motor, "view", view);
+                motorObject.SetActive(true); ((Behaviour)Motor).enabled = false;
+                view.GetComponent<AudioListener>().enabled = false;
+                var walker = (CharacterController)Field(Motor, "walker");
+                walker.transform.position = vehicle.position; walker.enabled = true;
+                Cursor.lockState = CursorLockMode.None; Cursor.visible = true;
+            }
+            Transform Child(string name)
+            { var child = new GameObject(name).transform; child.SetParent(Root.transform, false); return child; }
+            public Vector2 Look => (Vector2)Get(Adapter, "Look");
+            public void Configure(float speed = 60) => Call(Adapter, "ConfigureKeyboardLook", true, speed);
+            public void Rearm(bool held = false) => Invoke(Adapter, "RearmKeyboardWhenReleased", held);
+            public void Sample(float delta, bool left = false, bool right = true, bool up = false, bool down = false,
+                bool focused = true, bool touch = false) =>
+                Invoke(Adapter, "SampleKeyboardLook", left, right, up, down, focused, touch, delta);
+            public void Tick(float delta) { Call(Motor, "Tick", delta); Call(Adapter, "ConsumeFrame"); }
+            public void Dispose()
+            {
+                UnityEngine.Object.DestroyImmediate(Root);
+                Cursor.lockState = cursorLock; Cursor.visible = cursorVisible;
+            }
+        }
+
+        [Test] public void KeyboardLook_RateAndBounds()
+        {
+            using (var f = new KeyboardFixture())
+            {
+                f.Configure(); f.Rearm();
+                foreach (int fps in new[] { 30, 60, 120 })
+                {
+                    Field(f.Motor, "yaw", 0f); Field(f.Motor, "pitch", 0f);
+                    for (int frame = 0; frame < fps; frame++) { f.Sample(1f / fps); f.Tick(1f / fps); }
+                    Assert.That((float)Field(f.Motor, "yaw"), Is.EqualTo(60).Within(.002f), "Look -> Motor must integrate degrees once at " + fps + " FPS.");
+                }
+                Field(f.Motor, "pitch", 0f);
+                for (int frame = 0; frame < 120; frame++) { f.Sample(1f / 60, right:false, up:true); f.Tick(1f / 60); }
+                Assert.That((float)Field(f.Motor, "pitch"), Is.EqualTo(-70).Within(.001f));
+                for (int frame = 0; frame < 180; frame++) { f.Sample(1f / 60, right:false, down:true); f.Tick(1f / 60); }
+                Assert.That((float)Field(f.Motor, "pitch"), Is.EqualTo(70).Within(.001f));
+                foreach (float invalidSpeed in new[] { float.NaN, float.PositiveInfinity, float.NegativeInfinity })
+                { f.Configure(invalidSpeed); Assert.That(Get(f.Adapter, "KeyboardLookSpeed"), Is.EqualTo(60f)); }
+                f.Configure(-100); Assert.That(Get(f.Adapter, "KeyboardLookSpeed"), Is.EqualTo(30f));
+                f.Configure(1000); Assert.That(Get(f.Adapter, "KeyboardLookSpeed"), Is.EqualTo(120f)); f.Rearm();
+                foreach (float invalidDelta in new[] { 0, -.1f, float.NaN, float.PositiveInfinity, float.NegativeInfinity })
+                { f.Sample(invalidDelta); Assert.That(f.Look, Is.EqualTo(Vector2.zero)); }
+                f.Sample(10); Assert.That(f.Look.x, Is.EqualTo(12).Within(.0001f), "A stall cannot queue an unbounded turn.");
+                f.Sample(.1f, up:true); Assert.That(f.Look.magnitude, Is.EqualTo(12).Within(.0001f));
+                f.Sample(.1f, left:true, up:true, down:true); Assert.That(f.Look, Is.EqualTo(Vector2.zero));
+                f.Sample(.1f, left:true, right:false); Assert.That(f.Look.x, Is.EqualTo(-12).Within(.0001f));
+            }
+        }
+
+        [Test] public void KeyboardLook_ContextAndRelease()
+        {
+            using (var f = new KeyboardFixture())
+            {
+                Assert.That(Get(f.Adapter, "KeyboardLookEnabled"), Is.False);
+                Assert.That(Get(f.Adapter, "KeyboardLookSpeed"), Is.EqualTo(60f));
+                f.Rearm(); f.Sample(1f / 60); Assert.That(f.Look, Is.EqualTo(Vector2.zero));
+                f.Configure(); f.Rearm(true); f.Sample(1f / 60); Assert.That(f.Look, Is.EqualTo(Vector2.zero));
+                f.Rearm(); f.Sample(1f / 60); Assert.That(f.Look.x, Is.EqualTo(1).Within(.0001f));
+                Call(f.Session, "TogglePause"); Assert.That(f.Look, Is.EqualTo(Vector2.zero));
+                f.Sample(1f / 60); Assert.That(f.Look, Is.EqualTo(Vector2.zero));
+                Call(f.Session, "TogglePause"); f.Rearm(true); f.Sample(1f / 60); Assert.That(f.Look, Is.EqualTo(Vector2.zero));
+                Cursor.lockState = CursorLockMode.None;
+                f.Rearm(); f.Sample(1f / 60); Assert.That(f.Look.x, Is.EqualTo(1).Within(.0001f));
+                Invoke(f.Session, "OnApplicationFocus", false); Assert.That(f.Look, Is.EqualTo(Vector2.zero));
+                Invoke(f.Session, "OnApplicationFocus", true); f.Rearm(true); f.Sample(1f / 60); Assert.That(f.Look, Is.EqualTo(Vector2.zero));
+                Cursor.lockState = CursorLockMode.None;
+                f.Rearm(); f.Sample(1f / 60); Assert.That(f.Look.x, Is.EqualTo(1).Within(.0001f));
+                f.Sample(1f / 60, focused:false); Assert.That(f.Look, Is.EqualTo(Vector2.zero));
+                f.Sample(1f / 60, touch:true); Assert.That(f.Look, Is.EqualTo(Vector2.zero));
+                f.Sample(1f / 60); Call(f.Adapter, "ConsumeFrame"); Assert.That(f.Look, Is.EqualTo(Vector2.zero));
+                foreach (string context in new[] { "Driving", "Overlay" })
+                {
+                    Call(f.Adapter, "SetContext", E("TouchContext", context)); f.Rearm();
+                    f.Sample(1f / 60); Assert.That(f.Look, Is.EqualTo(Vector2.zero));
+                }
+                Call(f.Adapter, "SetContext", E("TouchContext", "OnFoot")); f.Rearm(); f.Sample(1f / 60);
+                Call(f.State, "DamagePlayer", 100);
+                Assert.That(Call(f.Session, "RestartJourney"), Is.True); Assert.That(f.Look, Is.EqualTo(Vector2.zero));
+                Call(f.State, "SetControl", E("ControlMode", "OnFoot")); Call(f.Adapter, "SetContext", E("TouchContext", "OnFoot"));
+                f.Rearm(true); f.Sample(1f / 60); Assert.That(f.Look, Is.EqualTo(Vector2.zero));
+                f.Rearm(); f.Sample(1f / 60); Assert.That(f.Look.x, Is.EqualTo(1).Within(.0001f));
+                f.Configure(120); f.Rearm(true); f.Sample(1f / 60); Assert.That(f.Look, Is.EqualTo(Vector2.zero));
+                f.Rearm(); f.Sample(1f / 60); Assert.That(f.Look.x, Is.EqualTo(2).Within(.0001f));
+                f.Sample(1f / 60, right:false); Assert.That(f.Look, Is.EqualTo(Vector2.zero), "Key-up stops rotation in the next sample.");
+                Invoke(f.Adapter, "OnDisable"); Assert.That(f.Look, Is.EqualTo(Vector2.zero));
+            }
+        }
+
+        [Test] public void KeyboardLook_PreservesExistingSources()
+        {
+            using (var f = new KeyboardFixture())
+            {
+                f.Configure(); f.Rearm();
+                Call(f.Touch, "Begin", 42001, E("TouchControl", "Look")); Call(f.Touch, "Move", 42001, .02f, -.03f);
+                Call(f.Touch, "Begin", 42002, E("TouchControl", "Move")); Call(f.Touch, "Move", 42002, .4f, .6f);
+                Call(f.Touch, "Begin", 42003, E("TouchControl", "Fire"));
+                Vector2 expectedMovement = Vector2.ClampMagnitude(new Vector2(.4f, .6f) +
+                    new Vector2(Input.GetAxisRaw("Horizontal"), Input.GetAxisRaw("Vertical")), 1);
+                f.Sample(1f / 60);
+                Assert.That(f.Look.x, Is.EqualTo(4).Within(.0001f), "Touch contributes 3 degrees; keyboard contributes 1, without another x150.");
+                Assert.That(f.Look.y, Is.EqualTo(-4.5f).Within(.0001f));
+                Assert.That((Vector2)Get(f.Adapter, "Movement"), Is.EqualTo(expectedMovement));
+                Assert.That(Get(f.Adapter, "Fire"), Is.True);
+                Call(f.Adapter, "ConsumeFrame"); Assert.That(f.Look, Is.EqualTo(Vector2.zero));
+                Assert.That(Get(f.Adapter, "Fire"), Is.True, "Look consumption does not clear held touch fire.");
+                Call(f.Adapter, "ConfigureKeyboardLook", false, 60f); f.Rearm();
+                Call(f.Touch, "End", 42001); Call(f.Touch, "Begin", 42001, E("TouchControl", "Look"));
+                Call(f.Touch, "Move", 42001, .02f, -.03f); f.Sample(1f / 60);
+                Assert.That(f.Look.x, Is.EqualTo(3).Within(.0001f)); Assert.That(f.Look.y, Is.EqualTo(-4.5f).Within(.0001f));
+            }
+        }
+
+        [Test] public void KeyboardLook_EditorReplayIsExclusive()
+        {
+            using (var f = new KeyboardFixture())
+            {
+                f.Configure(); f.Rearm(); f.Sample(1f / 60); Assert.That(f.Look.x, Is.EqualTo(1).Within(.0001f));
+                Call(f.Adapter, "AttachEditorReplay", f.Root); Assert.That(f.Look, Is.EqualTo(Vector2.zero));
+                Call(f.Touch, "Begin", 42011, E("TouchControl", "Look")); Call(f.Touch, "Move", 42011, .02f, -.03f);
+                Call(f.Adapter, "SetEditorReplayFingers", f.Root, new[] { 42011 }); Call(f.Adapter, "Sample");
+                Assert.That((Vector2)Field(f.Adapter, "keyboardLookDelta"), Is.EqualTo(Vector2.zero));
+                Assert.That(Field(f.Adapter, "keyboardArmed"), Is.False);
+                Assert.That(f.Look.x, Is.EqualTo(3).Within(.0001f)); Assert.That(f.Look.y, Is.EqualTo(-4.5f).Within(.0001f));
+                Call(f.Adapter, "DetachEditorReplay", f.Root); Assert.That(f.Look, Is.EqualTo(Vector2.zero));
+            }
+        }
+
         [UnityTest] public IEnumerator HeldFire_SurvivesAdapterSampleWithoutNewPressedEdge()
         {
             var go = new GameObject("replay ownership test"); var adapter = go.AddComponent(T("MobileInputAdapter"));
