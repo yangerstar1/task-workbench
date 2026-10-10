@@ -1,4 +1,4 @@
-"""Single-use fresh shader producer push; never a restoration or manual route."""
+"""Single-use isolated cabin diagnostic push; no producer, player or manual route."""
 import hashlib
 import json
 import os
@@ -8,14 +8,14 @@ import subprocess
 import sys
 
 ROOT = Path(__file__).resolve().parents[3]
-BASE = '8e4e88ccd526f2f5f0225a564610732a0d733628'
+BASE = '2c64f9b5a8cb86ea9a0beb6de582b7209e6f136c'
 BRANCH = 'journey-tracer-shader-fix-6648'
 REF = 'refs/heads/' + BRANCH
 REPOSITORY = 'yangerstar1/task-workbench'
 OWNER = 'yangerstar1'
 WORKFLOW = '.github/workflows/desert-rv-tracer-shader-prepare.yml'
-REQUEST = '.github/dispatch/desert-rv-tracer-shader-prepare-keyboard-empty-r1-20261010.json'
-REQUEST_ID = 'desert-rv-tracer-shader-prepare-keyboard-empty-r1-20261010-once'
+REQUEST = '.github/dispatch/desert-rv-cabin-entry-probe-r1-20261010.json'
+REQUEST_ID = 'desert-rv-cabin-entry-probe-r1-20261010-once'
 SOURCE = 'tasks/desert-rv/SOURCE-STATE.json'
 SELECTION = 'tasks/desert-rv/art/journey-preparation/three-strict-candidates.json'
 
@@ -127,9 +127,9 @@ def main():
             with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as stream:
                 stream.write('selection=' + SELECTION + '\nselection_sha256=' + request['selectionSha256'] + '\n')
     except Exception:
-        print('TRACER_PRODUCER_IDENTITY_REJECTED')
+        print('CABIN_DIAGNOSTIC_IDENTITY_REJECTED')
         raise SystemExit(2) from None
-    print('TRACER_PRODUCER_IDENTITY_VERIFIED')
+    print('CABIN_DIAGNOSTIC_IDENTITY_VERIFIED')
 
 
 if __name__ == '__main__':

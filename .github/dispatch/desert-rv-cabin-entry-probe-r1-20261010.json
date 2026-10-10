@@ -1,0 +1,8 @@
+{
+  "schema": 1,
+  "requestId": "desert-rv-cabin-entry-probe-r1-20261010-once",
+  "baseCommit": "2c64f9b5a8cb86ea9a0beb6de582b7209e6f136c",
+  "sourceStateSha256": "3ffafc3a2c44774fbdb9e0dd9fb753e13bd08280650f5e6f7d9e61e749b3f854",
+  "selection": "tasks/desert-rv/art/journey-preparation/three-strict-candidates.json",
+  "selectionSha256": "dfbc3b9a5959350b69544828ab3e6dbb5cfb7f01895fa985c0eefdb38e051f24"
+}

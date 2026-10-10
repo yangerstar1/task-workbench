@@ -1,8 +1,8 @@
-name: Desert RV fresh tracer shader producer and Linux candidate
+name: Desert RV isolated native cabin entry diagnostic
 on:
   push:
     branches: [journey-tracer-shader-fix-6648]
-    paths: [.github/dispatch/desert-rv-tracer-shader-prepare-keyboard-empty-r1-20261010.json]
+    paths: [.github/dispatch/desert-rv-cabin-entry-probe-r1-20261010.json]
 permissions:
   contents: read
   actions: read
@@ -16,7 +16,7 @@ jobs:
       github.event_name == 'push' && github.ref == 'refs/heads/journey-tracer-shader-fix-6648' &&
       github.actor == 'yangerstar1' && github.triggering_actor == 'yangerstar1'
     runs-on: ubuntu-24.04
-    timeout-minutes: 230
+    timeout-minutes: 60
     env:
       GITHUB_REPOSITORY_VISIBILITY: ${{ github.event.repository.visibility }}
     steps:
@@ -25,7 +25,7 @@ jobs:
           persist-credentials: false
           lfs: false
           fetch-depth: 2
-      - name: Verify the single-use tracer producer push
+      - name: Verify the single-use cabin diagnostic push
         id: dispatch_identity
         run: |
           /usr/bin/python3 tasks/desert-rv/scripts/test_journey_tracer_dispatch.py
@@ -96,6 +96,7 @@ jobs:
           /usr/bin/python3 tasks/desert-rv/scripts/test_journey_tracer_source_diagnostic.py
           /usr/bin/python3 tasks/desert-rv/scripts/test_journey_tracer_native.py
           /usr/bin/python3 tasks/desert-rv/scripts/test_journey_keyboard_look_native.py
+          /usr/bin/python3 tasks/desert-rv/scripts/test_journey_cabin_entry_native.py
           /usr/bin/python3 tasks/desert-rv/scripts/player/test_verify_tracer_shader.py
           /usr/bin/python3 tasks/desert-rv/art/journey-preparation/test_pipeline.py
           /usr/bin/python3 tasks/desert-rv/art/journey-preparation/test_generated_export.py
@@ -115,53 +116,9 @@ jobs:
         run: |
           bash tasks/desert-rv/scripts/prepare_runner.sh
           docker build --build-arg BASE_IMAGE=unityci/editor@sha256:17406791cf1e438bea2dac20671668e05d83db5ed38c916744815db4584a8264 --file tasks/desert-rv/scripts/Environment.Dockerfile --tag desert-rv-environment:local tasks/desert-rv/scripts
-      - name: Native exact ten tracer material cases before strict imports
-        id: tracer_native
-        uses: game-ci/unity-test-runner@0ff419b913a3630032cbe0de48a0099b5a9f0ed9
-        env:
-          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
-          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
-          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
-        with:
-          unityVersion: 6000.3.19f1
-          customImage: desert-rv-environment:local
-          projectPath: tasks/desert-rv/unity
-          testMode: editmode
-          artifactsPath: tasks/desert-rv/artifacts/journey-tracer-material
-          customParameters: -assemblyNames DesertRV.EditModeTests -testFilter DesertRV.Tests.JourneyTracerMaterialTests -force-glcore -job-worker-count 2
-          dockerCpuLimit: 2
-          dockerMemoryLimit: 12g
-      - name: Diagnose original source and import union even after failed native tests
-        id: tracer_source
-        if: always() && steps.tracer_native.outcome != 'skipped'
-        env:
-          NATIVE_OUTCOME: ${{ steps.tracer_native.outcome }}
-        run: python3 tasks/desert-rv/scripts/journey_tracer_source_diagnostic.py
-      - name: Upload bounded original source and fixture residue diagnostics
-        if: always() && steps.tracer_source.outputs.report_written == 'true' && steps.tracer_source.outputs.report_valid == 'true'
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        with:
-          name: journey-tracer-source-${{ github.run_id }}-${{ github.run_attempt }}
-          path: tasks/desert-rv/journey-tracer-source-report.json
-          if-no-files-found: error
-          retention-days: 7
-      - name: Require exact ten passes and unchanged initial source and import union
-        id: tracer_verify
-        if: always() && steps.tracer_native.outcome != 'skipped'
-        env:
-          NATIVE_OUTCOME: ${{ steps.tracer_native.outcome }}
-        run: python3 tasks/desert-rv/scripts/journey_tracer_native.py
-      - name: Upload bounded validated tracer native status
-        if: always() && steps.tracer_verify.outputs.report_written == 'true' && steps.tracer_verify.outputs.report_valid == 'true'
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        with:
-          name: journey-tracer-native-${{ github.run_id }}-${{ github.run_attempt }}
-          path: tasks/desert-rv/journey-tracer-native-report.json
-          if-no-files-found: error
-          retention-days: 7
       - name: Create exact same-commit isolated keyboard look project
         id: keyboard_copy
-        if: success() && steps.tracer_source.outcome == 'success' && steps.tracer_source.outputs.source_unchanged == 'true' && steps.tracer_verify.outcome == 'success' && steps.tracer_verify.outputs.native_verified == 'true'
+        if: success()
         run: python3 tasks/desert-rv/scripts/journey_keyboard_look_native.py copy
       - name: Native exact four keyboard look PlayMode cases before strict imports
         id: keyboard_native
@@ -178,6 +135,23 @@ jobs:
           testMode: playmode
           artifactsPath: tasks/desert-rv/artifacts/journey-keyboard-look
           customParameters: -assemblyNames DesertRV.PlayModeTests -testFilter DesertRV.Tests.JourneyReplayInputTests.KeyboardLook_RateAndBounds;DesertRV.Tests.JourneyReplayInputTests.KeyboardLook_ContextAndRelease;DesertRV.Tests.JourneyReplayInputTests.KeyboardLook_PreservesExistingSources;DesertRV.Tests.JourneyReplayInputTests.KeyboardLook_EditorReplayIsExclusive -force-glcore -job-worker-count 2
+          dockerCpuLimit: 2
+          dockerMemoryLimit: 12g
+      - name: Diagnose actual RV entry across five timesteps independently
+        id: cabin_native
+        if: always() && !cancelled() && steps.keyboard_copy.outputs.copy_ready == 'true'
+        uses: game-ci/unity-test-runner@0ff419b913a3630032cbe0de48a0099b5a9f0ed9
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+        with:
+          unityVersion: 6000.3.19f1
+          customImage: desert-rv-environment:local
+          projectPath: tasks/desert-rv/journey-keyboard-look-project
+          testMode: playmode
+          artifactsPath: tasks/desert-rv/artifacts/journey-cabin-entry
+          customParameters: -assemblyNames DesertRV.PlayModeTests -testFilter DesertRV.Tests.JourneyCabinEntryPhysicsTests.RealRV_StandardExitToCabin_AllTimesteps -force-glcore -job-worker-count 2
           dockerCpuLimit: 2
           dockerMemoryLimit: 12g
       - name: Preserve isolated project source and complete safe settings diff
@@ -223,6 +197,20 @@ jobs:
       - name: Preserve separate keyboard look reports in preparation evidence
         if: always() && steps.keyboard_source.outputs.report_valid == 'true' && steps.keyboard_verify.outputs.report_valid == 'true' && steps.keyboard_isolation.outputs.report_valid == 'true'
         run: python3 tasks/desert-rv/scripts/journey_keyboard_look_native.py preserve
+      - name: Preserve complete safe cabin physics observations even on native failure
+        id: cabin_report
+        if: always() && steps.keyboard_copy.outputs.copy_created == 'true'
+        env:
+          NATIVE_OUTCOME: ${{ steps.cabin_native.outcome }}
+        run: python3 tasks/desert-rv/scripts/journey_cabin_entry_native.py
+      - name: Upload bounded validated cabin physics diagnosis
+        if: always() && steps.cabin_report.outputs.report_written == 'true' && steps.cabin_report.outputs.report_valid == 'true'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: journey-cabin-entry-native-${{ github.run_id }}-${{ github.run_attempt }}
+          path: tasks/desert-rv/journey-cabin-entry-native-report.json
+          if-no-files-found: error
+          retention-days: 7
       - name: Remove only the owned isolated keyboard look project
         id: keyboard_cleanup
         if: always() && steps.keyboard_copy.outputs.copy_created == 'true' && steps.keyboard_isolation.outputs.report_valid == 'true'
@@ -237,218 +225,6 @@ jobs:
             test "$actual" = "$expected"
           done
           sudo --preserve-env=GITHUB_SHA,GITHUB_RUN_ID,GITHUB_RUN_ATTEMPT /usr/bin/python3 -I -B tasks/desert-rv/scripts/journey_keyboard_look_native.py cleanup
-      - name: Stage verified armored source archive
-        id: stage_armored
-        if: success() && steps.tracer_source.outcome == 'success' && steps.tracer_source.outputs.source_unchanged == 'true' && steps.tracer_verify.outcome == 'success' && steps.tracer_verify.outputs.native_verified == 'true' && steps.keyboard_source.outcome == 'success' && steps.keyboard_source.outputs.source_unchanged == 'true' && steps.keyboard_verify.outcome == 'success' && steps.keyboard_verify.outputs.native_verified == 'true' && steps.keyboard_isolation.outputs.copy_verified == 'true' && steps.keyboard_cleanup.outcome == 'success'
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: python3 tasks/desert-rv/art/journey-preparation/pipeline.py stage --kind armored
-      - name: Native strict armored import and actual capture
-        id: armored
-        uses: game-ci/unity-test-runner@0ff419b913a3630032cbe0de48a0099b5a9f0ed9
-        env:
-          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
-          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
-          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
-        with:
-          unityVersion: 6000.3.19f1
-          customImage: desert-rv-environment:local
-          projectPath: tasks/desert-rv/unity
-          testMode: editmode
-          artifactsPath: tasks/desert-rv/artifacts/journey-strict-armored
-          customParameters: -assemblyNames DesertRV.CandidateArtTests -force-glcore -job-worker-count 2
-          dockerCpuLimit: 2
-          dockerMemoryLimit: 12g
-      - name: Reuse exact strict quality gate and preserve armored reports
-        if: always() && steps.stage_armored.outcome == 'success'
-        env:
-          NATIVE: ${{ steps.armored.outcome }}
-        run: python3 tasks/desert-rv/art/journey-preparation/pipeline.py collect --kind armored --native "$NATIVE"
-      - name: Stage verified pouncer source archive
-        id: stage_pouncer
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: python3 tasks/desert-rv/art/journey-preparation/pipeline.py stage --kind pouncer
-      - name: Native strict pouncer import and actual capture
-        id: pouncer
-        uses: game-ci/unity-test-runner@0ff419b913a3630032cbe0de48a0099b5a9f0ed9
-        env:
-          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
-          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
-          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
-        with:
-          unityVersion: 6000.3.19f1
-          customImage: desert-rv-environment:local
-          projectPath: tasks/desert-rv/unity
-          testMode: editmode
-          artifactsPath: tasks/desert-rv/artifacts/journey-strict-pouncer
-          customParameters: -assemblyNames DesertRV.CandidateArtTests -force-glcore -job-worker-count 2
-          dockerCpuLimit: 2
-          dockerMemoryLimit: 12g
-      - name: Reuse exact strict quality gate and preserve pouncer reports
-        if: always() && steps.stage_pouncer.outcome == 'success'
-        env:
-          NATIVE: ${{ steps.pouncer.outcome }}
-        run: python3 tasks/desert-rv/art/journey-preparation/pipeline.py collect --kind pouncer --native "$NATIVE"
-      - name: Stage verified weapon source archive
-        id: stage_weapon
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: python3 tasks/desert-rv/art/journey-preparation/pipeline.py stage --kind weapon
-      - name: Native strict weapon import and actual capture
-        id: weapon
-        uses: game-ci/unity-test-runner@0ff419b913a3630032cbe0de48a0099b5a9f0ed9
-        env:
-          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
-          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
-          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
-        with:
-          unityVersion: 6000.3.19f1
-          customImage: desert-rv-environment:local
-          projectPath: tasks/desert-rv/unity
-          testMode: editmode
-          artifactsPath: tasks/desert-rv/artifacts/journey-strict-weapon
-          customParameters: -assemblyNames DesertRV.CandidateArtTests -force-glcore -job-worker-count 2
-          dockerCpuLimit: 2
-          dockerMemoryLimit: 12g
-      - name: Reuse exact strict quality gate and preserve weapon reports
-        if: always() && steps.stage_weapon.outcome == 'success'
-        env:
-          NATIVE: ${{ steps.weapon.outcome }}
-        run: python3 tasks/desert-rv/art/journey-preparation/pipeline.py collect --kind weapon --native "$NATIVE"
-      - name: Require exact three-candidate union and freeze real selections
-        run: python3 tasks/desert-rv/art/journey-preparation/pipeline.py ready
-      - name: Native exact candidate Linux boundary tests
-        id: linux_boundary
-        uses: game-ci/unity-test-runner@0ff419b913a3630032cbe0de48a0099b5a9f0ed9
-        env:
-          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
-          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
-          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
-        with:
-          unityVersion: 6000.3.19f1
-          customImage: desert-rv-environment:local
-          projectPath: tasks/desert-rv/unity
-          testMode: editmode
-          artifactsPath: tasks/desert-rv/artifacts/journey-linux-boundary
-          customParameters: -assemblyNames DesertRV.CandidateLinuxTests -force-glcore -job-worker-count 2
-          dockerCpuLimit: 2
-          dockerMemoryLimit: 12g
-      - name: Require exact seventeen passing candidate boundary cases
-        run: python3 tasks/desert-rv/art/journey-preparation/linux_build_input.py verify-boundary
-      - name: Native original FX, four scenes, integration and diagnostic scope
-        id: author
-        uses: game-ci/unity-test-runner@0ff419b913a3630032cbe0de48a0099b5a9f0ed9
-        env:
-          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
-          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
-          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
-        with:
-          unityVersion: 6000.3.19f1
-          customImage: desert-rv-environment:local
-          projectPath: tasks/desert-rv/unity
-          testMode: editmode
-          artifactsPath: tasks/desert-rv/artifacts/journey-preparation
-          customParameters: -assemblyNames DesertRV.JourneyPreparationTests -force-glcore -job-worker-count 2
-          dockerCpuLimit: 2
-          dockerMemoryLimit: 12g
-      - name: Verify actual preparation test, saved outputs and final scope pins
-        id: finish
-        if: always() && steps.author.outcome != 'skipped'
-        env:
-          NATIVE: ${{ steps.author.outcome }}
-        run: python3 tasks/desert-rv/art/journey-preparation/pipeline.py finish --native "$NATIVE"
-      - name: Prepare exact same-job candidate Linux input
-        id: linux_input
-        if: success() && steps.finish.outcome == 'success'
-        run: python3 tasks/desert-rv/art/journey-preparation/linux_build_input.py prepare
-      - name: Read pinned official activation and return scripts
-        if: success() && steps.linux_input.outcome == 'success'
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
-        with:
-          repository: game-ci/unity-test-runner
-          ref: 0ff419b913a3630032cbe0de48a0099b5a9f0ed9
-          path: _ci/gameci-journey-linux
-          persist-credentials: false
-          lfs: false
-      - name: Validate build-only source and reuse existing pinned image
-        if: success() && steps.linux_input.outcome == 'success'
-        run: |
-          python3 tasks/desert-rv/scripts/player/journey_linux_export.py before
-          docker build --build-arg BASE_IMAGE=desert-rv-environment:local --file tasks/desert-rv/scripts/rendered/Rendered.Dockerfile --tag desert-rv-journey-linux:local tasks/desert-rv/scripts/rendered
-      - name: Build candidate Linux player without launching it
-        id: linux_native
-        if: success() && steps.linux_input.outcome == 'success'
-        env:
-          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
-          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
-          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
-        run: |
-          set +x
-          docker run --rm --init --cpus=2 --memory=12g --stop-timeout=210 \
-            --workdir /github/workspace \
-            --volume "$GITHUB_WORKSPACE:/github/workspace" \
-            --volume "$GITHUB_WORKSPACE/_ci/gameci-journey-linux/dist:/gameci:ro" \
-            --env UNITY_LICENSE --env UNITY_EMAIL --env UNITY_PASSWORD \
-            --env GITHUB_ACTIONS --env GITHUB_SHA --env GITHUB_RUN_ID --env GITHUB_RUN_ATTEMPT \
-            --env GITHUB_REPOSITORY --env GITHUB_REF --env GITHUB_ACTOR --env GITHUB_TRIGGERING_ACTOR \
-            --env GITHUB_EVENT_NAME --env GITHUB_WORKFLOW_REF --env GITHUB_EVENT_PATH=/github/workflow/event.json \
-            --volume "$GITHUB_EVENT_PATH:/github/workflow/event.json:ro" \
-            --env RUNNER_ENVIRONMENT --env RUNNER_OS --env GITHUB_REPOSITORY_VISIBILITY \
-            --entrypoint /bin/bash desert-rv-journey-linux:local \
-            /github/workspace/tasks/desert-rv/scripts/player/journey_linux_container.sh
-      - name: Reverify prepared source and exact candidate asset union
-        id: linux_verify
-        if: success() && steps.linux_native.outcome == 'success'
-        run: python3 tasks/desert-rv/art/journey-preparation/linux_build_input.py verify
-      - name: Export only reusable candidate runtime or fixed failure status
-        id: linux_public
-        if: always() && steps.linux_native.outcome != 'skipped'
-        env:
-          NATIVE_OUTCOME: ${{ steps.linux_native.outcome }}
-          UNION_OUTCOME: ${{ steps.linux_verify.outcome }}
-        run: python3 tasks/desert-rv/scripts/player/journey_linux_export.py export
-      - name: Upload existing safe Linux control status and native receipt
-        if: always() && steps.linux_public.outputs.export_ready == 'true'
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        with:
-          name: journey-linux-build-status-${{ github.run_id }}-${{ github.run_attempt }}
-          path: |
-            tasks/desert-rv/journey-linux-public-export/status.json
-            tasks/desert-rv/journey-linux-public-export/control.json
-            tasks/desert-rv/journey-linux-public-export/native-build-receipt.json
-          if-no-files-found: error
-          retention-days: 7
-      - name: Verify actual player shader registry after safe export
-        id: shader_registry
-        if: success() && steps.linux_public.outputs.export_ready == 'true'
-        env:
-          EXPORT_OUTCOME: ${{ steps.linux_public.outcome }}
-        run: python3 tasks/desert-rv/scripts/player/verify_tracer_shader.py
-      - name: Upload bounded validated shader registry status
-        if: always() && steps.shader_registry.outputs.report_written == 'true' && steps.shader_registry.outputs.report_valid == 'true'
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        with:
-          name: journey-tracer-shader-registry-${{ github.run_id }}-${{ github.run_attempt }}
-          path: tasks/desert-rv/journey-tracer-shader-report.json
-          if-no-files-found: error
-          retention-days: 7
-      - name: Upload bounded unreviewed Linux candidate bundle
-        if: success() && steps.linux_public.outputs.export_ready == 'true' && steps.shader_registry.outcome == 'success' && steps.shader_registry.outputs.shader_registry_pass == 'true'
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        with:
-          name: journey-linux-CANDIDATE-NOT-PLAYTESTED-${{ github.run_id }}-${{ github.run_attempt }}
-          path: tasks/desert-rv/journey-linux-public-export/
-          if-no-files-found: error
-          retention-days: 7
       - name: Prove tracked original source was not edited
         if: always()
         run: git diff --quiet --exit-code && git diff --cached --quiet --exit-code
-      - name: Upload only existing strict-safe exports and bounded preparation status
-        if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        with:
-          name: journey-preparation-UNREVIEWED-${{ github.run_id }}-${{ github.run_attempt }}
-          path: tasks/desert-rv/journey-preparation-export/
-          if-no-files-found: warn
-          retention-days: 7

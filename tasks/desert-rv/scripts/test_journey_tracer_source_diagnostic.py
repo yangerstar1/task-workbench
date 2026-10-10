@@ -166,11 +166,11 @@ class RealWorkflowFixtureTests(unittest.TestCase):
             run(['/usr/bin/python3','tasks/desert-rv/scripts/verify_evidence.py','guard'],env)
             run(['/usr/bin/python3','tasks/desert-rv/scripts/backup/restore_unity_font.py'],env)
             run(['/usr/bin/python3','tasks/desert-rv/art/journey-preparation/pipeline.py','init','--selection',dispatch.SELECTION,'--sha256',request['selectionSha256']],env)
-            workflow=yaml.load((root/dispatch.WORKFLOW).read_text(),Loader=yaml.BaseLoader);steps=workflow['jobs']['prepare']['steps'];step=next(s for s in steps if s.get('id')=='tracer_source')
-            self.assertEqual(step['if'],"always() && steps.tracer_native.outcome != 'skipped'")
-            self.assertIn("steps.tracer_source.outputs.source_unchanged == 'true'",next(s for s in steps if s.get('id')=='stage_armored')['if'])
+            workflow=yaml.load((root/dispatch.WORKFLOW).read_text(),Loader=yaml.BaseLoader);steps=workflow['jobs']['prepare']['steps'];step=next(s for s in steps if s.get('id')=='keyboard_source')
+            self.assertEqual(step['if'],"always() && steps.keyboard_copy.outputs.copy_created == 'true'")
+            self.assertNotIn('stage_armored',[s.get('id') for s in steps])
             # A failed native outcome must not suppress a genuinely clean source result.
-            run(['bash','-e','-c',step['run']],env);report=root/'tasks/desert-rv/journey-tracer-source-report.json';clean=json.loads(report.read_text());self.assertTrue(clean['sourceUnchanged']);self.assertEqual(clean['nativeOutcome'],'failure');report.unlink()
+            run(['bash','-e','-c',step['run']],env);report=root/'tasks/desert-rv/journey-keyboard-look-source-report.json';clean=json.loads(report.read_text());self.assertTrue(clean['sourceUnchanged']);self.assertEqual(clean['nativeOutcome'],'failure');report.unlink()
             # The exact HEAD baseline stays unchanged while native output modifies bytes.
             mat=root/d.MATERIAL;before=mat.read_bytes();mat.write_bytes(before+b'\n# changed by host fixture\n')
             lock=root/d.SEMANTIC_PATHS[1];lock_before=lock.read_bytes();value=json.loads(lock_before);value['dependencies']['com.unity.test-framework']['depth']=7;lock.write_text(json.dumps(value))
@@ -185,7 +185,7 @@ class RealWorkflowFixtureTests(unittest.TestCase):
             self.assertEqual(sha(root/dispatch.SOURCE),request['sourceStateSha256']);self.assertEqual(mat.read_bytes(),before+b'\n# changed by host fixture\n')
             self.assertIn('report_valid=true',Path(env['GITHUB_OUTPUT']).read_text())
             # The original native/source gate remains failed; diagnostic export is no waiver.
-            original=next(s for s in steps if s.get('id')=='tracer_verify');run(['bash','-e','-c',original['run']],env,2)
+            original=next(s for s in steps if s.get('id')=='keyboard_verify');run(['bash','-e','-c',original['run']],env,2)
             self.assertNotIn('native_verified=true',Path(env['GITHUB_OUTPUT']).read_text())
 
 

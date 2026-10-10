@@ -56,17 +56,16 @@ class KeyboardNativeEvidenceTests(unittest.TestCase):
                                         env=dict(os.environ, CUSTOM_PARAMETERS=native['with']['customParameters'])).decode().splitlines()
         self.assertEqual(actual, ['-assemblyNames', 'DesertRV.PlayModeTests', '-testFilter', ';'.join(n.EXPECTED), '-force-glcore', '-job-worker-count', '2'])
         order = [s.get('id', '') for s in steps]
-        self.assertLess(order.index('tracer_verify'), order.index('keyboard_native'))
+        self.assertLess(order.index('keyboard_copy'), order.index('keyboard_native'))
         self.assertLess(order.index('keyboard_native'), order.index('keyboard_source'))
         self.assertLess(order.index('keyboard_source'), order.index('keyboard_verify'))
-        self.assertLess(order.index('keyboard_verify'), order.index('stage_armored'))
+        self.assertLess(order.index('keyboard_verify'), order.index('keyboard_cleanup'))
         for ident in ('keyboard_source', 'keyboard_verify'):
             step = next(s for s in steps if s.get('id') == ident)
             self.assertEqual(step['if'], "always() && steps.keyboard_copy.outputs.copy_created == 'true'" if ident == 'keyboard_source' else "always() && steps.keyboard_native.outcome != 'skipped'")
-        stage = next(s for s in steps if s.get('id') == 'stage_armored')
-        for expression in ("steps.keyboard_source.outcome == 'success'", "steps.keyboard_source.outputs.source_unchanged == 'true'",
-                           "steps.keyboard_verify.outcome == 'success'", "steps.keyboard_verify.outputs.native_verified == 'true'"):
-            self.assertIn(expression, stage['if'])
+        self.assertNotIn('stage_armored', order)
+        self.assertIn('cabin_native', order)
+        self.assertIn('cabin_report', order)
 
     def test_omitted_duplicate_extra_failed_skipped_and_wrong_counts_reject(self):
         names = list(n.EXPECTED)
@@ -381,14 +380,14 @@ class IsolatedProjectLifecycleTests(unittest.TestCase):
         real=Path(__file__).resolve().parents[3]
         steps=yaml.load((real/'.github/workflows/desert-rv-tracer-shader-prepare.yml').read_text(),Loader=yaml.BaseLoader)['jobs']['prepare']['steps']
         order=[step.get('id') for step in steps]
-        for before,after in [('tracer_verify','keyboard_copy'),('keyboard_copy','keyboard_native'),('keyboard_native','keyboard_isolation'),('keyboard_isolation','keyboard_verify'),('keyboard_verify','keyboard_cleanup'),('keyboard_cleanup','stage_armored')]:
+        for before,after in [('keyboard_copy','keyboard_native'),('keyboard_native','cabin_native'),('cabin_native','keyboard_isolation'),('keyboard_isolation','keyboard_verify'),('keyboard_verify','cabin_report'),('cabin_report','keyboard_cleanup')]:
             self.assertLess(order.index(before),order.index(after))
         cleanup=next(step for step in steps if step.get('id')=='keyboard_cleanup')
         self.assertIn('sudo --preserve-env=GITHUB_SHA,GITHUB_RUN_ID,GITHUB_RUN_ATTEMPT /usr/bin/python3 -I -B tasks/desert-rv/scripts/journey_keyboard_look_native.py cleanup',cleanup['run'])
         self.assertNotIn('rm -rf',cleanup['run']); self.assertNotIn('chmod',cleanup['run']); self.assertNotIn('chown',cleanup['run'])
-        stage=next(step for step in steps if step.get('id')=='stage_armored')
-        self.assertIn("steps.keyboard_cleanup.outcome == 'success'",stage['if'])
-        self.assertIn("steps.keyboard_isolation.outputs.copy_verified == 'true'",stage['if'])
+        self.assertNotIn('stage_armored',order)
+        self.assertNotIn('linux_native',order)
+
 
 
 if __name__ == '__main__':

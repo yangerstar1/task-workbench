@@ -85,8 +85,8 @@
     },
     {
       "path": ".github/workflows/desert-rv-tracer-shader-prepare.yml",
-      "sha256": "6b815715b4ec28a34d2d2fda28d4bbf819d1967b04e894448b4764a48b6d1dc9",
-      "size": 26649
+      "sha256": "fc26d7d2955419474c54749336633d3d83cf83a132bda73fbde805f030fe1714",
+      "size": 13767
     },
     {
       "path": "tasks/desert-rv/ASSET-NOTICES.md",
@@ -474,6 +474,11 @@
       "size": 19377
     },
     {
+      "path": "tasks/desert-rv/scripts/journey_cabin_entry_native.py",
+      "sha256": "36ed6b6edabf082db0332cd41a0311838a47914685f1500f7cd11e6b7c41bc76",
+      "size": 20343
+    },
+    {
       "path": "tasks/desert-rv/scripts/journey_keyboard_look_native.py",
       "sha256": "f14c9b9b231222aadd5d776b33d712f4e828cf865d657168cf5b06937a46e287",
       "size": 35367
@@ -485,8 +490,8 @@
     },
     {
       "path": "tasks/desert-rv/scripts/journey_tracer_dispatch.py",
-      "sha256": "32f84ede38f2ea535ecf7e44576bd2ade1fc3d44eaa2002c7b897c36d330fde7",
-      "size": 6551
+      "sha256": "57a3c70ee9cc0fc1d30377c92c76c2a7a251dc0ddede9585587497a81362ea66",
+      "size": 6519
     },
     {
       "path": "tasks/desert-rv/scripts/journey_tracer_native.py",
@@ -689,9 +694,14 @@
       "size": 79839
     },
     {
+      "path": "tasks/desert-rv/scripts/test_journey_cabin_entry_native.py",
+      "sha256": "4cc84ba887570296c774cad3ea3391f0e99d1ed0fdc44119c13cc14e5df63462",
+      "size": 13488
+    },
+    {
       "path": "tasks/desert-rv/scripts/test_journey_keyboard_look_native.py",
-      "sha256": "48642b4675e0d5df16679f13c3b466fe9ca96829ecba97c899c5bc97dbb783a6",
-      "size": 32522
+      "sha256": "73802ee34afdc14afdb9847beeae494491d4bf3d9ee2c1ef810df433b44e157c",
+      "size": 32110
     },
     {
       "path": "tasks/desert-rv/scripts/test_journey_rebuild_dispatch.py",
@@ -700,8 +710,8 @@
     },
     {
       "path": "tasks/desert-rv/scripts/test_journey_tracer_dispatch.py",
-      "sha256": "4530622ae37aca4af545d18d3eae7a50f7ab922fbd1234b75833a93f4ed89e69",
-      "size": 13759
+      "sha256": "4995ff9a9b63bd924ab3fd903285dd2a09e2c7d56964393d437293c87360985e",
+      "size": 12886
     },
     {
       "path": "tasks/desert-rv/scripts/test_journey_tracer_native.py",
@@ -710,8 +720,8 @@
     },
     {
       "path": "tasks/desert-rv/scripts/test_journey_tracer_source_diagnostic.py",
-      "sha256": "74ce09acadd4859b22c8348e1c9c58db682d44d280ab00d466fdc71272444277",
-      "size": 17793
+      "sha256": "5292e84786596011b379900bb056e362b1519889182abe1ee30186c43f3b6dee",
+      "size": 17744
     },
     {
       "path": "tasks/desert-rv/scripts/test_safe_diagnostic_export.py",
@@ -5511,6 +5521,16 @@
     {
       "path": "tasks/desert-rv/unity/Assets/DesertRV/Tests/PlayMode/DesertRV.PlayModeTests.asmdef.meta",
       "sha256": "3a802dd76e3af1136321b25a140da650c9810eaa4ccf42bf9754abea818e0b8b",
+      "size": 60
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Tests/PlayMode/JourneyCabinEntryPhysicsTests.cs",
+      "sha256": "abad9acc32c51629dba41baaf95b3ddd5b9492d99ef7b41e26c9e66c5428173a",
+      "size": 25157
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Tests/PlayMode/JourneyCabinEntryPhysicsTests.cs.meta",
+      "sha256": "a02372c8a4bc48a53f1c9b47e0ee9ae10d7a0570641f147f8ebc7cafba8dde5e",
       "size": 60
     },
     {

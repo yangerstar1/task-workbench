@@ -86,7 +86,7 @@ class IdentityTests(unittest.TestCase):
 
 
 class RealGitAndWorkflowTests(unittest.TestCase):
-    def test_real_git_and_actual_workflow_bridge_reach_both_guards(self):
+    def test_real_git_and_host_runner_prefix_reach_both_guards(self):
         import sys
         import verify_evidence as source
         sys.path.insert(0, str(d.ROOT / 'tasks/desert-rv/art/journey-preparation'))
@@ -122,14 +122,9 @@ class RealGitAndWorkflowTests(unittest.TestCase):
                 git('add','.');git('commit','-m','single request');head=git('rev-parse','HEAD')
                 event=root/'event.json';event.write_text(json.dumps(fixture_event(head,parent)));env=fixture_env(head,str(event))
                 workflow=(d.ROOT/d.WORKFLOW).read_text()
-                block=workflow.split('      - name: Build candidate Linux player without launching it\n',1)[1].split('      - name:',1)[0]
-                declared=re.findall(r'--env ([A-Z_]+)(?:=([^\s]+))?',block)
-                forwarded={key:value or env.get(key,'') for key,value in declared if key in env or key=='GITHUB_EVENT_PATH'}
-                self.assertEqual(forwarded['GITHUB_EVENT_PATH'],'/github/workflow/event.json')
-                self.assertIn('--volume "$GITHUB_EVENT_PATH:/github/workflow/event.json:ro"',block)
-                self.assertEqual(set(forwarded),set(env))
-                mounted=root/'container/github/workflow/event.json';mounted.parent.mkdir(parents=True);mounted.write_bytes(event.read_bytes());mounted.chmod(0o444)
-                forwarded['GITHUB_EVENT_PATH']=str(mounted)
+                self.assertIn('bash tasks/desert-rv/scripts/prepare_runner.sh',workflow)
+                self.assertNotIn('journey_linux_container.sh',workflow)
+                forwarded=dict(env)
                 with mock.patch.object(d,'BASE',parent),mock.patch.dict(os.environ,forwarded,clear=True),mock.patch.object(pipeline,'REPO',root):
                     self.assertEqual(source_sha,d.verify(root,forwarded)['sourceStateSha256'])
                     pipeline.guard();source.guard()
@@ -160,19 +155,18 @@ class RealGitAndWorkflowTests(unittest.TestCase):
         self.assertEqual(workflow.split(start,1)[1].split('      - name: Prepare official validators',1)[0],
                          old.split(start,1)[1].split('      - name: Verify fresh source',1)[0])
         order=['id: dispatch_identity','Verify current source before fixed-image readiness','id: image_precheck',
-               'pipeline.py init','JOURNEY_HOSTED_ROOT_CACHE_TEST:','UNITY_LICENSE:','id: tracer_native','id: tracer_verify',
-               'id: stage_armored','id: stage_pouncer','id: stage_weapon','pipeline.py ready','id: linux_boundary',
-               'linux_build_input.py verify-boundary','id: author','pipeline.py finish','linux_build_input.py prepare',
-               'journey_linux_export.py before','id: linux_native','id: linux_verify','id: linux_public','id: shader_registry',
-               'Upload bounded unreviewed Linux candidate bundle']
+               'pipeline.py init','JOURNEY_HOSTED_ROOT_CACHE_TEST:','UNITY_LICENSE:',
+               'id: keyboard_copy','id: keyboard_native','id: cabin_native','id: keyboard_isolation',
+               'id: keyboard_source','id: keyboard_verify','id: cabin_report','id: keyboard_cleanup',
+               'Prove tracked original source was not edited']
         positions=[workflow.index(text) for text in order];self.assertEqual(positions,sorted(positions))
-        self.assertNotIn('workflow_dispatch:',workflow);self.assertNotIn('restore_preparation.py',workflow)
-        self.assertNotIn('prepare-restored',workflow);self.assertNotIn('restoration-transition',workflow)
-        self.assertIn('-assemblyNames DesertRV.EditModeTests -testFilter DesertRV.Tests.JourneyTracerMaterialTests',workflow)
-        self.assertEqual(workflow.count('-assemblyNames DesertRV.CandidateArtTests'),3)
-        self.assertIn('-assemblyNames DesertRV.CandidateLinuxTests',workflow)
-        self.assertIn('-assemblyNames DesertRV.JourneyPreparationTests',workflow)
-        self.assertIn("steps.shader_registry.outputs.shader_registry_pass == 'true'",workflow)
+        for forbidden in ('workflow_dispatch:', 'restore_preparation.py', 'prepare-restored',
+                          'restoration-transition', 'id: stage_armored', 'id: linux_native',
+                          'id: shader_registry', 'DesertRV.CandidateArtTests', 'DesertRV.CandidateLinuxTests',
+                          'DesertRV.JourneyPreparationTests', 'journey_linux_container.sh'):
+            self.assertNotIn(forbidden,workflow)
+        self.assertEqual(workflow.count('uses: game-ci/unity-test-runner@'),2)
+        self.assertIn('DesertRV.Tests.JourneyCabinEntryPhysicsTests.RealRV_StandardExitToCabin_AllTimesteps',workflow)
         runner=(d.ROOT/'tasks/desert-rv/scripts/prepare_runner.sh').read_text()
         self.assertLess(runner.index('journey_tracer_dispatch.py'),runner.index('UNITY_LICENSE'))
         self.assertIn('else\n    /usr/bin/python3 "$(dirname "${BASH_SOURCE[0]}")/journey_rebuild_dispatch.py" --verify-only',runner)
