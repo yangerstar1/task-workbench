@@ -8,14 +8,14 @@ import subprocess
 import sys
 
 ROOT = Path(__file__).resolve().parents[3]
-BASE = '5eb792ead590507b58868aea7854bb56c92516e4'
+BASE = '8e4e88ccd526f2f5f0225a564610732a0d733628'
 BRANCH = 'journey-tracer-shader-fix-6648'
 REF = 'refs/heads/' + BRANCH
 REPOSITORY = 'yangerstar1/task-workbench'
 OWNER = 'yangerstar1'
 WORKFLOW = '.github/workflows/desert-rv-tracer-shader-prepare.yml'
-REQUEST = '.github/dispatch/desert-rv-tracer-shader-prepare-keyboard-isolated-r1-20261010.json'
-REQUEST_ID = 'desert-rv-tracer-shader-prepare-keyboard-isolated-r1-20261010-once'
+REQUEST = '.github/dispatch/desert-rv-tracer-shader-prepare-keyboard-empty-r1-20261010.json'
+REQUEST_ID = 'desert-rv-tracer-shader-prepare-keyboard-empty-r1-20261010-once'
 SOURCE = 'tasks/desert-rv/SOURCE-STATE.json'
 SELECTION = 'tasks/desert-rv/art/journey-preparation/three-strict-candidates.json'
 

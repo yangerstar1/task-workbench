@@ -335,6 +335,47 @@ class IsolatedProjectLifecycleTests(unittest.TestCase):
         for payload, reason in [(b'  localFolder: /home/runner/private\n','ABSOLUTE_PATH'),(b'  apiToken: value\n','SENSITIVE_FIELD'),(b'  normal: ghp_PRIVATE_TOKEN\n','SENSITIVE_VALUE')]:
             with self.subTest(reason=reason), self.assertRaises(n.SettingsRejected) as caught: n.settings_diff(self.settings,self.settings+payload)
             self.assertEqual(caught.exception.reason,reason)
+    def test_actual_after_hash_reconstruction_replays_full_isolation_diff_and_validator(self):
+        # Actual runner after SHA/size; bytes reconstructed solely by adding one
+        # trailing space to the nine public single-line empty fields. No raw log.
+        real=Path(n.__file__).resolve().parents[3]/'tasks/desert-rv/unity'/n.SETTINGS
+        before=real.read_bytes(); self.assertEqual(hashlib.sha256(before).hexdigest(),'4508539ef0d76b843206ef4d05d4f0700c6eb0dc2d6a36d14174fc9072411577')
+        lines=before.splitlines(keepends=True)
+        starts=[i for i,line in enumerate(lines) if re.match(rb'^  [A-Za-z0-9_][A-Za-z0-9_ ]*:',line)]
+        indices=[i for j,i in enumerate(starts) if (starts[j+1] if j+1<len(starts) else len(lines))==i+1 and re.fullmatch(rb'  [A-Za-z0-9_][A-Za-z0-9_ ]*:\n',lines[i])]
+        self.assertEqual(len(indices),9)
+        after=b''.join(line[:-1]+b' \n' if i in indices else line for i,line in enumerate(lines))
+        self.assertEqual(len(after),22351); self.assertEqual(hashlib.sha256(after).hexdigest(),'5dfc460eab7c3d48818bad6069e9458130ae742a152b41d98a3b61943d2446f0')
+        (self.project/n.SETTINGS).write_bytes(before); self.rows.clear(); self.rows.update(n.protected_inventory(self.project)[0])
+        self.create(); (self.copy/n.SETTINGS).write_bytes(after)
+        value=self.inspect(0); self.assertEqual(value['settingsStatus'],'COMPLETE_DIFF');self.assertEqual(value['settingsRejectedFields'],[])
+        self.assertEqual(value['allowedEmptySensitiveFields'],[dict(field=field,beforeValueKind='EMPTY_NULL',afterValueKind='EMPTY_NULL') for field in ('AndroidKeystoreName','metroCertificatePassword','ps4NPTitleSecret')])
+        changed=copy.deepcopy(value);changed['allowedEmptySensitiveFields']=[];self.assertFalse(n.validate_isolation(changed))
+        changed=copy.deepcopy(value);changed['allowedEmptySensitiveFields'][0]['afterValueKind']='EMPTY_STRING';self.assertFalse(n.validate_isolation(changed))
+        self.assertEqual(n.apply_settings_diff(before,value['settingsDiff']),after)
+        self.assertEqual(n.cleanup_copy(self.env),0); self.assertEqual((self.project/n.SETTINGS).read_bytes(),before)
+    def test_sensitive_field_only_existing_explicit_single_line_empty_literals_are_allowed(self):
+        original=b'  secretSetting: \n'
+        for literal in (b'',b' ',b'null',b'Null',b'NULL',b'~',b"''",b'""'):
+            after=self.settings.replace(original,b'  secretSetting: '+literal+b'\n')
+            with self.subTest(literal=literal):
+                diff=n.settings_diff(self.settings,after)
+                if diff:self.assertEqual(n.apply_settings_diff(self.settings,diff),after)
+        variants=[(self.settings,self.settings.replace(original,b'  secretSetting: PRIVATE_TOKEN\n'),'EMPTY_NULL','NONEMPTY_OR_UNSAFE'),
+                  (self.settings,self.settings.replace(original,b'  secretSetting: # hidden\n'),'EMPTY_NULL','NONEMPTY_OR_UNSAFE'),
+                  (self.settings,self.settings.replace(original,b'  secretSetting: " "\n'),'EMPTY_NULL','NONEMPTY_OR_UNSAFE'),
+                  (self.settings,self.settings.replace(original,b'  secretSetting: |\n    \n'),'EMPTY_NULL','NONEMPTY_OR_UNSAFE'),
+                  (self.settings,self.settings+b'  newPassword: \n','ABSENT','EMPTY_NULL'),
+                  (self.settings,self.settings.replace(original,b''),'EMPTY_NULL','ABSENT'),
+                  (self.settings.replace(original,b'  secretSetting: PRIVATE_TOKEN\n'),self.settings,'NONEMPTY_OR_UNSAFE','EMPTY_NULL')]
+        for before,after,old_kind,new_kind in variants:
+            with self.subTest(beforeKind=old_kind,afterKind=new_kind),self.assertRaises(n.SettingsRejected) as caught:n.settings_diff(before,after)
+            self.assertEqual(caught.exception.reason,'SENSITIVE_FIELD');self.assertEqual(caught.exception.before_kind,old_kind);self.assertEqual(caught.exception.after_kind,new_kind)
+        self.create(); (self.copy/n.SETTINGS).write_bytes(self.settings.replace(original,b'  secretSetting: PRIVATE_TOKEN\n'))
+        report=self.inspect(2)
+        self.assertEqual(report['settingsRejectedFields'],[dict(field='secretSetting',reason='SENSITIVE_FIELD',beforeValueKind='EMPTY_NULL',afterValueKind='NONEMPTY_OR_UNSAFE')])
+        self.assertNotIn('PRIVATE_TOKEN',self.report.read_text());self.assertEqual(report['settingsDiff'],'')
+        rejected=copy.deepcopy(report);rejected['settingsRejectedFields'][0]['afterValueKind']='PRIVATE_TOKEN';self.assertFalse(n.validate_isolation(rejected))
     def test_workflow_preserves_diagnostics_before_fixed_cleanup_and_expensive_stages(self):
         import yaml
         real=Path(__file__).resolve().parents[3]

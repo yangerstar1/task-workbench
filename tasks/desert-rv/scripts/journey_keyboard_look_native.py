@@ -207,13 +207,28 @@ def create_copy(env):
 
 
 class SettingsRejected(ValueError):
-    def __init__(self, field, reason):
+    def __init__(self, field, reason, before_kind='NOT_CHECKED', after_kind='NOT_CHECKED'):
+        self.before_kind = before_kind
+        self.after_kind = after_kind
         self.field = field if re.fullmatch(r'[A-Za-z_][A-Za-z0-9_ ]{0,95}', field) else 'UNSAFE_FIELD_NAME'
         self.reason = reason
         super().__init__('SETTINGS_REJECTED')
 
 
-def settings_diff(before, after):
+EMPTY_KINDS = {'EMPTY_NULL', 'EMPTY_STRING'}
+VALUE_KINDS = EMPTY_KINDS | {'ABSENT', 'NONEMPTY_OR_UNSAFE', 'NOT_CHECKED'}
+
+
+def empty_setting_kind(field, block, value):
+    if block is None: return 'ABSENT'
+    if len(block) != 1 or re.fullmatch(r'  ' + re.escape(field) + r':[ \t]*(?:null|Null|NULL|~|\'\'|"")?[ \t]*\n', block[0]) is None:
+        return 'NONEMPTY_OR_UNSAFE'
+    if value is None: return 'EMPTY_NULL'
+    if type(value) is str and value == '': return 'EMPTY_STRING'
+    return 'NONEMPTY_OR_UNSAFE'
+
+
+def settings_diff(before, after, allowed_empty=None):
     require(len(before) <= MAX_DIFF and len(after) <= MAX_DIFF, 'SETTINGS_SIZE')
     old = before.decode('utf-8'); new = after.decode('utf-8')
     require(old.endswith('\n') and new.endswith('\n') and '\r' not in old + new and '\x00' not in old + new, 'SETTINGS_TEXT')
@@ -275,9 +290,17 @@ def settings_diff(before, after):
                 for item in value: inspect(item, field, depth + 1)
             return
         raise SettingsRejected(field, 'VALUE_TYPE')
-    for key in set(old_blocks) | set(new_blocks):
+    for key in sorted(set(old_blocks) | set(new_blocks)):
         if old_blocks.get(key) == new_blocks.get(key): continue
-        if SENSITIVE.search(key): raise SettingsRejected(key, 'SENSITIVE_FIELD')
+        if SENSITIVE.search(key):
+            before_kind = empty_setting_kind(key, old_blocks.get(key), old_values.get(key))
+            after_kind = empty_setting_kind(key, new_blocks.get(key), new_values.get(key))
+            # Existing single-line empty values only. No comments, hidden scalar,
+            # added/removed credential field, nonempty value or nested structure.
+            if before_kind in EMPTY_KINDS and after_kind in EMPTY_KINDS:
+                if allowed_empty is not None: allowed_empty.append(dict(field=key, beforeValueKind=before_kind, afterValueKind=after_kind))
+                continue
+            raise SettingsRejected(key, 'SENSITIVE_FIELD', before_kind, after_kind)
         inspect(new_values.get(key), key)
     diff = ''.join(difflib.unified_diff(old.splitlines(keepends=True), new.splitlines(keepends=True),
                    fromfile='before/' + SETTINGS, tofile='after/' + SETTINGS, n=0))
@@ -310,16 +333,16 @@ def apply_settings_diff(before, diff):
 
 
 def isolation_blank(env):
-    return dict(schema=1, **owner_identity(env), projectPath=COPY_REL, status='FAIL', reason='COPY_CHECK_FAILED',
+    return dict(schema=2, **owner_identity(env), projectPath=COPY_REL, status='FAIL', reason='COPY_CHECK_FAILED',
                 copyVerified=False, sourceStateSha256='', protectedFiles=0, otherSourceUnchanged=False,
                 changedPathCount=0, changedPathHashes=[], settingsStatus='NOT_CHECKED',
-                settingsBefore=None, settingsAfter=None, settingsDiff='', settingsRejectedFields=[], failureClass='NONE')
+                settingsBefore=None, settingsAfter=None, settingsDiff='', allowedEmptySensitiveFields=[], settingsRejectedFields=[], failureClass='NONE')
 
 
 def validate_isolation(value, check_diff=True):
     try:
         expected = isolation_blank(dict(GITHUB_SHA=value['sourceCommit'], GITHUB_RUN_ID=value['runId'], GITHUB_RUN_ATTEMPT=value['runAttempt']))
-        require(type(value) is dict and set(value) == set(expected) and type(value['schema']) is int and value['schema'] == 1 and value['projectPath'] == COPY_REL, 'ISOLATION_SCHEMA')
+        require(type(value) is dict and set(value) == set(expected) and type(value['schema']) is int and value['schema'] == 2 and value['projectPath'] == COPY_REL, 'ISOLATION_SCHEMA')
         require(value['status'] in {'PASS', 'FAIL'} and value['reason'] in {'COPY_CHECK_FAILED', 'ISOLATED_COPY_VERIFIED'}, 'ISOLATION_SCHEMA')
         require(type(value['copyVerified']) is bool and type(value['otherSourceUnchanged']) is bool, 'ISOLATION_SCHEMA')
         require(type(value['protectedFiles']) is int and 0 <= value['protectedFiles'] <= 4096 and
@@ -331,9 +354,15 @@ def validate_isolation(value, check_diff=True):
         for key in ('settingsBefore', 'settingsAfter'):
             pin = value[key]
             require(pin is None or type(pin) is dict and set(pin) == {'sha256', 'bytes'} and re.fullmatch('[a-f0-9]{64}', pin['sha256']) and type(pin['bytes']) is int and 0 <= pin['bytes'] <= MAX_DIFF, 'ISOLATION_SCHEMA')
+        allowed = value['allowedEmptySensitiveFields']
+        require(type(allowed) is list and len(allowed) <= 32, 'ISOLATION_SCHEMA')
+        for item in allowed:
+            require(type(item) is dict and set(item) == {'field', 'beforeValueKind', 'afterValueKind'} and isinstance(item['field'], str) and re.fullmatch(r'[A-Za-z_][A-Za-z0-9_ ]{0,95}', item['field']) and SENSITIVE.search(item['field']) and item['beforeValueKind'] in EMPTY_KINDS and item['afterValueKind'] in EMPTY_KINDS, 'ISOLATION_SCHEMA')
+        require([item['field'] for item in allowed] == sorted({item['field'] for item in allowed}), 'ISOLATION_SCHEMA')
+        require(not allowed or value['settingsStatus'] == 'COMPLETE_DIFF', 'ISOLATION_SCHEMA')
         require(type(value['settingsRejectedFields']) is list and len(value['settingsRejectedFields']) <= 1, 'ISOLATION_SCHEMA')
         for rejected in value['settingsRejectedFields']:
-            require(type(rejected) is dict and set(rejected) == {'field', 'reason'} and isinstance(rejected['field'], str) and re.fullmatch(r'[A-Za-z_][A-Za-z0-9_ ]{0,95}', rejected['field']) and rejected['reason'] in {'YAML_ALIAS_OR_TAG', 'YAML_INVALID', 'YAML_DUPLICATE', 'VALUE_LIMIT', 'SENSITIVE_VALUE', 'ABSOLUTE_PATH', 'SENSITIVE_URL', 'UNSAFE_FIELD_NAME', 'SENSITIVE_FIELD', 'VALUE_TYPE'}, 'ISOLATION_SCHEMA')
+            require(type(rejected) is dict and set(rejected) == {'field', 'reason', 'beforeValueKind', 'afterValueKind'} and rejected['beforeValueKind'] in VALUE_KINDS and rejected['afterValueKind'] in VALUE_KINDS and isinstance(rejected['field'], str) and re.fullmatch(r'[A-Za-z_][A-Za-z0-9_ ]{0,95}', rejected['field']) and rejected['reason'] in {'YAML_ALIAS_OR_TAG', 'YAML_INVALID', 'YAML_DUPLICATE', 'VALUE_LIMIT', 'SENSITIVE_VALUE', 'ABSOLUTE_PATH', 'SENSITIVE_URL', 'UNSAFE_FIELD_NAME', 'SENSITIVE_FIELD', 'VALUE_TYPE'}, 'ISOLATION_SCHEMA')
         require(not value['settingsRejectedFields'] or value['settingsStatus'] == 'REJECTED', 'ISOLATION_SCHEMA')
         require(type(value['settingsDiff']) is str and len(value['settingsDiff'].encode()) <= MAX_DIFF, 'ISOLATION_SCHEMA')
         if value['settingsStatus'] == 'COMPLETE_DIFF':
@@ -342,7 +371,8 @@ def validate_isolation(value, check_diff=True):
                 before = file_bytes(PROJECT / SETTINGS, MAX_DIFF)
                 require(raw_pin(before) == value['settingsBefore'], 'ISOLATION_BEFORE')
                 after = apply_settings_diff(before, value['settingsDiff'])
-                require(raw_pin(after) == value['settingsAfter'] and settings_diff(before, after) == value['settingsDiff'], 'ISOLATION_DIFF')
+                expected_empty = []
+                require(raw_pin(after) == value['settingsAfter'] and settings_diff(before, after, expected_empty) == value['settingsDiff'] and expected_empty == allowed, 'ISOLATION_DIFF')
         else: require(value['settingsDiff'] == '', 'ISOLATION_SCHEMA')
         if value['settingsStatus'] == 'UNCHANGED': require(value['settingsBefore'] is not None and value['settingsBefore'] == value['settingsAfter'], 'ISOLATION_SCHEMA')
         if value['status'] == 'PASS':
@@ -369,12 +399,13 @@ def inspect_copy(env):
         require(raw_pin(before) == rows[SETTINGS], 'FORMAL_SETTINGS_CHANGED')
         after = file_bytes(COPY / SETTINGS, MAX_DIFF)
         report.update(settingsBefore=raw_pin(before), settingsAfter=raw_pin(after), settingsStatus='REJECTED')
-        diff = settings_diff(before, after)
-        report.update(settingsStatus='COMPLETE_DIFF' if diff else 'UNCHANGED', settingsDiff=diff)
+        allowed_empty = []
+        diff = settings_diff(before, after, allowed_empty)
+        report.update(settingsStatus='COMPLETE_DIFF' if diff else 'UNCHANGED', settingsDiff=diff, allowedEmptySensitiveFields=allowed_empty)
         require(not changes, 'COPY_OTHER_SOURCE_CHANGED')
         report.update(status='PASS', reason='ISOLATED_COPY_VERIFIED')
     except Exception as error:
-        if isinstance(error, SettingsRejected): report['settingsRejectedFields'] = [dict(field=error.field, reason=error.reason)]
+        if isinstance(error, SettingsRejected): report['settingsRejectedFields'] = [dict(field=error.field, reason=error.reason, beforeValueKind=error.before_kind, afterValueKind=error.after_kind)]
         name = type(error).__name__
         report['failureClass'] = name if name in {'ValueError', 'StrictError', 'FileNotFoundError', 'PermissionError', 'OSError'} else 'OtherError'
     require(validate_isolation(report), 'ISOLATION_SCHEMA')

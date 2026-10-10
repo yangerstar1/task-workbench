@@ -85,8 +85,8 @@
     },
     {
       "path": ".github/workflows/desert-rv-tracer-shader-prepare.yml",
-      "sha256": "019184f0b74cabeffd1580f5ea201426fd393084e1ff1720f9a83bbff9f09e75",
-      "size": 26652
+      "sha256": "6b815715b4ec28a34d2d2fda28d4bbf819d1967b04e894448b4764a48b6d1dc9",
+      "size": 26649
     },
     {
       "path": "tasks/desert-rv/ASSET-NOTICES.md",
@@ -475,8 +475,8 @@
     },
     {
       "path": "tasks/desert-rv/scripts/journey_keyboard_look_native.py",
-      "sha256": "b3dc9b8e00176116000e53f23a21d58c4824368aab4b6e685a0fea40f75a4a43",
-      "size": 32948
+      "sha256": "f14c9b9b231222aadd5d776b33d712f4e828cf865d657168cf5b06937a46e287",
+      "size": 35367
     },
     {
       "path": "tasks/desert-rv/scripts/journey_rebuild_dispatch.py",
@@ -485,8 +485,8 @@
     },
     {
       "path": "tasks/desert-rv/scripts/journey_tracer_dispatch.py",
-      "sha256": "f5834efb4b3bd60781e15d3963d8ac0ea49f3b873302e2662619c3c6a556d040",
-      "size": 6557
+      "sha256": "32f84ede38f2ea535ecf7e44576bd2ade1fc3d44eaa2002c7b897c36d330fde7",
+      "size": 6551
     },
     {
       "path": "tasks/desert-rv/scripts/journey_tracer_native.py",
@@ -690,8 +690,8 @@
     },
     {
       "path": "tasks/desert-rv/scripts/test_journey_keyboard_look_native.py",
-      "sha256": "e9ec570784c3387db3b9397116bc37a3ff5170cee39432ceedae8ff05c638519",
-      "size": 28015
+      "sha256": "48642b4675e0d5df16679f13c3b466fe9ca96829ecba97c899c5bc97dbb783a6",
+      "size": 32522
     },
     {
       "path": "tasks/desert-rv/scripts/test_journey_rebuild_dispatch.py",

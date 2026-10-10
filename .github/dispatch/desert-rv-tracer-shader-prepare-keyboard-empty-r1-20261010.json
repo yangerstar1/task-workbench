@@ -1,0 +1,8 @@
+{
+  "schema": 1,
+  "requestId": "desert-rv-tracer-shader-prepare-keyboard-empty-r1-20261010-once",
+  "baseCommit": "8e4e88ccd526f2f5f0225a564610732a0d733628",
+  "sourceStateSha256": "ebcb83545a83ea434fcf94d52730461893fad4caaf0be0b12108bc42beee58a6",
+  "selection": "tasks/desert-rv/art/journey-preparation/three-strict-candidates.json",
+  "selectionSha256": "dfbc3b9a5959350b69544828ab3e6dbb5cfb7f01895fa985c0eefdb38e051f24"
+}
