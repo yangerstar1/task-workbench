@@ -1,0 +1,157 @@
+name: Desert RV single saved-scene interaction reachability diagnosis
+on:
+  push:
+    branches: [journey-interaction-reachability-ecd3]
+    paths: [.github/dispatch/desert-rv-interaction-reachability-r1-20261010.json]
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: desert-rv-interaction-reachability-ecd3-r1
+  cancel-in-progress: false
+jobs:
+  diagnose:
+    if: >-
+      github.repository == 'yangerstar1/task-workbench' &&
+      github.event_name == 'push' && github.ref == 'refs/heads/journey-interaction-reachability-ecd3' &&
+      github.actor == 'yangerstar1' && github.triggering_actor == 'yangerstar1'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    env:
+      GITHUB_REPOSITORY_VISIBILITY: ${{ github.event.repository.visibility }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+          lfs: false
+          fetch-depth: 2
+      - name: Verify exact one-use diagnostic identity and untouched source
+        run: |
+          python3 tasks/desert-rv/scripts/test_journey_interaction_reachability.py
+          python3 tasks/desert-rv/scripts/journey_interaction_reachability.py dispatch
+          python3 tasks/desert-rv/scripts/verify_evidence.py guard
+      - name: Verify fixed-image readiness with at most one bounded fallback pull
+        id: image_precheck
+        run: |
+          /usr/bin/python3 tasks/desert-rv/scripts/test_environment_image_precheck.py
+          test ! -e tasks/desert-rv/journey-image-precheck.json
+          test ! -L tasks/desert-rv/journey-image-precheck.json
+          set -o noclobber
+          exec 3> tasks/desert-rv/journey-image-precheck.json
+          set +e
+          /usr/bin/python3 tasks/desert-rv/scripts/environment_image_precheck.py >&3
+          precheck_exit=$?
+          set -e
+          exec 3>&-
+          echo 'report_written=true' >> "$GITHUB_OUTPUT"
+          PRECHECK_EXIT="$precheck_exit" /usr/bin/python3 - <<'PYCODE'
+          import json, os, pathlib, sys
+          sys.path.insert(0, 'tasks/desert-rv/scripts')
+          import environment_image_precheck as check
+          path=pathlib.Path('tasks/desert-rv/journey-image-precheck.json')
+          assert path.is_file() and not path.is_symlink() and 0 < path.stat().st_size <= 8192
+          value=json.loads(path.read_text(), object_pairs_hook=check.unique_object)
+          assert check.validate_report(value)
+          assert os.environ['PRECHECK_EXIT'] == ('0' if value['status']=='PASS' else '2')
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as output: output.write('report_valid=true\n')
+          PYCODE
+          exit "$precheck_exit"
+      - name: Validate bounded image observation and actual step outcome
+        id: image_report
+        if: always() && steps.image_precheck.outputs.report_written == 'true' && steps.image_precheck.outputs.report_valid == 'true'
+        env:
+          PRECHECK_OUTCOME: ${{ steps.image_precheck.outcome }}
+        run: |
+          /usr/bin/python3 - <<'PYCODE'
+          import json, os, pathlib, sys
+          sys.path.insert(0, 'tasks/desert-rv/scripts')
+          import environment_image_precheck as check
+          path=pathlib.Path('tasks/desert-rv/journey-image-precheck.json')
+          assert path.is_file() and not path.is_symlink() and 0 < path.stat().st_size <= 8192
+          value=json.loads(path.read_text(), object_pairs_hook=check.unique_object)
+          assert check.validate_report(value)
+          assert os.environ['PRECHECK_OUTCOME'] == ('success' if value['status']=='PASS' else 'failure')
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as output: output.write('export_ready=true\n')
+          PYCODE
+      - name: Upload only validated fixed image availability observation
+        if: always() && steps.image_precheck.outputs.report_written == 'true' && steps.image_report.outputs.export_ready == 'true'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: journey-image-precheck-${{ github.run_id }}-${{ github.run_attempt }}
+          path: tasks/desert-rv/journey-image-precheck.json
+          if-no-files-found: error
+          retention-days: 7
+      - name: Restore the exact source font
+        run: python3 tasks/desert-rv/scripts/backup/restore_unity_font.py
+      - name: Verify historical public artifact and stage the owned current-source copy
+        id: stage
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 tasks/desert-rv/scripts/journey_interaction_reachability.py stage
+      - name: Prepare the established licensed runner and pinned software renderer
+        if: success() && steps.stage.outputs.copy_ready == 'true'
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+        run: |
+          bash tasks/desert-rv/scripts/prepare_runner.sh
+          docker build --build-arg BASE_IMAGE=unityci/editor@sha256:17406791cf1e438bea2dac20671668e05d83db5ed38c916744815db4584a8264 --file tasks/desert-rv/scripts/Environment.Dockerfile --tag desert-rv-environment:local tasks/desert-rv/scripts
+      - name: Native one-case saved-scene dependency and reachability diagnosis
+        id: native
+        if: success() && steps.stage.outputs.copy_ready == 'true'
+        uses: game-ci/unity-test-runner@0ff419b913a3630032cbe0de48a0099b5a9f0ed9
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+        with:
+          unityVersion: 6000.3.19f1
+          customImage: desert-rv-environment:local
+          projectPath: tasks/desert-rv/journey-interaction-project
+          testMode: editmode
+          artifactsPath: tasks/desert-rv/artifacts/journey-interaction
+          customParameters: -assemblyNames DesertRV.InteractionReachabilityTests -testFilter DesertRV.Tests.JourneyInteractionReachabilityTests.SavedScenes_RecordProductionReachabilityAndExactBlockers -force-glcore -job-worker-count 2
+          dockerCpuLimit: 2
+          dockerMemoryLimit: 12g
+      - name: Preserve bounded report and XML-derived outcome even when native execution fails
+        id: report
+        if: always() && steps.stage.outcome != 'skipped'
+        env:
+          NATIVE_OUTCOME: ${{ steps.native.outcome }}
+        run: python3 tasks/desert-rv/scripts/journey_interaction_reachability.py finish
+      - name: Upload only validated interaction observations and input invariance
+        if: always() && steps.report.outputs.report_ready == 'true'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: journey-interaction-reachability-UNREVIEWED-${{ github.run_id }}-${{ github.run_attempt }}
+          path: tasks/desert-rv/journey-interaction-report.json
+          if-no-files-found: error
+          retention-days: 7
+      - name: Remove only the owned isolated interaction project
+        if: always() && steps.stage.outputs.copy_created == 'true'
+        run: |
+          set -euo pipefail
+          # Bound the privileged cleanup to reviewed helper bytes and their imports.
+          for source in journey_interaction_reachability.py journey_keyboard_look_native.py verify_evidence.py; do
+            relative="tasks/desert-rv/scripts/$source"
+            expected=$(git show "HEAD:$relative" | sha256sum | cut -d ' ' -f 1)
+            actual=$(sha256sum "$relative" | cut -d ' ' -f 1)
+            test "$actual" = "$expected"
+          done
+          for source in strict_output.py candidate_native_cases.py; do
+            relative="tasks/desert-rv/art/import-candidate/$source"
+            expected=$(git show "HEAD:$relative" | sha256sum | cut -d ' ' -f 1)
+            actual=$(sha256sum "$relative" | cut -d ' ' -f 1)
+            test "$actual" = "$expected"
+          done
+          relative=tasks/desert-rv/art/journey-preparation/generated_export.py
+          expected=$(git show "HEAD:$relative" | sha256sum | cut -d ' ' -f 1)
+          actual=$(sha256sum "$relative" | cut -d ' ' -f 1)
+          test "$actual" = "$expected"
+          sudo --preserve-env=GITHUB_SHA,GITHUB_RUN_ID,GITHUB_RUN_ATTEMPT /usr/bin/python3 -I -B tasks/desert-rv/scripts/journey_interaction_reachability.py cleanup
+      - name: Prove the formal source stayed unchanged
+        if: always()
+        run: |
+          git diff --quiet --exit-code
+          git diff --cached --quiet --exit-code
