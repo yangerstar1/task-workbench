@@ -40,6 +40,8 @@ namespace DesertRV.Editor
             if (!motor.ram || !motor.arc) throw new Exception("Retained upgrade model bindings missing");
             motor.ram.SetActive(false); motor.arc.SetActive(false);
             var controller = hostObject.AddComponent<FirstStationJourney>();
+            controller.nailTrajectoryMaterial = AssetDatabase.LoadAssetAtPath<Material>(JourneyTracerMaterial.AssetPath);
+            if (!JourneyTracerMaterial.IsValid(controller.nailTrajectoryMaterial)) throw new InvalidOperationException("Journey nail trajectory material or URP Unlit shader missing.");
             controller.journey = host; controller.motor = motor; controller.combatUnavailable = traversalOnly;
             var bench = reference.garageBench.GetComponent<Renderer>();
             controller.salvagePoint = Point("Salvage interaction", bench.transform, bench.bounds.center + Vector3.up * .3f);

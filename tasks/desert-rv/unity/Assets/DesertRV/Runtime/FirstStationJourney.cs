@@ -14,6 +14,7 @@ namespace DesertRV
         public GameObject salvageVisual;
         public BeastActor[] guards, roadBeasts;
         public AudioClip shotSound, hitSound, reloadSound, pickupSound, upgradeSound, windSound;
+        public Material nailTrajectoryMaterial;
         public string Notice { get; private set; }
         public string Prompt { get; private set; }
         public double WorldProgress => Vector3.Dot(motor.PlayerPosition, journeyDirection);
@@ -32,6 +33,7 @@ namespace DesertRV
         Vector3 journeyDirection;
         bool roadActivated;
         LineRenderer tracer;
+        bool tracerReady;
         float tracerRemaining;
         int interaction;
         Collider salvageSurface, workbenchSurface;
@@ -53,8 +55,9 @@ namespace DesertRV
             workbenchSurface = bench ? bench.GetComponent<Collider>() : null;
             tracer = new GameObject("Nail trajectory").AddComponent<LineRenderer>();
             tracer.positionCount = 2; tracer.startWidth = .008f; tracer.endWidth = .003f;
-            tracer.material = new Material(Shader.Find("Universal Render Pipeline/Unlit"));
-            tracer.material.color = new Color(1, .72f, .3f); tracer.enabled = false;
+            tracer.sharedMaterial = JourneyTracerMaterial.Validate(nailTrajectoryMaterial, this);
+            tracerReady = tracer.sharedMaterial != null; tracer.enabled = false;
+            tracer.transform.SetParent(transform, true);
             foreach (var beast in guards) if (beast) beast.gameObject.SetActive(false);
             foreach (var beast in roadBeasts) if (beast) beast.gameObject.SetActive(false);
         }
@@ -95,7 +98,7 @@ namespace DesertRV
             journey.TickStorm(delta, Vector3.Dot(motor.PlayerPosition, journeyDirection));
             if (state.Status != SessionStatus.Playing) { journey.Input.ReleaseAll(); return; }
             fireClock = Mathf.Max(0, fireClock - delta); hitFlash = Mathf.Max(0, hitFlash - delta); damageFlash = Mathf.Max(0, damageFlash - delta);
-            tracerRemaining -= delta; tracer.enabled = tracerRemaining > 0;
+            tracerRemaining -= delta; tracer.enabled = tracerReady && tracerRemaining > 0;
             noticeRemaining -= delta; if (noticeRemaining <= 0) Notice = "";
             if (state.PlayerHealth < lastHealth) { damageFlash = .3f; installRemaining = 0; }
             lastHealth = state.PlayerHealth;
@@ -193,7 +196,7 @@ namespace DesertRV
                 if (beast && beast.TakeHit(24, direction) > 0) { Play(hitSound, .35f); hitFlash = .1f; }
             }
             tracer.SetPosition(0, start + motor.view.transform.right * .2f - motor.view.transform.up * .18f + direction * .4f);
-            tracer.SetPosition(1, end); tracerRemaining = .06f; tracer.enabled = true;
+            tracer.SetPosition(1, end); tracerRemaining = .06f; tracer.enabled = tracerReady;
         }
         void Play(AudioClip clip, float volume) { if (clip) effects.PlayOneShot(clip, volume); }
         void Say(string message, float seconds) { Notice = message; noticeRemaining = seconds; }

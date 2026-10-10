@@ -40,6 +40,7 @@ namespace DesertRV
         public Transform cabinWorkbench;
         public Collider workbenchSurface;
         public AudioClip shotSound, hitSound, reloadSound, pickupSound, upgradeSound, windSound;
+        public Material nailTrajectoryMaterial;
         public RegionBinding Region { get; private set; }
         public RegionProgressState Progress { get; private set; }
         public string Notice { get; private set; }
@@ -55,6 +56,7 @@ namespace DesertRV
         int lastHealth;
         AudioSource effects, wind, reloadAudio;
         LineRenderer tracer;
+        bool tracerReady;
         float tracerRemaining;
         int interaction;
         JourneySupplyPoint nearbySupply;
@@ -69,8 +71,8 @@ namespace DesertRV
             wind.clip = windSound; wind.loop = true; wind.volume = .16f;
             tracer = new GameObject("Nail trajectory").AddComponent<LineRenderer>();
             tracer.positionCount = 2; tracer.startWidth = .008f; tracer.endWidth = .003f;
-            tracer.material = new Material(Shader.Find("Universal Render Pipeline/Unlit"));
-            tracer.material.color = new Color(1, .72f, .3f); tracer.enabled = false;
+            tracer.sharedMaterial = JourneyTracerMaterial.Validate(nailTrajectoryMaterial, this);
+            tracerReady = tracer.sharedMaterial != null; tracer.enabled = false;
             tracer.transform.SetParent(transform, true);
         }
         public void Bind(RegionBinding region, RegionProgressState progress)
@@ -117,7 +119,7 @@ namespace DesertRV
             if (!PresentationPlaying || !Region.gameObject.scene.IsValid() || !Region.gameObject.scene.isLoaded) { SetPaused(true); return; }
             SetPaused(false);
             fireClock = Mathf.Max(0, fireClock - delta); hitFlash = Mathf.Max(0, hitFlash - delta); damageFlash = Mathf.Max(0, damageFlash - delta);
-            tracerRemaining -= delta; tracer.enabled = tracerRemaining > 0;
+            tracerRemaining -= delta; tracer.enabled = tracerReady && tracerRemaining > 0;
             noticeRemaining -= delta; if (noticeRemaining <= 0) Notice = "";
             if (state.PlayerHealth < lastHealth) { damageFlash = .3f; installRemaining = 0; }
             lastHealth = state.PlayerHealth;
@@ -305,7 +307,7 @@ namespace DesertRV
             }
             // Aim/damage remain camera based; only the visible tracer starts at the authored muzzle.
             tracer.SetPosition(0, shotMuzzle ? shotMuzzle.position : start);
-            tracer.SetPosition(1, end); tracerRemaining = shotMuzzle ? .06f : 0; tracer.enabled = tracerRemaining > 0;
+            tracer.SetPosition(1, end); tracerRemaining = shotMuzzle ? .06f : 0; tracer.enabled = tracerReady && tracerRemaining > 0;
             Emit(ShotPresented, new ShotPresentationEvent(PresentationEpoch, ++shotSequence, end));
         }
         void Play(AudioClip clip, float volume) { if (clip) effects.PlayOneShot(clip, volume); }

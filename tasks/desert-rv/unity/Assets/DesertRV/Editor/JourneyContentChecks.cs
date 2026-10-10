@@ -192,6 +192,7 @@ namespace DesertRV.Editor
             Require(!d.transform.parent && d.journey && d.motor && d.actions && d.loader && d.hud,"Director persistent-root references missing.",errors);
             if (!d.motor || !d.actions || !d.loader || !d.hud) return;
             var motor = d.motor; var a = d.actions;
+            ValidateTracerMaterial(a.nailTrajectoryMaterial, d.gameObject.scene.path, errors);
             Require(motor.vehicle && motor.view && motor.ram && motor.arc && motor.entryStep && motor.doorHinge,"Retained RV/camera/two upgrades/entry bindings missing.",errors);
             foreach (var c in new Component[] { d.journey,motor,a,d.loader,d.hud,motor.vehicle,motor.view }) Require(c && c.transform.IsChildOf(d.transform),"Persistent dependency lies outside JourneyBootstrap.",errors);
             Require(d.hud.director == d && !d.hud.station && a.motor == motor && a.journey == d.journey && motor.journey == d.journey,"Runtime ownership links disagree.",errors);
@@ -217,6 +218,22 @@ namespace DesertRV.Editor
                 Require(instance && new HashSet<Mesh>(Meshes(m.weapon.prefab)).SetEquals(Meshes(instance.gameObject)),"Live weapon geometry must match the reviewed prefab.",errors);
             }
             if (motor.view && m.weapon?.prefab) Require(motor.view.GetComponentsInChildren<Transform>(true).Any(t => PrefabUtility.GetCorrespondingObjectFromSource(t.gameObject) == m.weapon.prefab),"Real weapon prefab must be instantiated beneath the persistent camera.",errors);
+        }
+        public static void ValidateTracerMaterial(Material material, string scenePath, List<string> errors)
+        {
+            string materialPath = AssetDatabase.GetAssetPath(material);
+            if (!JourneyTracerMaterial.IsValid(material) || materialPath != JourneyTracerMaterial.AssetPath)
+            { errors.Add("Bootstrap requires the authored JourneyNailTrajectory material with URP Unlit."); return; }
+            string shaderPath = AssetDatabase.GetAssetPath(material.shader);
+            Require(shaderPath == "Packages/com.unity.render-pipelines.universal/Shaders/Unlit.shader" &&
+                AssetDatabase.AssetPathToGUID(shaderPath) == "650dd9526735d5b46b79224bc6e94025",
+                "Tracer shader must reference the exact URP Unlit package asset.", errors);
+            Require(AssetDatabase.GetDependencies(materialPath, true).Contains(shaderPath),
+                "Tracer material has no saved dependency on its shader.", errors);
+            Require(!string.IsNullOrEmpty(scenePath) && File.Exists(scenePath) &&
+                AssetDatabase.GetDependencies(scenePath, true).Contains(materialPath) &&
+                AssetDatabase.GetDependencies(scenePath, true).Contains(shaderPath),
+                "Saved Bootstrap must include the tracer material and shader dependency. Reauthor and verify the scene.", errors);
         }
         static void ValidateSceneEnemy(BeastActor actor, JourneyContentManifest m, List<string> errors)
         {

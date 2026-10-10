@@ -65,6 +65,8 @@ namespace DesertRV.Editor
                 foreach (var root in sourceScene.GetRootGameObjects().Where(r => r.name == "Exposure response")) MoveUnder(root.transform, host.transform, boot);
                 motor.ram.SetActive(false); motor.arc.SetActive(false);
                 var actions = host.AddComponent<JourneyActions>(); actions.journey = session; actions.motor = motor;
+                actions.nailTrajectoryMaterial = AssetDatabase.LoadAssetAtPath<Material>(JourneyTracerMaterial.AssetPath);
+                if (!JourneyTracerMaterial.IsValid(actions.nailTrajectoryMaterial)) throw new InvalidOperationException("Journey nail trajectory material or URP Unlit shader missing.");
                 AuthorArcMeshGeometry(actions);
                 var repair = nodes.Single(t => t.name == "GEO-rear_repair_bench");
                 actions.workbenchSurface = ExactSurface(repair);
