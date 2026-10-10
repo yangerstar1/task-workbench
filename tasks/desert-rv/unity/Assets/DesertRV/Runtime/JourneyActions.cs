@@ -47,6 +47,23 @@ namespace DesertRV
         public string Prompt { get; private set; }
         public float HitConfirmation => hitFlash;
         public float DamageFeedback => damageFlash;
+        public BeastActor CloseRearThreat
+        {
+            get
+            {
+                if (!PresentationPlaying || !motor || !motor.view || !Region.gameObject.activeInHierarchy ||
+                    !Region.gameObject.scene.IsValid() || !Region.gameObject.scene.isLoaded ||
+                    Region.gameObject.scene != UnityEngine.SceneManagement.SceneManager.GetActiveScene()) return null;
+                BeastActor nearest = null; float distance = float.PositiveInfinity;
+                foreach (var enemy in Region.AllEnemies())
+                    if (enemy.IsCloseRearThreat(motor))
+                    {
+                        float candidate = (enemy.transform.position - motor.PlayerPosition).sqrMagnitude;
+                        if (candidate < distance) { nearest = enemy; distance = candidate; }
+                    }
+                return nearest;
+            }
+        }
         public bool Reloading => reloadRemaining > 0;
         public bool Installing => installRemaining > 0;
         public float ActionProgress => Installing ? 1 - installRemaining / 5f : Reloading ? 1 - reloadRemaining / 1.65f : 0;
@@ -191,13 +208,13 @@ namespace DesertRV
             ComponentPart part = Region.region == 1 ? ComponentPart.RamPart : ComponentPart.Coil;
             VehicleUpgrades upgrade = Region.region == 1 ? VehicleUpgrades.Ram : VehicleUpgrades.Arc;
             if (Region.region >= 2 && Near(Region.powerPoint, 2.5f))
-            { interaction = 6; Prompt = journey.State.PowerConnected ? "拔除电缆" : "连接房车供电"; }
+            { interaction = 6; Prompt = journey.State.PowerConnected ? "拔除电缆 · 暂停充能，敌人仍攻击" : "连接房车供电"; }
             else if (Region.region <= 2 && Near(Region.salvage, 2.5f) && !journey.State.HasPart(part) && (journey.State.Upgrades & upgrade) == 0)
             { interaction = 2; Prompt = Region.region == 1 ? "收取撞角组件" : "收取线圈"; }
             else if (motor.InsideCabin && Near(cabinWorkbench, 2.1f) && (journey.State.HasPart(ComponentPart.RamPart) || journey.State.HasPart(ComponentPart.Coil)))
             { interaction = 3; Prompt = "安装改装 · 5 秒"; }
             else if (motor.InsideCabin && Near(cabinWorkbench, 2.1f) && journey.State.VehicleHealth < 300 && journey.State.RepairKits > 0)
-            { interaction = 5; Prompt = "修理房车 · 消耗 1 修理包"; }
+            { interaction = 5; Prompt = "修理房车 · 只修车况，消耗 1 包"; }
             else if ((nearbySupply = FindSupplyInReach()) != null)
             {
                 interaction = 7;
@@ -205,7 +222,11 @@ namespace DesertRV
                     nearbySupply.label + " · " + nearbySupply.riskHint;
             }
             else if (Vector3.Distance(motor.PlayerPosition, motor.EntryPosition) < 2.8f)
-            { interaction = 4; Prompt = "回到驾驶位"; }
+            {
+                interaction = 4;
+                string reason = motor.DriverEntryBlockReason();
+                Prompt = reason == null ? "回到驾驶位" : "无法上车 · " + reason;
+            }
         }
         void Interact()
         {
@@ -218,8 +239,14 @@ namespace DesertRV
                     { if (Region.salvageVisual) Region.salvageVisual.SetActive(false); Play(pickupSound, .6f); Say("组件已收好，回房车工作台安装。", 4); }
                     break;
                 case 3: installPart = journey.State.HasPart(ComponentPart.RamPart) ? ComponentPart.RamPart : ComponentPart.Coil; CancelReloadPresentation(); installRemaining = 5; break;
-                case 4: if (motor.TryEnterDriver()) CancelReloadPresentation(); break;
-                case 5: if (journey.State.TryRepair()) Say("房车修复 +95。", 3); break;
+                case 4:
+                    if (motor.TryEnterDriver()) CancelReloadPresentation();
+                    else Say(motor.DriverEntryBlockReason(), 3);
+                    break;
+                case 5:
+                    int vehicleBefore = journey.State.VehicleHealth;
+                    if (journey.State.TryRepair()) Say($"车况 +{journey.State.VehicleHealth - vehicleBefore} · 不恢复体力。", 3);
+                    break;
                 case 7:
                     if (Reloading || Installing)
                     { Say(Reloading ? "装填中，完成后可领取补给。" : "改装中，完成后可领取补给。", 2); break; }
@@ -244,7 +271,9 @@ namespace DesertRV
                     break;
                 case 6:
                     if (Vector3.Distance(motor.vehicle.position, Region.powerPoint.position) > 12) Say("房车离插座太远。", 3);
-                    else journey.State.SetPowerConnected(!journey.State.PowerConnected);
+                    else if (journey.State.SetPowerConnected(!journey.State.PowerConnected))
+                        Say(journey.State.PowerConnected ? "供电已连接，守住设备。" :
+                            "断电：充能暂停，现有敌人仍会攻击。", 5);
                     break;
             }
         }

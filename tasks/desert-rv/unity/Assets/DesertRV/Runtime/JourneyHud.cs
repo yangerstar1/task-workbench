@@ -14,7 +14,7 @@ namespace DesertRV
         public Font font;
         RectTransform safe, menu;
         Text crosshair, hitMark;
-        Image damageEdge;
+        Text damageDirection, rearThreat;
         Text regionLabel, resources, objective, notice, prompt, menuTitle, menuBody, primaryLabel, storm;
         Button primary;
         Button keyboardLookToggle, keyboardLookSpeed;
@@ -62,8 +62,17 @@ namespace DesertRV
             Anchor(crosshair.rectTransform,new Vector2(.5f,.5f),new Vector2(.5f,.5f),Vector2.zero,new Vector2(38,38));
             hitMark = Label("Hit confirmation",safe,"×",34,Vector2.zero,new Vector2(48,48),TextAnchor.MiddleCenter);
             Anchor(hitMark.rectTransform,new Vector2(.5f,.5f),new Vector2(.5f,.5f),Vector2.zero,new Vector2(48,48));
-            damageEdge=Panel("Damage edge",safe,Vector2.zero,Vector2.zero,Vector2.zero,new Vector2(10,720),Color.clear).GetComponent<Image>();
-            damageEdge.raycastTarget=false;
+            var damagePanel = Panel("Contact damage direction", safe, new Vector2(.5f,.5f), new Vector2(.5f,.5f),
+                Vector2.zero, new Vector2(240,80), new Color(.15f,.08f,.05f,.9f));
+            damagePanel.GetComponent<Image>().raycastTarget = false;
+            damageDirection = Label("Damage direction text", damagePanel, "", 23, new Vector2(8,-4), new Vector2(224,72), TextAnchor.MiddleCenter);
+            damageDirection.color = new Color(1,.45f,.22f);
+            var rearPanel = Panel("Close rear threat", safe, new Vector2(.5f,.5f), new Vector2(.5f,.5f),
+                new Vector2(0,105), new Vector2(380,40), new Color(.15f,.08f,.05f,.9f));
+            rearPanel.GetComponent<Image>().raycastTarget = false;
+            rearThreat = Label("Rear threat text", rearPanel, "", 22, new Vector2(8,-2), new Vector2(364,36), TextAnchor.MiddleCenter);
+            rearThreat.color = orange;
+            damagePanel.gameObject.SetActive(false); rearPanel.gameObject.SetActive(false);
             actionBar = Progress(safe, "Action progress", new Vector2(0, -128), new Vector2(220, 7), orange);
             Anchor(actionBar.transform.parent.GetComponent<RectTransform>(), new Vector2(.5f,.5f), new Vector2(.5f,.5f), new Vector2(0,-128), new Vector2(220,7));
             controlsRoot = new GameObject("Touch controls", typeof(RectTransform)); controlsRoot.transform.SetParent(safe, false);
@@ -134,7 +143,26 @@ namespace DesertRV
             crosshair.gameObject.SetActive(playing && !driving);
             hitMark.gameObject.SetActive(playing && (actions ? actions.HitConfirmation : station.HitConfirmation) > 0);
             hitMark.color = orange;
-            damageEdge.color = new Color(.8f,.12f,.05f,Mathf.Clamp01((actions ? actions.DamageFeedback : station.DamageFeedback) * 3));
+            bool contactDamage = motor && motor.DamageCueRemaining > 0;
+            bool otherDamage = (actions ? actions.DamageFeedback : station.DamageFeedback) > 0;
+            damageDirection.transform.parent.gameObject.SetActive(playing && (contactDamage || otherDamage));
+            if (contactDamage)
+            {
+                Vector2 bearing = motor.DamageBearing;
+                string direction = Mathf.Abs(bearing.x) > Mathf.Abs(bearing.y) ? (bearing.x > 0 ? "右侧" : "左侧") : (bearing.y >= 0 ? "前方" : "后方");
+                damageDirection.text = $"{direction}受击\n{(motor.DamageToVehicle ? "车况" : "体力")} -{motor.DamageAmount}";
+                ((RectTransform)damageDirection.transform.parent).anchoredPosition = Mathf.Abs(bearing.x) > Mathf.Abs(bearing.y) ?
+                    new Vector2(Mathf.Sign(bearing.x) * 245, 0) : new Vector2(0, (bearing.y >= 0 ? 1 : -1) * 185);
+            }
+            else
+            {
+                damageDirection.text = "体力受损";
+                ((RectTransform)damageDirection.transform.parent).anchoredPosition = new Vector2(0,185);
+            }
+            var threat = playing && actions ? actions.CloseRearThreat : null;
+            rearThreat.transform.parent.gameObject.SetActive(threat);
+            if (threat) rearThreat.text = threat.Phase == BeastPhase.Windup ? "后方近敌 · 正在蓄力" :
+                threat.Phase == BeastPhase.Attack ? "后方近敌 · 正在冲刺" : "后方近敌 · 正在接近";
             prompt.text = installing ? "正在安装 · 移开会中断" : reloading ? "正在装填钉条" : !driving ? currentPrompt : "";
             actionBar.transform.parent.gameObject.SetActive(progress > 0); actionBar.fillAmount = progress;
             storm.text = state.IsInStorm(director ? director.WorldProgress : station.WorldProgress) ? "风暴中 · 正在受伤" : "风暴正在逼近";

@@ -24,3 +24,27 @@ The current candidate adds journey/combat rules and director integration. It has
 The export excludes the surrounding monorepo, reference images, internal handoff and conversation records, research/authoring studies, unknown-rights references, downloaded animal candidates, caches, logs, credentials, and compiled build products. Nonessential signing and account configuration was blanked in the public copy; Unity online reporting was disabled. The original source repository remains private.
 
 Third-party font notices and asset provenance are in `ASSET-NOTICES.md`. Public availability does not grant a new blanket software or artwork license; existing rights and the font's OFL remain applicable.
+
+## Local combat feedback candidate (2026-10-10)
+
+This patch is prepared against published source `9dd81678b649ac7a13eb7e47354afeaf62acf323`
+(player run `38070456519`). It has not been published, compiled, built or played.
+
+- Actual beast/vehicle contacts show a brief camera-relative direction and the actual
+  player/vehicle health lost. Nondirectional health loss keeps a generic damage cue.
+- A rear warning exists only for a live current-region enemy in an attacking or
+  approaching phase, behind the camera, inside its existing attack range, with a
+  clear attack line. It clears when those conditions end.
+- Repair explains that it restores vehicle health only, and reports the capped gain.
+- Driver prompts and failure messages use the same existing cable, distance and
+  line-of-sight gate as entry. Disconnect explains paused charging and surviving enemies.
+
+Damage values, health/repair limits, speed, collision, reach, wave and charge rules
+are unchanged. Seven new `JourneyCombatFeedbackTests` cases are registered in the
+existing EditMode inventory (210 total); they still require native Unity execution.
+The existing source/evidence verifier tests pass (50), as do workbench tests (32).
+Source inventory verification passes. Those host checks do not certify compilation,
+physics behavior, font layout or gameplay. Next verification must run the native
+cases and check ordinary play: real contacts from four directions; rear-threat
+appear/disappear through turn, cover, death, pause and region/restart; near-cap repair;
+cable/blocked-door rejection and successful re-entry; and unplugged active waves.

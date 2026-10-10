@@ -279,7 +279,7 @@ class TestSeparateModeInventories(unittest.TestCase):
     def test_separate_reviewed_inventories(self):
         edits = evidence.expected_cases('editmode')
         plays = evidence.expected_cases('playmode')
-        self.assertEqual(len(edits), 203)
+        self.assertEqual(len(edits), 210)
         self.assertEqual(len(plays), 13)
         self.assertFalse(edits & plays)
 

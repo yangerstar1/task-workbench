@@ -475,8 +475,8 @@
     },
     {
       "path": "tasks/desert-rv/scripts/expected_test_cases.json",
-      "sha256": "820960e17869087e6e9d5f94007524693c694b2988556dd1bbbd21d7e81b1e45",
-      "size": 19377
+      "sha256": "660e85f5d3d4a6e1c555d4d06e59d7677a7940d04039be8446b0e93b268e6f40",
+      "size": 20096
     },
     {
       "path": "tasks/desert-rv/scripts/journey_cabin_entry_native.py",
@@ -755,7 +755,7 @@
     },
     {
       "path": "tasks/desert-rv/scripts/test_verify_evidence.py",
-      "sha256": "01734822d3a8aa116584d1ed8587b244e2821954e02dccb9a1cf5f6347763ce5",
+      "sha256": "8d00e8adf8515c55f24895571f9aadb1ef791c6ab48876578279f513d38e6cc6",
       "size": 17777
     },
     {
@@ -4480,8 +4480,8 @@
     },
     {
       "path": "tasks/desert-rv/unity/Assets/DesertRV/Runtime/BeastActor.cs",
-      "sha256": "e967f23dc0f586f7c5e2c82721e330a0d47013bd59f2a051bec1d5223f65d25e",
-      "size": 9948
+      "sha256": "e47af91823a7b4f77bd4c65d6dcae6590fbe8a6a46596459ed48810e958bb638",
+      "size": 11318
     },
     {
       "path": "tasks/desert-rv/unity/Assets/DesertRV/Runtime/BeastActor.cs.meta",
@@ -4615,8 +4615,8 @@
     },
     {
       "path": "tasks/desert-rv/unity/Assets/DesertRV/Runtime/JourneyActions.cs",
-      "sha256": "a4f97f0b995138edda63899c96eb273dd5654e1f7aa63f30eb314ba7dcde7c00",
-      "size": 19545
+      "sha256": "798447d36ddcb9e140614c19b424e7f8607df365458b0a1e0af8efc18d4d1041",
+      "size": 21105
     },
     {
       "path": "tasks/desert-rv/unity/Assets/DesertRV/Runtime/JourneyActions.cs.meta",
@@ -4645,8 +4645,8 @@
     },
     {
       "path": "tasks/desert-rv/unity/Assets/DesertRV/Runtime/JourneyHud.cs",
-      "sha256": "b34162729939a99c5766a8839b7fb445754aacb7ba65622fc5a29a5e116f83f9",
-      "size": 19473
+      "sha256": "e6a53846efda2b3da55f6b84f1251cb8cb4c337928c029001a9d0dfa66ea4e0d",
+      "size": 21680
     },
     {
       "path": "tasks/desert-rv/unity/Assets/DesertRV/Runtime/JourneyHud.cs.meta",
@@ -4655,8 +4655,8 @@
     },
     {
       "path": "tasks/desert-rv/unity/Assets/DesertRV/Runtime/JourneyMotor.cs",
-      "sha256": "3f89acff873ebfbe17db5406b631d501d86151536f7f5a9d0308d854433d00fc",
-      "size": 17265
+      "sha256": "e17cac5a2ca365e83efa562f25dadc3bc3bab796e2d48e1106181701ebf40ba4",
+      "size": 19220
     },
     {
       "path": "tasks/desert-rv/unity/Assets/DesertRV/Runtime/JourneyMotor.cs.meta",
@@ -5267,6 +5267,16 @@
       "path": "tasks/desert-rv/unity/Assets/DesertRV/Tests/EditMode/JourneyCandidateIntegrationTests.cs.meta",
       "sha256": "82bbfc232c2c92758fa22ef90d05ad0986eebcdd326f3301b2e0aba3cb8bcdf2",
       "size": 243
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Tests/EditMode/JourneyCombatFeedbackTests.cs",
+      "sha256": "ae5bb28fe470bf88f4736d7b0917e8da607ef0e64832017ce3492bb43a2bf1d3",
+      "size": 13727
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Tests/EditMode/JourneyCombatFeedbackTests.cs.meta",
+      "sha256": "394535def57657145d86f533f4ce5292ab1d6e06c5f22714ca77b41aadde8c31",
+      "size": 60
     },
     {
       "path": "tasks/desert-rv/unity/Assets/DesertRV/Tests/EditMode/JourneyContentTests.cs",

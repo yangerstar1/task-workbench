@@ -97,13 +97,32 @@ namespace DesertRV
                 // Damage follows an actual swept contact, never proximity through cover.
                 if ((touchedVehicle || touchedPlayer) && combat.TryRegisterChargeHit(combatRegion, combatGeneration, chargeId))
                 {
-                    if (touchedVehicle) journey.State.DamageVehicle(armored ? 38 : 19);
-                    else journey.State.DamagePlayer(armored ? 27 : 15);
+                    ApplyContactDamage(touchedVehicle);
                     SetPhase(BeastPhase.Recover);
                 }
                 else if (blocked || attackClock > (armored ? 1.2f : .8f)) SetPhase(BeastPhase.Recover);
             }
             else if (phaseTime > (Phase == BeastPhase.Hit ? .28f : armored ? 2.0f : 1.3f)) SetPhase(BeastPhase.Stalk);
+        }
+        void ApplyContactDamage(bool touchedVehicle)
+        {
+            int before = touchedVehicle ? journey.State.VehicleHealth : journey.State.PlayerHealth;
+            if (touchedVehicle) journey.State.DamageVehicle(armored ? 38 : 19);
+            else journey.State.DamagePlayer(armored ? 27 : 15);
+            player.ShowContactDamage(transform.position,
+                before - (touchedVehicle ? journey.State.VehicleHealth : journey.State.PlayerHealth), touchedVehicle);
+        }
+        // Read the live actor, its existing attack range/line and current binding. Never activates an enemy.
+        public bool IsCloseRearThreat(JourneyMotor observer)
+        {
+            if (!isActiveAndEnabled || !observer || player != observer || journey != observer.journey ||
+                !journey || journey.State == null || journey.State.Status != SessionStatus.Playing ||
+                combat == null || combatRegion != journey.State.SceneId || combatGeneration != journey.Generation ||
+                (Phase != BeastPhase.Stalk && Phase != BeastPhase.Windup && Phase != BeastPhase.Attack)) return false;
+            Vector3 to = transform.position - observer.PlayerPosition; to.y = 0;
+            Vector3 forward = observer.view.transform.forward; forward.y = 0;
+            return to.sqrMagnitude < (armored ? 8 * 8 : 5.2f * 5.2f) &&
+                Vector3.Dot(to.normalized, forward.normalized) < -.35f && ClearAttackLine(observer.PlayerPosition);
         }
         bool ClearAttackLine(Vector3 target)
         {

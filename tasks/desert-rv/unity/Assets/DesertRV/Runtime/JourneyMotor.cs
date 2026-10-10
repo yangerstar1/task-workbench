@@ -12,6 +12,27 @@ namespace DesertRV
         public Vector3 localForward = Vector3.forward;
         public float topSpeed = 11;
         public float Speed { get; private set; }
+        public float DamageCueRemaining { get; private set; }
+        public Vector3 DamageSource { get; private set; }
+        public int DamageAmount { get; private set; }
+        public bool DamageToVehicle { get; private set; }
+        // Presentation only: callers supply the health actually lost at a real contact.
+        internal void ShowContactDamage(Vector3 source, int amount, bool toVehicle)
+        {
+            if (amount <= 0) return;
+            DamageSource = source; DamageAmount = amount; DamageToVehicle = toVehicle;
+            DamageCueRemaining = .8f;
+        }
+        internal void AdvanceDamageCue(float delta) => DamageCueRemaining = Mathf.Max(0, DamageCueRemaining - delta);
+        public Vector2 DamageBearing
+        {
+            get
+            {
+                Vector3 to = DamageSource - PlayerPosition; to.y = 0;
+                Vector3 forward = view.transform.forward; forward.y = 0; forward.Normalize();
+                return new Vector2(Vector3.Dot(to, Vector3.Cross(Vector3.up, forward)), Vector3.Dot(to, forward)).normalized;
+            }
+        }
         public event System.Action<RaycastHit, float> ObstacleContact;
         public Transform Walker => walker.transform;
         public Vector3 PlayerPosition => journey.State.Control == ControlMode.Driving ? vehicle.position : walker.transform.position;
@@ -48,6 +69,7 @@ namespace DesertRV
         }
         public void ResetVehicle()
         {
+            DamageCueRemaining = 0;
             walker.enabled = false;
             vehicle.SetPositionAndRotation(initialPosition, initialRotation);
             Speed = verticalSpeed = doorAngle = impactCooldown = 0; doorOpen = false;
@@ -56,6 +78,7 @@ namespace DesertRV
         // Placement never changes health, ammunition, inventory, or the storm clock.
         public void PlaceForRegion(Vector3 position, Quaternion rotation)
         {
+            DamageCueRemaining = 0;
             walker.enabled = false;
             vehicle.SetPositionAndRotation(position, rotation);
             walker.transform.position = position;
@@ -73,6 +96,7 @@ namespace DesertRV
         public void Tick(float delta)
         {
             if (journey.State.Status != SessionStatus.Playing) return;
+            AdvanceDamageCue(delta);
             recoil = Mathf.MoveTowards(recoil, 0, delta * 8);
             impactCooldown = Mathf.Max(0, impactCooldown - delta);
             float oldAngle = doorAngle;
@@ -124,6 +148,7 @@ namespace DesertRV
                 // before a beast behind it; never damage through the nearest obstruction.
                 System.Array.Sort(hits, 0, count, System.Collections.Generic.Comparer<RaycastHit>.Create((a,b) => a.distance.CompareTo(b.distance)));
                 float allowed = distance;
+                Vector3 impactPoint = vehicle.position;
                 rammed.Clear();
                 for (int i = 0; i < count; i++)
                 {
@@ -142,6 +167,7 @@ namespace DesertRV
                         if (beast.Dead) continue;
                     }
                     ObstacleContact?.Invoke(hit, Speed);
+                    if (hit.distance - .10f < allowed) impactPoint = hit.distance > 0 ? hit.point : hit.collider.bounds.center;
                     allowed = Mathf.Min(allowed, Mathf.Max(0, hit.distance - .10f));
                 }
                 vehicle.position += displacement.normalized * allowed;
@@ -149,7 +175,11 @@ namespace DesertRV
                 {
                     vehicle.rotation = oldRotation;
                     if (impactCooldown <= 0 && Mathf.Abs(Speed) > 3)
-                    { journey.State.DamageVehicle(Mathf.CeilToInt(Mathf.Abs(Speed) * 1.4f)); impactCooldown = .6f; }
+                    {
+                        int before = journey.State.VehicleHealth;
+                        journey.State.DamageVehicle(Mathf.CeilToInt(Mathf.Abs(Speed) * 1.4f)); impactCooldown = .6f;
+                        ShowContactDamage(impactPoint, before - journey.State.VehicleHealth, true);
+                    }
                     Speed = 0;
                 }
             }
@@ -256,14 +286,21 @@ namespace DesertRV
             Cursor.lockState = Application.isMobilePlatform ? CursorLockMode.None : CursorLockMode.Locked;
             Cursor.visible = Application.isMobilePlatform; return true;
         }
-        public bool TryEnterDriver()
+        public string DriverEntryBlockReason()
         {
-            if (journey.State.Status != SessionStatus.Playing || journey.State.Control != ControlMode.OnFoot ||
-                Vector3.Distance(PlayerPosition, EntryPosition) > 2.8f || journey.State.PowerConnected) return false;
+            if (journey.State.Status != SessionStatus.Playing) return "旅程暂停，暂时无法上车。";
+            if (journey.State.Control != ControlMode.OnFoot) return "已经在驾驶位。";
+            if (Vector3.Distance(PlayerPosition, EntryPosition) > 2.8f) return "靠近车门后再上车。";
+            if (journey.State.PowerConnected) return "先拔除电缆，再上车。";
             Vector3 eye = walker.transform.position + Vector3.up * 1.52f;
             Vector3 doorTarget = EntryPosition + Vector3.up * 1.15f;
             if (Physics.Linecast(eye, doorTarget, out var obstacle, ~0, QueryTriggerInteraction.Ignore) &&
-                Vector3.Distance(obstacle.point, doorTarget) > .35f) return false;
+                Vector3.Distance(obstacle.point, doorTarget) > .35f) return "门前受阻，请绕到车门。";
+            return null;
+        }
+        public bool TryEnterDriver()
+        {
+            if (DriverEntryBlockReason() != null) return false;
             journey.State.SetControl(ControlMode.Driving); walker.enabled = false; Speed = 0; doorOpen = false;
             journey.ApplyContext(); Cursor.lockState = CursorLockMode.None; Cursor.visible = true; return true;
         }
