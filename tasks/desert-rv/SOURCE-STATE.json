@@ -85,7 +85,7 @@
     },
     {
       "path": ".github/workflows/desert-rv-tracer-shader-prepare.yml",
-      "sha256": "5be949be1c0a94ac1d417942c84570efc0d58d0c8ca4456537b5f94824c39bcc",
+      "sha256": "8cfc379f7c811471d804dbea9d485f4dabea069c2c924e860438d94d090f8973",
       "size": 20850
     },
     {
@@ -480,7 +480,7 @@
     },
     {
       "path": "tasks/desert-rv/scripts/journey_tracer_dispatch.py",
-      "sha256": "601f3bd9b2da54bbf86b0b1e6dd1a304871916cfffa99f1b1b43dadacd72f883",
+      "sha256": "605624aea14f4f92874e3598b25c64ee0858d5c075eead270b8c996cd2b332ee",
       "size": 6521
     },
     {
@@ -1640,8 +1640,8 @@
     },
     {
       "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/Materials/JourneyNailTrajectory.mat",
-      "sha256": "5dcfc0159f6f9a12b1cabfadb482094c611900df4427ac8336123c8ea8214fc9",
-      "size": 1865
+      "sha256": "61e32967f4a6cd872e2a965d8081d2f759a2237c5a7f59af6237b03e03741800",
+      "size": 1889
     },
     {
       "path": "tasks/desert-rv/unity/Assets/DesertRV/Art/Materials/JourneyNailTrajectory.mat.meta",
@@ -5345,8 +5345,8 @@
     },
     {
       "path": "tasks/desert-rv/unity/Assets/DesertRV/Tests/EditMode/JourneyTracerMaterialTests.cs",
-      "sha256": "26df4d1f419f3d3712d4cebff9f011b53c54062aa17d594dc3c3d9fc3883cd09",
-      "size": 13758
+      "sha256": "eb975affbb977081750d026b61e50dbf746471c1fe0a20da78c307a59afcc9de",
+      "size": 18532
     },
     {
       "path": "tasks/desert-rv/unity/Assets/DesertRV/Tests/EditMode/JourneyTracerMaterialTests.cs.meta",

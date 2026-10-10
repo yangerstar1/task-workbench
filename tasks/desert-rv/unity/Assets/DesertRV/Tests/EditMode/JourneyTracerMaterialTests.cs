@@ -73,26 +73,64 @@ namespace DesertRV.Tests
         [TestCase("FirstStationJourney")]
         public void SerializedSceneRetainsMaterialAndShaderDependency(string type)
         {
-            var previousActive = SceneManager.GetActiveScene();
+            var setup = EditorSceneManager.GetSceneManagerSetup();
             var previous = Enumerable.Range(0, SceneManager.sceneCount).Select(SceneManager.GetSceneAt).ToArray();
-            var dirty = previous.ToDictionary(s => s.handle, s => s.isDirty);
-            var roots = previous.ToDictionary(s => s.handle, s => s.GetRootGameObjects().Select(go => go.GetInstanceID()).OrderBy(id => id).ToArray());
+            Debug.Log("JOURNEY_TRACER_FIXTURE_INITIAL sceneCount=" + previous.Length + " scenes=" + string.Join(";", previous.Select(s =>
+                "pathEmpty=" + string.IsNullOrEmpty(s.path) + ",loaded=" + s.isLoaded + ",dirty=" + s.isDirty + ",rootCount=" + (s.isLoaded ? s.rootCount : -1))));
+            bool restorable = setup.Any(s => s.isLoaded && s.isActive) &&
+                setup.All(s => !string.IsNullOrEmpty(s.path) && File.Exists(s.path)) && previous.All(s => !s.isLoaded || !s.isDirty);
+            // CI may start with default objects or test-runner state in Untitled. Preserve a
+            // serialized recovery copy first; never apply that identity-changing fallback to a user's Editor.
+            Assert.That(restorable || previous.Length == 0 || Application.isBatchMode, Is.True,
+                "Unsaved initial scenes require the isolated batch fixture or an explicitly saved Editor setup.");
+            var originalFiles = setup.Select(s => s.path).Where(p => !string.IsNullOrEmpty(p))
+                .SelectMany(p => new[] { p, p + ".meta" }).Distinct().Where(File.Exists).ToDictionary(p => p, File.ReadAllBytes);
+            string id = Guid.NewGuid().ToString("N");
+            string recovery = "Library/DesertRVTracerFixture/" + id;
+            var temporaryCopies = new List<string>();
+            var recoveryFiles = new Dictionary<string, byte[]>();
+            bool replaced = false;
             Scene scene = default;
-            GameObject owner = null;
-            string path = "Assets/JourneyTracerTest_" + Guid.NewGuid().ToString("N") + ".unity";
+            string path = "Assets/JourneyTracerTest_" + id + ".unity";
+            Assert.That(File.Exists(path) || File.Exists(path + ".meta"), Is.False);
             try
             {
-                // Match the FX/grounding fixtures: keep the runner's untitled scene open and untouched.
-                scene = EditorSceneManager.NewPreviewScene();
-                Assert.That(EditorSceneManager.IsPreviewScene(scene), Is.True);
-                owner = new GameObject("inactive serialized tracer fixture"); owner.SetActive(false);
+                if (!restorable && previous.Any(s => s.isLoaded))
+                {
+                    Assert.That(Directory.Exists(recovery), Is.False);
+                    Directory.CreateDirectory(recovery);
+                    for (int i = 0; i < previous.Length; i++)
+                    {
+                        var initial = previous[i]; if (!initial.isLoaded) continue;
+                        string initialPath = initial.path; bool initialDirty = initial.isDirty;
+                        string copy = "Assets/JourneyTracerInitial_" + id + "_" + i + ".unity";
+                        Assert.That(File.Exists(copy) || File.Exists(copy + ".meta"), Is.False);
+                        temporaryCopies.Add(copy);
+                        Assert.That(EditorSceneManager.SaveScene(initial, copy, true), Is.True);
+                        foreach (string suffix in new[] { "", ".meta" })
+                        {
+                            string destination = recovery + "/Initial-" + i + ".unity" + suffix;
+                            var bytes = File.ReadAllBytes(copy + suffix);
+                            File.WriteAllBytes(destination, bytes); recoveryFiles.Add(destination, bytes);
+                            Assert.That(File.ReadAllBytes(destination), Is.EqualTo(bytes));
+                        }
+                        File.WriteAllText(recovery + "/Initial-" + i + ".txt", "path=" + initialPath + "\ndirty=" + initialDirty +
+                            "\nactive=" + (initial == SceneManager.GetActiveScene()) + "\nrootCount=" + initial.rootCount);
+                        Assert.That(initial.path, Is.EqualTo(initialPath)); Assert.That(initial.isDirty, Is.EqualTo(initialDirty));
+                        Assert.That(AssetDatabase.DeleteAsset(copy), Is.True);
+                    }
+                }
+                // Match SavedSceneTransactionFixture: ordinary scenes support real save/reload.
+                replaced = true;
+                scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
+                var owner = new GameObject("inactive serialized tracer fixture"); owner.SetActive(false);
                 SceneManager.MoveGameObjectToScene(owner, scene);
                 var component = owner.AddComponent(Production.Type(type));
                 var serialized = new SerializedObject(component);
                 var field = serialized.FindProperty("nailTrajectoryMaterial");
                 Assert.That(field, Is.Not.Null, "Both runtime material fields must be serialized.");
                 field.objectReferenceValue = Material(); serialized.ApplyModifiedPropertiesWithoutUndo();
-                Assert.That(EditorSceneManager.SaveScene(scene, path, true), Is.True);
+                Assert.That(EditorSceneManager.SaveScene(scene, path), Is.True);
                 var dependencies = AssetDatabase.GetDependencies(path, true);
                 Assert.That(dependencies, Does.Contain(MaterialPath));
                 Assert.That(dependencies, Does.Contain(ShaderPath));
@@ -102,41 +140,68 @@ namespace DesertRV.Tests
                 var clone = new Material(Material());
                 try { Assert.That(CheckSavedMaterial(clone, path), Is.Not.Empty, "Runtime clones are not authored dependencies."); }
                 finally { Object.DestroyImmediate(clone); }
-                Assert.That(EditorSceneManager.ClosePreviewScene(scene), Is.True);
-                scene = EditorSceneManager.OpenPreviewScene(path);
-                Assert.That(EditorSceneManager.IsPreviewScene(scene), Is.True);
+                // Opening in Single mode closes the saved fixture and loads its serialized bytes.
+                scene = EditorSceneManager.OpenScene(path, OpenSceneMode.Single);
                 var restored = scene.GetRootGameObjects().Single().GetComponent(Production.Type(type));
                 Assert.That(Field(restored, "nailTrajectoryMaterial"), Is.SameAs(Material()));
                 Set(restored, "nailTrajectoryMaterial", null);
                 EditorUtility.SetDirty(restored);
-                EditorSceneManager.MarkSceneDirty(scene); Assert.That(EditorSceneManager.SaveScene(scene, path, true), Is.True);
+                EditorSceneManager.MarkSceneDirty(scene); Assert.That(EditorSceneManager.SaveScene(scene, path), Is.True);
                 Assert.That(CheckSavedMaterial(Material(), path), Is.Not.Empty, "An old saved scene cannot pass using only an in-memory material.");
             }
             finally
             {
+                bool setupRestored = false;
                 try
                 {
-                    try { if (owner) Object.DestroyImmediate(owner); }
-                    finally { if (scene.IsValid()) Assert.That(EditorSceneManager.ClosePreviewScene(scene), Is.True); }
+                    // Unload even a partially authored/dirty fixture before deleting its asset.
+                    if (replaced)
+                    {
+                        EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
+                        if (restorable) EditorSceneManager.RestoreSceneManagerSetup(setup);
+                        setupRestored = true;
+                    }
                 }
                 finally
                 {
+                    bool fixtureUnloaded = !SceneManager.GetSceneByPath(path).IsValid();
                     try
                     {
-                        AssetDatabase.DeleteAsset(path);
-                        Assert.That(File.Exists(path), Is.False);
-                        Assert.That(File.Exists(path + ".meta"), Is.False);
+                        if (fixtureUnloaded)
+                        {
+                            AssetDatabase.DeleteAsset(path);
+                            Assert.That(File.Exists(path), Is.False);
+                            Assert.That(File.Exists(path + ".meta"), Is.False);
+                        }
+                        else Debug.Log("JOURNEY_TRACER_FIXTURE_RETAINED loadedFixture=true");
+                        foreach (string copy in temporaryCopies)
+                        {
+                            AssetDatabase.DeleteAsset(copy);
+                            Assert.That(File.Exists(copy) || File.Exists(copy + ".meta"), Is.False);
+                        }
                     }
                     finally
                     {
-                        var after = Enumerable.Range(0, SceneManager.sceneCount).Select(SceneManager.GetSceneAt).ToArray();
-                        Assert.That(after.Select(s => s.handle), Is.EqualTo(previous.Select(s => s.handle)));
-                        Assert.That(SceneManager.GetActiveScene(), Is.EqualTo(previousActive));
-                        foreach (var original in after)
+                        foreach (var original in originalFiles) Assert.That(File.ReadAllBytes(original.Key), Is.EqualTo(original.Value));
+                        foreach (var copy in recoveryFiles) Assert.That(File.ReadAllBytes(copy.Key), Is.EqualTo(copy.Value));
+                        var after = EditorSceneManager.GetSceneManagerSetup();
+                        if (setupRestored && restorable)
                         {
-                            Assert.That(original.isDirty, Is.EqualTo(dirty[original.handle]));
-                            Assert.That(original.GetRootGameObjects().Select(go => go.GetInstanceID()).OrderBy(id => id), Is.EqualTo(roots[original.handle]));
+                            Assert.That(after.Select(s => s.path), Is.EqualTo(setup.Select(s => s.path)));
+                            Assert.That(after.Select(s => s.isLoaded), Is.EqualTo(setup.Select(s => s.isLoaded)));
+                            Assert.That(after.Select(s => s.isActive), Is.EqualTo(setup.Select(s => s.isActive)));
                         }
+                        else if (setupRestored)
+                        {
+                            Assert.That(SceneManager.sceneCount, Is.EqualTo(1));
+                            var empty = SceneManager.GetActiveScene();
+                            Assert.That(empty.IsValid() && empty.isLoaded, Is.True);
+                            Assert.That(empty.path, Is.Empty); Assert.That(empty.rootCount, Is.Zero);
+                        }
+                        if (setupRestored) Assert.That(Enumerable.Range(0, SceneManager.sceneCount).Select(SceneManager.GetSceneAt)
+                            .All(s => !s.isLoaded || !s.isDirty), Is.True);
+                        Debug.Log("JOURNEY_TRACER_FIXTURE_RECOVERY restoredNamedSetup=" + (setupRestored && restorable) +
+                            " privateRecoveryFiles=" + recoveryFiles.Count + " replaced=" + replaced);
                     }
                 }
             }
