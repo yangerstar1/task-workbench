@@ -8,14 +8,14 @@ import subprocess
 import sys
 
 ROOT = Path(__file__).resolve().parents[3]
-BASE = '2c64f9b5a8cb86ea9a0beb6de582b7209e6f136c'
+BASE = 'dfe44f28a8270d8d4ac4f558c9073bca9d889017'
 BRANCH = 'journey-tracer-shader-fix-6648'
 REF = 'refs/heads/' + BRANCH
 REPOSITORY = 'yangerstar1/task-workbench'
 OWNER = 'yangerstar1'
 WORKFLOW = '.github/workflows/desert-rv-tracer-shader-prepare.yml'
-REQUEST = '.github/dispatch/desert-rv-cabin-entry-probe-r1-20261010.json'
-REQUEST_ID = 'desert-rv-cabin-entry-probe-r1-20261010-once'
+REQUEST = '.github/dispatch/desert-rv-cabin-entry-probe-r2-20261010.json'
+REQUEST_ID = 'desert-rv-cabin-entry-probe-r2-20261010-once'
 SOURCE = 'tasks/desert-rv/SOURCE-STATE.json'
 SELECTION = 'tasks/desert-rv/art/journey-preparation/three-strict-candidates.json'
 

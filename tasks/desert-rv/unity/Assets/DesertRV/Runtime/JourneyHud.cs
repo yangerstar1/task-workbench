@@ -43,11 +43,11 @@ namespace DesertRV
             if (!FindFirstObjectByType<EventSystem>())
             { var events = new GameObject("Journey UI events"); events.transform.SetParent(transform, false); events.AddComponent<EventSystem>(); events.AddComponent<StandaloneInputModule>(); }
             safe = Rect("Safe area", transform, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
-            var top = Panel("Vehicle status", safe, new Vector2(0, 1), new Vector2(0, 1), new Vector2(24, -24), new Vector2(260, 116), ink);
+            var top = Panel("Vehicle status", safe, new Vector2(0, 1), new Vector2(0, 1), new Vector2(24, -24), new Vector2(280, 124), ink);
             Label("Journey label", top, "荒漠行路 / 01", 19, new Vector2(16, -10), new Vector2(228, 28), TextAnchor.UpperLeft);
-            resources = Label("Resources", top, "", 21, new Vector2(16, -44), new Vector2(228, 56), TextAnchor.UpperLeft);
-            playerBar = Progress(top, "Suit health", new Vector2(16, -106), new Vector2(100, 4), new Color(.74f,.82f,.64f));
-            carBar = Progress(top, "RV condition", new Vector2(132, -106), new Vector2(112, 4), orange);
+            resources = Label("Resources", top, "", 21, new Vector2(16, -44), new Vector2(248, 64), TextAnchor.UpperLeft);
+            playerBar = Progress(top, "Suit health", new Vector2(16, -114), new Vector2(100, 4), new Color(.74f,.82f,.64f));
+            carBar = Progress(top, "RV condition", new Vector2(132, -114), new Vector2(132, 4), orange);
             var goal = Panel("Objective", safe, new Vector2(.5f, 1), new Vector2(.5f, 1), new Vector2(0, -24), new Vector2(510, 90), new Color(.15f,.20f,.22f,.85f));
             objective = Label("Objective text", goal, "", 24, new Vector2(18, -12), new Vector2(474, 65), TextAnchor.MiddleLeft);
             var pause = Button("Pause", safe, "II", new Vector2(1, 1), new Vector2(1, 1), new Vector2(-24, -24), new Vector2(76, 66), paper, ink);
@@ -91,13 +91,13 @@ namespace DesertRV
                 else if (journey.ManualPause) journey.TogglePause();
             });
             keyboardLookToggle = Button("Keyboard look mode", menu, "", new Vector2(.5f,0), new Vector2(.5f,0),
-                new Vector2(-134,122), new Vector2(254,44), paper, ink);
+                new Vector2(-134,114), new Vector2(254,52), paper, ink);
             keyboardLookSpeed = Button("Keyboard look speed", menu, "", new Vector2(.5f,0), new Vector2(.5f,0),
-                new Vector2(134,122), new Vector2(254,44), paper, ink);
+                new Vector2(134,114), new Vector2(254,52), paper, ink);
             keyboardLookToggle.GetComponentInChildren<Text>().fontSize = 22;
             keyboardLookSpeed.GetComponentInChildren<Text>().fontSize = 22;
             keyboardLookHelp = Label("Keyboard look help", menu, "I/K 上下看 · J/L 左右转 · WASD/方向键移动", 18,
-                new Vector2(38,-184), new Vector2(524,28), TextAnchor.MiddleLeft);
+                new Vector2(38,-204), new Vector2(524,28), TextAnchor.MiddleLeft);
             keyboardLookToggle.onClick.AddListener(() => journey.Input.ConfigureKeyboardLook(
                 !journey.Input.KeyboardLookEnabled, journey.Input.KeyboardLookSpeed));
             keyboardLookSpeed.onClick.AddListener(() =>
@@ -164,8 +164,9 @@ namespace DesertRV
             keyboardLookToggle.gameObject.SetActive(keyboardOptions);
             keyboardLookSpeed.gameObject.SetActive(keyboardOptions);
             keyboardLookHelp.gameObject.SetActive(keyboardOptions);
-            // Keep the existing 600 x 380 menu: description, help, options, primary have separate rows.
-            menuBody.rectTransform.sizeDelta = new Vector2(524, keyboardOptions ? 64 : 136);
+            // Allow the authored CJK font's full line height in the keyboard settings menu.
+            menu.sizeDelta = new Vector2(600, keyboardOptions ? 400 : 380);
+            menuBody.rectTransform.sizeDelta = new Vector2(524, keyboardOptions ? 84 : 136);
             if (keyboardOptions)
             {
                 keyboardLookToggle.GetComponentInChildren<Text>().text = journey.Input.KeyboardLookEnabled ? "键盘视角：IJKL" : "键盘视角：关闭";

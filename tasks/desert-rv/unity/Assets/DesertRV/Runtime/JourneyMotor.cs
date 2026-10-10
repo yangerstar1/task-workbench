@@ -148,8 +148,17 @@ namespace DesertRV
             yaw += look.x; pitch = Mathf.Clamp(pitch - look.y, -70, 70);
             Vector2 movement = journey.Input.Movement;
             Vector3 velocity = Quaternion.Euler(0, yaw, 0) * new Vector3(movement.x, 0, movement.y) * 3.1f;
-            verticalSpeed = walker.isGrounded ? -1 : Mathf.Max(-24, verticalSpeed - 18 * delta);
-            walker.Move((velocity + Vector3.up * verticalSpeed) * delta);
+            // Long moves can span both RV risers before the controller settles on one.
+            // At the configured 1/3-second frame cap, each move is at most 1/60 second.
+            // Keep all elapsed time even for larger deltas; bound collision work to 20 moves.
+            int steps = delta > 0 && !float.IsInfinity(delta)
+                ? Mathf.Clamp(Mathf.CeilToInt(Mathf.Min(delta, 1f / 3) * 60), 1, 20) : 1;
+            float step = delta / steps;
+            for (int i = 0; i < steps; i++)
+            {
+                verticalSpeed = walker.isGrounded ? -1 : Mathf.Max(-24, verticalSpeed - 18 * step);
+                walker.Move((velocity + Vector3.up * verticalSpeed) * step);
+            }
         }
         public bool TryExitVehicle()
         {

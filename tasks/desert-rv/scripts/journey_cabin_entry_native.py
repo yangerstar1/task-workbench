@@ -23,7 +23,7 @@ ARTIFACTS = TASK / 'artifacts/journey-cabin-entry'
 RAW_REPORT = isolated.COPY / 'JourneyEvidence/CabinEntry/native-entry-probe.json'
 TEST_SOURCE = 'tasks/desert-rv/unity/Assets/DesertRV/Tests/PlayMode/JourneyCabinEntryPhysicsTests.cs'
 EXPECTED = 'DesertRV.Tests.JourneyCabinEntryPhysicsTests.RealRV_StandardExitToCabin_AllTimesteps'
-MAX_PHYSICS = 2 * 1024**2
+MAX_PHYSICS = 4 * 1024**2
 MAX_REPORT = 2 * MAX_PHYSICS
 OUTCOMES = {'success', 'failure', 'cancelled', 'skipped', 'unknown'}
 SCENE = 'Assets/DesertRV/Scenes/BodyStudy.unity'
@@ -31,6 +31,8 @@ AUTHOR = 'Assets/DesertRV/Editor/JourneySceneAuthoring.cs'
 MOTOR = 'Assets/DesertRV/Runtime/JourneyMotor.cs'
 ADAPTER = 'Assets/DesertRV/Runtime/MobileInputAdapter.cs'
 TIMESTEPS = (('fps-60', 1 / 60), ('fps-30', 1 / 30), ('fps-10', .1), ('fps-5', .2), ('fps-3', 1 / 3))
+REGRESSIONS = ('downstairs', 'road-grounded', 'driver-cycle', 'sidewall')
+REGRESSION_ROUTE = 'backward-to-standard-exit; road-settle-1s; real-driver-cycle; road-strafe-rear-1.5m; shell-push-2s'
 
 
 def require(ok):
@@ -62,21 +64,93 @@ def vector(value, limit=1000):
     return type(value) is dict and set(value) == {'x', 'y', 'z'} and all(number(part, limit) for part in value.values())
 
 
+def distance(a, b, horizontal=False):
+    return math.sqrt(sum((a[key] - b[key]) ** 2 for key in (('x', 'z') if horizontal else ('x', 'y', 'z'))))
+
+
 def path(value):
     return type(value) is str and len(value) <= 512 and value.startswith('Assets/DesertRV/') and re.fullmatch(r'[A-Za-z0-9 _./-]+', value) and all(part not in {'', '.', '..'} for part in value.split('/'))
 
 
+def validate_regressions(case, value):
+    rows = case['regressions']
+    require(type(rows) is list and len(rows) <= len(REGRESSIONS))
+    for index, row in enumerate(rows):
+        keys(row, 'name outcome start end standardReset frames driver')
+        require(row['name'] == REGRESSIONS[index] and row['outcome'] in {'incomplete', 'passed', 'failed', 'entry-not-reached', 'setup-failed'})
+        require(vector(row['start']) and vector(row['end']) and type(row['standardReset']) is bool)
+        require(row['name'] == 'road-grounded' or row['standardReset'] is False)
+        require(row['outcome'] != 'entry-not-reached' or row['name'] == 'downstairs' and not case['enteredCabin'])
+        frames = row['frames']
+        require(type(frames) is list and len(frames) <= 240)
+        if row['name'] == 'driver-cycle':
+            require(not frames)
+        push_started = False
+        for frame_index, frame in enumerate(frames):
+            keys(frame, 'frame phase position flags grounded supportCollider verticalSpeed insideCabin intendedDistance forwardDistance sideCollider sidePoint sideNormal contactCount')
+            require(type(frame['frame']) is int and frame['frame'] == frame_index and vector(frame['position']) and integer(frame['flags'], 0, 7))
+            require(type(frame['grounded']) is bool and type(frame['insideCabin']) is bool and integer(frame['supportCollider'], 0, len(value['colliders'])) and integer(frame['sideCollider'], 0, len(value['colliders'])))
+            require(vector(frame['sidePoint']) and vector(frame['sideNormal'], 1.01) and number(frame['verticalSpeed'], 24) and frame['verticalSpeed'] <= 0)
+            require(number(frame['intendedDistance'], 100) and frame['intendedDistance'] >= 0 and number(frame['forwardDistance'], 100) and integer(frame['contactCount'], 0, 10000))
+            phases = {'downstairs': {'backward', 'settle'}, 'road-grounded': {'settle'}, 'driver-cycle': set(), 'sidewall': {'settle', 'approach', 'push'}}[row['name']]
+            require(frame['phase'] in phases and not (push_started and frame['phase'] != 'push'))
+            push_started = push_started or frame['phase'] == 'push'
+            require(frame['sideCollider'] == 0 or frame['contactCount'] > 0)
+        require(type(row['driver']) is list and len(row['driver']) <= 1)
+        if row['name'] != 'driver-cycle':
+            require(row['driver'] == [])
+        elif row['driver']:
+            driver = row['driver'][0]
+            keys(driver, 'enterAttempted enterSucceeded exitAttempted exitSucceeded controlBefore controlAfterEnter controlAfterExit contextBefore contextAfterEnter contextAfterExit controllerBefore controllerAfterEnter controllerAfterExit positionBefore positionAfterEnter positionAfterExit')
+            require(all(type(driver[key]) is bool for key in ('enterAttempted', 'enterSucceeded', 'exitAttempted', 'exitSucceeded', 'controllerBefore', 'controllerAfterEnter', 'controllerAfterExit')))
+            require(all(driver[key] in {'OnFoot', 'Driving'} for key in ('controlBefore', 'controlAfterEnter', 'controlAfterExit')))
+            require(all(driver[key] in {'OnFoot', 'Driving', 'Overlay'} for key in ('contextBefore', 'contextAfterEnter', 'contextAfterExit')))
+            require(all(vector(driver[key]) for key in ('positionBefore', 'positionAfterEnter', 'positionAfterExit')))
+            require(not driver['enterSucceeded'] or driver['enterAttempted'])
+            require(not driver['exitSucceeded'] or driver['exitAttempted'])
+            require(not driver['exitAttempted'] or driver['enterSucceeded'])
+            require(row['start'] == driver['positionBefore'] and row['end'] == driver['positionAfterExit'])
+        if row['outcome'] == 'entry-not-reached':
+            require(not frames)
+        if row['outcome'] == 'passed':
+            if row['name'] == 'driver-cycle':
+                require(len(row['driver']) == 1)
+                driver = row['driver'][0]
+                require(all(driver[key] for key in ('enterAttempted', 'enterSucceeded', 'exitAttempted', 'exitSucceeded', 'controllerBefore', 'controllerAfterExit')) and not driver['controllerAfterEnter'])
+                require(all(driver[key] == 'OnFoot' for key in ('controlBefore', 'contextBefore', 'controlAfterExit', 'contextAfterExit')) and driver['controlAfterEnter'] == driver['contextAfterEnter'] == 'Driving')
+                require(distance(driver['positionBefore'], driver['positionAfterEnter']) <= .001 and distance(driver['positionAfterExit'], case['exit']) <= .001)
+            else:
+                require(bool(frames))
+                require(row['end'] == frames[-1]['position'])
+                on_road = lambda frame: frame['grounded'] and frame['supportCollider'] == value['roadCollider'] and not frame['insideCabin']
+                if row['name'] == 'downstairs':
+                    require(case['enteredCabin'] and on_road(frames[-1]) and distance(frames[-1]['position'], case['exit'], True) <= .05 and row['start']['y'] - frames[-1]['position']['y'] >= .6)
+                elif row['name'] == 'road-grounded':
+                    road_top = value['colliders'][value['roadCollider'] - 1]['max']['y']
+                    require(all(on_road(frame) and road_top - .01 <= frame['position']['y'] <= road_top + .06 and distance(frame['position'], row['start'], True) <= .01 for frame in frames))
+                else:
+                    shell = [item for item in value['colliders'] if item['hierarchy'].split('/')[-1] == 'GEO-coach_body_shell']
+                    require(len(shell) == 1)
+                    push = [frame for frame in frames if frame['phase'] == 'push']
+                    approach = [frame for frame in frames if frame['phase'] == 'approach']
+                    target = dict(case['exit'], z=case['exit']['z'] - 1.5)
+                    outside = shell[0]['min']['x'] - value['controller']['radius'] + 2 * value['controller']['skinWidth'] + .02
+                    require(push and approach and distance(approach[-1]['position'], target, True) <= .05 and all(on_road(frame) for frame in frames))
+                    require(all(frame['position']['x'] <= outside for frame in push) and sum(frame['sideCollider'] == shell[0]['id'] for frame in push) * case['delta'] >= .5)
+                    require(push[-1]['sideCollider'] == shell[0]['id'] and push[-1]['forwardDistance'] <= push[-1]['intendedDistance'] * .25)
+
+
 def validate_physics(value):
     try:
-        keys(value, 'schemaVersion status unityVersion fixture referenceRun referenceBootstrapSha256 referenceRegionSha256 sourceScene route maximumDeltaTime referenceGeometryMatched allEntered replayDetached sceneUnloaded sourceFilesUnchanged controller lowerCollider upperCollider floorCollider roadCollider savedRvColliderCount sourceFiles colliders cases')
-        require(type(value['schemaVersion']) is int and value['schemaVersion'] == 1 and value['status'] in {'fixture-incomplete', 'completed'})
+        keys(value, 'schemaVersion status unityVersion fixture referenceRun referenceBootstrapSha256 referenceRegionSha256 sourceScene route regressionRoute maximumDeltaTime referenceGeometryMatched allEntered allRegressionsPassed replayDetached sceneUnloaded sourceFilesUnchanged controller lowerCollider upperCollider floorCollider roadCollider savedRvColliderCount sourceFiles colliders cases')
+        require(type(value['schemaVersion']) is int and value['schemaVersion'] == 2 and value['status'] in {'fixture-incomplete', 'completed'})
         fixed = dict(unityVersion='6000.3.19f1', fixture='saved-RV-with-reconstructed-authored-road', referenceRun='38034314713',
                      referenceBootstrapSha256='a31e108cf90a6244847d414670e4922150c73f45d38d6365cb3f795ed728d09f',
                      referenceRegionSha256='ee6ded8b1e4c6284f6d40218a5b7b3768c95b2b4fee23c46d3f09162880e87e0',
-                     sourceScene=SCENE, route='standard-exit; settle-1s; held-forward-max-6s; stop-on-cabin-floor')
+                     sourceScene=SCENE, route='standard-exit; settle-1s; held-forward-max-6s; stop-on-cabin-floor', regressionRoute=REGRESSION_ROUTE)
         require(all(value[key] == item for key, item in fixed.items()))
         require(number(value['maximumDeltaTime'], 1) and value['maximumDeltaTime'] > 0)
-        for key in ('referenceGeometryMatched', 'allEntered', 'replayDetached', 'sceneUnloaded', 'sourceFilesUnchanged'):
+        for key in ('referenceGeometryMatched', 'allEntered', 'allRegressionsPassed', 'replayDetached', 'sceneUnloaded', 'sourceFilesUnchanged'):
             require(type(value[key]) is bool)
         controller = value['controller']
         if controller is not None:
@@ -109,7 +183,7 @@ def validate_physics(value):
         cases = value['cases']
         require(type(cases) is list and len(cases) <= len(TIMESTEPS))
         for i, case in enumerate(cases):
-            keys(case, 'name outcome delta exit end exited lowerSupported upperSupported floorSupported enteredCabin firstSideContactFrame firstConstrainedFrame firstPersistentBlockFrame frames')
+            keys(case, 'name outcome delta exit end exited lowerSupported upperSupported floorSupported enteredCabin firstSideContactFrame firstConstrainedFrame firstPersistentBlockFrame frames regressions')
             name, delta = TIMESTEPS[i]
             require(case['name'] == name and number(case['delta'], 1) and abs(case['delta'] - delta) <= 1e-6 and case['outcome'] in {'incomplete', 'exit-rejected', 'entered', 'blocked'})
             require(vector(case['exit']) and vector(case['end']))
@@ -142,12 +216,15 @@ def validate_physics(value):
                     require(case['enteredCabin'] == (frames[-1]['insideCabin'] and frames[-1]['groundedAfter'] and frames[-1]['supportCollider'] == value['floorCollider']))
                 for key, collider in (('lowerSupported', 'lowerCollider'), ('upperSupported', 'upperCollider'), ('floorSupported', 'floorCollider')):
                     require(case[key] == any(frame['groundedAfter'] and frame['supportCollider'] == value[collider] for frame in frames))
+            validate_regressions(case, value)
         if value['status'] == 'completed':
             require(len(cases) == 5 and controller is not None and len(colliders) == value['savedRvColliderCount'] + 1 and
                     len({value[key] for key in ('lowerCollider', 'upperCollider', 'floorCollider', 'roadCollider')}) == 4 and all(value[key] > 0 for key in ('lowerCollider', 'upperCollider', 'floorCollider', 'roadCollider')))
             require(all(case['outcome'] != 'incomplete' for case in cases) and value['allEntered'] == all(case['enteredCabin'] for case in cases))
+            require(all(len(case['regressions']) == 4 and all(row['outcome'] != 'incomplete' for row in case['regressions']) for case in cases))
+            require(value['allRegressionsPassed'] == all(row['outcome'] == 'passed' for case in cases for row in case['regressions']))
         else:
-            require(value['allEntered'] is False)
+            require(value['allEntered'] is False and value['allRegressionsPassed'] is False)
         return True
     except (ValueError, KeyError, TypeError, AttributeError, OverflowError):
         return False
@@ -182,7 +259,8 @@ def inspect_xml():
             cases[0].get('fullname') == EXPECTED and root.get('total') == '1' and
             root.get('skipped') == '0' and root.get('inconclusive') == '0')
     result = cases[0].get('result')
-    require(result in {'Passed', 'Failed'} and root.get('result') == result and
+    root_results = {'Passed': {'Passed'}, 'Failed': {'Failed', 'Failed(Child)'}}
+    require(result in root_results and root.get('result') in root_results[result] and
             root.get('passed') == ('1' if result == 'Passed' else '0') and
             root.get('failed') == ('0' if result == 'Passed' else '1'))
     row = dict(fullname=EXPECTED, result=result)
@@ -203,7 +281,7 @@ def physics_complete(value):
 def diagnostic_complete(report):
     return (all(item == 'PASS' for item in report['checks'].values()) and physics_complete(report['physics']) and
             len(report['nativeResults']) == 1 and
-            (report['nativeResults'][0]['result'] == 'Passed') == report['physics']['allEntered'])
+            (report['nativeResults'][0]['result'] == 'Passed') == (report['physics']['allEntered'] and report['physics']['allRegressionsPassed']))
 
 
 def blank(env):
