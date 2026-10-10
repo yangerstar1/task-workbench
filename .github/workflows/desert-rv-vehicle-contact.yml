@@ -2,7 +2,7 @@ name: Desert RV bounded ed21 vehicle contact diagnosis
 on:
   push:
     branches: [journey-vehicle-contact-ed21]
-    paths: [.github/dispatch/desert-rv-vehicle-contact-ed21-r1-20261010.json]
+    paths: [.github/dispatch/desert-rv-vehicle-contact-ed21-r2-20261010.json]
 permissions:
   contents: read
   actions: read

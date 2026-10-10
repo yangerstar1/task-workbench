@@ -91,7 +91,7 @@
     },
     {
       "path": ".github/workflows/desert-rv-vehicle-contact.yml",
-      "sha256": "b270d0d40e87ebc97846b48c7fc49547a943055e02fd228dbff3922e79ae96b3",
+      "sha256": "0f7a7505f87693553ab3bf1a7f1ec0de503fb0749f52b97c1dc755d96e3390c8",
       "size": 8545
     },
     {
@@ -511,8 +511,8 @@
     },
     {
       "path": "tasks/desert-rv/scripts/journey_vehicle_contact_probe.py",
-      "sha256": "a54b47536a90055a3076d5578df101a44bb731d21b827acd4b7407d3b1e54ffb",
-      "size": 31369
+      "sha256": "336ca47fc332f05abe8ef910af33ed67d7f3d05e0abaa435653e33a3e0515db0",
+      "size": 31407
     },
     {
       "path": "tasks/desert-rv/scripts/journey_vehicle_contact_report.py",
@@ -586,8 +586,8 @@
     },
     {
       "path": "tasks/desert-rv/scripts/prepare_runner.sh",
-      "sha256": "243a14295864364d73726374d0d45793f0acb38948b4d8f1b8df8149e4f9ff94",
-      "size": 1427
+      "sha256": "cdb992cc6651e997b92ae8b33ebc48ecf44c4ced8a05429f90b7b1e26677c233",
+      "size": 1603
     },
     {
       "path": "tasks/desert-rv/scripts/prepare_safe_diagnostic_export.py",
@@ -741,8 +741,8 @@
     },
     {
       "path": "tasks/desert-rv/scripts/test_journey_vehicle_contact_probe.py",
-      "sha256": "198ec5a204ee0d084e072aad8f4cec06f2bce0c1c481ee9c8d858aee2953eaa2",
-      "size": 17158
+      "sha256": "2728e00357839839a1c6d929f5598d1fc8991bcd5d36586462fadb61b5fc6bbd",
+      "size": 21242
     },
     {
       "path": "tasks/desert-rv/scripts/test_safe_diagnostic_export.py",

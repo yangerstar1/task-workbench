@@ -24,15 +24,15 @@ from journey_keyboard_look_native import file_bytes, raw_pin, safe_path, protect
 from strict_output import verify_staged_inventory
 import generated_export as generated
 
-BASE = 'ed21b214f327b3ec439b9b3d7fec6b41a16d8a85'
-PRODUCTION_BASE = BASE
+BASE = '65f78c4aee22c9df7591295881c0261e62ebe5b8'
+PRODUCTION_BASE = 'ed21b214f327b3ec439b9b3d7fec6b41a16d8a85'
 BRANCH = 'journey-vehicle-contact-ed21'
 REF = 'refs/heads/' + BRANCH
 REPOSITORY = 'yangerstar1/task-workbench'
 OWNER_NAME = 'yangerstar1'
 WORKFLOW = '.github/workflows/desert-rv-vehicle-contact.yml'
-REQUEST = '.github/dispatch/desert-rv-vehicle-contact-ed21-r1-20261010.json'
-NONCE = 'desert-rv-vehicle-contact-ed21-r1-20261010-once'
+REQUEST = '.github/dispatch/desert-rv-vehicle-contact-ed21-r2-20261010.json'
+NONCE = 'desert-rv-vehicle-contact-ed21-r2-20261010-once'
 PRODUCER = dict(commit='ed21b214f327b3ec439b9b3d7fec6b41a16d8a85', runId=38054694730,
     artifactId=11673265859, artifactName='journey-preparation-UNREVIEWED-38054694730-1',
     artifactBytes=15842817, artifactSha256='1e9f5e73417b7454f5e85e5bfa426499c93cb045e383da6467e49eca64d878b1',

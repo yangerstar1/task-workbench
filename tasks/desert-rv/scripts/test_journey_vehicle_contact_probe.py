@@ -5,6 +5,7 @@ import json
 import os
 from pathlib import Path
 import tempfile
+import subprocess
 import unittest
 from unittest import mock
 import zipfile
@@ -105,12 +106,12 @@ class Boundaries(unittest.TestCase):
 
 class ProducerAndIsolation(unittest.TestCase):
     def test_exact_producer_metadata_rejects_stale_or_failed_inputs(self):
-        run = dict(id=probe.PRODUCER['runId'],run_attempt=1,head_sha=probe.BASE,
+        run = dict(id=probe.PRODUCER['runId'],run_attempt=1,head_sha=probe.PRODUCER['commit'],
             head_branch='journey-tracer-shader-fix-6648',path='.github/workflows/desert-rv-tracer-shader-prepare.yml',
             event='push',status='completed',conclusion='success')
         artifact = dict(id=probe.PRODUCER['artifactId'],name=probe.PRODUCER['artifactName'],expired=False,
             size_in_bytes=probe.PRODUCER['artifactBytes'],digest='sha256:'+probe.PRODUCER['artifactSha256'],
-            workflow_run=dict(id=probe.PRODUCER['runId'],head_sha=probe.BASE))
+            workflow_run=dict(id=probe.PRODUCER['runId'],head_sha=probe.PRODUCER['commit']))
         names=['Native strict '+k+' import and actual capture' for k in probe.generated.KINDS]
         names+=['Reuse exact strict quality gate and preserve '+k+' reports' for k in probe.generated.KINDS]
         names+=['Native original FX, four scenes, integration and diagnostic scope', 'Verify actual preparation test, saved outputs and final scope pins']
@@ -241,6 +242,66 @@ class OriginalReportValidation(unittest.TestCase):
             lambda f:f.update(overlaps=[999])):
             args=synthetic_report(complete=True);mutation(args[0]['cases'][0]['frames'][0])
             with self.assertRaises(ValueError):reports.verify_native_report(*args)
+
+
+
+class ActualRunnerShellRoute(unittest.TestCase):
+    OLD_ROUTE = '  if [[ "${GITHUB_REF:-}" == refs/heads/journey-tracer-shader-fix-6648 ]]; then\n'
+    NEW_ROUTE = ('  if [[ "${GITHUB_REF:-}" == refs/heads/journey-vehicle-contact-ed21 ]]; then\n'
+        '    /usr/bin/python3 "$(dirname "${BASH_SOURCE[0]}")/journey_vehicle_contact_probe.py" dispatch\n'
+        '  elif [[ "${GITHUB_REF:-}" == refs/heads/journey-tracer-shader-fix-6648 ]]; then\n')
+
+    def runner(self,source,ref,event='push',extra=None):
+        # Execute the actual Bash admission prefix. The cut is before license,
+        # removal, disk, Docker or network work. Spies record executable/arguments.
+        marker='test -n "${UNITY_LICENSE:-}"'
+        self.assertEqual(source.count(marker),1)
+        prefix=source[:source.index(marker)]
+        self.assertNotIn('sudo',prefix);self.assertNotIn('docker',prefix)
+        with tempfile.TemporaryDirectory() as d:
+            root=Path(d);script=root/'prepare_runner.sh';script.write_text(prefix)
+            record=root/'route.json'
+            for name in ('journey_vehicle_contact_probe.py','journey_tracer_dispatch.py','journey_rebuild_dispatch.py'):
+                (root/name).write_text('import json,os,sys\nfrom pathlib import Path\nPath(os.environ["ROUTE_RECORD"]).write_text(json.dumps(dict(name=Path(__file__).name,args=sys.argv[1:])))\n')
+            env=dict(PATH='/usr/bin:/bin',RUNNER_ENVIRONMENT='github-hosted',RUNNER_OS='Linux',GITHUB_ACTIONS='true',
+                GITHUB_EVENT_NAME=event,GITHUB_REF=ref,ROUTE_RECORD=str(record))
+            env.update(extra or {})
+            result=subprocess.run(['/usr/bin/bash',str(script)],env=env,text=True,capture_output=True,timeout=10)
+            return result.returncode,json.loads(record.read_text()) if record.exists() else None
+
+    def source(self):return (probe.TASK/'scripts/prepare_runner.sh').read_text()
+
+    def test_actual_shell_routes_new_and_legacy_branches(self):
+        source=self.source()
+        for branch,name,arg in (
+            ('journey-vehicle-contact-ed21','journey_vehicle_contact_probe.py','dispatch'),
+            ('journey-tracer-shader-fix-6648','journey_tracer_dispatch.py','--verify-only'),
+            ('journey-linux-export-recovery-938','journey_rebuild_dispatch.py','--verify-only')):
+            with self.subTest(branch=branch):
+                code,record=self.runner(source,'refs/heads/'+branch)
+                self.assertEqual(code,0);self.assertEqual(record,dict(name=name,args=[arg]))
+        self.assertEqual(self.runner(source,'refs/heads/main','workflow_dispatch'),(0,None))
+
+    def test_actual_old_shell_reproduces_recorded_wrong_dispatcher(self):
+        current=self.source();self.assertEqual(current.count(self.NEW_ROUTE),1)
+        old=current.replace(self.NEW_ROUTE,self.OLD_ROUTE,1)
+        self.assertEqual(hashlib.sha256(old.encode()).hexdigest(),'243a14295864364d73726374d0d45793f0acb38948b4d8f1b8df8149e4f9ff94')
+        code,record=self.runner(old,probe.REF)
+        self.assertEqual(code,0);self.assertEqual(record,dict(name='journey_rebuild_dispatch.py',args=['--verify-only']))
+        # This is the historical routing defect; the new shell must not repeat it.
+        self.assertNotEqual(self.runner(current,probe.REF)[1],record)
+
+    def test_actual_shell_keeps_hosted_linux_action_gate(self):
+        for key,value in dict(RUNNER_ENVIRONMENT='self-hosted',RUNNER_OS='Windows',GITHUB_ACTIONS='false').items():
+            with self.subTest(key=key):
+                code,record=self.runner(self.source(),probe.REF,extra={key:value})
+                self.assertNotEqual(code,0);self.assertIsNone(record)
+
+    def test_consumer_parent_is_separate_from_actual_production(self):
+        self.assertEqual(probe.BASE,'65f78c4aee22c9df7591295881c0261e62ebe5b8')
+        self.assertEqual(probe.PRODUCTION_BASE,'ed21b214f327b3ec439b9b3d7fec6b41a16d8a85')
+        self.assertEqual(probe.PRODUCER['commit'],probe.PRODUCTION_BASE)
+        self.assertNotEqual(probe.BASE,probe.PRODUCTION_BASE)
 
 
 
