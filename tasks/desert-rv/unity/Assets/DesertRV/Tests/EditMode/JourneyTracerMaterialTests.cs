@@ -74,18 +74,25 @@ namespace DesertRV.Tests
         public void SerializedSceneRetainsMaterialAndShaderDependency(string type)
         {
             var previousActive = SceneManager.GetActiveScene();
-            var scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Additive);
+            var previous = Enumerable.Range(0, SceneManager.sceneCount).Select(SceneManager.GetSceneAt).ToArray();
+            var dirty = previous.ToDictionary(s => s.handle, s => s.isDirty);
+            var roots = previous.ToDictionary(s => s.handle, s => s.GetRootGameObjects().Select(go => go.GetInstanceID()).OrderBy(id => id).ToArray());
+            Scene scene = default;
+            GameObject owner = null;
             string path = "Assets/JourneyTracerTest_" + Guid.NewGuid().ToString("N") + ".unity";
             try
             {
-                var owner = new GameObject("inactive serialized tracer fixture"); owner.SetActive(false);
+                // Match the FX/grounding fixtures: keep the runner's untitled scene open and untouched.
+                scene = EditorSceneManager.NewPreviewScene();
+                Assert.That(EditorSceneManager.IsPreviewScene(scene), Is.True);
+                owner = new GameObject("inactive serialized tracer fixture"); owner.SetActive(false);
                 SceneManager.MoveGameObjectToScene(owner, scene);
                 var component = owner.AddComponent(Production.Type(type));
                 var serialized = new SerializedObject(component);
                 var field = serialized.FindProperty("nailTrajectoryMaterial");
                 Assert.That(field, Is.Not.Null, "Both runtime material fields must be serialized.");
                 field.objectReferenceValue = Material(); serialized.ApplyModifiedPropertiesWithoutUndo();
-                Assert.That(EditorSceneManager.SaveScene(scene, path), Is.True);
+                Assert.That(EditorSceneManager.SaveScene(scene, path, true), Is.True);
                 var dependencies = AssetDatabase.GetDependencies(path, true);
                 Assert.That(dependencies, Does.Contain(MaterialPath));
                 Assert.That(dependencies, Does.Contain(ShaderPath));
@@ -95,20 +102,43 @@ namespace DesertRV.Tests
                 var clone = new Material(Material());
                 try { Assert.That(CheckSavedMaterial(clone, path), Is.Not.Empty, "Runtime clones are not authored dependencies."); }
                 finally { Object.DestroyImmediate(clone); }
-                EditorSceneManager.CloseScene(scene, true);
-                scene = EditorSceneManager.OpenScene(path, OpenSceneMode.Additive);
+                Assert.That(EditorSceneManager.ClosePreviewScene(scene), Is.True);
+                scene = EditorSceneManager.OpenPreviewScene(path);
+                Assert.That(EditorSceneManager.IsPreviewScene(scene), Is.True);
                 var restored = scene.GetRootGameObjects().Single().GetComponent(Production.Type(type));
                 Assert.That(Field(restored, "nailTrajectoryMaterial"), Is.SameAs(Material()));
                 Set(restored, "nailTrajectoryMaterial", null);
                 EditorUtility.SetDirty(restored);
-                EditorSceneManager.MarkSceneDirty(scene); Assert.That(EditorSceneManager.SaveScene(scene, path), Is.True);
+                EditorSceneManager.MarkSceneDirty(scene); Assert.That(EditorSceneManager.SaveScene(scene, path, true), Is.True);
                 Assert.That(CheckSavedMaterial(Material(), path), Is.Not.Empty, "An old saved scene cannot pass using only an in-memory material.");
             }
             finally
             {
-                if (previousActive.IsValid() && previousActive.isLoaded) SceneManager.SetActiveScene(previousActive);
-                if (scene.IsValid() && scene.isLoaded) EditorSceneManager.CloseScene(scene, true);
-                AssetDatabase.DeleteAsset(path);
+                try
+                {
+                    try { if (owner) Object.DestroyImmediate(owner); }
+                    finally { if (scene.IsValid()) Assert.That(EditorSceneManager.ClosePreviewScene(scene), Is.True); }
+                }
+                finally
+                {
+                    try
+                    {
+                        AssetDatabase.DeleteAsset(path);
+                        Assert.That(File.Exists(path), Is.False);
+                        Assert.That(File.Exists(path + ".meta"), Is.False);
+                    }
+                    finally
+                    {
+                        var after = Enumerable.Range(0, SceneManager.sceneCount).Select(SceneManager.GetSceneAt).ToArray();
+                        Assert.That(after.Select(s => s.handle), Is.EqualTo(previous.Select(s => s.handle)));
+                        Assert.That(SceneManager.GetActiveScene(), Is.EqualTo(previousActive));
+                        foreach (var original in after)
+                        {
+                            Assert.That(original.isDirty, Is.EqualTo(dirty[original.handle]));
+                            Assert.That(original.GetRootGameObjects().Select(go => go.GetInstanceID()).OrderBy(id => id), Is.EqualTo(roots[original.handle]));
+                        }
+                    }
+                }
             }
         }
 

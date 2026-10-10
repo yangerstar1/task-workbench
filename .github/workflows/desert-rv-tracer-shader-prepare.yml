@@ -2,7 +2,7 @@ name: Desert RV fresh tracer shader producer and Linux candidate
 on:
   push:
     branches: [journey-tracer-shader-fix-6648]
-    paths: [.github/dispatch/desert-rv-tracer-shader-prepare-20261010.json]
+    paths: [.github/dispatch/desert-rv-tracer-shader-prepare-r1-20261010.json]
 permissions:
   contents: read
   actions: read
@@ -93,6 +93,7 @@ jobs:
           SELECTION: ${{ steps.dispatch_identity.outputs.selection }}
           SELECTION_SHA: ${{ steps.dispatch_identity.outputs.selection_sha256 }}
         run: |
+          /usr/bin/python3 tasks/desert-rv/scripts/test_journey_tracer_source_diagnostic.py
           /usr/bin/python3 tasks/desert-rv/scripts/test_journey_tracer_native.py
           /usr/bin/python3 tasks/desert-rv/scripts/player/test_verify_tracer_shader.py
           /usr/bin/python3 tasks/desert-rv/art/journey-preparation/test_pipeline.py
@@ -129,6 +130,20 @@ jobs:
           customParameters: -assemblyNames DesertRV.EditModeTests -testFilter DesertRV.Tests.JourneyTracerMaterialTests -force-glcore -job-worker-count 2
           dockerCpuLimit: 2
           dockerMemoryLimit: 12g
+      - name: Diagnose original source and import union even after failed native tests
+        id: tracer_source
+        if: always() && steps.tracer_native.outcome != 'skipped'
+        env:
+          NATIVE_OUTCOME: ${{ steps.tracer_native.outcome }}
+        run: python3 tasks/desert-rv/scripts/journey_tracer_source_diagnostic.py
+      - name: Upload bounded original source and fixture residue diagnostics
+        if: always() && steps.tracer_source.outputs.report_written == 'true' && steps.tracer_source.outputs.report_valid == 'true'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: journey-tracer-source-${{ github.run_id }}-${{ github.run_attempt }}
+          path: tasks/desert-rv/journey-tracer-source-report.json
+          if-no-files-found: error
+          retention-days: 7
       - name: Require exact ten passes and unchanged initial source and import union
         id: tracer_verify
         if: always() && steps.tracer_native.outcome != 'skipped'
@@ -145,7 +160,7 @@ jobs:
           retention-days: 7
       - name: Stage verified armored source archive
         id: stage_armored
-        if: success() && steps.tracer_verify.outcome == 'success' && steps.tracer_verify.outputs.native_verified == 'true'
+        if: success() && steps.tracer_source.outcome == 'success' && steps.tracer_source.outputs.source_unchanged == 'true' && steps.tracer_verify.outcome == 'success' && steps.tracer_verify.outputs.native_verified == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         run: python3 tasks/desert-rv/art/journey-preparation/pipeline.py stage --kind armored
