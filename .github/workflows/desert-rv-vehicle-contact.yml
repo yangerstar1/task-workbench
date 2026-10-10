@@ -1,8 +1,8 @@
-name: Desert RV bounded ed21 vehicle contact diagnosis
+name: Desert RV bounded vehicle Motor fix regression
 on:
   push:
     branches: [journey-vehicle-contact-ed21]
-    paths: [.github/dispatch/desert-rv-vehicle-contact-ed21-r2-20261010.json]
+    paths: [.github/dispatch/desert-rv-vehicle-contact-ed21-r3-20261010.json]
 permissions:
   contents: read
   actions: read
@@ -28,6 +28,7 @@ jobs:
       - name: Verify exact one-use diagnostic identity and untouched source
         run: |
           python3 tasks/desert-rv/scripts/test_journey_vehicle_contact_probe.py
+          python3 tasks/desert-rv/scripts/test_journey_vehicle_contact_fix_report.py
           python3 tasks/desert-rv/scripts/journey_vehicle_contact_probe.py dispatch
           python3 tasks/desert-rv/scripts/verify_evidence.py guard
       - name: Verify fixed-image readiness with at most one bounded fallback pull
@@ -97,7 +98,7 @@ jobs:
         run: |
           bash tasks/desert-rv/scripts/prepare_runner.sh
           docker build --build-arg BASE_IMAGE=unityci/editor@sha256:17406791cf1e438bea2dac20671668e05d83db5ed38c916744815db4584a8264 --file tasks/desert-rv/scripts/Environment.Dockerfile --tag desert-rv-environment:local tasks/desert-rv/scripts
-      - name: Native one-case ed21 vehicle contact discriminators
+      - name: Native one-case fixed Motor regressions
         id: native
         if: success() && steps.stage.outputs.copy_ready == 'true'
         uses: game-ci/unity-test-runner@0ff419b913a3630032cbe0de48a0099b5a9f0ed9
@@ -111,7 +112,7 @@ jobs:
           projectPath: tasks/desert-rv/journey-vehicle-contact-project
           testMode: playmode
           artifactsPath: tasks/desert-rv/artifacts/journey-vehicle-contact
-          customParameters: -assemblyNames DesertRV.PlayModeTests -testFilter DesertRV.Tests.JourneyVehicleContactPhysicsTests.RealRV_RecordContactLockDiscriminators -force-glcore -job-worker-count 2
+          customParameters: -assemblyNames DesertRV.PlayModeTests -testFilter DesertRV.Tests.JourneyVehicleContactFixPhysicsTests.RealRV_RegressionInitialOverlapAndFullBuffer -force-glcore -job-worker-count 2
           dockerCpuLimit: 2
           dockerMemoryLimit: 12g
       - name: Preserve bounded report and XML-derived outcome even when native execution fails
@@ -124,7 +125,7 @@ jobs:
         if: always() && steps.report.outputs.report_ready == 'true'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: journey-vehicle-contact-UNREVIEWED-${{ github.run_id }}-${{ github.run_attempt }}
+          name: journey-vehicle-contact-fix-UNREVIEWED-${{ github.run_id }}-${{ github.run_attempt }}
           path: tasks/desert-rv/journey-vehicle-contact-export/
           if-no-files-found: error
           retention-days: 7
@@ -133,7 +134,7 @@ jobs:
         run: |
           set -euo pipefail
           # Bound the privileged cleanup to reviewed helper bytes and their imports.
-          for source in journey_vehicle_contact_probe.py journey_vehicle_contact_report.py journey_keyboard_look_native.py verify_evidence.py; do
+          for source in journey_vehicle_contact_probe.py journey_vehicle_contact_report.py journey_vehicle_contact_fix_report.py journey_keyboard_look_native.py verify_evidence.py; do
             relative="tasks/desert-rv/scripts/$source"
             expected=$(git show "HEAD:$relative" | sha256sum | cut -d ' ' -f 1)
             actual=$(sha256sum "$relative" | cut -d ' ' -f 1)

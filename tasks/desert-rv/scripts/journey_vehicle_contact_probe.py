@@ -1,4 +1,4 @@
-"""One-use PlayMode vehicle contact diagnosis of exact ed21 prepared assets; no BuildPlayer."""
+"""One-use PlayMode Motor fix regression with exact ed21 prepared assets and one pinned source replacement; no BuildPlayer."""
 import base64
 import hashlib
 import json
@@ -24,15 +24,16 @@ from journey_keyboard_look_native import file_bytes, raw_pin, safe_path, protect
 from strict_output import verify_staged_inventory
 import generated_export as generated
 
-BASE = '65f78c4aee22c9df7591295881c0261e62ebe5b8'
-PRODUCTION_BASE = 'ed21b214f327b3ec439b9b3d7fec6b41a16d8a85'
+BASE = 'da02a3a4a16c09c18cf63bc99499291b4ff1af54'
+PREPARED_PRODUCTION_BASE = 'ed21b214f327b3ec439b9b3d7fec6b41a16d8a85'
+MOTOR_CHANGE = {'path': 'Assets/DesertRV/Runtime/JourneyMotor.cs', 'before': {'sha256': '7f12f78f5fee78f03aac4ea32dd53e3ed9336d0866d19f750df4496f9e310397', 'bytes': 12486}, 'after': {'sha256': '3f89acff873ebfbe17db5406b631d501d86151536f7f5a9d0308d854433d00fc', 'bytes': 17265}}
 BRANCH = 'journey-vehicle-contact-ed21'
 REF = 'refs/heads/' + BRANCH
 REPOSITORY = 'yangerstar1/task-workbench'
 OWNER_NAME = 'yangerstar1'
 WORKFLOW = '.github/workflows/desert-rv-vehicle-contact.yml'
-REQUEST = '.github/dispatch/desert-rv-vehicle-contact-ed21-r2-20261010.json'
-NONCE = 'desert-rv-vehicle-contact-ed21-r2-20261010-once'
+REQUEST = '.github/dispatch/desert-rv-vehicle-contact-ed21-r3-20261010.json'
+NONCE = 'desert-rv-vehicle-contact-ed21-r3-20261010-once'
 PRODUCER = dict(commit='ed21b214f327b3ec439b9b3d7fec6b41a16d8a85', runId=38054694730,
     artifactId=11673265859, artifactName='journey-preparation-UNREVIEWED-38054694730-1',
     artifactBytes=15842817, artifactSha256='1e9f5e73417b7454f5e85e5bfa426499c93cb045e383da6467e49eca64d878b1',
@@ -48,15 +49,15 @@ COPY = TASK / 'journey-vehicle-contact-project'
 PRIVATE = TASK / 'journey-vehicle-contact-private'
 OWNER = TASK / 'journey-vehicle-contact-owner.json'
 MARKER = '.journey-vehicle-contact-owner.json'
-INPUT_REL = 'JourneyEvidence/VehicleContact/consumer-input.json'
-RAW_REL = 'JourneyEvidence/VehicleContact/native-contact-probe.json'
+INPUT_REL = 'JourneyEvidence/VehicleContactFix/consumer-input.json'
+RAW_REL = 'JourneyEvidence/VehicleContactFix/native-contact-fix.json'
 ARTIFACTS = TASK / 'artifacts/journey-vehicle-contact'
 EXPORT = TASK / 'journey-vehicle-contact-export'
 REPORT = EXPORT / 'report.json'
 SNAPSHOT_SOURCES = tuple('Assets/DesertRV/' + name for name in (
     'Runtime/JourneyMotor.cs', 'Runtime/BeastActor.cs', 'Runtime/MobileInputAdapter.cs',
-    'Tests/PlayMode/JourneyVehicleContactPhysicsTests.cs'))
-TEST = 'DesertRV.Tests.JourneyVehicleContactPhysicsTests.RealRV_RecordContactLockDiscriminators'
+    'Tests/PlayMode/JourneyVehicleContactFixPhysicsTests.cs'))
+TEST = 'DesertRV.Tests.JourneyVehicleContactFixPhysicsTests.RealRV_RegressionInitialOverlapAndFullBuffer'
 SOURCE_NAME = 'tasks/desert-rv/SOURCE-STATE.json'
 PREFIX = 'tasks/desert-rv/unity/'
 MAX_REPORT = 8 * 1024**2
@@ -244,6 +245,7 @@ def bundle_assets(folder, producer_source):
 
 
 def consumer_input(assets, receipt, before, after, consumer_commit):
+    require(re.fullmatch('[a-f0-9]{40}', consumer_commit or '') and consumer_commit not in {BASE, PRODUCER['commit']}, 'CONSUMER_COMMIT')
     old = {r['path'][len(PREFIX):]: r for r in before['files'] + before['restoredFiles'] if r['path'].startswith(PREFIX)}
     current = {r['path'][len(PREFIX):]: r for r in after['files'] + after['restoredFiles'] if r['path'].startswith(PREFIX)}
     controls = receipt['packageControls']
@@ -270,18 +272,24 @@ def consumer_input(assets, receipt, before, after, consumer_commit):
                 require(name in old and name in current and old[name]['sha256'] == row['sha256'] and old[name]['size'] == row['bytes'], 'PRODUCER_SOURCE_DEPENDENCY')
                 actual = raw_pin(file_bytes(PROJECT / name))
                 require(actual == dict(sha256=current[name]['sha256'], bytes=current[name]['size']), 'CONSUMER_SOURCE_DEPENDENCY')
-                require(actual == dict(sha256=row['sha256'], bytes=row['bytes']), 'PRODUCTION_DEPENDENCY_CHANGED')
+                if name == MOTOR_CHANGE['path']:
+                    require(dict(sha256=row['sha256'], bytes=row['bytes']) == MOTOR_CHANGE['before'] and
+                        actual == MOTOR_CHANGE['after'] and actual != MOTOR_CHANGE['before'], 'EXACT_MOTOR_REPLACEMENT')
+                    row.update(actual)
+                    changes.append(dict(path=name, before=dict(MOTOR_CHANGE['before']), after=dict(MOTOR_CHANGE['after'])))
+                else:
+                    require(actual == dict(sha256=row['sha256'], bytes=row['bytes']), 'PRODUCTION_DEPENDENCY_CHANGED')
             else:
                 require(owner in {'strict','generated'} and name in assets and name not in current and
                     raw_pin(assets[name]) == dict(sha256=row['sha256'], bytes=row['bytes']), 'ARTIFACT_DEPENDENCY')
                 require((owner == 'strict') == name.startswith('Assets/DesertRV/CandidateArtImports'), 'ASSET_OWNER')
         rows.append(row)
     require(counts == {'source':636,'strict':64,'generated':72,'official-package':24} and
-        changes == [], 'EXACT_CLOSURE_COUNTS')
+        changes == [MOTOR_CHANGE], 'EXACT_CLOSURE_COUNTS')
     require(all((n[:-5] if n.endswith('.meta') else n + '.meta') in seen for n in seen), 'DEPENDENCY_META_PAIR')
-    return dict(schema=1, status='VERIFIED_ED21_PREPARED_ASSETS_DIAGNOSTIC_CONSUMER_NOT_APPROVED',
+    return dict(schema=1, status='VERIFIED_ED21_PREPARED_ASSETS_MOTOR_FIX_CONSUMER_NOT_APPROVED',
         producerCommit=PRODUCER['commit'], producerRunId=str(PRODUCER['runId']),
-        producerArtifactSha256=PRODUCER['artifactSha256'], consumerCommit=consumer_commit, currentProductionCommit=PRODUCTION_BASE,
+        producerArtifactSha256=PRODUCER['artifactSha256'], consumerCommit=consumer_commit, currentProductionCommit=consumer_commit,
         dependencies=sorted(rows, key=lambda r:r['path']), dependencyChanges=sorted(changes, key=lambda r:r['path']))
 
 
@@ -411,7 +419,7 @@ def inspect_isolated_union(owner):
 
 def finish():
     value = dict(schema=1, status='INCOMPLETE_NOT_GAMEPLAY_ACCEPTANCE', **owner_identity(),
-        currentProductionCommit=PRODUCTION_BASE, consumerParentCommit=BASE, producer=PRODUCER,
+        currentProductionCommit=os.environ['GITHUB_SHA'], consumerParentCommit=BASE, producer=PRODUCER,
         approved=False, gameplayReviewed=False, scopeReusable=False,
         nativeOutcome=os.environ.get('NATIVE_OUTCOME','unknown'), sourceUnchanged=False,
         isolatedInputsVerified=False, inputUnchanged=False, xml=None, nativeReport=None,
@@ -449,7 +457,7 @@ def finish():
         value['checks'].extend(('EXACT_ONE_CASE_XML_UNAVAILABLE', failure_code(error)))
     if owner is not None and value['inputUnchanged']:
         try:
-            from journey_vehicle_contact_report import verify_native_report
+            from journey_vehicle_contact_fix_report import verify_native_report
             raw = file_bytes(COPY / RAW_REL, MAX_NATIVE_REPORT)
             native = parse(raw)
             pins = {name: row['sha256'] for name,row in owner['union'].items()}
@@ -457,9 +465,11 @@ def finish():
             pins[INPUT_REL.replace('.json','.sha256')] = sha(file_bytes((COPY / INPUT_REL).with_suffix('.sha256')))
             summary = verify_native_report(native, read(COPY / INPUT_REL), owner['inputSha256'], pins)
             value['nativeSummary'] = summary
-            value['nativeReport'] = dict(path='native-contact-probe.json', **raw_pin(raw))
+            if native['status'] == 'completed' and not summary['regressionsPassed']:
+                value['checks'].append('MOTOR_REGRESSION_FAILED')
+            value['nativeReport'] = dict(path='native-contact-fix.json', **raw_pin(raw))
             # Keep the validated original bytes, never turn a host fixture into native evidence.
-            with (EXPORT / 'native-contact-probe.json').open('xb') as stream: stream.write(raw)
+            with (EXPORT / 'native-contact-fix.json').open('xb') as stream: stream.write(raw)
         except Exception as error:
             value['checks'].extend(('BOUNDED_ORIGINAL_NATIVE_REPORT_UNAVAILABLE', failure_code(error)))
     snapshots = [
@@ -483,8 +493,8 @@ def finish():
             value['checks'].extend(('SOURCE_SNAPSHOT_UNAVAILABLE', failure_code(error)))
     complete = (value['sourceUnchanged'] and value['isolatedInputsVerified'] and value['inputUnchanged'] and
         value['xml'] is not None and value['xml']['result'] == 'Passed' and value['nativeOutcome'] == 'success' and
-        value['nativeSummary'] is not None and value['nativeSummary']['diagnosticComplete'] and not value['checks'])
-    if complete: value['status'] = 'OBSERVATIONS_COMPLETE_NOT_GAMEPLAY_ACCEPTANCE'
+        value['nativeSummary'] is not None and value['nativeSummary']['diagnosticComplete'] and value['nativeSummary']['regressionsPassed'] and not value['checks'])
+    if complete: value['status'] = 'REGRESSIONS_PASSED_NOT_GAMEPLAY_ACCEPTANCE'
     write_new(REPORT, value)
     output('report_ready=true'); output('diagnostic_complete=' + str(complete).lower())
     return 0 if complete else 2

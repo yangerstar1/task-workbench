@@ -298,10 +298,10 @@ class ActualRunnerShellRoute(unittest.TestCase):
                 self.assertNotEqual(code,0);self.assertIsNone(record)
 
     def test_consumer_parent_is_separate_from_actual_production(self):
-        self.assertEqual(probe.BASE,'65f78c4aee22c9df7591295881c0261e62ebe5b8')
-        self.assertEqual(probe.PRODUCTION_BASE,'ed21b214f327b3ec439b9b3d7fec6b41a16d8a85')
-        self.assertEqual(probe.PRODUCER['commit'],probe.PRODUCTION_BASE)
-        self.assertNotEqual(probe.BASE,probe.PRODUCTION_BASE)
+        self.assertEqual(probe.BASE,'da02a3a4a16c09c18cf63bc99499291b4ff1af54')
+        self.assertEqual(probe.PREPARED_PRODUCTION_BASE,'ed21b214f327b3ec439b9b3d7fec6b41a16d8a85')
+        self.assertEqual(probe.PRODUCER['commit'],probe.PREPARED_PRODUCTION_BASE)
+        self.assertNotEqual(probe.BASE,probe.PREPARED_PRODUCTION_BASE)
 
 
 
