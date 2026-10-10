@@ -2,7 +2,7 @@ name: Desert RV fresh tracer shader producer and Linux candidate
 on:
   push:
     branches: [journey-tracer-shader-fix-6648]
-    paths: [.github/dispatch/desert-rv-tracer-shader-prepare-keyboard-r1-20261010.json]
+    paths: [.github/dispatch/desert-rv-tracer-shader-prepare-keyboard-isolated-r1-20261010.json]
 permissions:
   contents: read
   actions: read
@@ -159,9 +159,13 @@ jobs:
           path: tasks/desert-rv/journey-tracer-native-report.json
           if-no-files-found: error
           retention-days: 7
+      - name: Create exact same-commit isolated keyboard look project
+        id: keyboard_copy
+        if: success() && steps.tracer_source.outcome == 'success' && steps.tracer_source.outputs.source_unchanged == 'true' && steps.tracer_verify.outcome == 'success' && steps.tracer_verify.outputs.native_verified == 'true'
+        run: python3 tasks/desert-rv/scripts/journey_keyboard_look_native.py copy
       - name: Native exact four keyboard look PlayMode cases before strict imports
         id: keyboard_native
-        if: success() && steps.tracer_source.outcome == 'success' && steps.tracer_source.outputs.source_unchanged == 'true' && steps.tracer_verify.outcome == 'success' && steps.tracer_verify.outputs.native_verified == 'true'
+        if: success() && steps.keyboard_copy.outputs.copy_ready == 'true'
         uses: game-ci/unity-test-runner@0ff419b913a3630032cbe0de48a0099b5a9f0ed9
         env:
           UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
@@ -170,15 +174,27 @@ jobs:
         with:
           unityVersion: 6000.3.19f1
           customImage: desert-rv-environment:local
-          projectPath: tasks/desert-rv/unity
+          projectPath: tasks/desert-rv/journey-keyboard-look-project
           testMode: playmode
           artifactsPath: tasks/desert-rv/artifacts/journey-keyboard-look
           customParameters: -assemblyNames DesertRV.PlayModeTests -testFilter DesertRV.Tests.JourneyReplayInputTests.KeyboardLook_RateAndBounds;DesertRV.Tests.JourneyReplayInputTests.KeyboardLook_ContextAndRelease;DesertRV.Tests.JourneyReplayInputTests.KeyboardLook_PreservesExistingSources;DesertRV.Tests.JourneyReplayInputTests.KeyboardLook_EditorReplayIsExclusive -force-glcore -job-worker-count 2
           dockerCpuLimit: 2
           dockerMemoryLimit: 12g
+      - name: Preserve isolated project source and complete safe settings diff
+        id: keyboard_isolation
+        if: always() && steps.keyboard_copy.outputs.copy_created == 'true'
+        run: python3 tasks/desert-rv/scripts/journey_keyboard_look_native.py isolation
+      - name: Upload bounded isolated keyboard look project diagnostics
+        if: always() && steps.keyboard_isolation.outputs.report_written == 'true' && steps.keyboard_isolation.outputs.report_valid == 'true'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: journey-keyboard-look-isolation-${{ github.run_id }}-${{ github.run_attempt }}
+          path: tasks/desert-rv/journey-keyboard-look-isolation-report.json
+          if-no-files-found: error
+          retention-days: 7
       - name: Diagnose source and union independently after keyboard look native tests
         id: keyboard_source
-        if: always() && steps.keyboard_native.outcome != 'skipped'
+        if: always() && steps.keyboard_copy.outputs.copy_created == 'true'
         env:
           NATIVE_OUTCOME: ${{ steps.keyboard_native.outcome }}
         run: python3 tasks/desert-rv/scripts/journey_keyboard_look_native.py source
@@ -205,11 +221,25 @@ jobs:
           if-no-files-found: error
           retention-days: 7
       - name: Preserve separate keyboard look reports in preparation evidence
-        if: always() && steps.keyboard_source.outputs.report_valid == 'true' && steps.keyboard_verify.outputs.report_valid == 'true'
+        if: always() && steps.keyboard_source.outputs.report_valid == 'true' && steps.keyboard_verify.outputs.report_valid == 'true' && steps.keyboard_isolation.outputs.report_valid == 'true'
         run: python3 tasks/desert-rv/scripts/journey_keyboard_look_native.py preserve
+      - name: Remove only the owned isolated keyboard look project
+        id: keyboard_cleanup
+        if: always() && steps.keyboard_copy.outputs.copy_created == 'true' && steps.keyboard_isolation.outputs.report_valid == 'true'
+        run: |
+          set -euo pipefail
+          # Pin cleanup source before its isolated privileged interpreter.
+          # Refuse native-modified cleanup code before the bounded privileged call.
+          for source in journey_keyboard_look_native.py; do
+            relative="tasks/desert-rv/scripts/$source"
+            expected=$(git show "HEAD:$relative" | sha256sum | cut -d ' ' -f 1)
+            actual=$(sha256sum "$relative" | cut -d ' ' -f 1)
+            test "$actual" = "$expected"
+          done
+          sudo --preserve-env=GITHUB_SHA,GITHUB_RUN_ID,GITHUB_RUN_ATTEMPT /usr/bin/python3 -I -B tasks/desert-rv/scripts/journey_keyboard_look_native.py cleanup
       - name: Stage verified armored source archive
         id: stage_armored
-        if: success() && steps.tracer_source.outcome == 'success' && steps.tracer_source.outputs.source_unchanged == 'true' && steps.tracer_verify.outcome == 'success' && steps.tracer_verify.outputs.native_verified == 'true' && steps.keyboard_source.outcome == 'success' && steps.keyboard_source.outputs.source_unchanged == 'true' && steps.keyboard_verify.outcome == 'success' && steps.keyboard_verify.outputs.native_verified == 'true'
+        if: success() && steps.tracer_source.outcome == 'success' && steps.tracer_source.outputs.source_unchanged == 'true' && steps.tracer_verify.outcome == 'success' && steps.tracer_verify.outputs.native_verified == 'true' && steps.keyboard_source.outcome == 'success' && steps.keyboard_source.outputs.source_unchanged == 'true' && steps.keyboard_verify.outcome == 'success' && steps.keyboard_verify.outputs.native_verified == 'true' && steps.keyboard_isolation.outputs.copy_verified == 'true' && steps.keyboard_cleanup.outcome == 'success'
         env:
           GH_TOKEN: ${{ github.token }}
         run: python3 tasks/desert-rv/art/journey-preparation/pipeline.py stage --kind armored
