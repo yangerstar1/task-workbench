@@ -33,6 +33,7 @@ namespace DesertRV
         readonly System.Collections.Generic.HashSet<BeastActor> rammed = new System.Collections.Generic.HashSet<BeastActor>();
         readonly RaycastHit[] carHits = new RaycastHit[32];
         readonly Collider[] rotationHits = new Collider[32];
+        readonly float[] capsuleBoxTimes = new float[8];
 
         void Awake()
         {
@@ -110,17 +111,28 @@ namespace DesertRV
                 Vector3 center = vehicle.position + Vector3.up * 1.45f;
                 int count = Physics.BoxCastNonAlloc(center, new Vector3(1.05f, 1.12f, 2.7f),
                     displacement.normalized, carHits, heading, distance + .10f, ~0, QueryTriggerInteraction.Ignore);
+                // A full buffer may contain only our own cabin colliders, or omit
+                // the nearest wall. Recover the complete set before filtering.
+                RaycastHit[] hits = carHits;
+                if (count == carHits.Length)
+                {
+                    hits = Physics.BoxCastAll(center, new Vector3(1.05f, 1.12f, 2.7f),
+                        displacement.normalized, heading, distance + .10f, ~0, QueryTriggerInteraction.Ignore);
+                    count = hits.Length;
+                }
                 // Physics non-alloc casts are not ordered. A wall must stop processing
                 // before a beast behind it; never damage through the nearest obstruction.
-                System.Array.Sort(carHits, 0, count, System.Collections.Generic.Comparer<RaycastHit>.Create((a,b) => a.distance.CompareTo(b.distance)));
-                float allowed = count == carHits.Length ? 0 : distance;
+                System.Array.Sort(hits, 0, count, System.Collections.Generic.Comparer<RaycastHit>.Create((a,b) => a.distance.CompareTo(b.distance)));
+                float allowed = distance;
                 rammed.Clear();
                 for (int i = 0; i < count; i++)
                 {
-                    var hit = carHits[i];
+                    var hit = hits[i];
                     if (hit.distance > allowed + .10f) break;
                     if (!hit.collider || hit.collider.transform.IsChildOf(vehicle) || hit.collider == walker || hit.normal.y > .65f) continue;
                     var beast = hit.collider.GetComponentInParent<BeastActor>();
+                    if (beast && !beast.Dead && hit.distance == 0 &&
+                        CanLeaveInitialBeastOverlap(beast, hit.collider, center, heading, Speed * delta)) continue;
                     if (beast && !beast.Dead && Speed > 3 &&
                         Vector3.Dot(hit.point - vehicle.position, Forward) > 1.8f &&
                         Vector3.Dot(-hit.normal, Forward) > .45f &&
@@ -141,6 +153,71 @@ namespace DesertRV
                     Speed = 0;
                 }
             }
+        }
+        // Initial-overlap casts return a synthetic normal opposite either travel
+        // direction. Only independently proved capsule separation can bypass one.
+        // The capsule axis must still be outside the box; deep embedding stays
+        // blocked. No helper collider or world/actor displacement is introduced.
+        bool CanLeaveInitialBeastOverlap(BeastActor beast, Collider hit, Vector3 center, Quaternion heading, float travel)
+        {
+            if (!beast || beast.Dead || travel == 0 || hit != beast.GetComponent<CapsuleCollider>() ||
+                !beast.TryGetSweepCapsule(out var bottom, out var top, out float radius)) return false;
+            var inverse = Quaternion.Inverse(heading);
+            Vector3 a = inverse * (bottom - center), b = inverse * (top - center);
+            if (!Finite(a) || !Finite(b) || float.IsNaN(travel) || float.IsInfinity(travel)) return false;
+            Vector3 separation = CapsuleBoxVector(a, b);
+            float squared = separation.sqrMagnitude;
+            if (squared <= 1e-10f || squared >= radius * radius) return false;
+            // Drive translates exactly along the query box's local Z axis.
+            // Keep the initial supporting direction: an endpoint-only check could
+            // allow a long step through a beast and out its opposite side.
+            // Squared distance between these convex shapes is convex under
+            // translation. This closest vector makes its initial derivative
+            // nonnegative, hence distance cannot decrease anywhere in the step.
+            if (Mathf.Sign(travel) * separation.z > 0) return false;
+            Vector3 offset = Vector3.forward * travel;
+            return CapsuleBoxVector(a - offset, b - offset).sqrMagnitude + 1e-10f >= squared;
+        }
+        static bool Finite(Vector3 value) =>
+            !float.IsNaN(value.x) && !float.IsInfinity(value.x) &&
+            !float.IsNaN(value.y) && !float.IsInfinity(value.y) &&
+            !float.IsNaN(value.z) && !float.IsInfinity(value.z);
+
+        // Exact segment-to-AABB closest vector. Each slab crossing changes which
+        // coordinates contribute to squared distance; each interval is quadratic.
+        Vector3 CapsuleBoxVector(Vector3 a, Vector3 b)
+        {
+            Vector3 extents = new Vector3(1.05f, 1.12f, 2.7f), direction = b - a;
+            int count = 2; capsuleBoxTimes[0] = 0; capsuleBoxTimes[1] = 1;
+            for (int axis = 0; axis < 3; axis++)
+            {
+                if (direction[axis] == 0) continue;
+                for (int side = -1; side <= 1; side += 2)
+                {
+                    float t = (side * extents[axis] - a[axis]) / direction[axis];
+                    if (t > 0 && t < 1) capsuleBoxTimes[count++] = t;
+                }
+            }
+            System.Array.Sort(capsuleBoxTimes, 0, count);
+            Vector3 best = Vector3.zero; float bestSquared = float.PositiveInfinity;
+            for (int interval = 0; interval < count - 1; interval++)
+            {
+                float lo = capsuleBoxTimes[interval], hi = capsuleBoxTimes[interval + 1];
+                Vector3 middle = a + direction * ((lo + hi) * .5f);
+                float quadratic = 0, linear = 0;
+                for (int axis = 0; axis < 3; axis++)
+                {
+                    float edge = middle[axis] < -extents[axis] ? -extents[axis] : extents[axis];
+                    if (middle[axis] >= -extents[axis] && middle[axis] <= extents[axis]) continue;
+                    quadratic += direction[axis] * direction[axis];
+                    linear += direction[axis] * (a[axis] - edge);
+                }
+                float t = quadratic > 0 ? Mathf.Clamp(-linear / quadratic, lo, hi) : lo;
+                Vector3 point = a + direction * t;
+                Vector3 delta = point - Vector3.Min(Vector3.Max(point, -extents), extents);
+                if (delta.sqrMagnitude < bestSquared) { best = delta; bestSquared = delta.sqrMagnitude; }
+            }
+            return best;
         }
         void Walk(float delta)
         {

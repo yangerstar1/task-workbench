@@ -1,0 +1,8 @@
+{
+  "schema": 1,
+  "requestId": "desert-rv-contact-art-ed21-20261010-once",
+  "baseCommit": "ed21b214f327b3ec439b9b3d7fec6b41a16d8a85",
+  "sourceStateSha256": "e67aa315cef1dc2051ef25b1040162cbdb8c807a5b8c127efdced43a47ed44c3",
+  "selection": "tasks/desert-rv/art/journey-preparation/three-strict-candidates.json",
+  "selectionSha256": "e46d71b118dbf614cb183928528992037a4f8e4d408bf5359484716106457b05"
+}

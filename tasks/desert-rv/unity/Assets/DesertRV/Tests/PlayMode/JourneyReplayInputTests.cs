@@ -173,6 +173,99 @@ namespace DesertRV.Tests
             }
         }
 
+        [UnityTest] public IEnumerator HudRegionLabel_TracksSessionAdvanceAndWholeRunRestart()
+        {
+            // Real Awake/Update and the retained UI Text are exercised in PlayMode.
+            // Session tickets are driven directly; this is not an authored-region load or gameplay replay.
+            var root = new GameObject("region HUD lifecycle fixture"); root.SetActive(false);
+            var originalLock = Cursor.lockState; bool originalCursor = Cursor.visible;
+            Component hud = null;
+            var sprites = new System.Collections.Generic.HashSet<Sprite>();
+            Texture2D roundedTexture = null;
+            try
+            {
+                Assert.That(Application.isPlaying, Is.True);
+                Transform Child(string name)
+                { var child = new GameObject(name).transform; child.SetParent(root.transform, false); return child; }
+                var session = root.AddComponent(T("JourneySession"));
+                var vehicle = Child("fixture vehicle"); var door = Child("fixture door"); door.SetParent(vehicle, false);
+                var view = Child("fixture camera").gameObject.AddComponent<Camera>(); view.enabled = false;
+                var motor = Child("fixture motor").gameObject.AddComponent(T("JourneyMotor"));
+                Field(motor, "journey", session); Field(motor, "vehicle", vehicle); Field(motor, "doorHinge", door); Field(motor, "view", view);
+                var actions = Child("fixture actions").gameObject.AddComponent(T("JourneyActions"));
+                Field(actions, "journey", session); Field(actions, "motor", motor);
+                var tracer = UnityEditor.AssetDatabase.LoadAssetAtPath<Material>("Assets/DesertRV/Art/Materials/JourneyNailTrajectory.mat");
+                Assert.That(tracer, Is.Not.Null); Field(actions, "nailTrajectoryMaterial", tracer);
+                var loader = Child("fixture loader").gameObject.AddComponent(T("RegionLoader"));
+                hud = Child("fixture HUD").gameObject.AddComponent(T("JourneyHud"));
+                var font = UnityEditor.AssetDatabase.LoadAssetAtPath<Font>("Assets/DesertRV/UI/Fonts/NotoSansCJKsc-Regular.otf");
+                Assert.That(font, Is.Not.Null, "Restore the pinned production font before the native run.");
+                var director = root.AddComponent(T("JourneyDirector"));
+                Field(director, "journey", session); Field(director, "motor", motor); Field(director, "actions", actions);
+                Field(director, "loader", loader); Field(director, "hud", hud);
+                Field(hud, "journey", session); Field(hud, "director", director); Field(hud, "motor", motor); Field(hud, "font", font);
+                root.SetActive(true); // Run the production lifecycle once, after all serialized dependencies are assigned.
+                ((Behaviour)session).enabled = false; // Keep live device input outside this focused HUD test.
+                view.GetComponent<AudioListener>().enabled = false;
+                Assert.That(Get(director, "OwnsJourney"), Is.True);
+                var textType = Type.GetType("UnityEngine.UI.Text, UnityEngine.UI", true);
+                const string labelPath = "Safe area/Vehicle status/Journey label";
+                var label = hud.transform.Find(labelPath).GetComponent(textType);
+                Assert.That(label, Is.Not.Null);
+                var state = Get(session, "State");
+                void AssertLabel(int scene, string status, string expected)
+                {
+                    Assert.That(Get(session, "State"), Is.SameAs(state));
+                    Assert.That(Get(state, "SceneId"), Is.EqualTo(scene));
+                    Assert.That(Get(state, "Status").ToString(), Is.EqualTo(status));
+                    Assert.That(hud.transform.Find(labelPath).GetComponent(textType), Is.SameAs(label));
+                    Assert.That(((Behaviour)hud).isActiveAndEnabled && hud.GetComponent<Canvas>().enabled && label.gameObject.activeInHierarchy, Is.True);
+                    Assert.That(Get(label, "text"), Is.EqualTo(expected));
+                }
+                Assert.That(Call(session, "StartJourney"), Is.True);
+                yield return null; AssertLabel(1, "Playing", "荒漠行路 / 01");
+                int generation = (int)Get(session, "Generation");
+                string[] parts = { "RamPart", "Coil" }, labels = { "荒漠行路 / 02", "荒漠行路 / 03" };
+                for (int step = 0; step < 2; step++)
+                {
+                    Assert.That(Call(state, "TryCollect", "hud-fixture-" + parts[step], E("ComponentPart", parts[step])), Is.True);
+                    Assert.That(Call(state, "TryInstall", E("ComponentPart", parts[step])), Is.True);
+                    Assert.That(Call(state, "SetGateOpen", true), Is.True);
+                    Assert.That(Call(state, "SetObjectivesResolved", true), Is.True);
+                    var ticket = Call(session, "BeginRegionAdvance");
+                    Assert.That(Call(session, "IsCurrentLoad", ticket), Is.True);
+                    yield return null; AssertLabel(step + 2, "Loading", labels[step]);
+                    Assert.That(Call(session, "CompleteRegionLoad", ticket, 0d), Is.True);
+                    yield return null; AssertLabel(step + 2, "Playing", labels[step]);
+                    Assert.That(Get(session, "Generation"), Is.EqualTo(generation));
+                }
+                Call(state, "DamagePlayer", 100);
+                yield return null; AssertLabel(3, "Failed", "荒漠行路 / 03");
+                Assert.That(Call(session, "RestartJourney"), Is.True);
+                Assert.That(Get(session, "Generation"), Is.EqualTo(generation + 1));
+                var restart = Call(session, "BeginCurrentRegionLoad");
+                Assert.That(Call(session, "IsCurrentLoad", restart), Is.True);
+                yield return null; AssertLabel(1, "Loading", "荒漠行路 / 01");
+                Assert.That(Call(session, "CompleteRegionLoad", restart, 0d), Is.True);
+                yield return null; AssertLabel(1, "Playing", "荒漠行路 / 01");
+            }
+            finally
+            {
+                // HUD Awake owns four runtime sprites and one texture; do not destroy imported assets or whiteTexture.
+                if (hud)
+                {
+                    var rounded = (Sprite)Field(hud, "rounded");
+                    if (rounded) { sprites.Add(rounded); roundedTexture = rounded.texture; }
+                    foreach (string field in new[] { "playerBar", "carBar", "actionBar" })
+                    { var bar = Field(hud, field); if (bar != null) sprites.Add((Sprite)Get(bar, "sprite")); }
+                }
+                UnityEngine.Object.DestroyImmediate(root);
+                foreach (var sprite in sprites) if (sprite) UnityEngine.Object.DestroyImmediate(sprite);
+                if (roundedTexture) UnityEngine.Object.DestroyImmediate(roundedTexture);
+                Cursor.lockState = originalLock; Cursor.visible = originalCursor;
+            }
+        }
+
         [UnityTest] public IEnumerator HeldFire_SurvivesAdapterSampleWithoutNewPressedEdge()
         {
             var go = new GameObject("replay ownership test"); var adapter = go.AddComponent(T("MobileInputAdapter"));

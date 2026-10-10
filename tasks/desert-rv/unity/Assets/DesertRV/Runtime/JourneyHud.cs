@@ -15,7 +15,7 @@ namespace DesertRV
         RectTransform safe, menu;
         Text crosshair, hitMark;
         Image damageEdge;
-        Text resources, objective, notice, prompt, menuTitle, menuBody, primaryLabel, storm;
+        Text regionLabel, resources, objective, notice, prompt, menuTitle, menuBody, primaryLabel, storm;
         Button primary;
         Button keyboardLookToggle, keyboardLookSpeed;
         Text keyboardLookHelp;
@@ -44,7 +44,7 @@ namespace DesertRV
             { var events = new GameObject("Journey UI events"); events.transform.SetParent(transform, false); events.AddComponent<EventSystem>(); events.AddComponent<StandaloneInputModule>(); }
             safe = Rect("Safe area", transform, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
             var top = Panel("Vehicle status", safe, new Vector2(0, 1), new Vector2(0, 1), new Vector2(24, -24), new Vector2(280, 124), ink);
-            Label("Journey label", top, "荒漠行路 / 01", 19, new Vector2(16, -10), new Vector2(228, 28), TextAnchor.UpperLeft);
+            regionLabel = Label("Journey label", top, "荒漠行路 / 01", 19, new Vector2(16, -10), new Vector2(228, 28), TextAnchor.UpperLeft);
             resources = Label("Resources", top, "", 21, new Vector2(16, -44), new Vector2(248, 64), TextAnchor.UpperLeft);
             playerBar = Progress(top, "Suit health", new Vector2(16, -114), new Vector2(100, 4), new Color(.74f,.82f,.64f));
             carBar = Progress(top, "RV condition", new Vector2(132, -114), new Vector2(132, 4), orange);
@@ -118,6 +118,7 @@ namespace DesertRV
             safe.anchorMax = new Vector2(area.xMax / Screen.width, area.yMax / Screen.height);
             safe.offsetMin = safe.offsetMax = Vector2.zero;
             var state = journey.State;
+            regionLabel.text = $"荒漠行路 / {state.SceneId:00}";
             bool playing = state.Status == SessionStatus.Playing;
             bool driving = state.Control == ControlMode.Driving;
             resources.text = $"体力 {state.PlayerHealth}     车况 {state.VehicleHealth}\n钉弹 {state.LoadedAmmo} / {state.ReserveAmmo}  ·  修理包 {state.RepairKits}";
