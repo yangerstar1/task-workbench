@@ -85,8 +85,8 @@
     },
     {
       "path": ".github/workflows/desert-rv-tracer-shader-prepare.yml",
-      "sha256": "d73bb07657c40a2d2e1122df152d9eeec6de166e1d8d77f91b46b33105241d1e",
-      "size": 29402
+      "sha256": "35ccd474834ec4629fd86cc618d71bf7ca955da8d49dd27d8d92372c6b75e17b",
+      "size": 29403
     },
     {
       "path": "tasks/desert-rv/ASSET-NOTICES.md",
@@ -490,8 +490,8 @@
     },
     {
       "path": "tasks/desert-rv/scripts/journey_tracer_dispatch.py",
-      "sha256": "95908174ba1fbf00be50b7c8f4255367c6d99d81b311b8201f8c03f96762ed42",
-      "size": 6511
+      "sha256": "d2b59ff19ca38a34127fc884cdbe643cea5d3cb98d383d549301b3bfc802ff7a",
+      "size": 6513
     },
     {
       "path": "tasks/desert-rv/scripts/journey_tracer_native.py",
@@ -4300,8 +4300,8 @@
     },
     {
       "path": "tasks/desert-rv/unity/Assets/DesertRV/Editor/JourneySceneAuthoring.cs",
-      "sha256": "f5a3ecc89119a4a19189a869d1bfb0b506b41d5a08faea408ceb818aa5e8506b",
-      "size": 66690
+      "sha256": "066b7358383d05216168f39561790aed01ac70be4367db003f3d59d93710820f",
+      "size": 66885
     },
     {
       "path": "tasks/desert-rv/unity/Assets/DesertRV/Editor/JourneySceneAuthoring.cs.meta",

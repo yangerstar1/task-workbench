@@ -687,6 +687,9 @@ namespace DesertRV.Editor
             b.environmentVerified = b.combatAssetsVerified = false;
             return b;
         }
+        // Keep the endpoint in front of the cabinet face and its status indicators.
+        internal static Vector3 PowerInteractionPosition(Collider power) => power.bounds.center + Vector3.back * .50f;
+
         static void PopulateLayout(RegionBinding b, JourneyContentManifest manifest)
         {
             Solid("Route foundation", b.transform, new Vector3(0,-.24f,30), new Vector3(34,.4f,94), new Color(.46f,.37f,.25f));
@@ -695,7 +698,7 @@ namespace DesertRV.Editor
             else
             {
                 var power = Solid(b.region == 3 ? "Beacon power cabinet" : "Scrapyard power cabinet", b.transform, new Vector3(6,.65f,23), new Vector3(1.1f,1.3f,.8f), new Color(.21f,.31f,.33f));
-                b.powerSurface = power; b.powerPoint = Point("Power interaction", b.transform, power.bounds.center + Vector3.back * .45f);
+                b.powerSurface = power; b.powerPoint = Point("Power interaction", b.transform, PowerInteractionPosition(power));
                 b.chargeSeconds = b.region == 3 ? 36 : 28;
                 if (b.region == 2)
                 {

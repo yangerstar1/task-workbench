@@ -1,0 +1,8 @@
+{
+  "schema": 1,
+  "requestId": "desert-rv-power-anchor-full-r1-20261010-once",
+  "baseCommit": "ecd3fd411802e498ff21d14626cae5e4bde4333c",
+  "sourceStateSha256": "d18bad2fed1b311a355f53a04adfdea5f97411a69a4c6d0f7df3e5c0a58414f3",
+  "selection": "tasks/desert-rv/art/journey-preparation/three-strict-candidates.json",
+  "selectionSha256": "dfbc3b9a5959350b69544828ab3e6dbb5cfb7f01895fa985c0eefdb38e051f24"
+}
