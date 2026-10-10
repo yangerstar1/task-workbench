@@ -1,0 +1,8 @@
+{
+  "schema": 1,
+  "requestId": "desert-rv-combat-feedback-full-061f-20261010-once",
+  "baseCommit": "061fd618abb456df8d4bfb2d33c0db9c01eb1e9c",
+  "sourceStateSha256": "9ef70e6f285d93241b84b6e9dd3aa4daaeb5d7e8f5bd77230531607c1d6f558a",
+  "selection": "tasks/desert-rv/art/journey-preparation/three-strict-candidates.json",
+  "selectionSha256": "e46d71b118dbf614cb183928528992037a4f8e4d408bf5359484716106457b05"
+}

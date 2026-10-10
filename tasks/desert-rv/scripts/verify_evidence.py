@@ -123,14 +123,14 @@ def guard():
     require(os.environ.get('GITHUB_ACTIONS') == 'true', 'GitHub Actions required')
     require(os.environ.get('RUNNER_ENVIRONMENT') == 'github-hosted' and os.environ.get('RUNNER_OS') == 'Linux', 'Standard hosted Linux required')
     if os.environ.get('GITHUB_EVENT_NAME') != 'workflow_dispatch':
-        if os.environ.get('GITHUB_REF') == 'refs/heads/journey-tracer-shader-fix-6648':
+        if os.environ.get('GITHUB_REF') in ('refs/heads/journey-tracer-shader-fix-6648', 'refs/heads/wip/combat-feedback-20261010'):
             import journey_tracer_dispatch
             journey_tracer_dispatch.verify(ROOT, os.environ)
         else:
             import journey_rebuild_dispatch
             journey_rebuild_dispatch.verify(ROOT, os.environ)  # Existing fixed recovery request remains unchanged.
     require(os.environ.get('GITHUB_REPOSITORY') == REPOSITORY and (os.environ.get('GITHUB_REF') == 'refs/heads/main' or
-            os.environ.get('GITHUB_EVENT_NAME') == 'push' and os.environ.get('GITHUB_REF') in ('refs/heads/journey-linux-export-recovery-938', 'refs/heads/journey-tracer-shader-fix-6648')), 'Trusted repository/ref required')
+            os.environ.get('GITHUB_EVENT_NAME') == 'push' and os.environ.get('GITHUB_REF') in ('refs/heads/journey-linux-export-recovery-938', 'refs/heads/journey-tracer-shader-fix-6648', 'refs/heads/wip/combat-feedback-20261010')), 'Trusted repository/ref required')
     require(os.environ.get('GITHUB_ACTOR') == OWNER and os.environ.get('GITHUB_TRIGGERING_ACTOR') == OWNER, 'Owner dispatch and owner rerun required')
     repo = read_json(os.environ['GITHUB_EVENT_PATH'])['repository']
     require(repo.get('full_name') == REPOSITORY and repo.get('private') is False and repo.get('fork') is False and repo.get('default_branch') == 'main', 'Public original repository required')

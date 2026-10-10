@@ -1,8 +1,8 @@
-name: Desert RV verified movement fresh producer and Linux candidate
+name: Desert RV combat feedback fresh producer and Linux candidate
 on:
   push:
-    branches: [journey-tracer-shader-fix-6648]
-    paths: [.github/dispatch/desert-rv-tracer-contact-art-20261010.json]
+    branches: [wip/combat-feedback-20261010]
+    paths: [.github/dispatch/desert-rv-combat-feedback-full-20261010.json]
 permissions:
   contents: read
   actions: read
@@ -13,7 +13,7 @@ jobs:
   prepare:
     if: >-
       github.repository == 'yangerstar1/task-workbench' &&
-      github.event_name == 'push' && github.ref == 'refs/heads/journey-tracer-shader-fix-6648' &&
+      github.event_name == 'push' && github.ref == 'refs/heads/wip/combat-feedback-20261010' &&
       github.actor == 'yangerstar1' && github.triggering_actor == 'yangerstar1'
     runs-on: ubuntu-24.04
     timeout-minutes: 230
@@ -98,6 +98,7 @@ jobs:
           /usr/bin/python3 tasks/desert-rv/scripts/test_journey_keyboard_look_native.py
           /usr/bin/python3 tasks/desert-rv/scripts/test_journey_cabin_entry_native.py
           /usr/bin/python3 tasks/desert-rv/scripts/test_journey_region_hud_native.py
+          /usr/bin/python3 tasks/desert-rv/scripts/test_journey_combat_feedback_native.py
           /usr/bin/python3 tasks/desert-rv/scripts/player/test_verify_tracer_shader.py
           /usr/bin/python3 tasks/desert-rv/art/journey-preparation/test_pipeline.py
           /usr/bin/python3 tasks/desert-rv/art/journey-preparation/test_generated_export.py
@@ -216,6 +217,23 @@ jobs:
           customParameters: -assemblyNames DesertRV.PlayModeTests -testFilter DesertRV.Tests.JourneyReplayInputTests.HudRegionLabel_TracksSessionAdvanceAndWholeRunRestart -force-glcore -job-worker-count 2
           dockerCpuLimit: 2
           dockerMemoryLimit: 12g
+      - name: Native exact seven combat feedback EditMode cases in the isolated project
+        id: combat_feedback_native
+        if: always() && !cancelled() && steps.keyboard_copy.outputs.copy_ready == 'true'
+        uses: game-ci/unity-test-runner@0ff419b913a3630032cbe0de48a0099b5a9f0ed9
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+        with:
+          unityVersion: 6000.3.19f1
+          customImage: desert-rv-environment:local
+          projectPath: tasks/desert-rv/journey-keyboard-look-project
+          testMode: editmode
+          artifactsPath: tasks/desert-rv/artifacts/journey-combat-feedback-full
+          customParameters: -assemblyNames DesertRV.EditModeTests -testFilter DesertRV.Tests.JourneyCombatFeedbackTests -force-glcore -job-worker-count 2
+          dockerCpuLimit: 2
+          dockerMemoryLimit: 12g
       - name: Preserve isolated project source and complete safe settings diff
         id: keyboard_isolation
         if: always() && steps.keyboard_copy.outputs.copy_created == 'true'
@@ -290,6 +308,23 @@ jobs:
       - name: Preserve separate bounded region HUD evidence in the fresh preparation
         if: always() && steps.region_hud_verify.outputs.report_valid == 'true'
         run: python3 tasks/desert-rv/scripts/journey_region_hud_native.py preserve
+      - name: Require fresh exact-seven feedback passes and same-job source and isolation evidence
+        id: combat_feedback_verify
+        if: always() && steps.combat_feedback_native.outcome != 'skipped'
+        env:
+          NATIVE_OUTCOME: ${{ steps.combat_feedback_native.outcome }}
+        run: python3 tasks/desert-rv/scripts/journey_combat_feedback_native.py native
+      - name: Upload bounded validated combat feedback native status
+        if: always() && steps.combat_feedback_verify.outputs.report_written == 'true' && steps.combat_feedback_verify.outputs.report_valid == 'true'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: journey-combat-feedback-full-native-${{ github.run_id }}-${{ github.run_attempt }}
+          path: tasks/desert-rv/journey-combat-feedback-full-native-report.json
+          if-no-files-found: error
+          retention-days: 7
+      - name: Preserve bounded combat feedback evidence in the fresh preparation
+        if: always() && steps.combat_feedback_verify.outputs.report_valid == 'true'
+        run: python3 tasks/desert-rv/scripts/journey_combat_feedback_native.py preserve
       - name: Remove only the owned isolated keyboard look project
         id: keyboard_cleanup
         if: always() && steps.keyboard_copy.outputs.copy_created == 'true' && steps.keyboard_isolation.outputs.report_valid == 'true'
@@ -306,7 +341,7 @@ jobs:
           sudo --preserve-env=GITHUB_SHA,GITHUB_RUN_ID,GITHUB_RUN_ATTEMPT /usr/bin/python3 -I -B tasks/desert-rv/scripts/journey_keyboard_look_native.py cleanup
       - name: Stage verified armored source archive
         id: stage_armored
-        if: success() && steps.tracer_source.outcome == 'success' && steps.tracer_source.outputs.source_unchanged == 'true' && steps.tracer_verify.outcome == 'success' && steps.tracer_verify.outputs.native_verified == 'true' && steps.keyboard_source.outcome == 'success' && steps.keyboard_source.outputs.source_unchanged == 'true' && steps.keyboard_verify.outcome == 'success' && steps.keyboard_verify.outputs.native_verified == 'true' && steps.keyboard_isolation.outputs.copy_verified == 'true' && steps.keyboard_cleanup.outcome == 'success' && steps.cabin_native.outcome == 'success' && steps.cabin_report.outcome == 'success' && steps.cabin_report.outputs.diagnostic_complete == 'true' && steps.region_hud_native.outcome == 'success' && steps.region_hud_verify.outcome == 'success' && steps.region_hud_verify.outputs.native_verified == 'true'
+        if: success() && steps.tracer_source.outcome == 'success' && steps.tracer_source.outputs.source_unchanged == 'true' && steps.tracer_verify.outcome == 'success' && steps.tracer_verify.outputs.native_verified == 'true' && steps.keyboard_source.outcome == 'success' && steps.keyboard_source.outputs.source_unchanged == 'true' && steps.keyboard_verify.outcome == 'success' && steps.keyboard_verify.outputs.native_verified == 'true' && steps.keyboard_isolation.outputs.copy_verified == 'true' && steps.keyboard_cleanup.outcome == 'success' && steps.cabin_native.outcome == 'success' && steps.cabin_report.outcome == 'success' && steps.cabin_report.outputs.diagnostic_complete == 'true' && steps.region_hud_native.outcome == 'success' && steps.region_hud_verify.outcome == 'success' && steps.region_hud_verify.outputs.native_verified == 'true' && steps.combat_feedback_native.outcome == 'success' && steps.combat_feedback_verify.outcome == 'success' && steps.combat_feedback_verify.outputs.native_verified == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         run: python3 tasks/desert-rv/art/journey-preparation/pipeline.py stage --kind armored

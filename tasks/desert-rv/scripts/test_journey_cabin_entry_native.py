@@ -283,7 +283,7 @@ class WorkflowTests(unittest.TestCase):
         self.assertEqual(workflow['on']['push']['paths'],[n.dispatch.REQUEST])
         steps=workflow['jobs']['prepare']['steps'];order=[step.get('id') for step in steps]
         native=[s for s in steps if s.get('uses','').startswith('game-ci/unity-test-runner@')]
-        self.assertEqual([s['id'] for s in native],['tracer_native','keyboard_native','cabin_native','region_hud_native','armored','pouncer','weapon','linux_boundary','author'])
+        self.assertEqual([s['id'] for s in native],['tracer_native','keyboard_native','cabin_native','region_hud_native','combat_feedback_native','armored','pouncer','weapon','linux_boundary','author'])
         cabin=native[2];self.assertIn('always()',cabin['if']);self.assertIn("steps.keyboard_copy.outputs.copy_ready == 'true'",cabin['if'])
         self.assertNotIn('keyboard_native.outcome',cabin['if']);self.assertEqual(cabin['with']['projectPath'],n.isolated.COPY_REL)
         self.assertEqual(cabin['with']['customParameters'],'-assemblyNames DesertRV.PlayModeTests -testFilter '+n.EXPECTED+' -force-glcore -job-worker-count 2')
@@ -316,7 +316,9 @@ class WorkflowTests(unittest.TestCase):
             'cabin_native.outcome':'success','cabin_report.outcome':'success',
             'cabin_report.outputs.diagnostic_complete':'true',
             'region_hud_native.outcome':'success','region_hud_verify.outcome':'success',
-            'region_hud_verify.outputs.native_verified':'true'}
+            'region_hud_verify.outputs.native_verified':'true',
+            'combat_feedback_native.outcome':'success','combat_feedback_verify.outcome':'success',
+            'combat_feedback_verify.outputs.native_verified':'true'}
         parsed=[]
         for term in terms[1:]:
             match=re.fullmatch(r"steps\.([a-z_]+\.(?:outcome|outputs\.[a-z_]+)) == '(success|true)'",term)

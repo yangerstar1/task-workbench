@@ -51,7 +51,7 @@ def guard():
     require(os.environ.get('GITHUB_REPOSITORY')=='yangerstar1/task-workbench','PREP_REPOSITORY')
     if os.environ.get('GITHUB_REF')!='refs/heads/main':
         sys.path.insert(0,str(ROOT/'scripts'))
-        if os.environ.get('GITHUB_REF')=='refs/heads/journey-tracer-shader-fix-6648':
+        if os.environ.get('GITHUB_REF') in ('refs/heads/journey-tracer-shader-fix-6648', 'refs/heads/wip/combat-feedback-20261010'):
             import journey_tracer_dispatch
             journey_tracer_dispatch.verify(REPO,os.environ)
         else:

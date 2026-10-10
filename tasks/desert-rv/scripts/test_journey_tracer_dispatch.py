@@ -166,7 +166,7 @@ class RealGitAndWorkflowTests(unittest.TestCase):
         for forbidden in ('workflow_dispatch:', 'restore_preparation.py', 'prepare-restored',
                           'restoration-transition', 'continue-on-error:', 'workflow_run:'):
             self.assertNotIn(forbidden,workflow)
-        self.assertEqual(workflow.count('uses: game-ci/unity-test-runner@'),9)
+        self.assertEqual(workflow.count('uses: game-ci/unity-test-runner@'),10)
         self.assertIn('DesertRV.Tests.JourneyCabinEntryPhysicsTests.RealRV_StandardExitToCabin_AllTimesteps',workflow)
         runner=(d.ROOT/'tasks/desert-rv/scripts/prepare_runner.sh').read_text()
         self.assertLess(runner.index('journey_tracer_dispatch.py'),runner.index('UNITY_LICENSE'))

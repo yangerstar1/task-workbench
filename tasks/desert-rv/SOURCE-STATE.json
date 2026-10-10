@@ -85,8 +85,8 @@
     },
     {
       "path": ".github/workflows/desert-rv-tracer-shader-prepare.yml",
-      "sha256": "d34f987f969c06a0eea05cf8edda3bc157c39db85563868aa65c7b6a8dd6a373",
-      "size": 31758
+      "sha256": "bc19a17f04133e2f6fe21397e5c32daf77172017c59b709ba193f63de6521deb",
+      "size": 34159
     },
     {
       "path": "tasks/desert-rv/ASSET-NOTICES.md",
@@ -390,8 +390,8 @@
     },
     {
       "path": "tasks/desert-rv/art/journey-preparation/pipeline.py",
-      "sha256": "3a2889348f51ed902ca94b9011a12c5b18ef0d45ac0377625f7befdb5fff4dd7",
-      "size": 24335
+      "sha256": "4e49fde2aa22c3069c71ed6b4d14c861d5189037903ed395585272b62724ad28",
+      "size": 24382
     },
     {
       "path": "tasks/desert-rv/art/journey-preparation/restoration-transition.json",
@@ -484,6 +484,11 @@
       "size": 27709
     },
     {
+      "path": "tasks/desert-rv/scripts/journey_combat_feedback_native.py",
+      "sha256": "27efbd773057c8d63d5af508c24ad7bc9bcde73c62ffccc0f35d42e0ad4f3435",
+      "size": 8044
+    },
+    {
       "path": "tasks/desert-rv/scripts/journey_combat_feedback_probe.py",
       "sha256": "9d3531771571d517f6545686b48eda6c68e8ce8a86e74452e2d28841dc7de1fb",
       "size": 14419
@@ -505,8 +510,8 @@
     },
     {
       "path": "tasks/desert-rv/scripts/journey_tracer_dispatch.py",
-      "sha256": "cda10ed0ab7e3edf95a050172f13ec893baddf9e9efb5d86d2d78e17a079cc9f",
-      "size": 6507
+      "sha256": "08aa0e9a215706701f52b54ec1ae8a75d6d15a147eedbc218cd497bd1fe62b83",
+      "size": 6516
     },
     {
       "path": "tasks/desert-rv/scripts/journey_tracer_native.py",
@@ -585,8 +590,8 @@
     },
     {
       "path": "tasks/desert-rv/scripts/prepare_runner.sh",
-      "sha256": "064bc734a56dabd99a199bfeaad0973b06c6f60feb765cca00c9549b2b181a5d",
-      "size": 1603
+      "sha256": "3d91794d1d6f8bf385319785ff9f04ee1550d6b450f79edb21da983ab32beecc",
+      "size": 1932
     },
     {
       "path": "tasks/desert-rv/scripts/prepare_safe_diagnostic_export.py",
@@ -660,8 +665,8 @@
     },
     {
       "path": "tasks/desert-rv/scripts/rendered/test_prepared_source.py",
-      "sha256": "36326a1275f0601134dce75923d6f608cdf816bb54106ab838276d3fe100364d",
-      "size": 20079
+      "sha256": "a538a7d06516662c1237172c58ad69f54cb5764d11bc77ab296d298ecf9fd5d2",
+      "size": 20126
     },
     {
       "path": "tasks/desert-rv/scripts/rendered/test_rendered_shell.py",
@@ -710,8 +715,13 @@
     },
     {
       "path": "tasks/desert-rv/scripts/test_journey_cabin_entry_native.py",
-      "sha256": "edd57f79648b06591ed9f5b48c9dea94b0d9178dc1e4e33ee1d019c92599ba12",
-      "size": 26808
+      "sha256": "9078b17f900a217798cd5db781539fd1b4ca9633d3cafda12b6b3dc32d07fa92",
+      "size": 27001
+    },
+    {
+      "path": "tasks/desert-rv/scripts/test_journey_combat_feedback_native.py",
+      "sha256": "63d2d1e6573da64a530c068d80076876fe43c55420d97bcf4d4b8ca1c743396d",
+      "size": 11547
     },
     {
       "path": "tasks/desert-rv/scripts/test_journey_combat_feedback_probe.py",
@@ -730,13 +740,13 @@
     },
     {
       "path": "tasks/desert-rv/scripts/test_journey_region_hud_native.py",
-      "sha256": "bd5e692973539d97eaeca177a20a29da0a1dac24e609a49f1fbd7f135ddd6091",
-      "size": 12015
+      "sha256": "fa21b634eae1c92e604554abaf8603fa0c44ffb62fa42b130b6268437c803ef4",
+      "size": 12016
     },
     {
       "path": "tasks/desert-rv/scripts/test_journey_tracer_dispatch.py",
-      "sha256": "afaf83e37cf59645ede796c802ed7ac48d63fa3a9c82f350579b800479433436",
-      "size": 13023
+      "sha256": "320b3ff5b889345e554f816ede3cb790470de1ab06bd58d2c96885c604f6096c",
+      "size": 13024
     },
     {
       "path": "tasks/desert-rv/scripts/test_journey_tracer_native.py",
@@ -780,8 +790,8 @@
     },
     {
       "path": "tasks/desert-rv/scripts/verify_evidence.py",
-      "sha256": "10e0c8f9b0997417355822371c12e6c12ced13d7b840da1c86d00bd1b2edee7b",
-      "size": 16922
+      "sha256": "f00e2d92145330e2962709427a1fe7cff0f7104570c07c43e733ac1f4479ae98",
+      "size": 17010
     },
     {
       "path": "tasks/desert-rv/unity/Assets/DefaultVolumeProfile.asset",

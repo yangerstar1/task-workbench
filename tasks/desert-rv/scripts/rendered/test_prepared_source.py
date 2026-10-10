@@ -182,7 +182,7 @@ class PreparedSourceTests(unittest.TestCase):
     def test_hosted_root_owned_cache_crosses_actual_host_union(self):
         # This opt-in must pass the real tracked Git/event/owner/public/branch/attempt
         # guard before sudo. The local fixture never substitutes a synthetic identity.
-        if os.environ.get('GITHUB_REF')=='refs/heads/journey-tracer-shader-fix-6648':
+        if os.environ.get('GITHUB_REF') in ('refs/heads/journey-tracer-shader-fix-6648', 'refs/heads/wip/combat-feedback-20261010'):
             import journey_tracer_dispatch as dispatch
         else:
             import journey_rebuild_dispatch as dispatch
