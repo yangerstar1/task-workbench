@@ -252,6 +252,18 @@ namespace DesertRV.Tests
                 }
             }
             public bool OwnsScene(Scene scene) => ownedScenes.Exists(owned => owned.handle == scene.handle);
+            public static void RequireActiveScene(Scene scene, string purpose)
+            {
+                Assert.That(scene.IsValid() && scene.isLoaded, Is.True,
+                    purpose + ": target must be valid and loaded; target=" + scene.handle);
+                var before = SceneManager.GetActiveScene();
+                bool requested = before != scene, accepted = false;
+                if (requested) accepted = SceneManager.SetActiveScene(scene);
+                var after = SceneManager.GetActiveScene();
+                Assert.That(after == scene, Is.True, purpose + ": target=" + scene.handle +
+                    "; before=" + before.handle + "; after=" + after.handle +
+                    "; setterCalled=" + requested + "; setterReturned=" + accepted);
+            }
             public Scene CreateOwnedScene()
             {
                 // Original model tests retain their proven preview path. Capsule tests opt
@@ -263,7 +275,7 @@ namespace DesertRV.Tests
                 if (ordinaryEditorScene)
                 {
                     Assert.That(!EditorSceneManager.IsPreviewScene(scene) && scene.GetPhysicsScene().Equals(Physics.defaultPhysicsScene), Is.True);
-                    Assert.That(SceneManager.SetActiveScene(scene), Is.True, "Owned ordinary scene must receive newly constructed objects.");
+                    RequireActiveScene(scene, "Owned ordinary scene must receive newly constructed objects");
                 }
                 return scene;
             }
@@ -427,11 +439,11 @@ namespace DesertRV.Tests
                 // the named setup or keeps its verified recovery copy plus an empty scene.
                 if (ordinaryEditorScene) Attempt(() => {
                     if (originalActive.IsValid() && originalActive.isLoaded && !OwnsScene(originalActive))
-                        Assert.That(SceneManager.SetActiveScene(originalActive), Is.True);
+                        RequireActiveScene(originalActive, "Restore original active scene");
                     else
                     {
                         var keeper = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Additive);
-                        Assert.That(SceneManager.SetActiveScene(keeper), Is.True);
+                        RequireActiveScene(keeper, "Keep a loaded active scene before closing owned scenes");
                     }
                 });
                 Attempt(() => { if (Root) UnityEngine.Object.DestroyImmediate(Root); });
@@ -444,7 +456,7 @@ namespace DesertRV.Tests
                     else if (clip) UnityEngine.Object.DestroyImmediate(clip);
                 });
                 if (!ordinaryEditorScene) Attempt(() => {
-                    if (originalActive.IsValid() && originalActive.isLoaded) Assert.That(SceneManager.SetActiveScene(originalActive), Is.True);
+                    if (originalActive.IsValid() && originalActive.isLoaded) RequireActiveScene(originalActive, "Restore original active scene");
                 });
                 for (int i = ownedScenes.Count - 1; i >= 0; i--)
                 {

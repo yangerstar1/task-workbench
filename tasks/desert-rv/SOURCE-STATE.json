@@ -76,7 +76,7 @@
     },
     {
       "path": ".github/workflows/desert-rv-pouncer-ground-support.yml",
-      "sha256": "c3d7185f1a96454f4375b520de45e7ece50d889507c1d921ece1481566ca5dde",
+      "sha256": "d054b0c2a1a4851e0783d19ff437e42cf40914e7d297996fe2cc56e19c89d6d1",
       "size": 10408
     },
     {
@@ -506,8 +506,8 @@
     },
     {
       "path": "tasks/desert-rv/scripts/journey_pouncer_ground_support_probe.py",
-      "sha256": "69d90fb165f3ffe9475386cefaedd9f019910689b763e1be523a674b4a2c9183",
-      "size": 52112
+      "sha256": "a6b290bce38a12ef47f46ca7a3c0d13b419328dbb7835ea9d195e40f28ebcdfb",
+      "size": 52309
     },
     {
       "path": "tasks/desert-rv/scripts/journey_pouncer_support_reports.py",
@@ -5246,8 +5246,8 @@
     },
     {
       "path": "tasks/desert-rv/unity/Assets/DesertRV/Tests/CandidateArt/PouncerPawContactConstraintTests.cs",
-      "sha256": "2749a383f891071ac8b63dbe9db4853a32187533f71a36a3063b9ae0c2d8c4b9",
-      "size": 46401
+      "sha256": "7762f0004c9225f1f685caf2e5299d2595173b4772b32e9c9e49091d1f9e36c8",
+      "size": 47191
     },
     {
       "path": "tasks/desert-rv/unity/Assets/DesertRV/Tests/CandidateArt/PouncerPawContactConstraintTests.cs.meta",
@@ -5386,8 +5386,8 @@
     },
     {
       "path": "tasks/desert-rv/unity/Assets/DesertRV/Tests/EditMode/JourneyPouncerSupportBindingTests.cs",
-      "sha256": "d8280512117d5de7c93aa93c01a8a59f8e71cea68fadffe3503faab6b5227b69",
-      "size": 40924
+      "sha256": "b77e92f7e51cfc61ae227c67eff7ed3ceaa5f8d67affae9f32d857e2cffdfd48",
+      "size": 49778
     },
     {
       "path": "tasks/desert-rv/unity/Assets/DesertRV/Tests/EditMode/JourneyPouncerSupportBindingTests.cs.meta",
@@ -5701,8 +5701,8 @@
     },
     {
       "path": "tasks/desert-rv/unity/Assets/DesertRV/Tests/PouncerGround/PouncerGroundSupportTests.cs",
-      "sha256": "5e623f8475cc86032078c41835e829c2164e4dcf192bce8de594ee618ad1419a",
-      "size": 27018
+      "sha256": "108d1667e6b3a445b7bd451ae5f2210bba90a28d87b3084ea8b537d1975c5c48",
+      "size": 27060
     },
     {
       "path": "tasks/desert-rv/unity/Assets/DesertRV/Tests/PouncerGround/PouncerGroundSupportTests.cs.meta",

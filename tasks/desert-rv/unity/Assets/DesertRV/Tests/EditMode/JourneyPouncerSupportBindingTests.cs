@@ -74,6 +74,31 @@ namespace DesertRV.Tests
         {
             internal Dictionary<string, string> poses, colliders, health, serialized;
             internal string binding;
+            internal List<BindingProbe> bindingProbe;
+            internal Dictionary<string, string> objectLocations;
+        }
+        [Serializable] sealed class BindingProbe
+        {
+            public string path, pathSha256, type, value, referenceTarget;
+            [NonSerialized] internal string raw;
+        }
+        [Serializable] sealed class BindingDifference
+        {
+            public int index;
+            public BindingProbe before, after;
+        }
+        [Serializable] sealed class ObjectDifference
+        {
+            public string globalObjectId, beforeLocation, afterLocation, beforeSha256, afterSha256;
+            public int beforeLength, afterLength;
+        }
+        [Serializable] sealed class SnapshotDifference
+        {
+            public string status = "CAPTURED";
+            public bool bindingEqual, serializedEqual, truncated;
+            public int bindingBeforeCount, bindingAfterCount, bindingDifferenceCount, serializedBeforeCount, serializedAfterCount, serializedDifferenceCount;
+            public BindingDifference[] binding;
+            public ObjectDifference[] serialized;
         }
         static Type Runtime(string name) => Type.GetType("DesertRV." + name + ", Assembly-CSharp", true);
         static Type Editor(string name) => Type.GetType("DesertRV.Editor." + name + ", Assembly-CSharp-Editor", true);
@@ -263,7 +288,49 @@ namespace DesertRV.Tests
             if (c is MeshCollider mesh) return common + "|" + Reference(mesh.sharedMesh) + "|" + mesh.convex + "|" + (int)mesh.cookingOptions;
             throw new GateFailure("UNEXPECTED_COLLIDER_TYPE");
         }
-        static string BindingState(Component binding)
+        // Diagnostic copies never participate in an acceptance comparison. Raw project
+        // strings are hashed; only finite numbers, fixed paths and object IDs are logged.
+        static string DiagnosticPath(string path)
+        {
+            const string root = "(?:m_InstanceID|m_EntityId|m_ObjectHideFlags|m_CorrespondingSourceObject|m_PrefabInstance|m_PrefabAsset|m_GameObject|m_Enabled|m_EditorHideFlags|m_Script|m_Name|m_EditorClassIdentifier|region|spawn|exit|salvage|powerPoint|exitVolume|safeZone|salvageSurface|powerSurface|ramGate|salvageVisual|guards|roadBeasts|waves|progressDirection|regionOffset|chargeSeconds|combatAssetsVerified|environmentVerified|pickupId|supplies)";
+            return path.Length <= 160 && Regex.IsMatch(path, "^" + root + @"(?:\.(?:Array|size|data\[[0-9]{1,6}\]|enemies|id|label|riskHint|choiceGroup|point|surface|visual|kind|amount|x|y|z))*$") ? path : "UNCLASSIFIED";
+        }
+        static string DiagnosticId(string value) => value == "null" || value.Length <= 160 &&
+            Regex.IsMatch(value, @"^(?:GlobalObjectId_V1-[0-9]+-[a-f0-9]{32}-[0-9]+-[0-9]+|UNCLASSIFIED:[a-f0-9]{64})$") ? value : "UNCLASSIFIED:" + HashText(value);
+        static string DiagnosticLocation(Object value)
+        {
+            if (!value) return "null";
+            var go = value as GameObject; var component = value as Component;
+            if (component) go = component.gameObject;
+            if (!go) return "asset:" + DiagnosticId(Reference(value));
+            string guid = AssetDatabase.AssetPathToGUID(go.scene.path), hierarchy = Key(go.transform);
+            if (!Regex.IsMatch(guid ?? "", "^[a-f0-9]{32}$") || hierarchy.Length > 96 || !Regex.IsMatch(hierarchy, @"^[0-9]+(?:/[0-9]+)*$")) return "UNCLASSIFIED:" + HashText(guid + ":" + hierarchy);
+            return "scene:" + guid + ":" + hierarchy + (component ? ":component:" + Array.IndexOf(go.GetComponents<Component>(), component) : ":gameObject");
+        }
+        static BindingProbe Probe(SerializedProperty property, string raw)
+        {
+            try
+            {
+                string value = "sha256:" + HashText(raw.Substring(raw.IndexOf('=') + 1));
+                string target = "";
+                switch (property.propertyType)
+                {
+                    case SerializedPropertyType.ObjectReference: value = DiagnosticId(Reference(property.objectReferenceValue)); target = DiagnosticLocation(property.objectReferenceValue); break;
+                    case SerializedPropertyType.Integer: value = property.longValue.ToString(CultureInfo.InvariantCulture); break;
+                    case SerializedPropertyType.Enum: value = property.enumValueIndex.ToString(CultureInfo.InvariantCulture); break;
+                    case SerializedPropertyType.ArraySize: value = property.intValue.ToString(CultureInfo.InvariantCulture); break;
+                    case SerializedPropertyType.Boolean: value = property.boolValue ? "true" : "false"; break;
+                    case SerializedPropertyType.Float:
+                        double number = property.doubleValue;
+                        value = double.IsNaN(number) || double.IsInfinity(number) ? "NONFINITE" : number.ToString("R", CultureInfo.InvariantCulture); break;
+                    case SerializedPropertyType.String: value = "length:" + property.stringValue.Length + ":sha256:" + HashText(property.stringValue); break;
+                }
+                return new BindingProbe { path = DiagnosticPath(property.propertyPath), pathSha256 = HashText(property.propertyPath),
+                    type = property.propertyType.ToString(), value = value, referenceTarget = target, raw = raw };
+            }
+            catch { return new BindingProbe { path = "UNCLASSIFIED", type = "UNCLASSIFIED", value = "DIAGNOSTIC_FAILED", raw = raw }; }
+        }
+        static string BindingState(Component binding, List<BindingProbe> probes)
         {
             Check(!(bool)Field(binding, "combatAssetsVerified") && !(bool)Field(binding, "environmentVerified"), "APPROVAL_GATE_OPENED");
             object[] reason = { null };
@@ -274,6 +341,7 @@ namespace DesertRV.Tests
             while (p.Next(true))
             {
                 if (p.propertyPath == "pouncerSupportSurfaces" || p.propertyPath.StartsWith("pouncerSupportSurfaces.", StringComparison.Ordinal)) continue;
+                int count = values.Count;
                 if (p.propertyType == SerializedPropertyType.ObjectReference) values.Add(p.propertyPath + "=" + Reference(p.objectReferenceValue));
                 else if (p.propertyType == SerializedPropertyType.Integer) values.Add(p.propertyPath + "=" + p.longValue);
                 else if (p.propertyType == SerializedPropertyType.Enum) values.Add(p.propertyPath + "=" + p.enumValueIndex);
@@ -285,6 +353,7 @@ namespace DesertRV.Tests
                     values.Add(p.propertyPath + "=" + p.doubleValue.ToString("R", CultureInfo.InvariantCulture));
                 }
                 else if (p.propertyType == SerializedPropertyType.String) values.Add(p.propertyPath + "=" + p.stringValue);
+                if (values.Count != count) probes.Add(Probe(p, values[values.Count - 1]));
             }
             return string.Join("\n", values);
         }
@@ -336,7 +405,7 @@ namespace DesertRV.Tests
             });
             return json + "\noriginalComponents=" + componentInventory + "\nobjectReferences=" + string.Join("\n", references);
         }
-        static Dictionary<string, string> ExistingSerializedState(Scene scene)
+        static Dictionary<string, string> ExistingSerializedState(Scene scene, Dictionary<string, string> locations = null)
         {
             var objects = scene.GetRootGameObjects().SelectMany(r => r.GetComponentsInChildren<Transform>(true)).Select(t => t.gameObject).ToArray();
             var values = objects.Cast<Object>().Concat(objects.SelectMany(go => go.GetComponents<Component>()).Where(c => c && c.GetType() != Runtime("PouncerGroundSupport")).Cast<Object>()).ToArray();
@@ -350,23 +419,68 @@ namespace DesertRV.Tests
                 if (!identities.TryGetValue(id, out string identity)) identities.Add(id, identity = NormalizedReference(value));
                 return identity;
             }
-            return values.ToDictionary(Normalize, value => SerializedState(value, Normalize));
+            var result = values.ToDictionary(Normalize, value => SerializedState(value, Normalize));
+            if (locations != null) foreach (var value in values)
+            {
+                try { locations[Normalize(value)] = DiagnosticLocation(value); }
+                catch { } // Supplemental diagnostics cannot replace a snapshot failure.
+            }
+            return result;
         }
         static SceneState Snapshot(Scene scene, Component binding)
         {
             var actors = Actors(scene, binding); var colliders = All(scene, typeof(Collider)).Cast<Collider>().ToArray();
             Check(colliders.Length > 2, "SCENE_COLLIDERS_ABSENT");
+            var probes = new List<BindingProbe>(); var locations = new Dictionary<string, string>();
             return new SceneState {
                 poses = scene.GetRootGameObjects().Select(r => r.transform).Concat(actors.Select(a => a.transform)).Concat(colliders.Select(c => c.transform)).Distinct().ToDictionary(Key, Pose),
                 colliders = colliders.ToDictionary(c => Key(c.transform) + "/" + Array.IndexOf(c.GetComponents<Collider>(), c), ColliderState),
                 health = actors.ToDictionary(a => Key(a.transform), a => string.Join("|", new[] { "Health", "Phase", "Dead", "KilledByRam" }.Select(n => a.GetType().GetProperty(n).GetValue(a, null).ToString()))),
-                serialized = ExistingSerializedState(scene),
-                binding = BindingState(binding)
+                serialized = ExistingSerializedState(scene, locations),
+                binding = BindingState(binding, probes), bindingProbe = probes, objectLocations = locations
             };
         }
         static bool Equal(Dictionary<string, string> a, Dictionary<string, string> b) => a.Count == b.Count && a.All(p => b.TryGetValue(p.Key, out string value) && value == p.Value);
+        static void LogDifferences(SceneState before, SceneState after, bool bindingEqual, bool serializedEqual)
+        {
+            const string prefix = "JOURNEY_POUNCER_AUTHOR_SNAPSHOT_DIFF ";
+            try
+            {
+                var binding = new List<BindingDifference>(); var objects = new List<ObjectDifference>();
+                int bindingCount = 0, objectCount = 0;
+                for (int i = 0; i < Math.Max(before.bindingProbe.Count, after.bindingProbe.Count); i++)
+                {
+                    var a = i < before.bindingProbe.Count ? before.bindingProbe[i] : null;
+                    var b = i < after.bindingProbe.Count ? after.bindingProbe[i] : null;
+                    if (a != null && b != null && a.raw == b.raw) continue;
+                    bindingCount++;
+                    if (binding.Count < 16) binding.Add(new BindingDifference { index = i, before = a, after = b });
+                }
+                foreach (string key in before.serialized.Keys.Union(after.serialized.Keys).OrderBy(k => k, StringComparer.Ordinal))
+                {
+                    before.serialized.TryGetValue(key, out string a); after.serialized.TryGetValue(key, out string b);
+                    if (a == b) continue;
+                    objectCount++;
+                    if (objects.Count >= 8) continue;
+                    before.objectLocations.TryGetValue(key, out string oldLocation); after.objectLocations.TryGetValue(key, out string newLocation);
+                    objects.Add(new ObjectDifference { globalObjectId = DiagnosticId(key), beforeLocation = oldLocation ?? "MISSING",
+                        afterLocation = newLocation ?? "MISSING", beforeSha256 = a == null ? "" : HashText(a), afterSha256 = b == null ? "" : HashText(b),
+                        beforeLength = a == null ? -1 : a.Length, afterLength = b == null ? -1 : b.Length });
+                }
+                var difference = new SnapshotDifference { bindingEqual = bindingEqual, serializedEqual = serializedEqual,
+                    bindingBeforeCount = before.bindingProbe.Count, bindingAfterCount = after.bindingProbe.Count, bindingDifferenceCount = bindingCount,
+                    serializedBeforeCount = before.serialized.Count, serializedAfterCount = after.serialized.Count, serializedDifferenceCount = objectCount,
+                    binding = binding.ToArray(), serialized = objects.ToArray(), truncated = bindingCount > binding.Count || objectCount > objects.Count };
+                string json = JsonUtility.ToJson(difference);
+                if (json.Length > 24576) { difference.status = "PAYLOAD_BOUND"; difference.truncated = true; difference.binding = Array.Empty<BindingDifference>(); difference.serialized = Array.Empty<ObjectDifference>(); json = JsonUtility.ToJson(difference); }
+                Debug.Log(prefix + json);
+            }
+            catch { try { Debug.Log(prefix + "{\"status\":\"DIAGNOSTIC_FAILED\"}"); } catch { } }
+        }
         static void Unchanged(SceneState before, SceneState after)
         {
+            bool bindingEqual = before.binding == after.binding, serializedEqual = Equal(before.serialized, after.serialized);
+            if (!bindingEqual || !serializedEqual) LogDifferences(before, after, bindingEqual, serializedEqual);
             Check(Equal(before.poses, after.poses), "ROOT_POSES_CHANGED");
             Check(Equal(before.colliders, after.colliders), "COLLIDER_GEOMETRY_CHANGED");
             Check(Equal(before.health, after.health), "ACTOR_HEALTH_CHANGED");

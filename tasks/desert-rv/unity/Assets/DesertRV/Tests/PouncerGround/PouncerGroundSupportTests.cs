@@ -91,7 +91,7 @@ namespace DesertRV.Tests
                 }
                 replaced = true; // A partly failed replacement still needs the recovery path.
                 var empty = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
-                Assert.That(SceneManager.SetActiveScene(empty), Is.True);
+                PouncerPawContactConstraintTests.Fixture.RequireActiveScene(empty, "Empty isolated fixture scene");
                 Assert.That(empty.rootCount, Is.Zero);
                 AssertCollisionDomain(null);
             }
