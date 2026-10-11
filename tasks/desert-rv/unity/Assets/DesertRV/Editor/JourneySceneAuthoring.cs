@@ -816,20 +816,19 @@ namespace DesertRV.Editor
         static bool WarmLampColorEqual(Color left, Color right) =>
             Mathf.Abs(left.r - right.r) <= 0.000001f && Mathf.Abs(left.g - right.g) <= 0.000001f &&
             Mathf.Abs(left.b - right.b) <= 0.000001f && Mathf.Abs(left.a - right.a) <= 0.000001f;
-        static string WarmLampColorLine(string text, string property)
+        static System.Text.RegularExpressions.Match WarmLampColorMatch(string text, string property)
         {
             var rows = System.Text.RegularExpressions.Regex.Matches(text, "^    - " + System.Text.RegularExpressions.Regex.Escape(property) + @": \{r: ([^,]+), g: ([^,]+), b: ([^,]+), a: ([^}]+)\}$", System.Text.RegularExpressions.RegexOptions.Multiline);
             WarmLampRequire(rows.Count == 1, "SOURCE_FORMAT");
-            return rows[0].Value;
+            return rows[0];
         }
+        static string WarmLampColorLine(string text, string property) => WarmLampColorMatch(text, property).Value;
         static Color WarmLampSourceColor(string text, string property)
         {
-            string line = WarmLampColorLine(text, property);
-            var matches = System.Text.RegularExpressions.Regex.Matches(line, @"[rgba]: ([^,}]+)");
-            WarmLampRequire(matches.Count == 4, "SOURCE_FORMAT");
+            var match = WarmLampColorMatch(text, property);
             var values = new float[4];
             for (int i = 0; i < 4; i++)
-                WarmLampRequire(float.TryParse(matches[i].Groups[1].Value, System.Globalization.NumberStyles.Float,
+                WarmLampRequire(float.TryParse(match.Groups[i + 1].Value, System.Globalization.NumberStyles.Float,
                     System.Globalization.CultureInfo.InvariantCulture, out values[i]) && !float.IsNaN(values[i]) && !float.IsInfinity(values[i]), "SOURCE_FORMAT");
             return new Color(values[0], values[1], values[2], values[3]);
         }

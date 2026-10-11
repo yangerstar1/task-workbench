@@ -63,6 +63,30 @@ namespace DesertRV.Tests
                 "    m_Floats:\n    - _Metallic: 0\n    - _Smoothness: 0.12\n    m_Colors:\n" +
                 "    - _BaseColor: {r: 1, g: 0.76, b: 0.38, a: 1}\n    - _Color: {r: 1, g: 0.76, b: 0.37999994, a: 1}\n" +
                 "    - _EmissionColor: {r: 2.5, g: 1.9, b: 0.95, a: 2.5}\n--- !u!114 &2086780894777222751\nMonoBehaviour:\n  version: 10\n";
+            var parseColor = authoring.GetMethod("WarmLampSourceColor", BindingFlags.NonPublic | BindingFlags.Static);
+            Assert.That(parseColor, Is.Not.Null);
+            var properties = new[] { "_BaseColor", "_Color", "_EmissionColor" };
+            var components = new[] { new[] { 1f, .76f, .38f, 1f }, new[] { 1f, .76f, .37999994f, 1f }, new[] { 2.5f, 1.9f, .95f, 2.5f } };
+            for (int index = 0; index < properties.Length; index++)
+            {
+                string property = properties[index];
+                var parsed = (UnityEngine.Color)parseColor.Invoke(null, new object[] { before, property });
+                for (int component = 0; component < 4; component++)
+                    Assert.That(parsed[component], Is.EqualTo(components[index][component]), property + " component " + component);
+                string line = System.Text.RegularExpressions.Regex.Match(before, "^    - " + property + @": .+$", System.Text.RegularExpressions.RegexOptions.Multiline).Value;
+                Assert.That(line, Is.Not.Empty);
+                foreach (string changed in new[] {
+                    before.Replace(line + "\n", ""), before.Replace(line, line + "\n" + line),
+                    before.Replace(line, line.Replace("{r:", "{g:")),
+                    before.Replace(line, System.Text.RegularExpressions.Regex.Replace(line, @"\{r: [^,]+", "{r: NaN")),
+                    before.Replace(line, System.Text.RegularExpressions.Regex.Replace(line, @"\{r: [^,]+", "{r: Infinity")),
+                    before.Replace(line, System.Text.RegularExpressions.Regex.Replace(line, @"\{r: [^,]+", "{r: bad")) })
+                {
+                    var error = Assert.Throws<TargetInvocationException>(() => parseColor.Invoke(null, new object[] { changed, property }));
+                    Assert.That(error.InnerException, Is.TypeOf<InvalidOperationException>());
+                    Assert.That(error.InnerException.Message, Is.EqualTo("JOURNEY_WARM_LAMP_SOURCE_FORMAT"));
+                }
+            }
             string giOnly = before.Replace("m_LightmapFlags: 4", "m_LightmapFlags: 2");
             string authored = giOnly.Replace("_Color: {r: 1, g: 0.76, b: 0.37999994, a: 1}", "_Color: {r: 1, g: 0.76, b: 0.38, a: 1}");
             Assert.That(validate.Invoke(null, new object[] { before, giOnly }), Is.EqualTo(new[] { "GLOBAL_ILLUMINATION_FLAGS_4_TO_2" }));

@@ -18,7 +18,7 @@
       "path": ".github/workflows/desert-rv-journey-android.yml",
       "beforeSha256": "963979866e1f137142deb66ac32d14ae025d819a4e90d625af29bd568cf0f239",
       "beforeBytes": 38603,
-      "afterSha256": "f57f4765e141af580a9bc1854459bd960d4fa8de25ff442e8a20c4ad38c24475",
+      "afterSha256": "b62c63fd689a5a02fcb5ef60e25bd53e2043f8a48815b9c873ce26c2ed331edd",
       "afterBytes": 15770
     },
     {
@@ -39,7 +39,7 @@
       "path": "tasks/desert-rv/art/journey-preparation/restore_preparation.py",
       "beforeSha256": "4b7c8313e02ae2cd190231edfd2f835f83c27975104ca23b2096928014839bb6",
       "beforeBytes": 39157,
-      "afterSha256": "5cd5b28ae0c772c0edf227ae0e5b57f6ab24f6d0d852a6d769cf276f62faf7e4",
+      "afterSha256": "f1fb5e3472f6ab80cde98246b6a6514c5fec201fd5a3eb2109e1d01595bedd95",
       "afterBytes": 76762
     },
     {
@@ -60,14 +60,14 @@
       "path": "tasks/desert-rv/scripts/player/journey_android.py",
       "beforeSha256": "f24299fcab2c20e4dcf15d4df0cfac2da434017c43f1c077868517ba46e65929",
       "beforeBytes": 28630,
-      "afterSha256": "a269658c8bd8100cdcc8c4d217346ecd4e69696e9d74371aaabb647ce4057f8e",
+      "afterSha256": "8fd699f1a68ecc85f0f58b71837386cbb00d2006fab806877431883052bf3b87",
       "afterBytes": 31812
     },
     {
       "path": "tasks/desert-rv/scripts/player/test_journey_android.py",
       "beforeSha256": "53e7c663ad4d96ec903aae035dcf20a8f6b0896b547349185bcbe8e7bbd13b94",
       "beforeBytes": 18347,
-      "afterSha256": "2874cb29794d786f9bb4240b556ec1b9c11e101bcf5a1ce51172e9bb3a83c59d",
+      "afterSha256": "b83ae486943a4a7fc7b27cf83e7a2a13684e87890a4c37a5a0d1340f4c668ace",
       "afterBytes": 21213
     },
     {
@@ -109,15 +109,15 @@
       "path": "tasks/desert-rv/unity/Assets/DesertRV/Editor/JourneySceneAuthoring.cs",
       "beforeSha256": "b813fbf42b44f9453a2d308f37c541899f350bf35a37005b05d55410352549de",
       "beforeBytes": 67105,
-      "afterSha256": "1e40a4b4fdf86d5cb2782240f2548b578f87d30add9226fa2b7a954fa13a0f3e",
-      "afterBytes": 109258
+      "afterSha256": "c1ebfaac5cb5a180a237b35e40b240bc728abc5b7c05b66a9923360250aa65da",
+      "afterBytes": 109231
     },
     {
       "path": "tasks/desert-rv/unity/Assets/DesertRV/Tests/JourneyRestoration/JourneyRestorationTests.cs",
       "beforeSha256": "11587b3b478122fc7ddc42f16890a570d29a93e5f61934e1b2f6bd89cd14aa82",
       "beforeBytes": 2033,
-      "afterSha256": "bf749f746ce68a2d7c3752e58161e506280a92801ac0f534fabdac7e2d6c49f2",
-      "afterBytes": 11032
+      "afterSha256": "12ef83144379c4990395aa8e589a684d4e785faf171cccc5eabd07a7ca6f152a",
+      "afterBytes": 13068
     }
   ]
 }

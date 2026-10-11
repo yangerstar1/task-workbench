@@ -44,12 +44,12 @@ REQUEST_ID = 'desert-rv-journey-android-c15-r2-20261011-once'
 SOURCE = 'tasks/desert-rv/SOURCE-STATE.json'
 SELECTION = 'tasks/desert-rv/art/journey-preparation/three-strict-candidates.json'
 IMAGE = 'unityci/editor@sha256:1e98c949ff728e6ff627b5c55ef65975125a6dc47cf27060601b79a141cc8692'
-RESTORE_REQUEST_ID = 'desert-rv-journey-android-c15-restored-r4-20261011-once'
+RESTORE_REQUEST_ID = 'desert-rv-journey-android-c15-restored-r5-20261011-once'
 RESTORED = os.environ.get('JOURNEY_ANDROID_RESTORATION') == RESTORE_REQUEST_ID
 RESTORE_POLICY = 'tasks/desert-rv/art/journey-preparation/android-restoration-transition.json'
 if RESTORED:
-    BASE = 'e3bf1c13030365cbef0ec7f852c8b7b69ab15436'
-    REQUEST = '.github/dispatch/desert-rv-journey-android-c15-restored-r4-20261011.json'
+    BASE = '6e6d8688d7adb6acaf7983fba43e2a020c814a5e'
+    REQUEST = '.github/dispatch/desert-rv-journey-android-c15-restored-r5-20261011.json'
     REQUEST_ID = RESTORE_REQUEST_ID
 STATE = PROJECT/'JourneyEvidence/JourneyPreparation'
 INPUT = STATE/'android-build-input.json'

@@ -26,7 +26,7 @@ PRODUCER=dict(repository='yangerstar1/task-workbench',runId=37923953772,runAttem
  generatedReceiptSha256='2b5e06b3b5dfcfb5a53afc3ff750b4eb8f460b222dc1abdca5974fc6c4702526',sourceStateSha256='c33b884bd4caaf3fb8d310cebbc0b8de62b52c61cd483cd39a846e245425205b')
 # This is the sole additional consumer: one reviewed Android request and producer.
 # The historical Linux profile remains byte-for-byte pinned below this selection.
-ANDROID_REQUEST_ID = 'desert-rv-journey-android-c15-restored-r4-20261011-once'
+ANDROID_REQUEST_ID = 'desert-rv-journey-android-c15-restored-r5-20261011-once'
 ANDROID = os.environ.get('JOURNEY_ANDROID_RESTORATION') == ANDROID_REQUEST_ID
 if ANDROID:
  POLICY='tasks/desert-rv/art/journey-preparation/android-restoration-transition.json'
