@@ -907,27 +907,80 @@ namespace DesertRV.Editor
             WarmLampRequire(material, "IDENTITY");
             bool persistent = EditorUtility.IsPersistent(material), main = AssetDatabase.IsMainAsset(material), pathMatched = AssetDatabase.GetAssetPath(material) == WarmLampMaterialPath;
             bool identity = AssetDatabase.TryGetGUIDAndLocalFileIdentifier(material, out string guid, out long id);
-            bool shaderIdentity = material.shader && AssetDatabase.TryGetGUIDAndLocalFileIdentifier(material.shader, out _, out _);
+            string shaderGuid = ""; long shaderId = 0;
+            bool shaderIdentity = material.shader && AssetDatabase.TryGetGUIDAndLocalFileIdentifier(material.shader, out shaderGuid, out shaderId);
             Debug.Log("JOURNEY_WARM_LAMP_IDENTITY persistent=" + persistent + "; main=" + main + "; pathMatched=" + pathMatched +
-                "; identityAvailable=" + identity + "; guidMatched=" + (guid == WarmLampMaterialGuid) + "; localId=" + id + "; shaderIdentityAvailable=" + shaderIdentity);
+                "; identityAvailable=" + identity + "; guidMatched=" + (guid == WarmLampMaterialGuid) + "; localId=" + id + "; shaderIdentityAvailable=" + shaderIdentity +
+                "; shaderGuidMatched=" + (shaderGuid == "933532a4fcc9baf4fa0491de14d08ed7") + "; shaderLocalId=" + shaderId);
             WarmLampRequire(persistent && main && pathMatched && identity && guid == WarmLampMaterialGuid && id == 2100000 && material.shader &&
-                AssetDatabase.TryGetGUIDAndLocalFileIdentifier(material.shader, out string shaderGuid, out long shaderId) &&
-                shaderGuid == "933532a4fcc9baf4fa0491de14d08ed7" && shaderId == 4800000, "IDENTITY");
+                shaderIdentity && shaderGuid == "933532a4fcc9baf4fa0491de14d08ed7" && shaderId == 4800000, "IDENTITY");
         }
-        static Object RequireWarmLampSubassets(Object[] assets, Material material, long versionId, bool allClean)
+        static string WarmLampObservedField(Func<string> read)
         {
-            WarmLampRequire(assets.Length == 2 && assets.Contains(material), "SUBASSET_IDENTITY");
-            var version = assets.Single(a => a != material);
-            WarmLampRequire(version && version.GetType().FullName == "UnityEditor.Rendering.Universal.AssetVersion" &&
-                AssetDatabase.GetAssetPath(version) == WarmLampMaterialPath && AssetDatabase.IsSubAsset(version) &&
-                AssetDatabase.TryGetGUIDAndLocalFileIdentifier(version, out string guid, out long id) && guid == WarmLampMaterialGuid && id == versionId, "SUBASSET_IDENTITY");
-            using (var data = new SerializedObject(version))
+            try { return read(); } catch { return "UNAVAILABLE"; }
+        }
+        static void ObserveWarmLampObjects(Object[] assets, Material material, long serializedVersionId, string phase)
+        {
+            Debug.Log("JOURNEY_WARM_LAMP_OBJECTS phase=" + phase + "; count=" + (assets == null ? -1 : assets.Length) +
+                "; containsMain=" + (assets != null && assets.Contains(material)) + "; target=" + WarmLampMaterialPath + "; serializedVersionLocalId=" + serializedVersionId);
+            if (assets == null) return;
+            for (int index = 0; index < assets.Length; index++)
             {
-                data.Update(); var property = data.FindProperty("version");
-                WarmLampRequire(property != null && property.intValue == 10, "SUBASSET_IDENTITY");
+                var asset = assets[index];
+                if (!asset) { Debug.Log("JOURNEY_WARM_LAMP_OBJECT phase=" + phase + "; index=" + index + "; valid=false"); continue; }
+                string type = asset.GetType().FullName ?? "UNAVAILABLE";
+                if (type.Length > 256 || !System.Text.RegularExpressions.Regex.IsMatch(type, @"^[A-Za-z0-9_.+`]+$")) type = "UNAVAILABLE";
+                string path = WarmLampObservedField(() => { string value = AssetDatabase.GetAssetPath(asset); return value == WarmLampMaterialPath ? WarmLampMaterialPath : string.IsNullOrEmpty(value) ? "EMPTY" : "OUTSIDE_TARGET"; });
+                string persistent = WarmLampObservedField(() => EditorUtility.IsPersistent(asset).ToString());
+                string main = WarmLampObservedField(() => AssetDatabase.IsMainAsset(asset).ToString());
+                string sub = WarmLampObservedField(() => AssetDatabase.IsSubAsset(asset).ToString());
+                string dirty = WarmLampObservedField(() => EditorUtility.IsDirty(asset).ToString());
+                string guid = "UNAVAILABLE", identity = "UNAVAILABLE"; long localId = 0;
+                try
+                {
+                    bool available = AssetDatabase.TryGetGUIDAndLocalFileIdentifier(asset, out string foundGuid, out localId);
+                    identity = available.ToString();
+                    if (available && System.Text.RegularExpressions.Regex.IsMatch(foundGuid ?? "", "^[a-f0-9]{32}$")) guid = foundGuid;
+                }
+                catch { }
+                string version = WarmLampObservedField(() => {
+                    using (var data = new SerializedObject(asset))
+                    {
+                        data.Update(); var property = data.FindProperty("version");
+                        return property == null ? "ABSENT" : property.propertyType == SerializedPropertyType.Integer ?
+                            property.intValue.ToString(System.Globalization.CultureInfo.InvariantCulture) : "NON_INTEGER";
+                    }
+                });
+                Debug.Log("JOURNEY_WARM_LAMP_OBJECT phase=" + phase + "; index=" + index + "; valid=true; ownedMain=" + (asset == material) +
+                    "; type=" + type + "; path=" + path + "; persistent=" + persistent + "; isMain=" + main + "; isSub=" + sub +
+                    "; identityAvailable=" + identity + "; guid=" + guid + "; localId=" + localId + "; dirty=" + dirty + "; version=" + version);
             }
-            WarmLampRequire(!EditorUtility.IsDirty(version) && (!allClean || !EditorUtility.IsDirty(material)), allClean ? "RELOAD_DIRTY" : "SUBASSET_DIRTY");
-            return version;
+        }
+        static Dictionary<Object, string> ReadWarmLampOwnedObjects(Material material, long serializedVersionId, bool authoring, string phase)
+        {
+            // The public loader defines file ownership. Hidden object classification is diagnostic only.
+            var assets = AssetDatabase.LoadAllAssetsAtPath(WarmLampMaterialPath);
+            ObserveWarmLampObjects(assets, material, serializedVersionId, phase);
+            WarmLampRequire(assets != null && assets.Contains(material) && assets.All(a => a), "SUBASSET_IDENTITY");
+            var snapshots = new Dictionary<Object, string>();
+            foreach (var asset in assets.Distinct())
+            {
+                bool dirty = EditorUtility.IsDirty(asset), main = asset == material;
+                Debug.Log("JOURNEY_WARM_LAMP_OBJECT_CHECK phase=" + phase + "; ownedMain=" + main + "; dirty=" + dirty + "; mainAuthoringAllowed=" + authoring);
+                WarmLampRequire(!dirty || main && authoring, main ? phase == "LOAD" ? "LOADED_DIRTY" : "RELOAD_DIRTY" : "SUBASSET_DIRTY");
+                snapshots.Add(asset, main || (phase != "LOAD" && phase != "AUTHOR") ? "" : EditorJsonUtility.ToJson(asset));
+                bool dirtyAfterSnapshot = EditorUtility.IsDirty(asset);
+                Debug.Log("JOURNEY_WARM_LAMP_OBJECT_CHECK phase=" + phase + "; ownedMain=" + main + "; dirtyAfterSnapshot=" + dirtyAfterSnapshot + "; mainAuthoringAllowed=" + authoring);
+                WarmLampRequire(!dirtyAfterSnapshot || main && authoring, main ? phase == "LOAD" ? "LOADED_DIRTY" : "RELOAD_DIRTY" : "SUBASSET_DIRTY");
+            }
+            return snapshots;
+        }
+        static void RequireWarmLampOtherObjectsUnchanged(Dictionary<Object, string> before, Dictionary<Object, string> after)
+        {
+            bool sameObjects = new HashSet<Object>(before.Keys).SetEquals(after.Keys);
+            bool sameData = sameObjects && before.All(pair => pair.Key && after[pair.Key] == pair.Value);
+            Debug.Log("JOURNEY_WARM_LAMP_OBJECT_SNAPSHOT sameObjects=" + sameObjects + "; sameSerializedData=" + sameData);
+            WarmLampRequire(sameObjects && sameData, "SUBASSET_CHANGED");
         }
         static Dictionary<int, string> WarmLampSceneState()
         {
@@ -989,11 +1042,11 @@ namespace DesertRV.Editor
                         WarmLampRequire(!EditorUtility.IsDirty(existing), "LOADED_DIRTY");
                     }
                 var material = AssetDatabase.LoadAssetAtPath<Material>(WarmLampMaterialPath); RequireWarmLampIdentity(material);
-                var subassets = AssetDatabase.LoadAllAssetsAtPath(WarmLampMaterialPath);
-                var version = RequireWarmLampSubassets(subassets, material, versionId, false);
-                string versionState = EditorJsonUtility.ToJson(version);
                 record.loaded = ReadWarmLampState(material); record.loadedDirtyBeforeAuthoring = EditorUtility.IsDirty(material);
                 Debug.Log("JOURNEY_WARM_LAMP_BEFORE source=" + JsonUtility.ToJson(record.source) + "; loaded=" + JsonUtility.ToJson(record.loaded) + "; loadedDirty=" + record.loadedDirtyBeforeAuthoring);
+                var ownedBefore = ReadWarmLampOwnedObjects(material, versionId, false, "LOAD");
+                record.loaded = ReadWarmLampState(material); record.loadedDirtyBeforeAuthoring = EditorUtility.IsDirty(material);
+                Debug.Log("JOURNEY_WARM_LAMP_BEFORE allObjectsLoaded=true; source=" + JsonUtility.ToJson(record.source) + "; loaded=" + JsonUtility.ToJson(record.loaded) + "; loadedDirty=" + record.loadedDirtyBeforeAuthoring);
                 // A dirty loaded object is not a trustworthy copy of the pinned source. Never save it.
                 WarmLampRequire(!record.loadedDirtyBeforeAuthoring, "LOADED_DIRTY");
                 WarmLampRequire(record.loaded.giFlags == record.source.giFlags &&
@@ -1006,6 +1059,8 @@ namespace DesertRV.Editor
                 {
                     before.Update();
                     AuthorLitEmission(material);
+                    var ownedAfter = ReadWarmLampOwnedObjects(material, versionId, true, "AUTHOR");
+                    RequireWarmLampOtherObjectsUnchanged(ownedBefore, ownedAfter);
                     record.authored = ReadWarmLampState(material);
                     Debug.Log("JOURNEY_WARM_LAMP_AUTHORED " + JsonUtility.ToJson(record.authored));
                     RequireWarmLampAuthoredState(record.loaded, record.authored);
@@ -1013,8 +1068,6 @@ namespace DesertRV.Editor
                     using (var after = new SerializedObject(material)) { after.Update(); RequireWarmLampOnlyAuthoredProperties(before, after); }
                 }
                 RequireWarmLampOtherAssetsClean(material, sceneState);
-                RequireWarmLampSubassets(subassets, material, versionId, false);
-                WarmLampRequire(EditorJsonUtility.ToJson(version) == versionState, "SUBASSET_CHANGED");
                 RequireWarmLampOtherBytesUnchanged(protectedFiles, false);
                 phase = "SAVE";
                 EditorUtility.SetDirty(material);
@@ -1026,20 +1079,19 @@ namespace DesertRV.Editor
                 phase = "IMPORT";
                 AssetDatabase.ImportAsset(WarmLampMaterialPath, ImportAssetOptions.ForceSynchronousImport | ImportAssetOptions.ForceUpdate);
                 WarmLampRequire(HashFile(WarmLampMaterialPath) == record.afterSha256, "IMPORT_BYTES");
-                subassets = AssetDatabase.LoadAllAssetsAtPath(WarmLampMaterialPath);
                 material = AssetDatabase.LoadAssetAtPath<Material>(WarmLampMaterialPath); RequireWarmLampIdentity(material);
-                RequireWarmLampSubassets(subassets, material, versionId, true);
+                var importedObjects = ReadWarmLampOwnedObjects(material, versionId, false, "IMPORT").Keys.ToArray();
                 phase = "UNLOAD";
                 // Explicitly release this exact owned asset file's objects; never use instance-ID equality as a reload test.
-                foreach (var asset in subassets) if (asset) Resources.UnloadAsset(asset);
-                record.unloadVerified = subassets.All(a => !a);
+                foreach (var asset in importedObjects) if (asset) Resources.UnloadAsset(asset);
+                record.unloadVerified = importedObjects.All(a => !a);
+                Debug.Log("JOURNEY_WARM_LAMP_UNLOADED returnedCount=" + importedObjects.Length + "; invalidatedCount=" + importedObjects.Count(a => !a) + "; verified=" + record.unloadVerified);
                 WarmLampRequire(record.unloadVerified, "UNLOAD");
                 phase = "RELOAD";
                 material = AssetDatabase.LoadAssetAtPath<Material>(WarmLampMaterialPath); RequireWarmLampIdentity(material);
-                subassets = AssetDatabase.LoadAllAssetsAtPath(WarmLampMaterialPath);
-                RequireWarmLampSubassets(subassets, material, versionId, true);
+                var reloadedObjects = ReadWarmLampOwnedObjects(material, versionId, false, "RELOAD").Keys.ToArray();
                 record.reloaded = ReadWarmLampState(material);
-                record.reloadedClean = subassets.Length > 0 && subassets.All(a => a && !EditorUtility.IsDirty(a));
+                record.reloadedClean = reloadedObjects.Length > 0 && reloadedObjects.All(a => a && !EditorUtility.IsDirty(a));
                 Debug.Log("JOURNEY_WARM_LAMP_RELOADED " + JsonUtility.ToJson(record.reloaded) + "; clean=" + record.reloadedClean + "; unloaded=" + record.unloadVerified);
                 RequireWarmLampAuthoredState(record.loaded, record.reloaded);
                 WarmLampRequire(material.shaderKeywords.Length == 1 && material.shaderKeywords[0] == "_EMISSION", "KEYWORD");

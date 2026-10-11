@@ -57,7 +57,7 @@
     },
     {
       "path": ".github/workflows/desert-rv-journey-android.yml",
-      "sha256": "b62c63fd689a5a02fcb5ef60e25bd53e2043f8a48815b9c873ce26c2ed331edd",
+      "sha256": "9a567b5a264282724c8d7fd771c8f656c4848b601ed961434e548a6ffb2149ec",
       "size": 15770
     },
     {
@@ -397,7 +397,7 @@
     },
     {
       "path": "tasks/desert-rv/art/journey-preparation/android-restoration-transition.json",
-      "sha256": "ed4f9d5dae3a0718c5b58cefabe81cfb60961dad2cf4e66f16c5a86523a937d7",
+      "sha256": "279a0ce2ef40655052f7cebb24322cdf7cf7e45b27b676d6b8d08dd22336590a",
       "size": 5524
     },
     {
@@ -422,7 +422,7 @@
     },
     {
       "path": "tasks/desert-rv/art/journey-preparation/restore_preparation.py",
-      "sha256": "f1fb5e3472f6ab80cde98246b6a6514c5fec201fd5a3eb2109e1d01595bedd95",
+      "sha256": "474f05328f8f0b30e591d7e1e16086820732a78ecedd22cecb4303cab3d3f405",
       "size": 76762
     },
     {
@@ -587,7 +587,7 @@
     },
     {
       "path": "tasks/desert-rv/scripts/player/journey_android.py",
-      "sha256": "8fd699f1a68ecc85f0f58b71837386cbb00d2006fab806877431883052bf3b87",
+      "sha256": "17e7efd0a4f02b725489a5ed0a8f4a85596791902dab0fd5cdde02abbdbadeaa",
       "size": 31812
     },
     {
@@ -622,7 +622,7 @@
     },
     {
       "path": "tasks/desert-rv/scripts/player/test_journey_android.py",
-      "sha256": "b83ae486943a4a7fc7b27cf83e7a2a13684e87890a4c37a5a0d1340f4c668ace",
+      "sha256": "a1d30c106a246923212d05c202ecbf78be5008482bfb5970321ec7b7516073bd",
       "size": 21213
     },
     {
@@ -4497,8 +4497,8 @@
     },
     {
       "path": "tasks/desert-rv/unity/Assets/DesertRV/Editor/JourneySceneAuthoring.cs",
-      "sha256": "c1ebfaac5cb5a180a237b35e40b240bc728abc5b7c05b66a9923360250aa65da",
-      "size": 109231
+      "sha256": "cb3db7fb6da8b8d75868dd24f1db1943f6c21cb9720d99119d2ec0182bee7997",
+      "size": 113843
     },
     {
       "path": "tasks/desert-rv/unity/Assets/DesertRV/Editor/JourneySceneAuthoring.cs.meta",
