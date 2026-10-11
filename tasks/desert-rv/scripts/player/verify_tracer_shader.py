@@ -111,7 +111,7 @@ class Reader:
         return value
 
 
-def serialized(data):
+def serialized(data, target=24):
     check(type(data) is bytes and 48 <= len(data) <= MAX_ASSET_BYTES, 'SERIALIZED_SIZE')
     legacy_meta, legacy_size, version, legacy_offset = struct.unpack_from('>IIII', data)
     check(version == 22, 'SERIALIZED_VERSION')
@@ -125,7 +125,7 @@ def serialized(data):
           not any(data[end:data_offset]), 'SERIALIZED_METADATA')
     r = Reader(data, 48, end)
     check(r.cstring(32) == UNITY, 'SERIALIZED_UNITY')
-    check(r.unpack('<i') == 24, 'SERIALIZED_PLATFORM')
+    check(target in (13,24) and r.unpack('<i') == target, 'SERIALIZED_PLATFORM')
     check(r.unpack('<B') == 0, 'SERIALIZED_TYPE_TREE')
     classes = []
     for _ in range(r.count(4096)):
@@ -164,7 +164,7 @@ def serialized(data):
     return dict(objects=objects, externals=externals)
 
 
-def registry(data, meta):
+def registry(data, meta, target=24, prefix="DesertRV_Data/"):
     candidates = [(key, row) for key, row in meta['objects'].items() if row['classId'] == 94]
     check(len(candidates) == 1, 'REGISTRY_COUNT')
     path_id, row = candidates[0]
@@ -187,21 +187,21 @@ def registry(data, meta):
         entries[name] = (file_id, object_id)
     # Exactly the observed final zero byte; no unbounded or guessed tail format.
     check(r.take(r.end - r.pos) == b'\0', 'REGISTRY_TRAILING')
-    return entries, dict(path=GLOBAL, sha256=sha_bytes(data), bytes=len(data),
-                         serializedVersion=22, unityVersion=UNITY, target=24,
+    return entries, dict(path=prefix+"globalgamemanagers", sha256=sha_bytes(data), bytes=len(data),
+                         serializedVersion=22, unityVersion=UNITY, target=target,
                          registryClassId=94, registryPathId=path_id,
                          registryObjectBytes=row['bytes'], entryCount=count)
 
 
-def resolve_shader(load, meta, entries, name):
+def resolve_shader(load, meta, entries, name, target=24, prefix="DesertRV_Data/"):
     """Internal diagnostic parameter; the CLI always checks TARGET."""
     check(name in entries, 'MISSING_SHADER')
     file_id, path_id = entries[name]
     check(path_id != 0, 'SHADER_NULL')
-    asset_name = GLOBAL if file_id == 0 else 'DesertRV_Data/' + meta['externals'][file_id - 1]
+    asset_name = prefix + ('globalgamemanagers' if file_id == 0 else meta['externals'][file_id - 1])
     check(safe_relative(asset_name), 'SERIALIZED_EXTERNAL')
     data = load(asset_name)
-    asset_meta = meta if file_id == 0 else serialized(data)
+    asset_meta = meta if file_id == 0 else serialized(data, target=target)
     check(path_id in asset_meta['objects'], 'SHADER_OBJECT_MISSING')
     obj = asset_meta['objects'][path_id]
     check(obj['classId'] == 48 and obj['bytes'] > 0, 'SHADER_CLASS_MISMATCH')

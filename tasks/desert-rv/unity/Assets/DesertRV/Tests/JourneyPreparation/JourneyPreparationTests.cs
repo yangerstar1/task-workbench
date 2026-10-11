@@ -289,6 +289,9 @@ namespace DesertRV.Tests
             verifyManifest.Invoke(null, new[] { request });
             Debug.Log("JOURNEY_MANIFEST_NATIVE_UNLOAD_RELOAD_REGRESSION: passed; real saved strict identities and approval=false verified.");
             MarkPhase("saved-grounding-and-manifest-regressions");
+            Type.GetType("DesertRV.Editor.JourneySceneAuthoring, Assembly-CSharp-Editor", true)
+                .GetMethod("ValidateSavedPhysicalSurfaceArt").Invoke(null, null);
+            MarkPhase("saved-surface-art-bindings-and-physical-uv-scale");
             Debug.Log("JOURNEY_PREPARATION_TEST_BODY_COMPLETED_UNREVIEWED: all authoring and regression assertions returned; exact native XML must still report Passed.");
         }
     }

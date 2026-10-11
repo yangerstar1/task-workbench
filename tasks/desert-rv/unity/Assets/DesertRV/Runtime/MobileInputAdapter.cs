@@ -16,6 +16,7 @@ namespace DesertRV
         Vector2 lastMouse;
         int screenWidth, screenHeight;
         Rect safeArea;
+        Rect? uiBlocker;
         bool keyboardArmed;
         bool keyboardLookEnabled;
         float keyboardLookSpeed = 60;
@@ -27,7 +28,8 @@ namespace DesertRV
         public bool IsTouch => Application.isMobilePlatform || Input.touchCount > 0;
 
         public void SetRegion(TouchControl control, Rect screenPixels) => regions[control] = screenPixels;
-        public void ClearRegions() => regions.Clear();
+        public void ClearRegions() { regions.Clear(); uiBlocker = null; }
+        public void SetUiBlocker(Rect screenPixels) => uiBlocker = screenPixels;
 
         // Session-local accessibility settings. Mouse and touch retain their own sensitivities.
         public void ConfigureKeyboardLook(bool enabled, float degreesPerSecond)
@@ -134,7 +136,7 @@ namespace DesertRV
 
         void Begin(int id, Vector2 point)
         {
-            if (!SafeArea.Contains(point)) return;
+            if (!SafeArea.Contains(point) || (uiBlocker.HasValue && uiBlocker.Value.Contains(point))) return;
             // Explicit priority prevents large look area stealing action buttons.
             TouchControl[] order = { TouchControl.Interact, TouchControl.Reload, TouchControl.Fire,
                 TouchControl.Accelerate, TouchControl.Brake, TouchControl.Move, TouchControl.Look };

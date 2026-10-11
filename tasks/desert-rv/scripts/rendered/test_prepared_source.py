@@ -74,6 +74,7 @@ class PreparedSourceTests(unittest.TestCase):
         receipt=self.write('JourneyEvidence/receipt.json',b'old receipt');pin=p.pin(receipt);p.verify_data_pin(pin);receipt.write_bytes(b'new receipt')
         with self.assertRaisesRegex(ValueError,'DATA_BYTES_CHANGED'):p.verify_data_pin(pin)
     def make_native_journey_fixture(self):
+        for name in sorted(p.surface_art_files()):self.add(name)
         for n in ('Region-1-Sky.mat','Region-2-Sky.mat','Region-3-Sky.mat','Layout-ABCDEF.mat'):
             self.add(p.JOURNEY+'/'+n);self.add(p.JOURNEY+'/'+n+'.meta')
         folder=p.JOURNEY+'/CandidateFx/fixture-r1';outputs=[]
@@ -86,6 +87,25 @@ class PreparedSourceTests(unittest.TestCase):
     def test_exact_native_author_asset_snapshot_is_consumed(self):
         fx=self.make_native_journey_fixture()
         with mock.patch.dict(os.environ,{'GITHUB_SHA':'fixture-sha'}):self.assertEqual(p.journey_files(fx),self.added)
+    def test_surface_art_inventory_is_finite(self):
+        names=p.surface_art_files()
+        self.assertEqual(len(names),245)
+        self.assertEqual(sum(n.endswith('.asset') for n in names),120)
+        self.assertEqual(sum(n.endswith('.mat') for n in names),2)
+        self.assertIn(p.JOURNEY+'/SurfaceArt/R3-Lobe-19.asset',names)
+        self.assertNotIn(p.JOURNEY+'/SurfaceArt/R3-Lobe-20.asset',names)
+    def test_surface_art_missing_mesh_is_rejected(self):
+        fx=self.make_native_journey_fixture();(p.PROJECT/(p.JOURNEY+'/SurfaceArt/R2-Shoulder-15.asset')).unlink()
+        with mock.patch.dict(os.environ,{'GITHUB_SHA':'fixture-sha'}):
+            with self.assertRaisesRegex(ValueError,'ADDITION_INVENTORY'):p.journey_files(fx)
+    def test_surface_art_extra_mesh_is_rejected(self):
+        fx=self.make_native_journey_fixture();self.add(p.JOURNEY+'/SurfaceArt/R1-Relief.asset')
+        with mock.patch.dict(os.environ,{'GITHUB_SHA':'fixture-sha'}):
+            with self.assertRaisesRegex(ValueError,'ADDITION_INVENTORY'):p.journey_files(fx)
+    def test_surface_art_changed_after_native_snapshot_is_rejected(self):
+        fx=self.make_native_journey_fixture();self.write(p.JOURNEY+'/SurfaceArt/Sand.mat',b'changed after native capture')
+        with mock.patch.dict(os.environ,{'GITHUB_SHA':'fixture-sha'}):
+            with self.assertRaisesRegex(ValueError,'NATIVE_ASSET_SNAPSHOT_CHANGED'):p.journey_files(fx)
     def test_scene_meta_changed_after_native_author_is_rejected(self):
         fx=self.make_native_journey_fixture();self.write(p.JOURNEY+'/FirstStation.unity.meta',b'changed after native test')
         with mock.patch.dict(os.environ,{'GITHUB_SHA':'fixture-sha'}):
@@ -186,7 +206,13 @@ class PreparedSourceTests(unittest.TestCase):
             import journey_tracer_dispatch as dispatch
         else:
             import journey_rebuild_dispatch as dispatch
-        dispatch.verify(dispatch.ROOT,os.environ)
+        if os.environ.get('GITHUB_REF') == 'refs/heads/journey-android-c15':
+            import sys
+            sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'player'))
+            import journey_android
+            journey_android.dispatch()
+        else:
+            dispatch.verify(dispatch.ROOT,os.environ)
         uid,gid=os.getuid(),os.getgid();self.assertNotEqual(uid,0)
         fixture=Path(self.tmp.name)
         self.assertEqual(fixture.parent.resolve(),Path(tempfile.gettempdir()).resolve())

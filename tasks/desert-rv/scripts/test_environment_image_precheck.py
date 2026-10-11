@@ -1294,6 +1294,74 @@ class DaemonObservationTests(unittest.TestCase):
         self.assertFalse(p.validate_report(bad))
 
 
+class FixedProfileTests(OfflineCase):
+    def setUp(self):
+        super().setUp()
+        p.select_profile("linux")
+        self.addCleanup(p.select_profile, "linux")
+
+    def test_android_profile_changes_every_digest_consumer_together(self):
+        quota_route, daemon_command = p.ROUTES[p.Route.QUOTA], p.DOCKER_INFO_COMMAND
+        p.select_profile("android")
+        digest = "sha256:1e98c949ff728e6ff627b5c55ef65975125a6dc47cf27060601b79a141cc8692"
+        self.assertEqual(p.DIGEST, digest)
+        self.assertEqual(p.IMAGE, "unityci/editor@" + digest)
+        self.assertEqual(p.ROUTES[p.Route.TARGET], ("/v2/unityci/editor/manifests/" + digest, p.TOKEN_PATH, "repository:unityci/editor:pull"))
+        self.assertEqual(p.DOCKER_COMMAND[-1], p.IMAGE)
+        self.assertEqual(p.PULL_COMMAND, ("/usr/bin/docker", "--host=unix:///var/run/docker.sock", "pull", "--quiet", p.IMAGE))
+        self.assertEqual(p.ROUTES[p.Route.QUOTA], quota_route)
+        self.assertEqual(p.DOCKER_INFO_COMMAND, daemon_command)
+
+    def test_android_cli_uses_android_head_and_keeps_dynamic_quota_windows(self):
+        headers = (("Docker-Content-Digest", p.IMAGE_PROFILES["android"]),)
+        pair = (("RateLimit-Limit", "100;w=3600"), ("RateLimit-Remaining", "20;w=3600"))
+        report, transport = self.exercise([Raw(200, headers), Raw(200, pair)], main=True, argv=["--profile", "android"])
+        self.assertEqual((report["status"], report["windowSeconds"]), ("PASS", 3600))
+        self.assertEqual(transport.calls[0][:3], (p.REGISTRY_HOST, "HEAD", p.MANIFEST_PATH))
+        self.assertTrue(p.MANIFEST_PATH.endswith(p.IMAGE_PROFILES["android"]))
+        self.pull_mock.assert_not_called()
+
+    def test_linux_head_cannot_admit_android_and_no_fallback_is_attempted(self):
+        report, transport = self.exercise([target()], main=True, argv=["--profile", "android"])
+        self.assertEqual((report["status"], report["reason"]), ("UNKNOWN", "TARGET_DIGEST_UNVERIFIED"))
+        self.assertEqual(len(transport.calls), 1)
+        self.pull_mock.assert_not_called()
+
+    def test_cache_and_reports_cannot_cross_platform_profiles(self):
+        linux_report, _ = self.exercise([], main=True, cache=True)
+        linux_image = p.IMAGE
+        p.select_profile("android")
+        self.assertFalse(p.validate_report(linux_report))
+        with mock.patch.object(p, "inspect_cache_bytes", return_value=json.dumps([linux_image]).encode()):
+            self.assertFalse(REAL_CACHE_HIT())
+        with mock.patch.object(p, "inspect_cache_bytes", return_value=json.dumps([p.IMAGE]).encode()):
+            self.assertTrue(REAL_CACHE_HIT())
+        android_report, _ = self.exercise([], main=True, argv=["--profile", "android"], cache=True)
+        p.select_profile("linux")
+        self.assertFalse(p.validate_report(android_report))
+        self.assertTrue(p.validate_report(linux_report))
+
+    def test_android_absent_preview_allows_only_one_same_image_pull(self):
+        headers = (("Docker-Content-Digest", p.IMAGE_PROFILES["android"]),)
+        self.pull_mock.return_value = ("SUCCESS", 0, "NONE")
+        report, _ = self.exercise([Raw(200, headers), Raw(200)], main=True, argv=["--profile", "android"], cache_after_pull=True)
+        self.assertEqual((report["status"], report["reason"]), ("PASS", "PULL_SUCCEEDED"))
+        self.assertEqual(p.PULL_COMMAND[-1], "unityci/editor@" + p.IMAGE_PROFILES["android"])
+        self.pull_mock.assert_called_once_with()
+
+    def test_arbitrary_profiles_images_and_extra_arguments_never_probe(self):
+        for profile in ("windows", "https://forbidden.invalid/secret", p.IMAGE, p.DIGEST, "ANDROID", "", None, True):
+            with self.assertRaises(ValueError):
+                p.select_profile(profile)
+            self.assertEqual(p.DIGEST, p.IMAGE_PROFILES["linux"])
+        for args in (["--profile", "windows"], ["--profile", p.DIGEST], ["--image", p.IMAGE],
+                     ["--profile"], ["--profile", "android", "extra"]):
+            report, transport = self.exercise([], main=True, argv=args)
+            self.assertEqual(report["status"], "UNKNOWN")
+            self.assertEqual(transport.calls, [])
+            self.pull_mock.assert_not_called()
+
+
 SERIALIZED_CONSERVATIVE_MAX = 5245
 
 

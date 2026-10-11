@@ -6,6 +6,18 @@ The RV body, upgrade modules, cabin, station, props, collision meshes, materials
 
 These provenance statements do not imply that every candidate asset has received final visual acceptance. The source tree is a recovered development baseline.
 
+## Surface art candidate: sand and asphalt
+
+The surface-only candidate reuses existing, byte-verified Poly Haven textures under
+CC0 1.0: `sand_03` by Charlotte Baglioni (https://polyhaven.com/a/sand_03) and
+`asphalt_02` by Rob Tuytel (https://polyhaven.com/a/asphalt_02).
+License: https://polyhaven.com/license and https://creativecommons.org/publicdomain/zero/1.0/.
+The original diffuse JPGs are retained unchanged. The separate illumination-corrected
+sand PNG is an existing derivative of `sand_03`; its original/derived hashes and
+historical recipe are recorded in `art/journey-preparation/surface-art-provenance.json`.
+No new asset download, external model, historical environment authoring code or
+visual-acceptance claim is part of this candidate.
+
 ## Noto Sans CJK SC
 
 The exact font is preserved as `backup-assets/fonts/NotoSansCJKsc-Regular.otf.xz` and restored by the included checksum-verifying script. The restored bytes retain their embedded attribution and licensing metadata:

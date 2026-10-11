@@ -45,6 +45,10 @@ namespace DesertRV
         public RegionProgressState Progress { get; private set; }
         public string Notice { get; private set; }
         public string Prompt { get; private set; }
+        // Presentation only: the existing interaction selector still owns all eligibility and effects.
+        public string InteractionLabel => interaction == 1 ? "下车" : interaction == 2 ? (Region && Region.region == 2 ? "收取线圈" : "收取组件") :
+            interaction == 3 ? "安装改装" : interaction == 4 ? "上车" : interaction == 5 ? "修理房车" :
+            interaction == 6 ? (journey.State.PowerConnected ? "拔除电缆" : "连接供电") : interaction == 7 ? "领取补给" : "交互";
         public float HitConfirmation => hitFlash;
         public float DamageFeedback => damageFlash;
         public BeastActor CloseRearThreat

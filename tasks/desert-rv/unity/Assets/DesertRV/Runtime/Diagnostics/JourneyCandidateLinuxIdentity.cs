@@ -1,4 +1,4 @@
-#if UNITY_EDITOR || (DESERTRV_CANDIDATE_LINUX && UNITY_STANDALONE_LINUX && DEVELOPMENT_BUILD)
+#if UNITY_EDITOR || (((DESERTRV_CANDIDATE_LINUX && UNITY_STANDALONE_LINUX) || (DESERTRV_CANDIDATE_ANDROID && UNITY_ANDROID)) && DEVELOPMENT_BUILD)
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -13,6 +13,7 @@ namespace DesertRV
     public sealed class JourneyCandidateLinuxIdentity : MonoBehaviour
     {
         public const string Define = "DESERTRV_CANDIDATE_LINUX";
+        public const string AndroidDefine = "DESERTRV_CANDIDATE_ANDROID";
         public const string Bootstrap = "Assets/DesertRV/Scenes/Journey/JourneyBootstrap.unity";
         public static readonly string[] Regions = { "Assets/DesertRV/Scenes/Journey/FirstStation.unity", "Assets/DesertRV/Scenes/Journey/Scrapyard.unity", "Assets/DesertRV/Scenes/Journey/NightBeacon.unity" };
         public string sourceCommit, producerRunUrl, generatedReceiptSha256;
@@ -25,8 +26,12 @@ namespace DesertRV
         {
             get
             {
-#if DESERTRV_CANDIDATE_LINUX && UNITY_STANDALONE_LINUX && DEVELOPMENT_BUILD && !UNITY_EDITOR
+#if ((DESERTRV_CANDIDATE_LINUX && UNITY_STANDALONE_LINUX) || (DESERTRV_CANDIDATE_ANDROID && UNITY_ANDROID)) && DEVELOPMENT_BUILD && !UNITY_EDITOR
+#if DESERTRV_CANDIDATE_ANDROID && UNITY_ANDROID
+                return Application.platform == RuntimePlatform.Android && Debug.isDebugBuild && owner;
+#else
                 return Application.platform == RuntimePlatform.LinuxPlayer && Debug.isDebugBuild && owner;
+#endif
 #else
                 return false;
 #endif
@@ -34,14 +39,14 @@ namespace DesertRV
         }
         void Awake()
         {
-#if DESERTRV_CANDIDATE_LINUX && UNITY_STANDALONE_LINUX && DEVELOPMENT_BUILD && !UNITY_EDITOR
+#if ((DESERTRV_CANDIDATE_LINUX && UNITY_STANDALONE_LINUX) || (DESERTRV_CANDIDATE_ANDROID && UNITY_ANDROID)) && DEVELOPMENT_BUILD && !UNITY_EDITOR
             // Capture before the existing Director moves its root to DontDestroyOnLoad.
             bornInBootstrap = gameObject.scene.path == Bootstrap;
 #endif
         }
         void Start()
         {
-#if DESERTRV_CANDIDATE_LINUX && UNITY_STANDALONE_LINUX && DEVELOPMENT_BUILD && !UNITY_EDITOR
+#if ((DESERTRV_CANDIDATE_LINUX && UNITY_STANDALONE_LINUX) || (DESERTRV_CANDIDATE_ANDROID && UNITY_ANDROID)) && DEVELOPMENT_BUILD && !UNITY_EDITOR
             if (!director || owner || !bornInBootstrap || !director.OwnsJourney || !ValidIdentity() ||
                 !ValidateBootstrap(director, content, out _)) return;
             owner = this;
@@ -70,7 +75,7 @@ namespace DesertRV
         }
         public static bool ValidateBootstrap(JourneyDirector d, JourneyContentManifest m, out string reason)
         {
-            reason = "Candidate Linux bootstrap identity or real content is invalid.";
+            reason = "Candidate development bootstrap identity or real content is invalid.";
             if (!UnapprovedContent(m) || !d || d.transform.parent || !d.journey || !d.motor || !d.actions || !d.loader || !d.hud ||
                 !d.motor.vehicle || !d.motor.view || !d.motor.arc || !d.motor.ram || !d.hud.font ||
                 d.actions.journey != d.journey || d.actions.motor != d.motor || d.motor.journey != d.journey || d.hud.director != d ||
@@ -90,7 +95,7 @@ namespace DesertRV
         }
         public static bool ValidateRegionContent(RegionBinding b, JourneyContentManifest m, out string reason)
         {
-            reason = "Candidate Linux region identity or real content is invalid.";
+            reason = "Candidate development region identity or real content is invalid.";
             if (!b || !UnapprovedContent(m) || b.combatAssetsVerified || b.environmentVerified || !b.ValidateStructure(out reason)) return false;
             var roots = b.gameObject.scene.GetRootGameObjects();
             if (roots.SelectMany(r => r.GetComponentsInChildren<RegionBinding>(true)).Count() != 1 ||
@@ -117,7 +122,7 @@ namespace DesertRV
         }
         public static bool ValidateForLoad(RegionBinding b, out string reason)
         {
-            reason = "Explicit prepared Linux Development identity is absent or stale.";
+            reason = "Explicit prepared Development identity is absent or stale.";
             if (!Active || !owner || !owner.director || !owner.director.OwnsJourney || !owner.ValidIdentity() ||
                 !ValidateBootstrap(owner.director, owner.content, out reason) || !b || b.region < 1 || b.region > 3 || b.gameObject.scene.path != Regions[b.region - 1]) return false;
             var stamps = b.gameObject.scene.GetRootGameObjects().SelectMany(r => r.GetComponentsInChildren<JourneyCandidateLinuxIdentity>(true)).ToArray();

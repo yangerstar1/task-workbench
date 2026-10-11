@@ -16,7 +16,18 @@ namespace DesertRV.Tests
         static object Call(string name, params object[] args) => Builder.GetMethod(name,BindingFlags.Public|BindingFlags.NonPublic|BindingFlags.Static).Invoke(null,args);
         const BuildOptions CandidateOptions=BuildOptions.Development|BuildOptions.DetailedBuildReport;
         static bool Profile(BuildTarget target, BuildOptions options, string[] defines) => (bool)Call("ValidBuildProfile",target,options,defines);
-        [Test] public void ExactLinuxDevelopmentProfileAccepted() => Assert.IsTrue(Profile(BuildTarget.StandaloneLinux64,CandidateOptions,new[]{"DESERTRV_CANDIDATE_LINUX"}));
+        [Test] public void ExactLinuxDevelopmentProfileAccepted()
+        {
+            Assert.IsTrue(Profile(BuildTarget.StandaloneLinux64,CandidateOptions,new[]{"DESERTRV_CANDIDATE_LINUX"}));
+            Assert.IsTrue((bool)Call("ValidAndroidBuildProfile",BuildTarget.Android,CandidateOptions,new[]{"DESERTRV_CANDIDATE_ANDROID"}));
+            Assert.IsFalse((bool)Call("ValidAndroidBuildProfile",BuildTarget.StandaloneLinux64,CandidateOptions,new[]{"DESERTRV_CANDIDATE_ANDROID"}));
+            foreach(var target in new[]{BuildTarget.StandaloneLinux64,BuildTarget.Android})
+                Assert.IsFalse((bool)Call("ValidAndroidBuildProfile",target,CandidateOptions,new[]{"DESERTRV_CANDIDATE_LINUX"}));
+            foreach(var options in new[]{BuildOptions.None,BuildOptions.Development, CandidateOptions|BuildOptions.AutoRunPlayer})
+                Assert.IsFalse((bool)Call("ValidAndroidBuildProfile",BuildTarget.Android,options,new[]{"DESERTRV_CANDIDATE_ANDROID"}));
+            foreach(var defines in new[]{new string[0],new[]{"DESERTRV_CANDIDATE_ANDROID","OTHER"}})
+                Assert.IsFalse((bool)Call("ValidAndroidBuildProfile",BuildTarget.Android,CandidateOptions,defines));
+        }
         [Test] public void MissingDefineRejected() => Assert.IsFalse(Profile(BuildTarget.StandaloneLinux64,CandidateOptions,new string[0]));
         [Test] public void ExtraDefineRejected() => Assert.IsFalse(Profile(BuildTarget.StandaloneLinux64,CandidateOptions,new[]{"DESERTRV_CANDIDATE_LINUX","OTHER"}));
         [Test] public void NonLinuxRejected() => Assert.IsFalse(Profile(BuildTarget.Android,CandidateOptions,new[]{"DESERTRV_CANDIDATE_LINUX"}));

@@ -188,6 +188,8 @@ namespace DesertRV.Editor
                         if(max-min<.06f || max<.10f) throw new InvalidOperationException("Blank/near-black render rejected: "+env.name+"/"+key);
                         string file=Path.Combine(output,env.name+"-"+key+".png");File.WriteAllBytes(file,pixels.EncodeToPNG());
                         records.Add(new ImageRecord{region=env.name,view=key,path=file,width=1440,height=900,minimum=min,maximum=max,cameraModel=key=="motor-driving-editor"?"JourneyMotor-driving-editor":key=="motor-walking-editor"?"JourneyMotor-walking-editor":"regression-editor",fieldOfView=camera.fieldOfView,sceneHash=AssetDatabase.GetAssetDependencyHash(RegionPaths[i]).ToString()});
+                        if(key=="motor-walking-editor" && (b.region==1 || b.region==3))
+                            JourneyHudCapture.CaptureOverWorld(camera,"region-"+b.region);
                         RenderTexture.active=previousTarget;
                     }
                 }
@@ -309,6 +311,7 @@ namespace DesertRV.Editor
             else if(b.region==2) {DressScrapyard(source,b);DressScrapWork(source,b,motor);}
             else {DressBeacon(source,b);DressSignalEquipment(source,b);}
             AuthorOptionalSupplies(source,b,motor);
+            AuthorPhysicalSurfaceArt(b);
         }
         static void ExtendSceneryRoad(RegionBinding b)
         {

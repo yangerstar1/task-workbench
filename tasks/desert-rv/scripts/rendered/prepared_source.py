@@ -104,6 +104,15 @@ def verified_package_snapshot(state):
         require(all(row['proof'].get(str(path.relative_to(ROOT)))==sha(path) for path in inputs),'PREPARED_PACKAGE_INPUT_PROOF_CHANGED')
     return expected
 
+def surface_art_files():
+    folder=JOURNEY+'/SurfaceArt'
+    names={'Sand.mat','Asphalt.mat'}
+    for region in (1,2,3):
+        roles=['Foundation','Road','RoadAhead','RoadBehind']+[f'Shoulder-{i:02d}' for i in range(16)]+[f'Lobe-{i:02d}' for i in range(20)]
+        names.update(f'R{region}-{role}.asset' for role in roles)
+    assets={folder+'/'+name for name in names}
+    return assets|{name+'.meta' for name in assets}|{folder+'.meta'}
+
 def journey_files(fx):
     require(fx['status']=='ORIGINAL_NATIVE_FX_AUTHORED_UNCALIBRATED' and fx['protectedSourcesUnchanged'] is True and fx['failures']==[],'PREPARED_FX_NOT_READY')
     allowed={JOURNEY+'/'+n for n in ('JourneyBootstrap.unity','FirstStation.unity','Scrapyard.unity','NightBeacon.unity','JourneyContent.asset')}
@@ -117,6 +126,9 @@ def journey_files(fx):
         require(re.fullmatch(r'Layout-[0-9A-F]{6}\.mat',path.name),'PREPARED_LAYOUT_MATERIAL_NAME');allowed.add(str(path.relative_to(PROJECT)))
     allowed|={name+'.meta' for name in tuple(allowed)}
     allowed|={JOURNEY+'.meta',JOURNEY+'/CandidateFx.meta',next(iter(fx_folders))+'.meta'}
+    # Finite new-source closure: exactly 120 projected render meshes and two materials.
+    # No wildcard and no terrain/collider/shader or historical diagnostic exemption.
+    allowed|=surface_art_files()
     actual={JOURNEY+'/'+name:sha(PROJECT/JOURNEY/name) for name in walk(PROJECT/JOURNEY)[0]}
     actual[JOURNEY+'.meta']=sha(PROJECT/(JOURNEY+'.meta'))
     require(set(actual)==allowed,'PREPARED_JOURNEY_ADDITION_INVENTORY')

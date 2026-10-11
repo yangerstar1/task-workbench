@@ -5,7 +5,9 @@ test "${RUNNER_ENVIRONMENT:-}" = github-hosted
 test "${RUNNER_OS:-}" = Linux
 test "${GITHUB_ACTIONS:-}" = true
 if [[ "${GITHUB_EVENT_NAME:-}" != workflow_dispatch ]]; then
-  if [[ "${GITHUB_REF:-}" == refs/heads/journey-pouncer-ground-support-2915 ]]; then
+  if [[ "${GITHUB_REF:-}" == refs/heads/journey-android-c15 ]]; then
+    /usr/bin/python3 "$(dirname "${BASH_SOURCE[0]}")/player/journey_android.py" dispatch
+  elif [[ "${GITHUB_REF:-}" == refs/heads/journey-pouncer-ground-support-2915 ]]; then
     /usr/bin/python3 "$(dirname "${BASH_SOURCE[0]}")/journey_pouncer_ground_support_probe.py" dispatch
   elif [[ "${GITHUB_REF:-}" == refs/heads/journey-pouncer-ground-support-full-1019 ]]; then
     /usr/bin/python3 "$(dirname "${BASH_SOURCE[0]}")/journey_tracer_dispatch.py" --verify-only

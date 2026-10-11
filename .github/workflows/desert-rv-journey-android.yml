@@ -1,0 +1,640 @@
+name: Desert RV fresh Journey Android development candidate
+on:
+  push:
+    branches: [journey-android-c15]
+    paths: [.github/dispatch/desert-rv-journey-android-c15-20261011.json]
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: desert-rv-journey-android
+  cancel-in-progress: false
+jobs:
+  prepare:
+    if: >-
+      github.repository == 'yangerstar1/task-workbench' &&
+      github.event_name == 'push' && github.ref == 'refs/heads/journey-android-c15' &&
+      github.actor == 'yangerstar1' && github.triggering_actor == 'yangerstar1'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 300
+    env:
+      GITHUB_REPOSITORY_VISIBILITY: ${{ github.event.repository.visibility }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+          lfs: false
+          fetch-depth: 2
+      - name: Verify one-use Android candidate source identity
+        id: dispatch_identity
+        run: |
+          /usr/bin/python3 tasks/desert-rv/scripts/player/journey_android.py dispatch
+      - name: Verify current source before fixed Android-image readiness
+        run: /usr/bin/python3 tasks/desert-rv/scripts/verify_evidence.py guard
+      - name: Verify fixed Android-image readiness with at most one bounded fallback pull
+        id: image_precheck
+        run: |
+          /usr/bin/python3 tasks/desert-rv/scripts/test_environment_image_precheck.py
+          test ! -e tasks/desert-rv/journey-android-image-precheck.json
+          test ! -L tasks/desert-rv/journey-android-image-precheck.json
+          set -o noclobber
+          exec 3> tasks/desert-rv/journey-android-image-precheck.json
+          set +e
+          /usr/bin/python3 tasks/desert-rv/scripts/environment_image_precheck.py --profile android >&3
+          precheck_exit=$?
+          set -e
+          exec 3>&-
+          echo 'report_written=true' >> "$GITHUB_OUTPUT"
+          PRECHECK_EXIT="$precheck_exit" /usr/bin/python3 - <<'PYCODE'
+          import json, os, pathlib, sys
+          sys.path.insert(0, 'tasks/desert-rv/scripts')
+          import environment_image_precheck as check
+          check.select_profile('android')
+          path=pathlib.Path('tasks/desert-rv/journey-android-image-precheck.json')
+          assert path.is_file() and not path.is_symlink() and 0 < path.stat().st_size <= 8192
+          value=json.loads(path.read_text(), object_pairs_hook=check.unique_object)
+          assert check.validate_report(value)
+          assert os.environ['PRECHECK_EXIT'] == ('0' if value['status']=='PASS' else '2')
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as output: output.write('report_valid=true\n')
+          PYCODE
+          exit "$precheck_exit"
+      - name: Validate bounded image observation and actual step outcome
+        id: image_report
+        if: always() && steps.image_precheck.outputs.report_written == 'true' && steps.image_precheck.outputs.report_valid == 'true'
+        env:
+          PRECHECK_OUTCOME: ${{ steps.image_precheck.outcome }}
+        run: |
+          /usr/bin/python3 - <<'PYCODE'
+          import json, os, pathlib, sys
+          sys.path.insert(0, 'tasks/desert-rv/scripts')
+          import environment_image_precheck as check
+          check.select_profile('android')
+          path=pathlib.Path('tasks/desert-rv/journey-android-image-precheck.json')
+          assert path.is_file() and not path.is_symlink() and 0 < path.stat().st_size <= 8192
+          value=json.loads(path.read_text(), object_pairs_hook=check.unique_object)
+          assert check.validate_report(value)
+          assert os.environ['PRECHECK_OUTCOME'] == ('success' if value['status']=='PASS' else 'failure')
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as output: output.write('export_ready=true\n')
+          PYCODE
+      - name: Upload only validated fixed Android image availability observation
+        if: always() && steps.image_precheck.outputs.report_written == 'true' && steps.image_report.outputs.export_ready == 'true'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: journey-android-image-precheck-${{ github.run_id }}-${{ github.run_attempt }}
+          path: tasks/desert-rv/journey-android-image-precheck.json
+          if-no-files-found: error
+          retention-days: 7
+      - name: Prepare official validators and source before snapshot
+        run: |
+          python3 tasks/desert-rv/scripts/verify_evidence.py guard
+          sudo apt-get update && sudo apt-get install -y --no-install-recommends python3-pil python3-yaml
+          python3 tasks/desert-rv/scripts/backup/restore_unity_font.py
+      - name: Validate ordered selection and snapshot protected source
+        env:
+          SELECTION: ${{ steps.dispatch_identity.outputs.selection }}
+          SELECTION_SHA: ${{ steps.dispatch_identity.outputs.selection_sha256 }}
+        run: |
+          /usr/bin/python3 tasks/desert-rv/scripts/player/test_journey_android.py
+          /usr/bin/python3 tasks/desert-rv/scripts/test_journey_tracer_source_diagnostic.py DiagnosticTests
+          /usr/bin/python3 tasks/desert-rv/scripts/test_journey_tracer_native.py
+          /usr/bin/python3 tasks/desert-rv/scripts/test_journey_keyboard_look_native.py
+          /usr/bin/python3 tasks/desert-rv/scripts/test_journey_cabin_entry_native.py
+          /usr/bin/python3 tasks/desert-rv/scripts/test_journey_region_hud_native.py
+          /usr/bin/python3 tasks/desert-rv/scripts/test_journey_mobile_hud_native.py
+          /usr/bin/python3 tasks/desert-rv/scripts/test_journey_combat_feedback_native.py
+          /usr/bin/python3 tasks/desert-rv/scripts/player/test_verify_tracer_shader.py
+          /usr/bin/python3 tasks/desert-rv/art/journey-preparation/test_pipeline.py
+          /usr/bin/python3 tasks/desert-rv/art/journey-preparation/test_generated_export.py
+          /usr/bin/python3 tasks/desert-rv/art/journey-preparation/test_linux_build_input.py
+          /usr/bin/python3 tasks/desert-rv/scripts/player/test_journey_linux_export.py
+          /usr/bin/python3 tasks/desert-rv/scripts/rendered/test_prepared_source.py
+          python3 tasks/desert-rv/art/journey-preparation/pipeline.py init --selection "$SELECTION" --sha256 "$SELECTION_SHA"
+      - name: Verify non-root host union across real root-owned bytecode caches
+        env:
+          JOURNEY_HOSTED_ROOT_CACHE_TEST: '1'
+        run: /usr/bin/python3 tasks/desert-rv/scripts/rendered/test_prepared_source.py
+      - name: Prepare existing licensed runner after input validation
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+        run: |
+          bash tasks/desert-rv/scripts/prepare_runner.sh
+          docker build --file tasks/desert-rv/scripts/player/JourneyAndroid.Dockerfile --tag desert-rv-journey-android:local tasks/desert-rv/scripts/player
+      - name: Native exact ten tracer material cases before strict imports
+        id: tracer_native
+        uses: game-ci/unity-test-runner@0ff419b913a3630032cbe0de48a0099b5a9f0ed9
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+        with:
+          unityVersion: 6000.3.19f1
+          customImage: desert-rv-journey-android:local
+          projectPath: tasks/desert-rv/unity
+          testMode: editmode
+          artifactsPath: tasks/desert-rv/artifacts/journey-tracer-material
+          customParameters: -assemblyNames DesertRV.EditModeTests -testFilter DesertRV.Tests.JourneyTracerMaterialTests -buildTarget Android -force-glcore -job-worker-count 2
+          dockerCpuLimit: 2
+          dockerMemoryLimit: 12g
+      - name: Diagnose original source and import union even after failed native tests
+        id: tracer_source
+        if: always() && steps.tracer_native.outcome != 'skipped'
+        env:
+          NATIVE_OUTCOME: ${{ steps.tracer_native.outcome }}
+        run: python3 tasks/desert-rv/scripts/journey_tracer_source_diagnostic.py
+      - name: Upload bounded original source and fixture residue diagnostics
+        if: always() && steps.tracer_source.outputs.report_written == 'true' && steps.tracer_source.outputs.report_valid == 'true'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: journey-tracer-source-${{ github.run_id }}-${{ github.run_attempt }}
+          path: tasks/desert-rv/journey-tracer-source-report.json
+          if-no-files-found: error
+          retention-days: 7
+      - name: Require exact ten passes and unchanged initial source and import union
+        id: tracer_verify
+        if: always() && steps.tracer_native.outcome != 'skipped'
+        env:
+          NATIVE_OUTCOME: ${{ steps.tracer_native.outcome }}
+        run: python3 tasks/desert-rv/scripts/journey_tracer_native.py
+      - name: Upload bounded validated tracer native status
+        if: always() && steps.tracer_verify.outputs.report_written == 'true' && steps.tracer_verify.outputs.report_valid == 'true'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: journey-tracer-native-${{ github.run_id }}-${{ github.run_attempt }}
+          path: tasks/desert-rv/journey-tracer-native-report.json
+          if-no-files-found: error
+          retention-days: 7
+      - name: Create exact same-commit isolated keyboard look project
+        id: keyboard_copy
+        if: success() && steps.tracer_source.outcome == 'success' && steps.tracer_source.outputs.source_unchanged == 'true' && steps.tracer_verify.outcome == 'success' && steps.tracer_verify.outputs.native_verified == 'true'
+        run: python3 tasks/desert-rv/scripts/journey_keyboard_look_native.py copy
+      - name: Native exact four keyboard look PlayMode cases before strict imports
+        id: keyboard_native
+        if: success() && steps.keyboard_copy.outputs.copy_ready == 'true'
+        uses: game-ci/unity-test-runner@0ff419b913a3630032cbe0de48a0099b5a9f0ed9
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+        with:
+          unityVersion: 6000.3.19f1
+          customImage: desert-rv-journey-android:local
+          projectPath: tasks/desert-rv/journey-keyboard-look-project
+          testMode: playmode
+          artifactsPath: tasks/desert-rv/artifacts/journey-keyboard-look
+          customParameters: -assemblyNames DesertRV.PlayModeTests -testFilter DesertRV.Tests.JourneyReplayInputTests.KeyboardLook_RateAndBounds;DesertRV.Tests.JourneyReplayInputTests.KeyboardLook_ContextAndRelease;DesertRV.Tests.JourneyReplayInputTests.KeyboardLook_PreservesExistingSources;DesertRV.Tests.JourneyReplayInputTests.KeyboardLook_EditorReplayIsExclusive -buildTarget Android -force-glcore -job-worker-count 2
+          dockerCpuLimit: 2
+          dockerMemoryLimit: 12g
+      - name: Diagnose actual RV entry across five timesteps independently
+        id: cabin_native
+        if: always() && !cancelled() && steps.keyboard_copy.outputs.copy_ready == 'true'
+        uses: game-ci/unity-test-runner@0ff419b913a3630032cbe0de48a0099b5a9f0ed9
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+        with:
+          unityVersion: 6000.3.19f1
+          customImage: desert-rv-journey-android:local
+          projectPath: tasks/desert-rv/journey-keyboard-look-project
+          testMode: playmode
+          artifactsPath: tasks/desert-rv/artifacts/journey-cabin-entry
+          customParameters: -assemblyNames DesertRV.PlayModeTests -testFilter DesertRV.Tests.JourneyCabinEntryPhysicsTests.RealRV_StandardExitToCabin_AllTimesteps -buildTarget Android -force-glcore -job-worker-count 2
+          dockerCpuLimit: 2
+          dockerMemoryLimit: 12g
+      - name: Native exact one region HUD lifecycle PlayMode case in the isolated project
+        id: region_hud_native
+        if: always() && !cancelled() && steps.keyboard_copy.outputs.copy_ready == 'true'
+        uses: game-ci/unity-test-runner@0ff419b913a3630032cbe0de48a0099b5a9f0ed9
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+        with:
+          unityVersion: 6000.3.19f1
+          customImage: desert-rv-journey-android:local
+          projectPath: tasks/desert-rv/journey-keyboard-look-project
+          testMode: playmode
+          artifactsPath: tasks/desert-rv/artifacts/journey-region-hud
+          customParameters: -assemblyNames DesertRV.PlayModeTests -testFilter DesertRV.Tests.JourneyReplayInputTests.HudRegionLabel_TracksSessionAdvanceAndWholeRunRestart -buildTarget Android -force-glcore -job-worker-count 2
+          dockerCpuLimit: 2
+          dockerMemoryLimit: 12g
+      - name: Native exact ten production mobile HUD layout and render cases
+        id: mobile_hud_native
+        if: always() && !cancelled() && steps.keyboard_copy.outputs.copy_ready == 'true'
+        uses: game-ci/unity-test-runner@0ff419b913a3630032cbe0de48a0099b5a9f0ed9
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+        with:
+          unityVersion: 6000.3.19f1
+          customImage: desert-rv-journey-android:local
+          projectPath: tasks/desert-rv/journey-keyboard-look-project
+          testMode: editmode
+          artifactsPath: tasks/desert-rv/artifacts/journey-mobile-hud
+          customParameters: -assemblyNames DesertRV.MobileHudTests -testFilter DesertRV.Tests.JourneyMobileHudTests -buildTarget Android -force-glcore -job-worker-count 2
+          dockerCpuLimit: 2
+          dockerMemoryLimit: 12g
+      - name: Native exact seven combat feedback EditMode cases in the isolated project
+        id: combat_feedback_native
+        if: always() && !cancelled() && steps.keyboard_copy.outputs.copy_ready == 'true'
+        uses: game-ci/unity-test-runner@0ff419b913a3630032cbe0de48a0099b5a9f0ed9
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+        with:
+          unityVersion: 6000.3.19f1
+          customImage: desert-rv-journey-android:local
+          projectPath: tasks/desert-rv/journey-keyboard-look-project
+          testMode: editmode
+          artifactsPath: tasks/desert-rv/artifacts/journey-combat-feedback-full
+          customParameters: -assemblyNames DesertRV.EditModeTests -testFilter DesertRV.Tests.JourneyCombatFeedbackTests -buildTarget Android -force-glcore -job-worker-count 2
+          dockerCpuLimit: 2
+          dockerMemoryLimit: 12g
+      - name: Native current thirteen baseline PlayMode cases
+        id: android_playmode
+        if: success() && steps.keyboard_copy.outputs.copy_ready == 'true'
+        uses: game-ci/unity-test-runner@0ff419b913a3630032cbe0de48a0099b5a9f0ed9
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+        with:
+          unityVersion: 6000.3.19f1
+          customImage: desert-rv-journey-android:local
+          projectPath: tasks/desert-rv/journey-keyboard-look-project
+          testMode: playmode
+          artifactsPath: tasks/desert-rv/artifacts/journey-android-playmode
+          customParameters: -assemblyNames DesertRV.PlayModeTests -testFilter ${{ steps.dispatch_identity.outputs.playmode_filter }} -buildTarget Android -force-glcore -job-worker-count 2
+          dockerCpuLimit: 2
+          dockerMemoryLimit: 12g
+      - name: Native thirteen current Pouncer ground support regressions
+        id: android_ground
+        if: success() && steps.keyboard_copy.outputs.copy_ready == 'true'
+        uses: game-ci/unity-test-runner@0ff419b913a3630032cbe0de48a0099b5a9f0ed9
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+        with:
+          unityVersion: 6000.3.19f1
+          customImage: desert-rv-journey-android:local
+          projectPath: tasks/desert-rv/journey-keyboard-look-project
+          testMode: editmode
+          artifactsPath: tasks/desert-rv/artifacts/journey-android-ground
+          customParameters: -assemblyNames DesertRV.PouncerGroundTests -testFilter DesertRV.Tests.PouncerGroundSupportTests -buildTarget Android -force-glcore -job-worker-count 2
+          dockerCpuLimit: 2
+          dockerMemoryLimit: 12g
+      - name: Preserve isolated project source and complete safe settings diff
+        id: keyboard_isolation
+        if: always() && steps.keyboard_copy.outputs.copy_created == 'true'
+        run: python3 tasks/desert-rv/scripts/journey_keyboard_look_native.py isolation
+      - name: Upload bounded isolated keyboard look project diagnostics
+        if: always() && steps.keyboard_isolation.outputs.report_written == 'true' && steps.keyboard_isolation.outputs.report_valid == 'true'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: journey-keyboard-look-isolation-${{ github.run_id }}-${{ github.run_attempt }}
+          path: tasks/desert-rv/journey-keyboard-look-isolation-report.json
+          if-no-files-found: error
+          retention-days: 7
+      - name: Diagnose source and union independently after keyboard look native tests
+        id: keyboard_source
+        if: always() && steps.keyboard_copy.outputs.copy_created == 'true'
+        env:
+          NATIVE_OUTCOME: ${{ steps.keyboard_native.outcome }}
+        run: python3 tasks/desert-rv/scripts/journey_keyboard_look_native.py source
+      - name: Upload bounded keyboard look source diagnostics
+        if: always() && steps.keyboard_source.outputs.report_written == 'true' && steps.keyboard_source.outputs.report_valid == 'true'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: journey-keyboard-look-source-${{ github.run_id }}-${{ github.run_attempt }}
+          path: tasks/desert-rv/journey-keyboard-look-source-report.json
+          if-no-files-found: error
+          retention-days: 7
+      - name: Require exact four keyboard look passes and unchanged initial source
+        id: keyboard_verify
+        if: always() && steps.keyboard_native.outcome != 'skipped'
+        env:
+          NATIVE_OUTCOME: ${{ steps.keyboard_native.outcome }}
+        run: python3 tasks/desert-rv/scripts/journey_keyboard_look_native.py native
+      - name: Upload bounded keyboard look native result evidence
+        if: always() && steps.keyboard_verify.outputs.report_written == 'true' && steps.keyboard_verify.outputs.report_valid == 'true'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: journey-keyboard-look-native-${{ github.run_id }}-${{ github.run_attempt }}
+          path: tasks/desert-rv/journey-keyboard-look-native-report.json
+          if-no-files-found: error
+          retention-days: 7
+      - name: Preserve separate keyboard look reports in preparation evidence
+        if: always() && steps.keyboard_source.outputs.report_valid == 'true' && steps.keyboard_verify.outputs.report_valid == 'true' && steps.keyboard_isolation.outputs.report_valid == 'true'
+        run: python3 tasks/desert-rv/scripts/journey_keyboard_look_native.py preserve
+      - name: Preserve complete safe cabin physics observations even on native failure
+        id: cabin_report
+        if: always() && steps.keyboard_copy.outputs.copy_created == 'true'
+        env:
+          NATIVE_OUTCOME: ${{ steps.cabin_native.outcome }}
+        run: python3 tasks/desert-rv/scripts/journey_cabin_entry_native.py
+      - name: Upload bounded validated cabin physics diagnosis
+        if: always() && steps.cabin_report.outputs.report_written == 'true' && steps.cabin_report.outputs.report_valid == 'true'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: journey-cabin-entry-native-${{ github.run_id }}-${{ github.run_attempt }}
+          path: tasks/desert-rv/journey-cabin-entry-native-report.json
+          if-no-files-found: error
+          retention-days: 7
+      - name: Require the separate exact HUD pass with same-job source and isolation evidence
+        id: region_hud_verify
+        if: always() && steps.region_hud_native.outcome != 'skipped'
+        env:
+          NATIVE_OUTCOME: ${{ steps.region_hud_native.outcome }}
+        run: python3 tasks/desert-rv/scripts/journey_region_hud_native.py native
+      - name: Upload bounded validated region HUD native status
+        if: always() && steps.region_hud_verify.outputs.report_written == 'true' && steps.region_hud_verify.outputs.report_valid == 'true'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: journey-region-hud-native-${{ github.run_id }}-${{ github.run_attempt }}
+          path: tasks/desert-rv/journey-region-hud-native-report.json
+          if-no-files-found: error
+          retention-days: 7
+      - name: Preserve separate bounded region HUD evidence in the fresh preparation
+        if: always() && steps.region_hud_verify.outputs.report_valid == 'true'
+        run: python3 tasks/desert-rv/scripts/journey_region_hud_native.py preserve
+      - name: Require fresh exact-seven feedback passes and same-job source and isolation evidence
+        id: combat_feedback_verify
+        if: always() && steps.combat_feedback_native.outcome != 'skipped'
+        env:
+          NATIVE_OUTCOME: ${{ steps.combat_feedback_native.outcome }}
+        run: python3 tasks/desert-rv/scripts/journey_combat_feedback_native.py native
+      - name: Upload bounded validated combat feedback native status
+        if: always() && steps.combat_feedback_verify.outputs.report_written == 'true' && steps.combat_feedback_verify.outputs.report_valid == 'true'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: journey-combat-feedback-full-native-${{ github.run_id }}-${{ github.run_attempt }}
+          path: tasks/desert-rv/journey-combat-feedback-full-native-report.json
+          if-no-files-found: error
+          retention-days: 7
+      - name: Preserve bounded combat feedback evidence in the fresh preparation
+        if: always() && steps.combat_feedback_verify.outputs.report_valid == 'true'
+        run: python3 tasks/desert-rv/scripts/journey_combat_feedback_native.py preserve
+      - name: Require exact mobile HUD cases and preserve bounded production render fixtures
+        id: mobile_hud_verify
+        if: always() && steps.mobile_hud_native.outcome != 'skipped' && steps.keyboard_isolation.outputs.copy_verified == 'true'
+        env:
+          NATIVE_OUTCOME: ${{ steps.mobile_hud_native.outcome }}
+        run: python3 tasks/desert-rv/scripts/journey_mobile_hud_native.py native
+      - name: Upload only verified thirteen HUD captures and native fit evidence
+        if: always() && steps.mobile_hud_verify.outputs.export_ready == 'true'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: journey-mobile-hud-native-${{ github.run_id }}-${{ github.run_attempt }}
+          path: tasks/desert-rv/mobile-hud-native-export
+          if-no-files-found: error
+          retention-days: 7
+      - name: Pin exact baseline ground support and mobile HUD evidence before authoring or building
+        if: success() && steps.android_playmode.outcome == 'success' && steps.android_ground.outcome == 'success' && steps.mobile_hud_verify.outputs.native_verified == 'true'
+        run: python3 tasks/desert-rv/scripts/player/journey_android.py gates
+      - name: Remove only the owned isolated keyboard look project
+        id: keyboard_cleanup
+        if: always() && steps.keyboard_copy.outputs.copy_created == 'true' && steps.keyboard_isolation.outputs.report_valid == 'true'
+        run: |
+          set -euo pipefail
+          # Pin cleanup source before its isolated privileged interpreter.
+          # Refuse native-modified cleanup code before the bounded privileged call.
+          for source in journey_keyboard_look_native.py; do
+            relative="tasks/desert-rv/scripts/$source"
+            expected=$(git show "HEAD:$relative" | sha256sum | cut -d ' ' -f 1)
+            actual=$(sha256sum "$relative" | cut -d ' ' -f 1)
+            test "$actual" = "$expected"
+          done
+          sudo --preserve-env=GITHUB_SHA,GITHUB_RUN_ID,GITHUB_RUN_ATTEMPT /usr/bin/python3 -I -B tasks/desert-rv/scripts/journey_keyboard_look_native.py cleanup
+      - name: Stage verified armored source archive
+        id: stage_armored
+        if: success() && steps.tracer_source.outcome == 'success' && steps.tracer_source.outputs.source_unchanged == 'true' && steps.tracer_verify.outcome == 'success' && steps.tracer_verify.outputs.native_verified == 'true' && steps.keyboard_source.outcome == 'success' && steps.keyboard_source.outputs.source_unchanged == 'true' && steps.keyboard_verify.outcome == 'success' && steps.keyboard_verify.outputs.native_verified == 'true' && steps.keyboard_isolation.outputs.copy_verified == 'true' && steps.keyboard_cleanup.outcome == 'success' && steps.cabin_native.outcome == 'success' && steps.cabin_report.outcome == 'success' && steps.cabin_report.outputs.diagnostic_complete == 'true' && steps.region_hud_native.outcome == 'success' && steps.region_hud_verify.outcome == 'success' && steps.region_hud_verify.outputs.native_verified == 'true' && steps.combat_feedback_native.outcome == 'success' && steps.combat_feedback_verify.outcome == 'success' && steps.combat_feedback_verify.outputs.native_verified == 'true' && steps.mobile_hud_verify.outputs.native_verified == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 tasks/desert-rv/art/journey-preparation/pipeline.py stage --kind armored
+      - name: Native strict armored import and actual capture
+        id: armored
+        if: success() && steps.stage_armored.outcome == 'success'
+        uses: game-ci/unity-test-runner@0ff419b913a3630032cbe0de48a0099b5a9f0ed9
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+        with:
+          unityVersion: 6000.3.19f1
+          customImage: desert-rv-journey-android:local
+          projectPath: tasks/desert-rv/unity
+          testMode: editmode
+          artifactsPath: tasks/desert-rv/artifacts/journey-strict-armored
+          customParameters: -assemblyNames DesertRV.CandidateArtTests -buildTarget Android -force-glcore -job-worker-count 2
+          dockerCpuLimit: 2
+          dockerMemoryLimit: 12g
+      - name: Reuse exact strict quality gate and preserve armored reports
+        id: collect_armored
+        if: always() && steps.stage_armored.outcome == 'success'
+        env:
+          NATIVE: ${{ steps.armored.outcome }}
+        run: python3 tasks/desert-rv/art/journey-preparation/pipeline.py collect --kind armored --native "$NATIVE"
+      - name: Stage verified pouncer source archive
+        id: stage_pouncer
+        if: success() && steps.collect_armored.outcome == 'success'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 tasks/desert-rv/art/journey-preparation/pipeline.py stage --kind pouncer
+      - name: Native strict pouncer import and actual capture
+        id: pouncer
+        if: success() && steps.stage_pouncer.outcome == 'success'
+        uses: game-ci/unity-test-runner@0ff419b913a3630032cbe0de48a0099b5a9f0ed9
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+        with:
+          unityVersion: 6000.3.19f1
+          customImage: desert-rv-journey-android:local
+          projectPath: tasks/desert-rv/unity
+          testMode: editmode
+          artifactsPath: tasks/desert-rv/artifacts/journey-strict-pouncer
+          customParameters: -assemblyNames DesertRV.CandidateArtTests -buildTarget Android -force-glcore -job-worker-count 2
+          dockerCpuLimit: 2
+          dockerMemoryLimit: 12g
+      - name: Reuse exact strict quality gate and preserve pouncer reports
+        id: collect_pouncer
+        if: always() && steps.stage_pouncer.outcome == 'success'
+        env:
+          NATIVE: ${{ steps.pouncer.outcome }}
+        run: python3 tasks/desert-rv/art/journey-preparation/pipeline.py collect --kind pouncer --native "$NATIVE"
+      - name: Stage verified weapon source archive
+        id: stage_weapon
+        if: success() && steps.collect_pouncer.outcome == 'success'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 tasks/desert-rv/art/journey-preparation/pipeline.py stage --kind weapon
+      - name: Native strict weapon import and actual capture
+        id: weapon
+        if: success() && steps.stage_weapon.outcome == 'success'
+        uses: game-ci/unity-test-runner@0ff419b913a3630032cbe0de48a0099b5a9f0ed9
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+        with:
+          unityVersion: 6000.3.19f1
+          customImage: desert-rv-journey-android:local
+          projectPath: tasks/desert-rv/unity
+          testMode: editmode
+          artifactsPath: tasks/desert-rv/artifacts/journey-strict-weapon
+          customParameters: -assemblyNames DesertRV.CandidateArtTests -buildTarget Android -force-glcore -job-worker-count 2
+          dockerCpuLimit: 2
+          dockerMemoryLimit: 12g
+      - name: Reuse exact strict quality gate and preserve weapon reports
+        id: collect_weapon
+        if: always() && steps.stage_weapon.outcome == 'success'
+        env:
+          NATIVE: ${{ steps.weapon.outcome }}
+        run: python3 tasks/desert-rv/art/journey-preparation/pipeline.py collect --kind weapon --native "$NATIVE"
+      - name: Require exact three-candidate union and freeze real selections
+        id: ready
+        if: success() && steps.collect_weapon.outcome == 'success'
+        run: python3 tasks/desert-rv/art/journey-preparation/pipeline.py ready
+      - name: Native exact candidate Linux boundary tests
+        id: linux_boundary
+        if: success() && steps.ready.outcome == 'success'
+        uses: game-ci/unity-test-runner@0ff419b913a3630032cbe0de48a0099b5a9f0ed9
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+        with:
+          unityVersion: 6000.3.19f1
+          customImage: desert-rv-journey-android:local
+          projectPath: tasks/desert-rv/unity
+          testMode: editmode
+          artifactsPath: tasks/desert-rv/artifacts/journey-linux-boundary
+          customParameters: -assemblyNames DesertRV.CandidateLinuxTests -buildTarget Android -force-glcore -job-worker-count 2
+          dockerCpuLimit: 2
+          dockerMemoryLimit: 12g
+      - name: Require exact seventeen passing candidate boundary cases
+        id: boundary_verify
+        if: success() && steps.linux_boundary.outcome == 'success'
+        run: python3 tasks/desert-rv/art/journey-preparation/linux_build_input.py verify-boundary
+      - name: Native original FX, four scenes, integration and diagnostic scope
+        id: author
+        if: success() && steps.boundary_verify.outcome == 'success'
+        uses: game-ci/unity-test-runner@0ff419b913a3630032cbe0de48a0099b5a9f0ed9
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+        with:
+          unityVersion: 6000.3.19f1
+          customImage: desert-rv-journey-android:local
+          projectPath: tasks/desert-rv/unity
+          testMode: editmode
+          artifactsPath: tasks/desert-rv/artifacts/journey-preparation
+          customParameters: -assemblyNames DesertRV.JourneyPreparationTests -buildTarget Android -force-glcore -job-worker-count 2
+          dockerCpuLimit: 2
+          dockerMemoryLimit: 12g
+      - name: Verify actual preparation test, saved outputs and final scope pins
+        id: finish
+        if: always() && steps.author.outcome != 'skipped'
+        env:
+          NATIVE: ${{ steps.author.outcome }}
+        run: python3 tasks/desert-rv/art/journey-preparation/pipeline.py finish --native "$NATIVE"
+      - name: Verify and preserve exact two authored world plus HUD fixture captures
+        id: mobile_hud_world
+        if: success() && steps.finish.outcome == 'success'
+        env:
+          NATIVE_OUTCOME: ${{ steps.author.outcome }}
+        run: python3 tasks/desert-rv/scripts/journey_mobile_hud_native.py world
+      - name: Upload only verified authored R1 and R3 world camera HUD fixtures
+        if: always() && steps.mobile_hud_world.outputs.export_ready == 'true'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: journey-mobile-hud-world-${{ github.run_id }}-${{ github.run_attempt }}
+          path: tasks/desert-rv/mobile-hud-world-export
+          if-no-files-found: error
+          retention-days: 7
+      - name: Prepare exact same-job Android input with native source and package closure
+        id: android_input
+        if: success() && steps.finish.outcome == 'success'
+        run: python3 tasks/desert-rv/scripts/player/journey_android.py prepare
+      - name: Read pinned official activation and return scripts
+        if: success() && steps.android_input.outcome == 'success'
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          repository: game-ci/unity-test-runner
+          ref: 0ff419b913a3630032cbe0de48a0099b5a9f0ed9
+          path: _ci/gameci-journey-android
+          persist-credentials: false
+          lfs: false
+      - name: Verify exact Android build inputs and fresh output paths
+        if: success() && steps.android_input.outcome == 'success'
+        run: python3 tasks/desert-rv/scripts/player/journey_android.py before
+      - name: Build Android IL2CPP ARM64 development APK without launching it
+        id: android_native
+        if: success() && steps.android_input.outcome == 'success'
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+        run: |
+          set +x
+          docker run --rm --init --cpus=2 --memory=12g --stop-timeout=210 \
+            --workdir /github/workspace \
+            --volume "$GITHUB_WORKSPACE:/github/workspace" \
+            --volume "$GITHUB_WORKSPACE/_ci/gameci-journey-android/dist:/gameci:ro" \
+            --env UNITY_LICENSE --env UNITY_EMAIL --env UNITY_PASSWORD \
+            --env GITHUB_ACTIONS --env GITHUB_SHA --env GITHUB_RUN_ID --env GITHUB_RUN_ATTEMPT \
+            --env GITHUB_REPOSITORY --env GITHUB_REF --env GITHUB_ACTOR --env GITHUB_TRIGGERING_ACTOR \
+            --env GITHUB_EVENT_NAME --env GITHUB_WORKFLOW_REF --env GITHUB_EVENT_PATH=/github/workflow/event.json \
+            --volume "$GITHUB_EVENT_PATH:/github/workflow/event.json:ro" \
+            --env RUNNER_ENVIRONMENT --env RUNNER_OS --env GITHUB_REPOSITORY_VISIBILITY \
+            --entrypoint /bin/bash desert-rv-journey-android:local \
+            /github/workspace/tasks/desert-rv/scripts/player/journey_android_container.sh
+      - name: Reverify prepared source and package closure after Android build
+        id: android_verify
+        if: success() && steps.android_native.outcome == 'success'
+        run: python3 tasks/desert-rv/scripts/player/journey_android.py verify
+      - name: Export verified unreviewed APK or bounded failure status
+        id: android_public
+        if: always() && steps.android_native.outcome != 'skipped'
+        env:
+          NATIVE_OUTCOME: ${{ steps.android_native.outcome }}
+          UNION_OUTCOME: ${{ steps.android_verify.outcome }}
+        run: python3 tasks/desert-rv/scripts/player/journey_android.py export
+      - name: Validate bounded Android control including first failure after cleanup or export
+        id: android_control_report
+        if: always() && steps.android_input.outcome != 'skipped'
+        run: python3 tasks/desert-rv/scripts/player/journey_android.py control-report
+      - name: Upload only validated Android control and fixed first-failure codes
+        if: always() && steps.android_control_report.outputs.control_valid == 'true'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: journey-android-control-${{ github.run_id }}-${{ github.run_attempt }}
+          path: tasks/desert-rv/journey-android-control.json
+          if-no-files-found: error
+          retention-days: 7
+      - name: Upload only Android candidate and sanitized proof
+        if: always() && steps.android_public.outputs.export_ready == 'true'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: journey-android-CANDIDATE-NOT-DEVICE-TESTED-${{ github.run_id }}-${{ github.run_attempt }}
+          path: tasks/desert-rv/journey-android-public-export/
+          if-no-files-found: error
+          retention-days: 7
+      - name: Prove tracked original source was not edited
+        if: always()
+        run: git diff --quiet --exit-code && git diff --cached --quiet --exit-code
+      - name: Upload only existing strict-safe exports and bounded preparation status
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: journey-preparation-UNREVIEWED-${{ github.run_id }}-${{ github.run_attempt }}
+          path: tasks/desert-rv/journey-preparation-export/
+          if-no-files-found: warn
+          retention-days: 7

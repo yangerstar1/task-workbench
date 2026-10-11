@@ -266,8 +266,8 @@ def safe_build_message(value):
     else:require(code=='NONE' and source=='' and line==0)
     require(value['text']==expected and len(expected)<=512)
 
-def native_diagnostic(value):
-    require(isinstance(value,dict) and set(value)==DIAG_KEYS and type(value['schema']) is int and value['schema']==1 and value['label']=='CANDIDATE_LINUX_BUILD_DIAGNOSTIC')
+def native_diagnostic(value, platform="LINUX"):
+    require(isinstance(value,dict) and set(value)==DIAG_KEYS and type(value['schema']) is int and value['schema']==1 and platform in {'LINUX','ANDROID'} and value['label']=='CANDIDATE_'+platform+'_BUILD_DIAGNOSTIC')
     require(value['stage'] in {'ENTRY','SOURCE_VERIFIED','CONTENT_VERIFIED','BUILD_PLAYER_ENTERED','BUILD_PLAYER_RETURNED','RECEIPT_WRITTEN'})
     require(value['exceptionKind'] in EXCEPTIONS and value['buildResult'] in {'UNAVAILABLE','SUCCEEDED','FAILED','CANCELLED','UNKNOWN'})
     for key in ('settingsRestored','sourceBytesUnchanged','receiptWritten','buildReportAvailable','leaseActiveAtBuildReturn','assemblyReloadObserved','buildMessagesTruncated'):require(type(value[key]) is bool)
@@ -287,8 +287,8 @@ def native_diagnostic(value):
     for message in messages:safe_build_message(message);require(message['category'] in kinds)
     return value
 
-def diagnostic_success(d):
-    return d is not None and performance_success(d['performanceResources']) and d['stage']=='RECEIPT_WRITTEN' and d['buildResult']=='SUCCEEDED' and d['exceptionKind']=='NONE' and d['buildReportAvailable'] is True and d['reportTarget']=='LINUX64' and d['totalErrors']==0 and all(d[p+'FailureCode']=='NONE' for p in ('primary','restoration','verification')) and all(d[p+'Inventory']['totalChanges']==0 for p in ('primary','verification')) and all(d[k] is True for k in ('settingsRestored','sourceBytesUnchanged','receiptWritten'))
+def diagnostic_success(d, target="LINUX64"):
+    return d is not None and performance_success(d['performanceResources']) and d['stage']=='RECEIPT_WRITTEN' and d['buildResult']=='SUCCEEDED' and d['exceptionKind']=='NONE' and d['buildReportAvailable'] is True and target in {'LINUX64','ANDROID'} and d['reportTarget']==target and d['totalErrors']==0 and all(d[p+'FailureCode']=='NONE' for p in ('primary','restoration','verification')) and all(d[p+'Inventory']['totalChanges']==0 for p in ('primary','verification')) and all(d[k] is True for k in ('settingsRestored','sourceBytesUnchanged','receiptWritten'))
 
 def runtime_require(condition,code):
     if not condition:raise ValueError(code)

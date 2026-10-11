@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
-"""Fail-closed readiness check for one immutable Unity image.
+"""Fail-closed readiness check for one of two fixed immutable Unity images.
 
 Two fixed scopes: target digest existence and official rate-limit preview.
 Two read-only HEAD channels; one bounded fixed-image Docker pull is permitted
 only when target digest is verified and preview 200 has neither quota header.
-No CLI parameters, credentials, Docker login, manifest GET, caller retries,
+Only --profile linux|android selects a reviewed digest (default: linux).
+No image/registry parameters, credentials, Docker login, manifest GET, caller retries,
 redirects, files, or persistent tokens. Call only after the workflow identity gate.
 PASS is a point-in-time observation, never a reservation or a later-pull guarantee.
 Docker must retain its original failure behavior if the subsequent pull fails.
@@ -30,7 +31,11 @@ import time
 from enum import Enum
 from dataclasses import dataclass, field
 
-DIGEST = "sha256:17406791cf1e438bea2dac20671668e05d83db5ed38c916744815db4584a8264"
+IMAGE_PROFILES = {
+    "linux": "sha256:17406791cf1e438bea2dac20671668e05d83db5ed38c916744815db4584a8264",
+    "android": "sha256:1e98c949ff728e6ff627b5c55ef65975125a6dc47cf27060601b79a141cc8692",
+}
+DIGEST = IMAGE_PROFILES["linux"]
 IMAGE = "unityci/editor@" + DIGEST
 REGISTRY_HOST = "registry-1.docker.io"
 MANIFEST_PATH = "/v2/unityci/editor/manifests/" + DIGEST
@@ -224,6 +229,26 @@ ROUTES = {
     Route.TARGET: (MANIFEST_PATH, TOKEN_PATH, "repository:unityci/editor:pull"),
     Route.QUOTA: ("/v2/ratelimitpreview/test/manifests/latest", "/token?service=registry.docker.io&scope=repository%3Aratelimitpreview%2Ftest%3Apull", "repository:ratelimitpreview/test:pull"),
 }
+
+
+def select_profile(profile):
+    """Select only a reviewed platform before probing or validating its report.
+
+    This process runs one probe at a time. Every digest-dependent route and
+    command changes together; the registry/auth scope and quota route stay fixed.
+    A caller cannot supply an image name, digest, registry or environment override.
+    """
+    if type(profile) is not str or profile not in IMAGE_PROFILES:
+        raise ValueError("Unknown fixed image profile")
+    global DIGEST, IMAGE, MANIFEST_PATH, DOCKER_COMMAND, PULL_COMMAND
+    DIGEST = IMAGE_PROFILES[profile]
+    IMAGE = "unityci/editor@" + DIGEST
+    MANIFEST_PATH = "/v2/unityci/editor/manifests/" + DIGEST
+    DOCKER_COMMAND = ("/usr/bin/docker", "--host=unix:///var/run/docker.sock", "image", "inspect", "--format", "{{json .RepoDigests}}", IMAGE)
+    PULL_COMMAND = ("/usr/bin/docker", "--host=unix:///var/run/docker.sock", "pull", "--quiet", IMAGE)
+    ROUTES[Route.TARGET] = (MANIFEST_PATH, TOKEN_PATH, "repository:unityci/editor:pull")
+
+
 STAGES = frozenset(("NOT_STARTED", "INITIAL_HEAD", "TOKEN_GET", "AUTHENTICATED_HEAD"))
 HEADER_STATES = frozenset(("NOT_CHECKED", "NOT_APPLICABLE", "VALID", "MISSING", "INVALID", "DUPLICATE", "MISMATCH"))
 CHANNEL_REASONS = frozenset(("NOT_STARTED", "TARGET_VERIFIED", "QUOTA_AVAILABLE", "QUOTA_EXHAUSTED", "HEADERS_INVALID", "DIGEST_UNVERIFIED", "QUOTA_HEADERS_ABSENT", "QUOTA_HEADER_PARTIAL", "QUOTA_INVALID", "AUTH_CHALLENGE_INVALID", "TOKEN_HEADERS_INVALID", "TOKEN_BODY_INVALID", "TOKEN_SCHEMA_INVALID", "TOKEN_LIFETIME_INVALID", "TOKEN_VALUE_INVALID", "TOKEN_TIME_INVALID", "TOKEN_EXPIRED", "HTTP_UNEXPECTED", "HTTP_RATE_LIMITED", "TRANSPORT_ERROR", "DEADLINE"))
@@ -1071,11 +1096,15 @@ def mark_interruption(result, timed_out):
 
 
 def main(argv=None):
-    result = blank_result()
     argv = sys.argv[1:] if argv is None else argv
+    select_profile("linux")
+    valid_args = not argv or (len(argv) == 2 and argv[0] == "--profile" and argv[1] in IMAGE_PROFILES)
+    if valid_args and argv:
+        select_profile(argv[1])
+    result = blank_result()
     previous_handler, alarm_set = None, False
     try:
-        if not argv:
+        if valid_args:
             previous_handler = signal.signal(signal.SIGALRM, alarm_expired)
             signal.setitimer(signal.ITIMER_REAL, TOTAL_TIMEOUT)
             alarm_set = True

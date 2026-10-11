@@ -14,7 +14,7 @@ using UnityEngine.SceneManagement;
 namespace DesertRV.Editor
 {
     [InitializeOnLoad]
-    public static class JourneyCandidateLinuxBuild
+    public static partial class JourneyCandidateLinuxBuild
     {
         const BuildOptions CandidateOptions = BuildOptions.Development | BuildOptions.DetailedBuildReport;
         const string PerformancePackage = "com.unity.test-framework.performance";
@@ -147,7 +147,7 @@ namespace DesertRV.Editor
         internal static void IsolatePerformanceResources(BuildReport report)
         {
             if(active==null) return;
-            Check(report!=null && report.summary.platform==BuildTarget.StandaloneLinux64 && report.summary.options==CandidateOptions && Path.GetFullPath(report.summary.outputPath)==Output,"LEASE_PROFILE");
+            Check(report!=null && report.summary.platform==CandidateTarget && report.summary.options==CandidateOptions && Path.GetFullPath(report.summary.outputPath)==Output,"LEASE_PROFILE");
             var observation=currentDiagnostic.performanceResources;
             Check(observation.status=="ARMED" && observation.baselineAbsent && observation.packageVerified,"PERFORMANCE_BASELINE");
             // Suppress before source revalidation or unknown-inventory rejection can leave additions behind.
@@ -187,11 +187,11 @@ namespace DesertRV.Editor
             observation.status="PACKED_VERIFIED";Persist(currentDiagnostic);
         }
 
-        const string Input = "JourneyEvidence/JourneyPreparation/linux-build-input.json";
+        static string Input => "JourneyEvidence/JourneyPreparation/" + CandidatePlatform + "-build-input.json";
         const string Receipt = "../journey-preparation-export/generated/receipt.json";
         const string Settings = "ProjectSettings/ProjectSettings.asset";
         static readonly string[] Paths = new[] { JourneyCandidateLinuxIdentity.Bootstrap }.Concat(JourneyCandidateLinuxIdentity.Regions).ToArray();
-        static string Output => Path.GetFullPath("../journey-linux-private-build/DesertRV.x86_64");
+        static string Output => Path.GetFullPath("../journey-" + CandidatePlatform + "-private-build/" + CandidateExecutable);
         [Serializable] public sealed class Dependency { public string path, sha256, kind, packageName, packageVersion, owner; public long bytes; }
         [Serializable] public sealed class Request
         {
@@ -338,7 +338,7 @@ namespace DesertRV.Editor
             File.WriteAllText(temporary,json);
             if (File.Exists(path)) File.Replace(temporary,path,null); else File.Move(temporary,path);
         }
-        static void Persist(Diagnostic diagnostic) => PersistJson("JourneyEvidence/JourneyPreparation/linux-build-diagnostic.json",JsonUtility.ToJson(diagnostic,true));
+        static void Persist(Diagnostic diagnostic) => PersistJson("JourneyEvidence/JourneyPreparation/" + CandidatePlatform + "-build-diagnostic.json",JsonUtility.ToJson(diagnostic,true));
         sealed class Lease
         {
             public Request request; public string requestHash, fingerprint, performanceQuarantine;
@@ -538,7 +538,7 @@ namespace DesertRV.Editor
         public static bool AllowsCandidateBuild(BuildReport report)
         {
             if (active == null) return false;
-            Check(report != null && report.summary.platform == BuildTarget.StandaloneLinux64 && report.summary.options == CandidateOptions &&
+            Check(report != null && report.summary.platform == CandidateTarget && report.summary.options == CandidateOptions &&
                 Path.GetFullPath(report.summary.outputPath) == Output, "LEASE_PROFILE");
             Verify(active,true); return true;
         }
@@ -582,31 +582,35 @@ namespace DesertRV.Editor
             identity.generatedReceiptSha256 = active.request.generatedReceiptSha256; identity.content = content; identity.director = director; identity.region = binding;
             // No SaveScene/SaveAssets call: the identity exists only in the scene copy passed to the build callback.
         }
-        public static void BuildPreparedLinuxDiagnostic()
+        public static void BuildPreparedLinuxDiagnostic() => BuildPreparedDiagnostic(false);
+        static void BuildPreparedDiagnostic(bool android)
         {
-            var diagnostic = new Diagnostic { activeTargetAtEntry=TargetKind(EditorUserBuildSettings.activeBuildTarget) }; inventoryBaselineSizes.Clear();currentDiagnostic=diagnostic;diagnosticContext="PRIMARY";Persist(diagnostic);
+            Check(active == null && currentDiagnostic == null, "ENTRY_PROFILE");
+            androidCandidate = android;
+            var diagnostic = new Diagnostic { label="CANDIDATE_" + CandidatePlatform.ToUpperInvariant() + "_BUILD_DIAGNOSTIC", activeTargetAtEntry=TargetKind(EditorUserBuildSettings.activeBuildTarget) }; inventoryBaselineSizes.Clear();currentDiagnostic=diagnostic;diagnosticContext="PRIMARY";Persist(diagnostic);
             try { BuildPrepared(diagnostic); }
             catch (Exception error)
             {
                 RecordUnhandled(diagnostic,error);
                 throw;
             }
-            finally { Close(); Persist(diagnostic);currentDiagnostic=null;inventoryBaselineSizes.Clear();diagnosticContext="PRIMARY";currentSceneRole="NONE"; }
+            finally { Close(); Persist(diagnostic);currentDiagnostic=null;inventoryBaselineSizes.Clear();diagnosticContext="PRIMARY";currentSceneRole="NONE";androidCandidate=false; }
         }
         static void BuildPrepared(Diagnostic diagnostic)
         {
             Check(active == null && !Application.isPlaying && !BuildPipeline.isBuildingPlayer && Application.unityVersion == "6000.3.19f1", "ENTRY_PROFILE");
-            string requestHash = File.ReadAllText("JourneyEvidence/JourneyPreparation/linux-build-input.sha256").Trim();
+            string requestHash = File.ReadAllText(Path.ChangeExtension(Input,".sha256")).Trim();
             Check(Regex.IsMatch(requestHash,"^[a-f0-9]{64}$") && Hash(Input) == requestHash, "REQUEST_HASH");
             var request = JsonUtility.FromJson<Request>(File.ReadAllText(Input));
-            Check(request != null && request.schema == 1 && request.label == "CANDIDATE_LINUX_DEVELOPMENT_ONLY" && !request.approved && request.development &&
-                request.boundaryNativeCases == 17 && Regex.IsMatch(request.boundaryNativeXmlSha256 ?? "","^[a-f0-9]{64}$") && request.target == "StandaloneLinux64" && request.define == JourneyCandidateLinuxIdentity.Define &&
+            Check(request != null && request.schema == 1 && request.label == "CANDIDATE_" + CandidatePlatform.ToUpperInvariant() + "_DEVELOPMENT_ONLY" && !request.approved && request.development &&
+                request.boundaryNativeCases == 17 && Regex.IsMatch(request.boundaryNativeXmlSha256 ?? "","^[a-f0-9]{64}$") && request.target == CandidateTarget.ToString() && request.define == CandidateDefine &&
                 request.sourceCommit == Environment.GetEnvironmentVariable("GITHUB_SHA") && Regex.IsMatch(request.sourceCommit ?? "","^[a-f0-9]{40}$") &&
                 request.producerRunUrl == "https://github.com/yangerstar1/task-workbench/actions/runs/" + Environment.GetEnvironmentVariable("GITHUB_RUN_ID") &&
                 Regex.IsMatch(request.generatedReceiptSha256 ?? "","^[a-f0-9]{64}$") && request.files != null && request.files.Length > 100 && request.files.Select(p=>p.path).Distinct().Count()==request.files.Length &&
                 request.directories != null && request.directories.Distinct().Count()==request.directories.Length && request.dependencies != null && request.dependencies.Length > 0 && request.scenes != null && request.scenes.Length == 5 &&
                 new HashSet<string>(request.scenes.Select(p=>p.path)).SetEquals(Paths.Concat(new[] { JourneySceneAuthoring.ManifestPath })), "REQUEST_IDENTITY");
-            Check(BuildPipeline.IsBuildTargetSupported(BuildTargetGroup.Standalone,BuildTarget.StandaloneLinux64) && !Directory.Exists(Path.GetDirectoryName(Output)), "TARGET_OUTPUT");
+            Check(BuildPipeline.IsBuildTargetSupported(androidCandidate ? BuildTargetGroup.Android : BuildTargetGroup.Standalone,CandidateTarget) &&
+                (!androidCandidate || EditorUserBuildSettings.activeBuildTarget == BuildTarget.Android) && !Directory.Exists(Path.GetDirectoryName(Output)), "TARGET_OUTPUT");
             var setup = EditorSceneManager.GetSceneManagerSetup(); Check(!setup.Any(s => s.isLoaded && SceneManager.GetSceneByPath(s.path).isDirty), "DIRTY_SCENE");
             var lease = new Lease { request=request,requestHash=requestHash,fingerprint=JourneyContentChecks.BuildFingerprint() }; Verify(lease,false);
             foreach(var pin in request.files.Where(p=>p.path.StartsWith("tasks/desert-rv/unity/Assets/",StringComparison.Ordinal) || p.path.StartsWith("tasks/desert-rv/unity/Packages/",StringComparison.Ordinal) || p.path.StartsWith("tasks/desert-rv/unity/ProjectSettings/",StringComparison.Ordinal)))
@@ -624,19 +628,22 @@ namespace DesertRV.Editor
             diagnostic.performanceResources.packageVerified=true;diagnostic.performanceResources.baselineAbsent=true;diagnostic.performanceResources.status="ARMED";
             var performancePreference=new PerformancePreference();
             byte[] settings = File.ReadAllBytes(Settings);
-            var oldBackend = PlayerSettings.GetScriptingBackend(NamedBuildTarget.Standalone);
+            var namedTarget = androidCandidate ? NamedBuildTarget.Android : NamedBuildTarget.Standalone;
+            var oldBackend = PlayerSettings.GetScriptingBackend(namedTarget);
+            var androidSettings = androidCandidate ? new AndroidCandidateSettings() : null;
             var oldWindow = PlayerSettings.fullScreenMode; int oldWidth=PlayerSettings.defaultScreenWidth,oldHeight=PlayerSettings.defaultScreenHeight;
             string oldProduct=PlayerSettings.productName; bool oldResize=PlayerSettings.resizableWindow; BuildReport result=null;
             try
             {
-                PlayerSettings.SetScriptingBackend(NamedBuildTarget.Standalone,ScriptingImplementation.Mono2x);
-                PlayerSettings.fullScreenMode=FullScreenMode.Windowed;PlayerSettings.defaultScreenWidth=1280;PlayerSettings.defaultScreenHeight=720;
-                PlayerSettings.productName="DESERTRV_JOURNEY_CANDIDATE";PlayerSettings.resizableWindow=false;
+                PlayerSettings.SetScriptingBackend(namedTarget,androidCandidate ? ScriptingImplementation.IL2CPP : ScriptingImplementation.Mono2x);
+                if(androidCandidate) androidSettings.Apply(request.sourceCommit);
+                else { PlayerSettings.fullScreenMode=FullScreenMode.Windowed;PlayerSettings.defaultScreenWidth=1280;PlayerSettings.defaultScreenHeight=720;PlayerSettings.resizableWindow=false; }
+                PlayerSettings.productName="DESERTRV_JOURNEY_CANDIDATE";
                 AssetDatabase.SaveAssets();
                 lease.temporarySettings[Settings]=Hash(Settings);active=lease;
-                string[] defines={JourneyCandidateLinuxIdentity.Define};Check(ValidBuildProfile(BuildTarget.StandaloneLinux64,CandidateOptions,defines),"BUILD_PROFILE");
+                string[] defines={CandidateDefine};Check(androidCandidate ? ValidAndroidBuildProfile(CandidateTarget,CandidateOptions,defines) : ValidBuildProfile(CandidateTarget,CandidateOptions,defines),"BUILD_PROFILE");
                 currentSceneRole="NONE";diagnostic.activeTargetBeforeBuild=TargetKind(EditorUserBuildSettings.activeBuildTarget);diagnostic.stage="BUILD_PLAYER_ENTERED";Persist(diagnostic);
-                result=BuildPipeline.BuildPlayer(new BuildPlayerOptions { scenes=Paths,target=BuildTarget.StandaloneLinux64,locationPathName=Output,options=CandidateOptions,extraScriptingDefines=defines });
+                result=BuildPipeline.BuildPlayer(new BuildPlayerOptions { scenes=Paths,target=CandidateTarget,locationPathName=Output,options=CandidateOptions,extraScriptingDefines=defines });
                 diagnostic.stage="BUILD_PLAYER_RETURNED";diagnostic.activeTargetAfterBuild=TargetKind(EditorUserBuildSettings.activeBuildTarget);diagnostic.leaseActiveAtBuildReturn=active!=null;Report(result,diagnostic);Persist(diagnostic);
                 Check(result != null && result.summary.result==BuildResult.Succeeded && lease.processed.SetEquals(Paths),"BUILD_OR_SCENE_FAILED");
                 VerifyPackedPerformanceExclusion(result,diagnostic.performanceResources,lease.processed.ToArray());
@@ -652,8 +659,9 @@ namespace DesertRV.Editor
                 try
                 {
                     performancePreference.Restore();diagnostic.performanceResources.preferenceRestored=true;
-                    PlayerSettings.SetScriptingBackend(NamedBuildTarget.Standalone,oldBackend);PlayerSettings.fullScreenMode=oldWindow;
-                    PlayerSettings.defaultScreenWidth=oldWidth;PlayerSettings.defaultScreenHeight=oldHeight;PlayerSettings.productName=oldProduct;PlayerSettings.resizableWindow=oldResize;
+                    PlayerSettings.SetScriptingBackend(namedTarget,oldBackend);androidSettings?.Restore();
+                    if(!androidCandidate) { PlayerSettings.fullScreenMode=oldWindow;PlayerSettings.defaultScreenWidth=oldWidth;PlayerSettings.defaultScreenHeight=oldHeight;PlayerSettings.resizableWindow=oldResize; }
+                    PlayerSettings.productName=oldProduct;
                     AssetDatabase.SaveAssets();
                 }
                 catch (Exception error) { RememberFailure(diagnostic,"RESTORATION","UNCLASSIFIED_EXCEPTION",ExceptionKind(error));throw; }
@@ -671,7 +679,7 @@ namespace DesertRV.Editor
                 }
             }
             diagnosticContext="PRIMARY";
-            PersistJson("JourneyEvidence/JourneyPreparation/linux-build-receipt.json",JsonUtility.ToJson(new Result { sourceCommit=request.sourceCommit,producerRunUrl=request.producerRunUrl,
+            PersistJson("JourneyEvidence/JourneyPreparation/" + CandidatePlatform + "-build-receipt.json",JsonUtility.ToJson(new Result { label="CANDIDATE_" + CandidatePlatform.ToUpperInvariant() + "_DEVELOPMENT_BUILT_UNREVIEWED",target=CandidateTarget.ToString(),backend=androidCandidate ? "IL2CPP" : "Mono2x",define=CandidateDefine,executable=CandidateExecutable,temporarySettingsApiFields=androidCandidate ? AndroidCandidateSettings.Fields : new Result().temporarySettingsApiFields,sourceCommit=request.sourceCommit,producerRunUrl=request.producerRunUrl,
                 restorationProof=request.restorationProof ?? new JourneyCandidateAssetIntegration.FilePin { path="",sha256="" },assetProducerSourceCommit=request.assetProducerSourceCommit ?? "",assetProducerRunUrl=request.assetProducerRunUrl ?? "",restorationNativeXmlSha256=request.restorationNativeXmlSha256 ?? "",generatedReceiptSha256=request.generatedReceiptSha256,boundaryNativeXmlSha256=request.boundaryNativeXmlSha256,boundaryNativeCases=request.boundaryNativeCases,requestSha256=requestHash,executableSha256=Hash(Output),settingsRestored=true,sourceBytesUnchanged=true,scenes=Paths },true));
             diagnostic.stage="RECEIPT_WRITTEN";diagnostic.receiptWritten=true;Persist(diagnostic);
         }
