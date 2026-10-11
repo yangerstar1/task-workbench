@@ -338,8 +338,12 @@ namespace DesertRV.Tests
             // Compare the complete existing binding, including all enemy/supply references,
             // while omitting only the newly authorized support array.
             var values = new List<string>(); var serialized = new SerializedObject(binding); var p = serialized.GetIterator();
-            while (p.Next(true))
+            bool enterChildren = true;
+            while (p.Next(enterChildren))
             {
+                // Compare the reference's stable target below, not its transient native
+                // handle children (.m_FileID was observed changing on ordinary reload).
+                enterChildren = p.propertyType != SerializedPropertyType.ObjectReference;
                 if (p.propertyPath == "pouncerSupportSurfaces" || p.propertyPath.StartsWith("pouncerSupportSurfaces.", StringComparison.Ordinal)) continue;
                 int count = values.Count;
                 if (p.propertyType == SerializedPropertyType.ObjectReference) values.Add(p.propertyPath + "=" + Reference(p.objectReferenceValue));
@@ -579,7 +583,28 @@ namespace DesertRV.Tests
                     result.failureStage = "scene-open";
                     opened = EditorSceneManager.OpenScene(ScenePaths[i], OpenSceneMode.Single); Ordinary(opened, ScenePaths[i]);
                     result.failureStage = "before-snapshot";
-                    var binding = Binding(opened, i + 1); var before = Snapshot(opened, binding);
+                    var binding = Binding(opened, i + 1);
+                    if (i == 0)
+                    {
+                        // A real target change must still fail both representations. This
+                        // in-memory negative control is restored before baseline or saving.
+                        var field = binding.GetType().GetField("spawn");
+                        var original = (Transform)field.GetValue(binding); var replacement = (Transform)Field(binding, "exit");
+                        Assert.That(original && replacement && original != replacement && replacement.gameObject.scene == opened, Is.True,
+                            "Reference snapshot control requires two distinct scene targets.");
+                        string bindingBefore = BindingState(binding, new List<BindingProbe>());
+                        string serializedBefore = SerializedState(binding, NormalizedReference);
+                        try
+                        {
+                            field.SetValue(binding, replacement);
+                            Assert.That(BindingState(binding, new List<BindingProbe>()), Is.Not.EqualTo(bindingBefore), "Changed reference target must change binding snapshot.");
+                            Assert.That(SerializedState(binding, NormalizedReference), Is.Not.EqualTo(serializedBefore), "Changed reference target must change serialized snapshot.");
+                        }
+                        finally { field.SetValue(binding, original); }
+                        Assert.That(BindingState(binding, new List<BindingProbe>()), Is.EqualTo(bindingBefore), "Reference control must restore binding snapshot.");
+                        Assert.That(SerializedState(binding, NormalizedReference), Is.EqualTo(serializedBefore), "Reference control must restore serialized snapshot.");
+                    }
+                    var before = Snapshot(opened, binding);
                     Check(All(opened, Runtime("PouncerGroundSupport")).Length == 0, "PREPARED_SCENE_ALREADY_DERIVED");
                     result.failureStage = "binder"; binder.Invoke(null, new object[] { binding }); VerifyBindings(opened, binding);
                     result.failureStage = "after-snapshot"; Unchanged(before, Snapshot(opened, binding));

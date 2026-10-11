@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.IO;
 using System.Reflection;
 using NUnit.Framework;
 using Unity.Collections;
@@ -141,6 +142,7 @@ namespace DesertRV.Tests
                     "; otherPhysicsEqualsDefault=" + otherScene.GetPhysicsScene().Equals(Physics.defaultPhysicsScene);
             }
             readonly List<Scene> ownedScenes = new List<Scene>();
+            readonly List<string> ownedSceneAssets = new List<string>();
             readonly Scene originalActive;
             readonly string controllerPath = "Assets/__PouncerPawNative_" + Guid.NewGuid().ToString("N") + ".controller";
             AnimationClip clip;
@@ -264,18 +266,54 @@ namespace DesertRV.Tests
                     "; before=" + before.handle + "; after=" + after.handle +
                     "; setterCalled=" + requested + "; setterReturned=" + accepted);
             }
+            void RequireOnlyOwnedOrdinaryScenes(bool requireSaved)
+            {
+                for (int i = 0; i < SceneManager.sceneCount; i++)
+                {
+                    var scene = SceneManager.GetSceneAt(i);
+                    Assert.That(scene.IsValid() && scene.isLoaded && OwnsScene(scene) && !EditorSceneManager.IsPreviewScene(scene),
+                        Is.True, "Ordinary fixture operation must not replace or save an unowned scene; handle=" + scene.handle);
+                    if (requireSaved)
+                        Assert.That(ownedSceneAssets.Contains(scene.path) && File.Exists(scene.path) && File.Exists(scene.path + ".meta"),
+                            Is.True, "Additive creation requires every existing owned scene to have a real saved path.");
+                }
+            }
             public Scene CreateOwnedScene()
             {
-                // Original model tests retain their proven preview path. Capsule tests opt
-                // into ordinary Editor scenes inside a separate batch-safe recovery scope.
-                var scene = ordinaryEditorScene
-                    ? EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Additive)
-                    : EditorSceneManager.NewPreviewScene();
-                ownedScenes.Add(scene); // Register before any validation or object creation.
+                Scene scene;
+                if (!ordinaryEditorScene) scene = EditorSceneManager.NewPreviewScene();
+                else if (ownedScenes.Count == 0)
+                {
+                    // The outer scope already protected the original setup and made this
+                    // unique empty Single scene. Take ownership instead of adding to Untitled.
+                    Assert.That(SceneManager.sceneCount, Is.EqualTo(1));
+                    scene = SceneManager.GetActiveScene();
+                    RequireActiveScene(scene, "Take ownership of the isolated empty scene");
+                    Assert.That(EditorSceneManager.IsPreviewScene(scene), Is.False);
+                    Assert.That(scene.path, Is.Empty);
+                    Assert.That(scene.rootCount, Is.Zero);
+                }
+                else
+                {
+                    // Geometry may be dirty in memory; its empty scene already has a path.
+                    // Never save runtime meshes just to permit the foreign-scene negative case.
+                    RequireOnlyOwnedOrdinaryScenes(true);
+                    scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Additive);
+                }
+                ownedScenes.Add(scene); // Register before validation, saving, or object creation.
                 if (ordinaryEditorScene)
                 {
                     Assert.That(!EditorSceneManager.IsPreviewScene(scene) && scene.GetPhysicsScene().Equals(Physics.defaultPhysicsScene), Is.True);
                     RequireActiveScene(scene, "Owned ordinary scene must receive newly constructed objects");
+                    Assert.That(scene.rootCount, Is.Zero, "Save only the empty fixture scene, before runtime geometry exists.");
+                    string path = "Assets/__PouncerPawNativeScene_" + Guid.NewGuid().ToString("N") + ".unity";
+                    Assert.That(File.Exists(path) || File.Exists(path + ".meta"), Is.False);
+                    ownedSceneAssets.Add(path); // Own a partly written asset if SaveScene fails.
+                    Assert.That(EditorSceneManager.SaveScene(scene, path, false), Is.True);
+                    Assert.That(scene.path, Is.EqualTo(path));
+                    Assert.That(File.Exists(path) && File.Exists(path + ".meta"), Is.True);
+                    Assert.That(scene.rootCount, Is.Zero);
+                    RequireActiveScene(scene, "Saved empty fixture scene remains active");
                 }
                 return scene;
             }
@@ -434,17 +472,15 @@ namespace DesertRV.Tests
                 if (disposed) return; disposed = true;
                 var errors = new List<Exception>();
                 void Attempt(Action action) { try { action(); } catch (Exception error) { errors.Add(error); } }
-                // Never try to close the last ordinary scene. An empty initial Untitled can
-                // be replaced by Unity when adding a scene; the outer batch scope restores
-                // the named setup or keeps its verified recovery copy plus an empty scene.
-                if (ordinaryEditorScene) Attempt(() => {
-                    if (originalActive.IsValid() && originalActive.isLoaded && !OwnsScene(originalActive))
-                        RequireActiveScene(originalActive, "Restore original active scene");
-                    else
-                    {
-                        var keeper = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Additive);
-                        RequireActiveScene(keeper, "Keep a loaded active scene before closing owned scenes");
-                    }
+                // Match the passed Tracer fixture: Single unloads even dirty owned scenes
+                // before deleting their assets, and leaves a clean empty scene for outer recovery.
+                // Before ownership was acquired, construction failure must not replace anything.
+                if (ordinaryEditorScene && ownedScenes.Count != 0) Attempt(() => {
+                    RequireOnlyOwnedOrdinaryScenes(false);
+                    var empty = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
+                    RequireActiveScene(empty, "Empty scene after unloading owned fixtures");
+                    Assert.That(empty.rootCount, Is.Zero); Assert.That(empty.path, Is.Empty);
+                    Assert.That(empty.isDirty, Is.False);
                 });
                 Attempt(() => { if (Root) UnityEngine.Object.DestroyImmediate(Root); });
                 Attempt(() => { if (Source) UnityEngine.Object.DestroyImmediate(Source); });
@@ -468,6 +504,13 @@ namespace DesertRV.Tests
                         Assert.That(!scene.IsValid() || !scene.isLoaded, Is.True, "Owned scene remains loaded after cleanup.");
                     });
                 }
+                foreach (string path in ownedSceneAssets) Attempt(() => {
+                    Assert.That(SceneManager.GetSceneByPath(path).IsValid(), Is.False,
+                        "Retain the owned scene asset while its scene remains loaded: " + path);
+                    if (File.Exists(path) || File.Exists(path + ".meta"))
+                        Assert.That(AssetDatabase.DeleteAsset(path), Is.True, "Owned empty scene deletion failed: " + path);
+                    Assert.That(File.Exists(path) || File.Exists(path + ".meta"), Is.False);
+                });
                 if (errors.Count != 0) throw new AggregateException("Paw fixture cleanup failed.", errors);
             }
         }
