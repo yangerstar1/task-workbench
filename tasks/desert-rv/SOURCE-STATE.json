@@ -76,7 +76,7 @@
     },
     {
       "path": ".github/workflows/desert-rv-pouncer-ground-support.yml",
-      "sha256": "1f789cbf240206911caf89cbdfff092fde26386e9192cffd5a73d8efed6c5fcb",
+      "sha256": "8debeecc3e5788dcf74e6c423b191fa5e2a80865b4d5edee3dacca6775109d33",
       "size": 10408
     },
     {
@@ -506,8 +506,8 @@
     },
     {
       "path": "tasks/desert-rv/scripts/journey_pouncer_ground_support_probe.py",
-      "sha256": "ef5c3fda917f336a7090434f1a8087c8ef883b9f1326e50b65f1133874026f74",
-      "size": 52447
+      "sha256": "908fcfaf2c4465b4ebf4d8ec628eb4975f56329395ee89ce9ad3646648a5f020",
+      "size": 52113
     },
     {
       "path": "tasks/desert-rv/scripts/journey_pouncer_support_reports.py",
@@ -5656,8 +5656,8 @@
     },
     {
       "path": "tasks/desert-rv/unity/Assets/DesertRV/Tests/PlayMode/JourneyR3ContinuousContactTests.cs",
-      "sha256": "4021cc235f7c445a840d94ce6acd76a57dbf2cd381140715d8828a119b45cc36",
-      "size": 43926
+      "sha256": "c524bc5705ac61b6b8416ecf999cfc71f378240d232b2234442bc2291eac453b",
+      "size": 47365
     },
     {
       "path": "tasks/desert-rv/unity/Assets/DesertRV/Tests/PlayMode/JourneyR3ContinuousContactTests.cs.meta",

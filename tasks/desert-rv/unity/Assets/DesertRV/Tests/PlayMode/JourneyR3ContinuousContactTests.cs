@@ -460,9 +460,58 @@ namespace DesertRV.Tests
         [UnityTearDown] public IEnumerator Cleanup()
         {
             recording=false;
+            bool finalPawsObserved=report==null || report.status!="completed";
             if(adapter && observerHost){Call(adapter,"DetachEditorReplay",observerHost);report.replayDetached=!(bool)Get(adapter,"EditorReplayActive");}
             if(motor && contactListener!=null)motor.GetType().GetEvent("ObstacleContact").RemoveEventHandler(motor,contactListener);
             if(actions && arcListener!=null)actions.GetType().GetEvent("ArcPresented").RemoveEventHandler(actions,arcListener);
+            // Let the last recorded Update frame finish its ordinary paw LateUpdate with
+            // its director and PhysicsScene intact. This released-input cleanup wait is not
+            // part of the 1212-frame recording; all native errors still fail the test.
+            if(ownsR3)
+            {
+                regionScene=SceneManager.GetSceneByPath(R3);
+                if(regionScene.IsValid()&&regionScene.isLoaded)
+                {
+                    int lastRecordedFrame=report==null ? -1 : report.sequences.SelectMany(s=>s.frames).Select(f=>f.frame).DefaultIfEmpty(-1).Last();
+                    int waitFrame=Time.frameCount;
+                    var eligible=Array.Empty<Component>(); bool witnessReadFailed=false;
+                    try
+                    {
+                        eligible=Components(regionScene,"PouncerPawContactConstraint").Where(p=>
+                        {
+                            var animation=(Animator)Field(p,"animator");
+                            return ((Behaviour)p).isActiveAndEnabled && animation && animation.isActiveAndEnabled &&
+                                animation.speed>0 && Time.timeScale>0;
+                        }).ToArray();
+                    }
+                    catch { witnessReadFailed=true; }
+                    yield return null;
+                    int freshValidCount=0,missingCount=0,minReportFrame=-1,maxReportFrame=-1;
+                    foreach(var paw in eligible)
+                    {
+                        try
+                        {
+                            object last=paw ? Field(paw,"lastReport") : null;
+                            if(last==null){missingCount++;continue;}
+                            int observed=(int)Field(last,"frame");
+                            minReportFrame=minReportFrame<0 ? observed : Mathf.Min(minReportFrame,observed);
+                            maxReportFrame=Mathf.Max(maxReportFrame,observed);
+                            if(observed>=waitFrame && observed>=lastRecordedFrame && (bool)Field(last,"valid") && !(bool)Get(paw,"HasFailure"))freshValidCount++;
+                        }
+                        catch { witnessReadFailed=true;missingCount++; }
+                    }
+                    finalPawsObserved=!witnessReadFailed && missingCount==0 && freshValidCount==eligible.Length &&
+                        (eligible.Length>0 || report==null || report.status!="completed");
+                    Debug.Log("R3 final paw observation: recordedFrame="+lastRecordedFrame+"; waitFrame="+waitFrame+
+                        "; minReportFrame="+minReportFrame+"; maxReportFrame="+maxReportFrame+"; eligibleCount="+eligible.Length+
+                        "; freshValidCount="+freshValidCount+"; missingCount="+missingCount+"; witnessReadFailed="+witnessReadFailed);
+                }
+                // Match RegionLoader: stop the owned environment before destroying its
+                // session or unloading its scene. Recheck after the cleanup wait.
+                regionScene=SceneManager.GetSceneByPath(R3);
+                if(regionScene.IsValid()&&regionScene.isLoaded)
+                    foreach(var root in regionScene.GetRootGameObjects())if(root.activeSelf)root.SetActive(false);
+            }
             if(director)Object.DestroyImmediate(director.gameObject);
             if(originalActive.IsValid() && originalActive.isLoaded)SceneManager.SetActiveScene(originalActive);
             if(ownsR3){regionScene=SceneManager.GetSceneByPath(R3);if(regionScene.IsValid()&&regionScene.isLoaded)yield return SceneManager.UnloadSceneAsync(regionScene);}
@@ -476,6 +525,7 @@ namespace DesertRV.Tests
                 Write();Assert.That(report.sceneUnloaded&&report.sourceFilesUnchanged&&report.timeRestored,Is.True,"CLEANUP_OR_SOURCE_MUTATION");
             }
             Cursor.lockState=oldLock;Cursor.visible=oldCursor;
+            Assert.That(finalPawsObserved,Is.True,"FINAL_RECORDED_PAW_LATEUPDATE_MISSING_OR_FAILED");
         }
     }
 }
