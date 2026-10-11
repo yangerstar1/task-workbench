@@ -189,6 +189,88 @@ class DiagnosticExportTests(unittest.TestCase):
    changed=dict(self.value,**{key:val})
    with self.assertRaisesRegex(Exception,'DIAGNOSTIC_SCHEMA'):r.bounded_native_diagnostic(changed)
 
+class AssetLifecycleDiagnosticTests(unittest.TestCase):
+ def setUp(self):
+  DiagnosticExportTests.setUp(self)
+  # Synthetic objects use one known dependency path to exercise object/path distinction without guessing the real five objects.
+  self.name='Assets/DesertRV/Fixture.asset';self.expected={self.name:dict(path=self.name,sha256='a'*64,bytes=12)}
+  patch=mock.patch.object(r,'diagnostic_dependencies',return_value=self.expected);patch.start();self.addCleanup(patch.stop)
+  self.first=dict(path=self.name,type='UnityEngine.Material',captureGateMembership='UNKNOWN',identityState='RESOLVED',guid='1'*32,localId=2100000,dirty='DIRTY',transition='PREEXISTING',diskState='AVAILABLE',sha256='a'*64,bytes=12)
+  self.second=dict(self.first,localId=2100001)
+  self.value.update(schema=2,stage='WORLD_HUD_CAPTURE',errorClass='DIRTY_DEPENDENCY',assetLifecycle=[self.snapshot(0,'RESTORATION_ENTRY',[self.first,self.second])])
+  patch=mock.patch.object(r,'ANDROID',True);patch.start();self.addCleanup(patch.stop)
+ def snapshot(self,index,stage,dirty=(),cleared=(),unobserved=(),changes=()):
+  return dict(sequence=index,stage=stage,status='CAPTURED',errorCode='NONE',preexistingBaseline=index==0,captureGateBound=False,captureGateObjectCount=0,declaredDependencyCount=len(self.expected),observedPathCount=1 if dirty or cleared or unobserved else 0,objectCount=len(dirty),distinctPathCount=len({x['path'] for x in dirty}),enteredDirtyCount=sum(x['transition']=='ENTERED' for x in dirty),retainedDirtyCount=sum(x['transition']=='RETAINED' for x in dirty),clearedCount=len(cleared),unobservedCount=len(unobserved),diskMismatchCount=0,diskUnavailableCount=0,dirtyDependencies=list(dirty),clearedDependencies=list(cleared),unobservedDependencies=list(unobserved),diskChanges=list(changes))
+ def test_lifecycle_preserves_two_objects_one_path_and_unobserved_is_not_clean(self):
+  retained=dict(self.first,transition='RETAINED');unloaded=dict(self.second,dirty='NOT_OBSERVED',transition='UNOBSERVED')
+  self.value['assetLifecycle'].append(self.snapshot(1,'CAPTURE_ENTRY',[retained],unobserved=[unloaded]))
+  r.DIAGNOSTIC.write_text(json.dumps(self.value));receipt=r.diagnose()
+  self.assertFalse(receipt['buildReady']);self.assertEqual(1,len(receipt['files']));self.assertEqual(self.value,json.loads((r.EXPORT/'native-diagnostic.json').read_text()))
+ def test_lifecycle_can_report_cleared_only_as_observed_clean(self):
+  cleared=[dict(x,dirty='CLEAN',transition='CLEARED') for x in (self.first,self.second)]
+  self.value['assetLifecycle'].append(self.snapshot(1,'CAPTURE_ENTRY',cleared=cleared));r.bounded_native_diagnostic(self.value)
+  self.value['assetLifecycle'][1]['clearedDependencies'][0]['dirty']='NOT_OBSERVED'
+  with self.assertRaisesRegex(Exception,'LIFECYCLE_OBJECT'):r.bounded_native_diagnostic(self.value)
+ def test_current_android_export_cannot_downgrade_to_historical_schema(self):
+  self.value.pop('assetLifecycle');self.value['schema']=1;r.DIAGNOSTIC.write_text(json.dumps(self.value));receipt=r.diagnose()
+  self.assertEqual([],receipt['files']);self.assertEqual('DIAGNOSTIC_SCHEMA_REJECTED',receipt['failure']['errorCode'])
+ def test_lifecycle_missing_empty_unknown_fields_and_stages_reject(self):
+  import copy
+  for change in (lambda v:v.pop('assetLifecycle'),lambda v:v.update(assetLifecycle=[]),lambda v:v['assetLifecycle'][0].update(privateLog='not-public'),lambda v:v['assetLifecycle'][0].update(stage='PRIVATE')):
+   bad=copy.deepcopy(self.value);change(bad)
+   with self.subTest(value=bad),self.assertRaises(Exception):r.bounded_native_diagnostic(bad)
+ def test_lifecycle_unknown_path_type_guid_count_sequence_and_identity_reject(self):
+  import copy
+  for target,key,value in [('row','path','/private/unknown'),('row','type','Type /private'),('row','guid','not-guid'),('row','localId',True),('snapshot','objectCount',1),('snapshot','sequence',1),('root','sourceCommit','d'*40)]:
+   bad=copy.deepcopy(self.value);part=bad if target=='root' else bad['assetLifecycle'][0] if target=='snapshot' else bad['assetLifecycle'][0]['dirtyDependencies'][0];part[key]=value
+   with self.subTest(key=key),self.assertRaises(Exception):r.bounded_native_diagnostic(bad)
+ def test_lifecycle_lost_object_and_duplicate_resolved_identity_reject(self):
+  self.value['assetLifecycle'].append(dict(self.snapshot(1,'CAPTURE_ENTRY'),observedPathCount=1))
+  with self.assertRaisesRegex(Exception,'LOST_OBJECT'):r.bounded_native_diagnostic(self.value)
+  self.value['assetLifecycle']=[self.snapshot(0,'RESTORATION_ENTRY',[self.first,self.first])]
+  with self.assertRaisesRegex(Exception,'DUPLICATE'):r.bounded_native_diagnostic(self.value)
+ def test_lifecycle_unavailable_identity_duplicates_remain_observed(self):
+  unknown=dict(self.first,identityState='UNAVAILABLE',guid='',localId=0)
+  self.value['assetLifecycle']=[self.snapshot(0,'RESTORATION_ENTRY',[unknown,unknown])];r.bounded_native_diagnostic(self.value)
+  self.assertEqual(2,self.value['assetLifecycle'][0]['objectCount']);self.assertEqual(1,self.value['assetLifecycle'][0]['distinctPathCount'])
+ def test_lifecycle_disk_changes_must_match_producer_then_previous_sample(self):
+  change=dict(path=self.name,beforeState='AVAILABLE',beforeSha256='a'*64,beforeBytes=12,afterState='AVAILABLE',afterSha256='b'*64,afterBytes=13)
+  self.value['assetLifecycle']=[self.snapshot(0,'RESTORATION_ENTRY',[dict(self.first,sha256='b'*64,bytes=13)],changes=[change])];self.value['assetLifecycle'][0]['diskMismatchCount']=1
+  r.bounded_native_diagnostic(self.value)
+  change['beforeSha256']='f'*64
+  with self.assertRaisesRegex(Exception,'DISK_CHAIN'):r.bounded_native_diagnostic(self.value)
+ def test_early_android_argument_failure_remains_schema2_without_claiming_identity(self):
+  self.value.update(stage='INPUT',producerRunUrl='',consumerIdentityMatched=False,runIdentity='UNVALIDATED',errorClass='DIAGNOSTIC_ARGUMENT',dependencyExpectedCount=0,dependencyActualCount=0,assetLifecycle=[])
+  r.DIAGNOSTIC.write_text(json.dumps(self.value));receipt=r.diagnose();self.assertFalse(receipt['buildReady']);self.assertEqual(1,len(receipt['files']))
+  self.assertEqual(self.value,json.loads((r.EXPORT/'native-diagnostic.json').read_text()))
+ def test_android_diagnostic_schema_argument_is_explicit_container_parameter(self):
+  import yaml
+  root=Path(__file__).resolve().parents[4];workflow=yaml.safe_load((root/'.github/workflows/desert-rv-journey-android.yml').read_text());native=next(s for s in workflow['jobs']['prepare']['steps'] if s.get('id')=='restore_native')
+  args=native['with']['customParameters'].split();self.assertEqual(1,args.count('-journeyRestorationDiagnosticSchema'));self.assertEqual('2',args[args.index('-journeyRestorationDiagnosticSchema')+1]);self.assertEqual(1,args.count('-journeyRestorationRunId'))
+ def test_gate_membership_bound_at_original_gate_preserves_object_scope(self):
+  bound=[dict(self.first,transition='RETAINED',captureGateMembership='INCLUDED'),dict(self.second,transition='RETAINED',captureGateMembership='INCLUDED')]
+  sample=self.snapshot(1,'CAPTURE_GATE_BEFORE',bound);sample.update(captureGateBound=True,captureGateObjectCount=2);self.value['assetLifecycle'].append(sample)
+  r.bounded_native_diagnostic(self.value)
+  sample['captureGateObjectCount']=1
+  with self.assertRaisesRegex(Exception,'LIFECYCLE_COUNTS'):r.bounded_native_diagnostic(self.value)
+ def test_schema2_fixed_size_budget_allows_128k_to_512k_without_truncation(self):
+  raw=json.dumps(self.value);r.DIAGNOSTIC.write_text(raw+' '*(129*1024-len(raw)))
+  receipt=r.diagnose();self.assertEqual(1,len(receipt['files']));self.assertEqual(self.value,json.loads((r.EXPORT/'native-diagnostic.json').read_text()))
+ def test_schema2_oversize_is_rejected_with_specific_code(self):
+  raw=json.dumps(self.value);r.DIAGNOSTIC.write_text(raw+' '*(512*1024+1-len(raw)))
+  receipt=r.diagnose();self.assertEqual([],receipt['files']);self.assertEqual('RESTORE_DIAGNOSTIC_SIZE',receipt['failure']['errorCode'])
+ def test_first_success_after_failed_entry_remains_preexisting_baseline(self):
+  failed=self.snapshot(0,'RESTORATION_ENTRY');failed.update(status='FAILED',errorCode='IO')
+  baseline=self.snapshot(1,'RESTORATION_SCENE_RESTORE_BEFORE',[self.first,self.second]);baseline['preexistingBaseline']=True
+  self.value['assetLifecycle']=[failed,baseline];r.bounded_native_diagnostic(self.value)
+  baseline['preexistingBaseline']=False
+  with self.assertRaisesRegex(Exception,'LIFECYCLE_SEQUENCE'):r.bounded_native_diagnostic(self.value)
+ def test_lifecycle_failed_snapshot_is_explicit_and_does_not_invent_clean(self):
+  failure=self.snapshot(1,'POSES_AFTER');failure.update(status='FAILED',errorCode='IO');self.value['assetLifecycle'].append(failure)
+  self.value['assetLifecycle'].append(self.snapshot(2,'RESTORATION_SCENE_RESTORE_BEFORE',[dict(x,transition='RETAINED') for x in (self.first,self.second)]));r.bounded_native_diagnostic(self.value)
+  failure['objectCount']=1
+  with self.assertRaisesRegex(Exception,'LIFECYCLE_FAILED'):r.bounded_native_diagnostic(self.value)
+
 class NativeReportTests(unittest.TestCase):
  def setUp(self):
   self.tmp=tempfile.TemporaryDirectory();self.addCleanup(self.tmp.cleanup);root=Path(self.tmp.name);project=root/'tasks/desert-rv/unity';project.mkdir(parents=True)

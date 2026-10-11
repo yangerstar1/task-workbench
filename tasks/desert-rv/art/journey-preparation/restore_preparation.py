@@ -18,7 +18,7 @@ PRODUCER=dict(repository='yangerstar1/task-workbench',runId=37923953772,runAttem
  generatedReceiptSha256='2b5e06b3b5dfcfb5a53afc3ff750b4eb8f460b222dc1abdca5974fc6c4702526',sourceStateSha256='c33b884bd4caaf3fb8d310cebbc0b8de62b52c61cd483cd39a846e245425205b')
 # This is the sole additional consumer: one reviewed Android request and producer.
 # The historical Linux profile remains byte-for-byte pinned below this selection.
-ANDROID_REQUEST_ID = 'desert-rv-journey-android-c15-restored-r1-20261011-once'
+ANDROID_REQUEST_ID = 'desert-rv-journey-android-c15-restored-r2-20261011-once'
 ANDROID = os.environ.get('JOURNEY_ANDROID_RESTORATION') == ANDROID_REQUEST_ID
 if ANDROID:
  POLICY='tasks/desert-rv/art/journey-preparation/android-restoration-transition.json'
@@ -387,10 +387,92 @@ def finish(native):
 DIAGNOSTIC=PRIVATE/'restoration-diagnostic.json'
 HOST_STATUS=TASK/'journey-restoration-status.json'
 DIAGNOSTIC_STAGES={'INPUT','INVENTORY','SOURCE_PROOF','STRICT_BUNDLES','DEPENDENCIES','GENERATED_BYTES','SELECTION','POSES','GROUNDING','IMPORTER_IDENTITIES','SAVED_BINDINGS','WORLD_HUD_CAPTURE','FINAL_PROTECTION','PROOF','COMPLETED'}
-DIAGNOSTIC_ERRORS={'RUN_ID_ARGUMENT','NONE','IMPORTER_IDENTITY','DEPENDENCY_BYTES','VALIDATION','IO','UNAUTHORIZED','OTHER'}
+DIAGNOSTIC_ERRORS={'DIAGNOSTIC_ARGUMENT','RUN_ID_ARGUMENT','NONE','IMPORTER_IDENTITY','DEPENDENCY_BYTES','DIRTY_DEPENDENCY','ASSET_LIFECYCLE','VALIDATION','IO','UNAUTHORIZED','OTHER'}
+ASSET_LIFECYCLE_ORDER=('RESTORATION_ENTRY','DEPENDENCIES_BEFORE','DEPENDENCIES_AFTER','POSES_BEFORE','POSES_AFTER','GROUNDING_BEFORE','GROUNDING_AFTER','IMPORTER_IDENTITIES_BEFORE','IMPORTER_IDENTITIES_AFTER','SAVED_ROOT_IDENTITIES_BEFORE','SAVED_ROOT_IDENTITIES_AFTER','SAVED_BINDINGS_BEFORE','SAVED_BINDINGS_AFTER','CAPTURE_ENTRY','CAPTURE_GATE_BEFORE','CAPTURE_GATE_AFTER','CAPTURE_REGION_1_BEFORE','CAPTURE_REGION_1_AFTER','CAPTURE_REGION_3_BEFORE','CAPTURE_REGION_3_AFTER','CAPTURE_SCENE_RESTORE_BEFORE','CAPTURE_SCENE_RESTORE_AFTER','RESTORATION_SCENE_RESTORE_BEFORE','RESTORATION_SCENE_RESTORE_AFTER','FINAL_PROTECTION_BEFORE','FINAL_PROTECTION_AFTER')
+ASSET_LIFECYCLE_STAGES=frozenset(ASSET_LIFECYCLE_ORDER)
+BUILTIN_DEPENDENCIES=frozenset(('Resources/unity_builtin_extra','Library/unity default resources'))
+def diagnostic_dependencies():
+ receipt=read(PUBLIC/'generated/receipt.json');require(sha(PUBLIC/'generated/receipt.json')==PRODUCER['generatedReceiptSha256'],'RESTORE_DIAGNOSTIC_ORIGINAL_RECEIPT')
+ native_path=PUBLIC/'generated/native-authored-assets.json';require(sha(native_path)==receipt['nativeManifestSha256'],'RESTORE_DIAGNOSTIC_ORIGINAL_MANIFEST')
+ rows=read(native_path)['dependencies'];expected={x['path']:x for x in rows}
+ require(len(expected)==len(rows) and all(rel(p) and (p.startswith(('Assets/','Packages/')) or p in BUILTIN_DEPENDENCIES) for p in expected),'RESTORE_DIAGNOSTIC_DEPENDENCY_DOMAIN')
+ return expected
+
+def bounded_asset_lifecycle(value):
+ snapshots=value['assetLifecycle']
+ require(type(snapshots) is list and len(snapshots)<=len(ASSET_LIFECYCLE_STAGES),'RESTORE_DIAGNOSTIC_LIFECYCLE_SCHEMA')
+ if not snapshots:
+  require(value['stage']=='INPUT' and not value['completed'],'RESTORE_DIAGNOSTIC_LIFECYCLE_MISSING');return
+ require(value['consumerIdentityMatched'],'RESTORE_DIAGNOSTIC_LIFECYCLE_IDENTITY')
+ expected=diagnostic_dependencies()
+ original={p:('BUILTIN','',0) if p in BUILTIN_DEPENDENCIES else ('AVAILABLE',r['sha256'],r['bytes']) for p,r in expected.items()}
+ disk=dict(original);previous={};stages=set();observed=set();has_baseline=False;gate_bound=False;gate_membership={};identity_context={};stage_index=-1
+ counts=('captureGateObjectCount','observedPathCount','objectCount','distinctPathCount','enteredDirtyCount','retainedDirtyCount','clearedCount','unobservedCount','diskMismatchCount','diskUnavailableCount')
+ keys={'sequence','stage','status','errorCode','preexistingBaseline','captureGateBound','declaredDependencyCount',*counts,'dirtyDependencies','clearedDependencies','unobservedDependencies','diskChanges'}
+ row_keys={'path','type','captureGateMembership','identityState','guid','localId','dirty','transition','diskState','sha256','bytes'}
+ def state(kind,h,size):
+  require(kind in {'AVAILABLE','MISSING','UNREADABLE','UNSAFE','BUILTIN','ERROR'} and type(size) is int and 0<=size<=512*1024**2 and
+          (digest(h) if kind=='AVAILABLE' else h=='' and size==0),'RESTORE_DIAGNOSTIC_LIFECYCLE_DISK')
+  return kind,h,size
+ def identity(row):return row['guid'],row['localId']
+ for sequence,snapshot in enumerate(snapshots):
+  require(type(snapshot) is dict and set(snapshot)==keys and type(snapshot['sequence']) is int and snapshot['sequence']==sequence and snapshot['stage'] in ASSET_LIFECYCLE_STAGES and snapshot['stage'] not in stages and ASSET_LIFECYCLE_ORDER.index(snapshot['stage'])>stage_index and
+          (sequence!=0 or snapshot['stage']=='RESTORATION_ENTRY') and type(snapshot['preexistingBaseline']) is bool and snapshot['preexistingBaseline']==(not has_baseline), 'RESTORE_DIAGNOSTIC_LIFECYCLE_SEQUENCE')
+  stages.add(snapshot['stage']);stage_index=ASSET_LIFECYCLE_ORDER.index(snapshot['stage'])
+  require(type(snapshot['captureGateBound']) is bool and (snapshot['captureGateBound'] or not gate_bound) and
+          (snapshot['captureGateBound']==gate_bound or snapshot['stage']=='CAPTURE_GATE_BEFORE'),'RESTORE_DIAGNOSTIC_LIFECYCLE_GATE_BINDING')
+  gate_bound=snapshot['captureGateBound']
+  require(type(snapshot['declaredDependencyCount']) is int and snapshot['declaredDependencyCount']==len(expected) and all(type(snapshot[k]) is int and 0<=snapshot[k]<=8192 for k in counts),'RESTORE_DIAGNOSTIC_LIFECYCLE_COUNTS')
+  arrays=('dirtyDependencies','clearedDependencies','unobservedDependencies','diskChanges')
+  require(all(type(snapshot[k]) is list and len(snapshot[k])<=8192 for k in arrays),'RESTORE_DIAGNOSTIC_LIFECYCLE_ROWS')
+  require(snapshot['status'] in {'CAPTURED','FAILED'} and snapshot['errorCode'] in {'NONE','IO','UNAUTHORIZED','VALIDATION','OTHER'} and
+          (snapshot['errorCode']=='NONE')==(snapshot['status']=='CAPTURED'),'RESTORE_DIAGNOSTIC_LIFECYCLE_STATUS')
+  if snapshot['status']=='FAILED':
+   require(all(snapshot[k]==0 for k in counts) and all(snapshot[k]==[] for k in arrays),'RESTORE_DIAGNOSTIC_LIFECYCLE_FAILED');continue
+  for name in ('dirtyDependencies','clearedDependencies','unobservedDependencies'):
+   require(all(type(row) is dict and row.get('path') in expected for row in snapshot[name]),'RESTORE_DIAGNOSTIC_LIFECYCLE_OBJECT_PATH')
+   for row in snapshot[name]:
+    observed.add(row['path'])
+    if row['path']+'.meta' in expected:observed.add(row['path']+'.meta')
+  require(snapshot['observedPathCount']==len(observed),'RESTORE_DIAGNOSTIC_LIFECYCLE_COVERAGE')
+  seen_disk=set()
+  for row in snapshot['diskChanges']:
+   require(type(row) is dict and set(row)=={'path','beforeState','beforeSha256','beforeBytes','afterState','afterSha256','afterBytes'} and row['path'] in observed and row['path'] not in seen_disk,'RESTORE_DIAGNOSTIC_LIFECYCLE_DISK_PATH')
+   name=row['path'];seen_disk.add(name)
+   before=state(row['beforeState'],row['beforeSha256'],row['beforeBytes']);after=state(row['afterState'],row['afterSha256'],row['afterBytes'])
+   require(before==disk[name] and before!=after and ((after[0]=='BUILTIN')==(name in BUILTIN_DEPENDENCIES)),'RESTORE_DIAGNOSTIC_LIFECYCLE_DISK_CHAIN');disk[name]=after
+  require(snapshot['diskMismatchCount']==sum(disk[p]!=original[p] for p in observed) and snapshot['diskUnavailableCount']==sum(disk[p][0] not in {'AVAILABLE','BUILTIN'} for p in observed),'RESTORE_DIAGNOSTIC_LIFECYCLE_DISK_COUNTS')
+  current={};removed=set()
+  for array,dirty,transitions in [('dirtyDependencies','DIRTY',{'PREEXISTING'} if not has_baseline else {'ENTERED','RETAINED'}),('clearedDependencies','CLEAN',{'CLEARED'}),('unobservedDependencies','NOT_OBSERVED',{'UNOBSERVED'})]:
+   for row in snapshot[array]:
+    require(type(row) is dict and set(row)==row_keys and row['path'] in expected and not row['path'].endswith('.meta') and isinstance(row['type'],str) and len(row['type'])<=256 and re.fullmatch(r'[A-Za-z_][A-Za-z0-9_.+`]*',row['type']) and
+            row['identityState'] in {'RESOLVED','UNAVAILABLE'} and type(row['localId']) is int and -(2**63)<=row['localId']<2**63 and
+            (digest(row['guid'],32) if row['identityState']=='RESOLVED' else row['guid']=='' and row['localId']==0) and row['dirty']==dirty and row['transition'] in transitions,'RESTORE_DIAGNOSTIC_LIFECYCLE_OBJECT')
+    require(row['captureGateMembership'] in ({'INCLUDED','EXCLUDED'} if gate_bound else {'UNKNOWN'}),'RESTORE_DIAGNOSTIC_LIFECYCLE_GATE_MEMBERSHIP')
+    if gate_bound:
+     require(gate_membership.get(row['path'],row['captureGateMembership'])==row['captureGateMembership'],'RESTORE_DIAGNOSTIC_LIFECYCLE_GATE_MEMBERSHIP');gate_membership[row['path']]=row['captureGateMembership']
+    require(state(row['diskState'],row['sha256'],row['bytes'])==disk[row['path']],'RESTORE_DIAGNOSTIC_LIFECYCLE_OBJECT_DISK')
+    key=identity(row)
+    # Unavailable Unity identities remain visible, including duplicate path/type objects; never invent a stable key.
+    if row['identityState']=='RESOLVED':
+     context=(row['path'],row['type']);require(identity_context.get(key,context)==context,'RESTORE_DIAGNOSTIC_LIFECYCLE_IDENTITY_CHANGED');identity_context[key]=context
+     require(key not in current and key not in removed,'RESTORE_DIAGNOSTIC_LIFECYCLE_DUPLICATE')
+     if dirty=='DIRTY':
+      require(row['transition']==('PREEXISTING' if not has_baseline else 'RETAINED' if key in previous else 'ENTERED'),'RESTORE_DIAGNOSTIC_LIFECYCLE_TRANSITION');current[key]=row
+     else:
+      require(key in previous,'RESTORE_DIAGNOSTIC_LIFECYCLE_TRANSITION');removed.add(key)
+  require(set(previous)-set(current)==removed,'RESTORE_DIAGNOSTIC_LIFECYCLE_LOST_OBJECT')
+  rows=snapshot['dirtyDependencies']
+  require(snapshot['captureGateObjectCount']==sum(row['captureGateMembership']=='INCLUDED' and row['identityState']=='RESOLVED' for row in rows) and snapshot['objectCount']==len(rows) and snapshot['distinctPathCount']==len({r['path'] for r in rows}) and
+          snapshot['enteredDirtyCount']==sum(r['transition']=='ENTERED' for r in rows) and snapshot['retainedDirtyCount']==sum(r['transition']=='RETAINED' for r in rows) and
+          snapshot['clearedCount']==len(snapshot['clearedDependencies']) and snapshot['unobservedCount']==len(snapshot['unobservedDependencies']),'RESTORE_DIAGNOSTIC_LIFECYCLE_COUNTS')
+  previous=current;has_baseline=True
+
 def bounded_native_diagnostic(value):
  keys={'schema','label','sourceCommit','producerRunUrl','stage','completed','importerIdentities','dependencyDifferences','errorClass','dependencyExpectedCount','dependencyActualCount','dependencyAddedCount','dependencyMissingCount','runIdentity','consumerIdentityMatched'}
- require(set(value)==keys and type(value['schema']) is int and value['schema']==1 and value['label']=='RESTORATION_NATIVE_DIAGNOSTIC_ONLY' and value['stage'] in DIAGNOSTIC_STAGES and type(value['completed']) is bool and value['errorClass'] in DIAGNOSTIC_ERRORS,'RESTORE_DIAGNOSTIC_SCHEMA')
+ require(type(value) is dict and type(value.get('schema')) is int and value['schema'] in {1,2},'RESTORE_DIAGNOSTIC_SCHEMA')
+ if value['schema']==2:keys.add('assetLifecycle')
+ require(set(value)==keys and value['label']=='RESTORATION_NATIVE_DIAGNOSTIC_ONLY' and value['stage'] in DIAGNOSTIC_STAGES and type(value['completed']) is bool and value['errorClass'] in DIAGNOSTIC_ERRORS,'RESTORE_DIAGNOSTIC_SCHEMA')
  require(type(value['consumerIdentityMatched']) is bool and value['runIdentity'] in {'UNVALIDATED','MISSING','DUPLICATE','MALFORMED','MISMATCH','MATCHED'},'RESTORE_DIAGNOSTIC_IDENTITY_STATE')
  if value['consumerIdentityMatched']:
   require(value['sourceCommit']==os.environ['GITHUB_SHA'] and value['producerRunUrl']==current_run() and value['runIdentity']=='MATCHED','RESTORE_DIAGNOSTIC_CONSUMER')
@@ -414,6 +496,7 @@ def bounded_native_diagnostic(value):
    require(set(row)=={'path','producerSha256','currentSha256','producerBytes','currentBytes'} and row['path'] in expected,'RESTORE_DIAGNOSTIC_DIFF_PATH')
    old=expected[row['path']]
    require(row['producerSha256']==old['sha256'] and row['producerBytes']==old['bytes'] and (digest(row['currentSha256']) or row['currentSha256']=='' and row['currentBytes']==0) and type(row['currentBytes']) is int and 0<=row['currentBytes']<=128*1024**2,'RESTORE_DIAGNOSTIC_DIFF_PIN')
+ if value['schema']==2:bounded_asset_lifecycle(value)
  return value
 
 def diagnose():
@@ -429,8 +512,13 @@ def diagnose():
   files=[];diagnostic=None
   if DIAGNOSTIC.exists():
    try:
-    require(DIAGNOSTIC.stat().st_size<=128*1024,'RESTORE_DIAGNOSTIC_SIZE');diagnostic=bounded_native_diagnostic(read(DIAGNOSTIC))
-   except Exception:status=dict(command='finish',errorCode='DIAGNOSTIC_SCHEMA_REJECTED')
+    require(DIAGNOSTIC.stat().st_size<=512*1024,'RESTORE_DIAGNOSTIC_SIZE');candidate=read(DIAGNOSTIC)
+    require(DIAGNOSTIC.stat().st_size<=(512 if candidate.get('schema')==2 else 128)*1024,'RESTORE_DIAGNOSTIC_SIZE')
+    require(candidate.get('schema')==(2 if ANDROID else 1),'RESTORE_DIAGNOSTIC_CURRENT_SCHEMA')
+    validated=bounded_native_diagnostic(candidate)
+    require(len((json.dumps(validated,indent=2)+'\n').encode('utf-8'))<=(512 if validated['schema']==2 else 128)*1024,'RESTORE_DIAGNOSTIC_SIZE')
+    diagnostic=validated
+   except Exception as error:status=dict(command='finish',errorCode='RESTORE_DIAGNOSTIC_SIZE' if str(error)=='RESTORE_DIAGNOSTIC_SIZE' else 'DIAGNOSTIC_SCHEMA_REJECTED')
   EXPORT.mkdir()
   if diagnostic is not None:
    write_fresh(EXPORT/'native-diagnostic.json',diagnostic);files.append(generated.record(EXPORT/'native-diagnostic.json','native-diagnostic.json'))

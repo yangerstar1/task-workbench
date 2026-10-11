@@ -63,7 +63,7 @@ namespace DesertRV.Editor
             public string path, producerSha256, currentSha256;
             public long producerBytes, currentBytes;
         }
-        [Serializable] public sealed class Diagnostic
+        [Serializable] public class Diagnostic
         {
             public int schema = 1;
             public string label = "RESTORATION_NATIVE_DIAGNOSTIC_ONLY", sourceCommit, producerRunUrl, stage = "INPUT", errorClass = "NONE", runIdentity = "UNVALIDATED";
@@ -71,9 +71,192 @@ namespace DesertRV.Editor
             public int dependencyExpectedCount, dependencyActualCount, dependencyAddedCount, dependencyMissingCount;
             public ImporterIdentity[] importerIdentities = Array.Empty<ImporterIdentity>();
             public DependencyDifference[] dependencyDifferences = Array.Empty<DependencyDifference>();
+            [NonSerialized] public AssetLifecycleSnapshot[] lifecycleSnapshots = Array.Empty<AssetLifecycleSnapshot>();
+        }
+        [Serializable] sealed class AndroidDiagnostic : Diagnostic
+        {
+            public AssetLifecycleSnapshot[] assetLifecycle = Array.Empty<AssetLifecycleSnapshot>();
+        }
+        [Serializable] public sealed class DirtyDependency
+        {
+            public string path, type, identityState, guid, dirty, transition, diskState, sha256, captureGateMembership;
+            public long localId, bytes;
+        }
+        [Serializable] public sealed class DiskChange
+        {
+            public string path, beforeState, beforeSha256, afterState, afterSha256;
+            public long beforeBytes, afterBytes;
+        }
+        [Serializable] public sealed class AssetLifecycleSnapshot
+        {
+            public int sequence, declaredDependencyCount, observedPathCount, objectCount, distinctPathCount, enteredDirtyCount, retainedDirtyCount,
+                clearedCount, unobservedCount, diskMismatchCount, diskUnavailableCount, captureGateObjectCount;
+            public string stage, status = "CAPTURED", errorCode = "NONE";
+            public bool preexistingBaseline, captureGateBound;
+            public DirtyDependency[] dirtyDependencies = Array.Empty<DirtyDependency>();
+            public DirtyDependency[] clearedDependencies = Array.Empty<DirtyDependency>();
+            public DirtyDependency[] unobservedDependencies = Array.Empty<DirtyDependency>();
+            public DiskChange[] diskChanges = Array.Empty<DiskChange>();
+        }
+        // This observer never loads, imports, saves, serializes or clears a Unity asset.
+        // The host-pinned request supplies the closure before any native GetDependencies query.
+        sealed class AssetLifecycleProbe
+        {
+            sealed class DiskState { public string state, sha256; public long bytes; }
+            sealed class Loaded { public DirtyDependency row; public bool dirty; }
+            readonly Diagnostic diagnostic;
+            readonly Dictionary<string, DependencyPin> declared;
+            readonly Dictionary<string, string> packages = new Dictionary<string, string>(StringComparer.Ordinal);
+            Dictionary<string, DiskState> previousDisk;
+            Dictionary<string, DirtyDependency> previousDirty = new Dictionary<string, DirtyDependency>(StringComparer.Ordinal);
+            bool hasBaseline;
+            HashSet<string> captureGateDependencies;
+            readonly HashSet<string> observedPaths = new HashSet<string>(StringComparer.Ordinal);
+            readonly List<AssetLifecycleSnapshot> snapshots = new List<AssetLifecycleSnapshot>();
+            static readonly HashSet<string> Stages = new HashSet<string>(new[] {
+                "RESTORATION_ENTRY", "DEPENDENCIES_BEFORE", "DEPENDENCIES_AFTER", "POSES_BEFORE", "POSES_AFTER",
+                "GROUNDING_BEFORE", "GROUNDING_AFTER", "IMPORTER_IDENTITIES_BEFORE", "IMPORTER_IDENTITIES_AFTER",
+                "SAVED_ROOT_IDENTITIES_BEFORE", "SAVED_ROOT_IDENTITIES_AFTER", "SAVED_BINDINGS_BEFORE", "SAVED_BINDINGS_AFTER",
+                "CAPTURE_ENTRY", "CAPTURE_GATE_BEFORE", "CAPTURE_GATE_AFTER", "CAPTURE_REGION_1_BEFORE", "CAPTURE_REGION_1_AFTER", "CAPTURE_REGION_3_BEFORE", "CAPTURE_REGION_3_AFTER",
+                "CAPTURE_SCENE_RESTORE_BEFORE", "CAPTURE_SCENE_RESTORE_AFTER", "RESTORATION_SCENE_RESTORE_BEFORE",
+                "RESTORATION_SCENE_RESTORE_AFTER", "FINAL_PROTECTION_BEFORE", "FINAL_PROTECTION_AFTER" }, StringComparer.Ordinal);
+            static bool Builtin(string path) => path == "Resources/unity_builtin_extra" || path == "Library/unity default resources";
+            static bool SafeName(string path) => !string.IsNullOrEmpty(path) && path.Length <= 512 && !Path.IsPathRooted(path) &&
+                !path.Any(char.IsControl) && !path.Contains("\\") && !path.Contains(":") && !path.Split('/').Any(part => part == "" || part == "." || part == "..") &&
+                (path.StartsWith("Assets/", StringComparison.Ordinal) || Regex.IsMatch(path, "^Packages/com\\.unity\\.[a-z0-9_.-]+/") || Builtin(path));
+            static bool Same(DiskState a, DiskState b) => a.state == b.state && a.sha256 == b.sha256 && a.bytes == b.bytes;
+            static string SnapshotError(Exception error) => error is UnauthorizedAccessException ? "UNAUTHORIZED" : error is IOException ? "IO" :
+                error is InvalidOperationException || error is ArgumentException ? "VALIDATION" : "OTHER";
+            public AssetLifecycleProbe(DependencyPin[] expected, Diagnostic diagnostic)
+            {
+                this.diagnostic = diagnostic;
+                Check(expected != null && expected.Length > 0 && expected.All(p => p != null && SafeName(p.path)) &&
+                    expected.Select(p => p.path).Distinct().Count() == expected.Length, "JOURNEY_RESTORATION_ASSET_LIFECYCLE_FAILED");
+                declared = expected.ToDictionary(p => p.path, StringComparer.Ordinal);
+                Check(declared.Values.All(p => Builtin(p.path) ? p.kind == "builtin" && p.sha256 == "" && p.bytes == 0 :
+                    Digest(p.sha256) && p.bytes >= 0 && (p.kind == "asset" && p.path.StartsWith("Assets/", StringComparison.Ordinal) ||
+                    p.kind == "package" && Regex.IsMatch(p.packageName ?? "", "^com\\.unity\\.[a-z0-9_.-]+$") && p.path.StartsWith("Packages/" + p.packageName + "/", StringComparison.Ordinal))),
+                    "JOURNEY_RESTORATION_ASSET_LIFECYCLE_FAILED");
+                previousDisk = declared.ToDictionary(p => p.Key, p => new DiskState { state = Builtin(p.Key) ? "BUILTIN" : "AVAILABLE", sha256 = p.Value.sha256, bytes = p.Value.bytes }, StringComparer.Ordinal);
+            }
+            DiskState ReadDisk(DependencyPin pin)
+            {
+                if (Builtin(pin.path)) return new DiskState { state = "BUILTIN", sha256 = "", bytes = 0 };
+                try
+                {
+                    string physical = pin.path;
+                    if (pin.kind == "package")
+                    {
+                        if (!packages.TryGetValue(pin.packageName, out string packageRoot))
+                        {
+                            // Package metadata lookup only; no AssetDatabase asset load or refresh.
+                            var package = UnityEditor.PackageManager.PackageInfo.FindForAssetPath(pin.path);
+                            if (package == null || package.name != pin.packageName || package.version != pin.packageVersion)
+                                return new DiskState { state = "ERROR", sha256 = "" };
+                            packages.Add(pin.packageName, packageRoot = package.resolvedPath);
+                        }
+                        physical = Path.Combine(packageRoot, pin.path.Substring(("Packages/" + pin.packageName + "/").Length));
+                    }
+                    string root = Path.GetFullPath(".").TrimEnd(Path.DirectorySeparatorChar), full = Path.GetFullPath(physical);
+                    if (!full.StartsWith(root + Path.DirectorySeparatorChar, StringComparison.Ordinal)) return new DiskState { state = "UNSAFE", sha256 = "" };
+                    for (string current = full; current != root; current = Path.GetDirectoryName(current))
+                        if ((File.GetAttributes(current) & FileAttributes.ReparsePoint) != 0) return new DiskState { state = "UNSAFE", sha256 = "" };
+                    var before = new FileInfo(full); long bytes = before.Length, stamp = before.LastWriteTimeUtc.Ticks;
+                    string digest = Hash(full); var after = new FileInfo(full);
+                    if (after.Length != bytes || after.LastWriteTimeUtc.Ticks != stamp) return new DiskState { state = "ERROR", sha256 = "" };
+                    return new DiskState { state = "AVAILABLE", sha256 = digest, bytes = bytes };
+                }
+                catch (FileNotFoundException) { return new DiskState { state = "MISSING", sha256 = "" }; }
+                catch (DirectoryNotFoundException) { return new DiskState { state = "MISSING", sha256 = "" }; }
+                catch (UnauthorizedAccessException) { return new DiskState { state = "UNREADABLE", sha256 = "" }; }
+                catch (IOException) { return new DiskState { state = "ERROR", sha256 = "" }; }
+            }
+            public void BindCaptureGate(HashSet<string> dependencies)
+            {
+                Check(captureGateDependencies == null && dependencies != null && dependencies.All(declared.ContainsKey), "JOURNEY_RESTORATION_ASSET_LIFECYCLE_FAILED");
+                captureGateDependencies = new HashSet<string>(dependencies, StringComparer.Ordinal);
+            }
+            DirtyDependency Row(DirtyDependency old, string dirty, string transition, DiskState disk) => new DirtyDependency {
+                path = old.path, type = old.type, identityState = old.identityState, guid = old.guid, localId = old.localId,
+                dirty = dirty, transition = transition, diskState = disk.state, sha256 = disk.sha256, bytes = disk.bytes,
+                captureGateMembership = captureGateDependencies == null ? "UNKNOWN" : captureGateDependencies.Contains(old.path) ? "INCLUDED" : "EXCLUDED" };
+            public void Observe(string stage)
+            {
+                var snapshot = new AssetLifecycleSnapshot { sequence = snapshots.Count, stage = stage, preexistingBaseline = !hasBaseline, captureGateBound = captureGateDependencies != null, declaredDependencyCount = declared.Count };
+                try
+                {
+                    Check(Stages.Contains(stage) && !snapshots.Any(row => row.stage == stage), "JOURNEY_RESTORATION_ASSET_LIFECYCLE_FAILED");
+                    var loaded = new Dictionary<string, Loaded>(StringComparer.Ordinal);
+                    foreach (var asset in Resources.FindObjectsOfTypeAll<UnityEngine.Object>())
+                    {
+                        if (!asset || !EditorUtility.IsPersistent(asset)) continue;
+                        string path = AssetDatabase.GetAssetPath(asset);
+                        if (!declared.ContainsKey(path)) continue;
+                        string type = asset.GetType().FullName;
+                        Check(type != null && type.Length <= 256 && Regex.IsMatch(type, "^[A-Za-z_][A-Za-z0-9_.+`]*$"), "JOURNEY_RESTORATION_ASSET_LIFECYCLE_FAILED");
+                        bool resolved = false; string guid = ""; long localId = 0;
+                        try { resolved = AssetDatabase.TryGetGUIDAndLocalFileIdentifier(asset, out guid, out localId) && Digest(guid, 32); }
+                        catch { /* Unresolved identity stays visible; never omit a dirty object. */ }
+                        string key = resolved ? "GUID:" + guid + ":" + localId : "INSTANCE:" + asset.GetInstanceID();
+                        loaded.Add(key, new Loaded { dirty = EditorUtility.IsDirty(asset), row = new DirtyDependency {
+                            path = path, type = type, identityState = resolved ? "RESOLVED" : "UNAVAILABLE", guid = resolved ? guid : "", localId = resolved ? localId : 0 } });
+                    }
+                    // Only paths implicated by dirty observations are reread here; the existing full
+                    // source/1040-dependency gates still independently protect the complete closure.
+                    var observed = new HashSet<string>(observedPaths, StringComparer.Ordinal);
+                    foreach (string path in loaded.Values.Where(p => p.dirty).Select(p => p.row.path).Concat(previousDirty.Values.Select(p => p.path)))
+                    {
+                        observed.Add(path);
+                        if (declared.ContainsKey(path + ".meta")) observed.Add(path + ".meta");
+                    }
+                    var disk = new Dictionary<string, DiskState>(previousDisk, StringComparer.Ordinal);
+                    foreach (string path in observed) disk[path] = ReadDisk(declared[path]);
+                    snapshot.observedPathCount = observed.Count;
+                    var dirty = new Dictionary<string, DirtyDependency>(StringComparer.Ordinal);
+                    foreach (var pair in loaded.Where(p => p.Value.dirty))
+                        dirty.Add(pair.Key, Row(pair.Value.row, "DIRTY", !hasBaseline ? "PREEXISTING" : previousDirty.ContainsKey(pair.Key) ? "RETAINED" : "ENTERED", disk[pair.Value.row.path]));
+                    Func<DirtyDependency, string> order = row => row.path + "|" + row.type + "|" + row.guid + "|" + row.localId;
+                    snapshot.dirtyDependencies = dirty.Values.OrderBy(order, StringComparer.Ordinal).ToArray();
+                    snapshot.clearedDependencies = previousDirty.Where(p => !dirty.ContainsKey(p.Key) && loaded.ContainsKey(p.Key))
+                        .Select(p => Row(loaded[p.Key].row, "CLEAN", "CLEARED", disk[p.Value.path])).OrderBy(order, StringComparer.Ordinal).ToArray();
+                    snapshot.unobservedDependencies = previousDirty.Where(p => !loaded.ContainsKey(p.Key))
+                        .Select(p => Row(p.Value, "NOT_OBSERVED", "UNOBSERVED", disk[p.Value.path])).OrderBy(order, StringComparer.Ordinal).ToArray();
+                    snapshot.objectCount = snapshot.dirtyDependencies.Length; snapshot.distinctPathCount = snapshot.dirtyDependencies.Select(p => p.path).Distinct().Count();
+                    snapshot.captureGateObjectCount = snapshot.dirtyDependencies.Count(p => p.captureGateMembership == "INCLUDED" && p.identityState == "RESOLVED");
+                    snapshot.enteredDirtyCount = snapshot.dirtyDependencies.Count(p => p.transition == "ENTERED");
+                    snapshot.retainedDirtyCount = snapshot.dirtyDependencies.Count(p => p.transition == "RETAINED");
+                    snapshot.clearedCount = snapshot.clearedDependencies.Length; snapshot.unobservedCount = snapshot.unobservedDependencies.Length;
+                    snapshot.diskChanges = disk.Where(p => !Same(p.Value, previousDisk[p.Key])).OrderBy(p => p.Key, StringComparer.Ordinal).Select(p => new DiskChange {
+                        path = p.Key, beforeState = previousDisk[p.Key].state, beforeSha256 = previousDisk[p.Key].sha256, beforeBytes = previousDisk[p.Key].bytes,
+                        afterState = p.Value.state, afterSha256 = p.Value.sha256, afterBytes = p.Value.bytes }).ToArray();
+                    snapshot.diskMismatchCount = disk.Count(p => !Builtin(p.Key) && (p.Value.state != "AVAILABLE" || p.Value.sha256 != declared[p.Key].sha256 || p.Value.bytes != declared[p.Key].bytes));
+                    snapshot.diskUnavailableCount = disk.Count(p => p.Value.state != "AVAILABLE" && p.Value.state != "BUILTIN");
+                    snapshots.Add(snapshot); diagnostic.lifecycleSnapshots = snapshots.ToArray(); previousDisk = disk; previousDirty = dirty; observedPaths.UnionWith(observed); hasBaseline = true;
+                }
+                catch (Exception error)
+                {
+                    snapshot = new AssetLifecycleSnapshot { sequence = snapshots.Count, stage = stage, preexistingBaseline = !hasBaseline,
+                        captureGateBound = captureGateDependencies != null, declaredDependencyCount = declared.Count, status = "FAILED", errorCode = SnapshotError(error) };
+                    snapshots.Add(snapshot); diagnostic.lifecycleSnapshots = snapshots.ToArray();
+                    throw new InvalidOperationException("JOURNEY_RESTORATION_ASSET_LIFECYCLE_FAILED", error);
+                }
+            }
+            public void Trace(string stage, Action action, bool cleanup = false)
+            {
+                var errors = new List<Exception>();
+                try { Observe(stage + "_BEFORE"); } catch (Exception error) { errors.Add(error); }
+                if (!cleanup && errors.Count != 0) System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(errors[0]).Throw();
+                try { action(); } catch (Exception error) { errors.Add(error); }
+                try { Observe(stage + "_AFTER"); } catch (Exception error) { errors.Add(error); }
+                if (errors.Count == 1) System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(errors[0]).Throw();
+                if (errors.Count > 1) throw new AggregateException("Restoration operation and lifecycle observation failed; primary first.", errors);
+            }
         }
         static string ErrorClass(Exception error)
         {
+            if (error.Message == "JOURNEY_WORLD_HUD_DIRTY_DEPENDENCY_PREEXISTING" || error.Message == "JOURNEY_WORLD_HUD_DIRTY_DEPENDENCY_ADDED") return "DIRTY_DEPENDENCY";
+            if (error.Message == "JOURNEY_RESTORATION_ASSET_LIFECYCLE_FAILED") return "ASSET_LIFECYCLE";
+            if (error.Message == "JOURNEY_RESTORATION_DIAGNOSTIC_SCHEMA_ARGUMENT") return "DIAGNOSTIC_ARGUMENT";
             if (error.Message == "JOURNEY_RESTORATION_IMPORTER_IDENTITY_MISMATCH") return "IMPORTER_IDENTITY";
             if (error.Message == "JOURNEY_RESTORATION_DEPENDENCY_BYTES_MISMATCH") return "DEPENDENCY_BYTES";
             if (error is AggregateException aggregate && aggregate.InnerExceptions.Count > 0) return ErrorClass(aggregate.InnerExceptions[0]);
@@ -89,7 +272,15 @@ namespace DesertRV.Editor
             if (File.Exists(path)) Check(JourneyDiagnosticScope.IsPinnedPathSafe(path, out _), "Unsafe diagnostic file.");
             // Neither names nor exception content are taken from an untrusted file or exception.
             Check(!File.Exists(temp), "Diagnostic temporary file already exists.");
-            WriteFresh(temp, diagnostic);
+            object payload = diagnostic;
+            if (diagnostic.schema == 2)
+            {
+                var android = JsonUtility.FromJson<AndroidDiagnostic>(JsonUtility.ToJson(diagnostic));
+                android.assetLifecycle = diagnostic.lifecycleSnapshots; payload = android;
+            }
+            byte[] bytes = new System.Text.UTF8Encoding(false).GetBytes(JsonUtility.ToJson(payload, true));
+            Check(bytes.Length <= (diagnostic.schema == 2 ? 512 * 1024 : 128 * 1024), "JOURNEY_RESTORATION_DIAGNOSTIC_SIZE_LIMIT");
+            using (var stream = new FileStream(temp, FileMode.CreateNew, FileAccess.Write)) stream.Write(bytes, 0, bytes.Length);
             if (File.Exists(path)) File.Replace(temp, path, null); else File.Move(temp, path);
         }
         [Serializable] sealed class StoredFile : FilePin { public long bytes; public long size; }
@@ -321,9 +512,18 @@ namespace DesertRV.Editor
         public static void RevalidatePinnedRestoredJourney()
         {
             string commit = Environment.GetEnvironmentVariable("GITHUB_SHA");
-            var diagnostic = new Diagnostic { sourceCommit = Digest(commit, 40) ? commit : "", producerRunUrl = "" };
+            const string diagnosticFlag = "-journeyRestorationDiagnosticSchema";
+            var arguments = Environment.GetCommandLineArgs();
+            var diagnosticPositions = Enumerable.Range(0, arguments.Length).Where(i => arguments[i] == diagnosticFlag).ToArray();
+            // This explicit GameCI custom parameter selects only the diagnostic format, never trust.
+            var diagnostic = new Diagnostic { schema = diagnosticPositions.Length == 0 ? 1 : 2, sourceCommit = Digest(commit, 40) ? commit : "", producerRunUrl = "" };
             Exception primary = null;
-            try { Revalidate(diagnostic); diagnostic.completed = true; diagnostic.stage = "COMPLETED"; }
+            try
+            {
+                Check(diagnosticPositions.Length == 0 || diagnosticPositions.Length == 1 && diagnosticPositions[0] + 1 < arguments.Length &&
+                    arguments[diagnosticPositions[0] + 1] == "2", "JOURNEY_RESTORATION_DIAGNOSTIC_SCHEMA_ARGUMENT");
+                Revalidate(diagnostic); diagnostic.completed = true; diagnostic.stage = "COMPLETED";
+            }
             catch (Exception error)
             {
                 primary = error; string identity = RunIdentityFailure(error);
@@ -334,7 +534,12 @@ namespace DesertRV.Editor
             finally
             {
                 try { PersistDiagnostic(diagnostic); }
-                catch { if (primary == null) throw; Debug.LogWarning("JOURNEY_RESTORATION_DIAGNOSTIC_WRITE_FAILED"); }
+                catch (Exception persistenceError)
+                {
+                    if (primary == null) throw;
+                    Debug.LogWarning(persistenceError.Message == "JOURNEY_RESTORATION_DIAGNOSTIC_SIZE_LIMIT" ?
+                        "JOURNEY_RESTORATION_DIAGNOSTIC_SIZE_LIMIT" : "JOURNEY_RESTORATION_DIAGNOSTIC_WRITE_FAILED");
+                }
             }
         }
         static void Revalidate(Diagnostic diagnostic)
@@ -360,8 +565,19 @@ namespace DesertRV.Editor
             Check(!setup.Any(s => s.isLoaded && SceneManager.GetSceneByPath(s.path).isDirty), "Restoration cannot discard existing scene edits.");
             var files = request.files.ToDictionary(p => p.path, StringComparer.Ordinal); Proof proof = null; var failures = new List<Exception>();
             bool dependenciesValidated = false;
+            AssetLifecycleProbe lifecycle = null;
+            void ObserveStage(string stage, Action action, bool cleanup = false)
+            {
+                if (lifecycle == null) action(); else lifecycle.Trace(stage, action, cleanup);
+            }
             try
             {
+                if (AndroidProducer(request))
+                {
+                    diagnostic.schema = 2;
+                    lifecycle = new AssetLifecycleProbe(request.expectedDependencies, diagnostic);
+                    lifecycle.Observe("RESTORATION_ENTRY");
+                }
                 diagnostic.stage = "INVENTORY"; VerifyInventory(request);
                 foreach (var pin in new[] { request.selection, request.originalGeneratedReceipt, request.originalNativeManifest, request.originalGrounding }) BoundPin(pin, files);
                 Check(request.selection.path == SelectionPath && request.selection.sha256 == SelectionDigest(request) && request.originalGeneratedReceipt.sha256 == request.generatedReceiptSha256,
@@ -379,7 +595,8 @@ namespace DesertRV.Editor
                 Check(native != null && native.schema == 3 && native.status == "ACTUAL_NATIVE_JOURNEY_ASSETS_UNREVIEWED" && native.sourceCommit == request.assetProducerSourceCommit &&
                     native.importRunUrl == request.assetProducerRunUrl && native.unityVersion == Application.unityVersion && !native.approved, "Original native authored inventory required.");
                 diagnostic.stage = "DEPENDENCIES"; MatchDependencies(request.expectedDependencies, native.dependencies);
-                var dependencies = JourneyCandidatePreparation.DependencySnapshot(); MatchDependencies(dependencies, native.dependencies, diagnostic); dependenciesValidated = true;
+                DependencyPin[] dependencies = null;
+                ObserveStage("DEPENDENCIES", () => { dependencies = JourneyCandidatePreparation.DependencySnapshot(); MatchDependencies(dependencies, native.dependencies, diagnostic); dependenciesValidated = true; });
                 diagnostic.stage = "GENERATED_BYTES"; var restored = generated.files.Where(p => p.path.StartsWith("Assets/", StringComparison.Ordinal)).ToArray();
                 int expectedGenerated = AndroidProducer(request) ? 314 : 75;
                 Check(restored.Length == expectedGenerated && restored.Select(p => p.path).Distinct().Count() == expectedGenerated, "Exact immutable producer generated file count required.");
@@ -397,14 +614,17 @@ namespace DesertRV.Editor
                     JsonUtility.ToJson(request.integration.flashMuzzlePose) == JsonUtility.ToJson(selector.integration.flashMuzzlePose), "Selected weapon/flash pose changed.");
                 var integration = JsonUtility.FromJson<JourneyCandidateAssetIntegration.Request>(JsonUtility.ToJson(request.integration));
                 Check(integration.sourceCommit == request.sourceCommit && Rows(integration).Count() == 9 && Rows(integration).All(p => p.position.y == 0), "Current request must preserve all nine declared anchors.");
-                diagnostic.stage = "POSES"; JourneyCandidateAssetIntegration.ProposeScenePoses();
+                diagnostic.stage = "POSES"; ObserveStage("POSES", () => JourneyCandidateAssetIntegration.ProposeScenePoses());
                 var poses = JsonUtility.FromJson<JourneyCandidateAssetIntegration.ScenePoseProposal>(File.ReadAllText("JourneyEvidence/journey-candidate-poses.json"));
                 Check(poses.sourceCommit == request.sourceCommit && !poses.gameplayCameraReviewed && !poses.reticleReviewed && poses.requiredWalkingVerticalFov == 66,
                     "Readonly scene pose proposal must preserve unreviewed 66-degree walking projection.");
                 integration.arcModulePose = JourneyCandidateAssetIntegration.ResolveArcModulePose("scene-geometry", integration.arcModulePose, poses.arcModulePose);
-                diagnostic.stage = "GROUNDING"; var grounding = JourneyCandidateAssetIntegration.ResolveSpawnRootHeights(integration, "scene-physical-floor", SelectionDigest(request), requestHash);
+                diagnostic.stage = "GROUNDING";
+                JourneyCandidateAssetIntegration.SpawnGroundingReport grounding = null;
+                ObserveStage("GROUNDING", () => { grounding = JourneyCandidateAssetIntegration.ResolveSpawnRootHeights(integration, "scene-physical-floor", SelectionDigest(request), requestHash); });
                 MatchGrounding(request, grounding, JsonUtility.FromJson<JourneyCandidateAssetIntegration.SpawnGroundingReport>(File.ReadAllText(Pin(request.originalGrounding))));
                 diagnostic.stage = "IMPORTER_IDENTITIES"; var identities = new List<ImporterIdentity>();
+                ObserveStage("IMPORTER_IDENTITIES", () => {
                 foreach (var candidate in integration.candidates)
                 {
                     var measured = MeasureAsset(candidate.prefab);
@@ -418,6 +638,7 @@ namespace DesertRV.Editor
                     Debug.LogError("JOURNEY_RESTORATION_IMPORTER_IDENTITY_MISMATCH");
                     throw new InvalidOperationException("JOURNEY_RESTORATION_IMPORTER_IDENTITY_MISMATCH");
                 }
+                });
                 Check(generated.integrationOutputs != null && generated.integrationOutputs.Length == 5 && integration.savedInputs != null && integration.savedInputs.Length == 5,
                     "Exactly five immutable scene/content roots required.");
                 foreach (var pin in integration.savedInputs)
@@ -425,11 +646,13 @@ namespace DesertRV.Editor
                     var old = generated.integrationOutputs.Single(p => p.path == pin.path);
                     Check(pin.sha256 == old.sha256 && Hash(pin.path) == old.sha256, "Original generated scene/content root changed.");
                 }
+                ObserveStage("SAVED_ROOT_IDENTITIES", () => {
                 integration.savedInputs = integration.savedInputs.Select(MeasureAsset).ToArray();
                 integration.muzzleFlashPrefab = MeasureAsset(integration.muzzleFlashPrefab); integration.arcPresentationPrefab = MeasureAsset(integration.arcPresentationPrefab);
                 foreach (var sound in integration.sounds) sound.clip = MeasureAsset(sound.clip);
-                diagnostic.stage = "SAVED_BINDINGS"; JourneyCandidateAssetIntegration.VerifyRestoredSavedContent(integration);
-                if (AndroidProducer(request)) { diagnostic.stage = "WORLD_HUD_CAPTURE"; JourneySceneAuthoring.CapturePreparedWorldHud(); }
+                });
+                diagnostic.stage = "SAVED_BINDINGS"; ObserveStage("SAVED_BINDINGS", () => JourneyCandidateAssetIntegration.VerifyRestoredSavedContent(integration));
+                if (AndroidProducer(request)) { diagnostic.stage = "WORLD_HUD_CAPTURE"; JourneySceneAuthoring.CapturePreparedWorldHudObserved(lifecycle.Observe, lifecycle.BindCaptureGate); }
                 var outputs = integration.savedInputs.Select(p => new JourneyCandidateAssetIntegration.OutputFile { path = p.path, sha256 = Hash(p.path),
                     dependencyHash = AssetDatabase.GetAssetDependencyHash(p.path).ToString(), dependencySha256 = JourneyContentChecks.DependencySha256(p.path) }).ToArray();
                 proof = new Proof { sourceCommit = request.sourceCommit, producerRunUrl = request.producerRunUrl, assetProducerSourceCommit = request.assetProducerSourceCommit, assetProducerRunUrl = request.assetProducerRunUrl,
@@ -441,12 +664,14 @@ namespace DesertRV.Editor
             finally
             {
                 if (failures.Count == 0) diagnostic.stage = "FINAL_PROTECTION";
-                try { JourneySceneAuthoring.RestoreSceneSetup(setup); } catch (Exception error) { failures.Add(error); }
+                try { ObserveStage("RESTORATION_SCENE_RESTORE", () => JourneySceneAuthoring.RestoreSceneSetup(setup), true); } catch (Exception error) { failures.Add(error); }
                 try
                 {
+                    ObserveStage("FINAL_PROTECTION", () => {
                     VerifyInventory(request);
                     if (dependenciesValidated) MatchDependencies(JourneyCandidatePreparation.DependencySnapshot(), request.expectedDependencies, diagnostic);
                     Check(Hash(InputPath) == requestHash && File.ReadAllText(Folder + "/restoration-input.sha256").Trim() == requestHash && !File.Exists(JourneyCandidatePreparation.Scope), "Restoration input or forbidden live scope changed.");
+                    }, true);
                 }
                 catch (Exception error) { failures.Add(error); }
             }

@@ -2,7 +2,7 @@ name: Desert RV restored Journey Android development candidate
 on:
   push:
     branches: [journey-android-c15]
-    paths: [.github/dispatch/desert-rv-journey-android-c15-restored-r1-20261011.json]
+    paths: [.github/dispatch/desert-rv-journey-android-c15-restored-r2-20261011.json]
 permissions:
   contents: read
   actions: read
@@ -19,7 +19,7 @@ jobs:
     timeout-minutes: 170
     env:
       GITHUB_REPOSITORY_VISIBILITY: ${{ github.event.repository.visibility }}
-      JOURNEY_ANDROID_RESTORATION: desert-rv-journey-android-c15-restored-r1-20261011-once
+      JOURNEY_ANDROID_RESTORATION: desert-rv-journey-android-c15-restored-r2-20261011-once
       WORLD_CAPTURE_MODE: restored
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
@@ -141,7 +141,7 @@ jobs:
           projectPath: tasks/desert-rv/unity
           testMode: editmode
           artifactsPath: tasks/desert-rv/artifacts/journey-restoration
-          customParameters: -assemblyNames DesertRV.JourneyRestorationTests -journeyRestorationRunId ${{ github.run_id }} -buildTarget Android -force-glcore -job-worker-count 2
+          customParameters: -assemblyNames DesertRV.JourneyRestorationTests -journeyRestorationDiagnosticSchema 2 -journeyRestorationRunId ${{ github.run_id }} -buildTarget Android -force-glcore -job-worker-count 2
           dockerCpuLimit: 2
           dockerMemoryLimit: 12g
       - name: Verify current restoration1 and unchanged original producer bytes

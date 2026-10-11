@@ -214,7 +214,7 @@ class AndroidPreparedInputTests(unittest.TestCase):
 
 class AndroidRestoredDispatchTests(AndroidDispatchTests):
     def setUp(self):
-        for key,value in dict(REQUEST='.github/dispatch/desert-rv-journey-android-c15-restored-r1-20261011.json',REQUEST_ID=a.RESTORE_REQUEST_ID).items():
+        for key,value in dict(REQUEST='.github/dispatch/desert-rv-journey-android-c15-restored-r2-20261011.json',REQUEST_ID=a.RESTORE_REQUEST_ID).items():
             changed=patch.object(a,key,value);changed.start();self.addCleanup(changed.stop)
         super().setUp()
         changed=patch.object(a,'RESTORED',True);changed.start();self.addCleanup(changed.stop)

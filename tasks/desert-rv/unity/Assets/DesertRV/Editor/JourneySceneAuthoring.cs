@@ -124,8 +124,10 @@ namespace DesertRV.Editor
 
         // Explicit restored-world entry: only two 960x540 production HUD renders.
         // No authoring, scene saves, gameplay startup, or environment-lighting replacement.
-        public static void CapturePreparedWorldHud()
+        public static void CapturePreparedWorldHud() => CapturePreparedWorldHudObserved(null, null);
+        internal static void CapturePreparedWorldHudObserved(Action<string> observe, Action<HashSet<string>> bindCaptureGate)
         {
+            observe?.Invoke("CAPTURE_ENTRY");
             if (Application.isPlaying || EditorApplication.isPlayingOrWillChangePlaymode || BuildPipeline.isBuildingPlayer)
                 throw new InvalidOperationException("Prepared world HUD capture requires Edit Mode.");
             if (SystemInfo.graphicsDeviceType == GraphicsDeviceType.Null)
@@ -141,7 +143,8 @@ namespace DesertRV.Editor
             var dependencies = new HashSet<string>(AssetDatabase.GetDependencies(
                 new[] { BootstrapPath, ManifestPath }.Concat(RegionPaths).ToArray(), true), StringComparer.Ordinal);
             var dirtyAssets = DirtyPersistentCaptureAssets(dependencies);
-            CheckCaptureAssetLifecycle(dependencies, dirtyAssets, "before");
+            bindCaptureGate?.Invoke(new HashSet<string>(dependencies, StringComparer.Ordinal));
+            ObserveCaptureStep(observe, "CAPTURE_GATE", () => CheckCaptureAssetLifecycle(dependencies, dirtyAssets, "before"));
             int captured = 0;
             var failures = new List<Exception>();
             void AttemptCleanup(Action action)
@@ -152,6 +155,7 @@ namespace DesertRV.Editor
             {
                 foreach (int index in new[] { 0, 2 })
                 {
+                    ObserveCaptureStep(observe, "CAPTURE_REGION_" + (index + 1), () => {
                     var boot = EditorSceneManager.OpenScene(BootstrapPath, OpenSceneMode.Single);
                     var env = EditorSceneManager.OpenScene(RegionPaths[index], OpenSceneMode.Additive);
                     if (SceneManager.GetActiveScene().handle != env.handle) SceneManager.SetActiveScene(env);
@@ -174,13 +178,14 @@ namespace DesertRV.Editor
                     CheckCaptureAssetLifecycle(dependencies, dirtyAssets, "after-region-" + binding.region);
                     captured++;
                     Debug.Log("JOURNEY_WORLD_HUD_CAPTURED region=" + binding.region + "; width=960; height=540; fieldOfView=66; controlledFixtureData=true");
+                    });
                 }
             }
             catch (Exception error) { failures.Add(error); }
             finally
             {
                 // Every cleanup/protection operation runs; the capture failure remains first.
-                AttemptCleanup(() => RestoreSceneSetup(setup));
+                AttemptCleanup(() => ObserveCaptureStep(observe, "CAPTURE_SCENE_RESTORE", () => RestoreSceneSetup(setup), true));
                 AttemptCleanup(() => CheckCaptureAssetLifecycle(dependencies, dirtyAssets, "after-scene-restoration"));
                 AttemptCleanup(() => VerifyProtectedFiles(protectedFiles, true));
             }
@@ -188,6 +193,16 @@ namespace DesertRV.Editor
             if (failures.Count > 1) throw new AggregateException("Prepared world HUD capture and cleanup failed; primary failure first.", failures);
             if (captured != 2) throw new InvalidOperationException("Incomplete prepared world HUD capture.");
             Debug.Log("JOURNEY_WORLD_HUD_CAPTURE_COMPLETE captures=2; originalAndPreparedBytesUnchanged=true; sceneSetupRestored=true; buffersReleasedBeforeSceneUnload=true");
+        }
+        static void ObserveCaptureStep(Action<string> observe, string stage, Action action, bool cleanup = false)
+        {
+            var errors = new List<Exception>();
+            try { observe?.Invoke(stage + "_BEFORE"); } catch (Exception error) { errors.Add(error); }
+            if (!cleanup && errors.Count != 0) System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(errors[0]).Throw();
+            try { action(); } catch (Exception error) { errors.Add(error); }
+            try { observe?.Invoke(stage + "_AFTER"); } catch (Exception error) { errors.Add(error); }
+            if (errors.Count == 1) System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(errors[0]).Throw();
+            if (errors.Count > 1) throw new AggregateException("World capture operation and lifecycle observation failed; primary first.", errors);
         }
         static HashSet<string> DirtyPersistentCaptureAssets(HashSet<string> dependencies)
         {
@@ -212,8 +227,8 @@ namespace DesertRV.Editor
                 "; trackedEmission=" + (sample && sample.IsKeywordEnabled("_EMISSION") ? "true" : "false") +
                 "; trackedLightmapFlags=" + (sample ? ((int)sample.globalIlluminationFlags).ToString() : "unloaded"));
             if (phase == "before" && dirty.Count != 0)
-                throw new InvalidOperationException("Prepared world capture requires clean persistent dependency assets.");
-            if (added != 0) throw new InvalidOperationException("Prepared world capture dirtied persistent dependency assets.");
+                throw new InvalidOperationException("JOURNEY_WORLD_HUD_DIRTY_DEPENDENCY_PREEXISTING");
+            if (added != 0) throw new InvalidOperationException("JOURNEY_WORLD_HUD_DIRTY_DEPENDENCY_ADDED");
         }
         // The existing environment regression and minimal HUD entry share the same legal dismount view.
         static void PlaceWalkingCaptureCamera(JourneyMotor motor)
