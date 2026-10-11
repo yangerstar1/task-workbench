@@ -24,15 +24,15 @@ from journey_keyboard_look_native import file_bytes, raw_pin, safe_path, protect
 from strict_output import verify_staged_inventory
 import generated_export as generated
 
-BASE = '2915b8b1e5be8b800a3d71f186b5316a8f626bc8'
-PRODUCTION_BASE = BASE
+BASE = 'c6f78eee249b2314df8b2a808b5768e35c6a8289'
+PRODUCTION_BASE = '2915b8b1e5be8b800a3d71f186b5316a8f626bc8'
 BRANCH = 'journey-pouncer-ground-support-2915'
 REF = 'refs/heads/' + BRANCH
 REPOSITORY = 'yangerstar1/task-workbench'
 OWNER_NAME = 'yangerstar1'
 WORKFLOW = '.github/workflows/desert-rv-pouncer-ground-support.yml'
-REQUEST = '.github/dispatch/desert-rv-pouncer-ground-support-2915-20261011.json'
-NONCE = 'desert-rv-pouncer-ground-support-2915-20261011-once'
+REQUEST = '.github/dispatch/desert-rv-pouncer-ground-support-2915-r1-20261011.json'
+NONCE = 'desert-rv-pouncer-ground-support-2915-r1-20261011-once'
 PRODUCER = dict(commit=PRODUCTION_BASE, runId=38091066745,
     artifactId=11685769353, artifactName='journey-preparation-UNREVIEWED-38091066745-1',
     artifactBytes=19825311, artifactSha256='98448f817201ca54b7206ba535040a6ef5641bc2151c0da8ebe3fcb6caa60957',
@@ -76,7 +76,7 @@ SNAPSHOT_SOURCES = tuple('Assets/DesertRV/' + name for name in (
     'Runtime/JourneyActions.cs', 'Runtime/JourneyActions.Geometry.cs', 'Runtime/PouncerPawContactConstraint.cs',
     'Runtime/PouncerGroundSupport.cs', 'Runtime/RegionBinding.cs', 'Editor/JourneyCandidateAssetIntegration.cs',
     'Tests/EditMode/JourneyPouncerSupportBindingTests.cs', 'Tests/PlayMode/JourneyPouncerPreparedSupportTests.cs',
-    'Tests/PouncerGround/PouncerGroundSupportTests.cs',
+    'Tests/PouncerGround/PouncerGroundSupportTests.cs', 'Tests/CandidateArt/PouncerPawContactConstraintTests.cs',
     'Tests/PlayMode/JourneyR3ContinuousContactTests.cs'))
 TEST = 'DesertRV.Tests.JourneyR3ContinuousContactTests.RealR3_ContinuousAIAndStaticControl'
 SOURCE_NAME = 'tasks/desert-rv/SOURCE-STATE.json'
@@ -86,36 +86,16 @@ MAX_NATIVE_REPORT = 24 * 1024**2
 TEST_ADDITIONS = {'Assets/DesertRV/Tests/PlayMode/JourneyR3ContinuousContactTests.cs',
     'Assets/DesertRV/Tests/PlayMode/JourneyR3ContinuousContactTests.cs.meta'}
 CHANGED_FILES = frozenset({
-    '.github/dispatch/desert-rv-pouncer-ground-support-2915-20261011.json',
+    '.github/dispatch/desert-rv-pouncer-ground-support-2915-r1-20261011.json',
     '.github/workflows/desert-rv-pouncer-ground-support.yml',
-    'tasks/desert-rv/README.md',
     'tasks/desert-rv/SOURCE-STATE.json',
     'tasks/desert-rv/scripts/journey_pouncer_ground_support_probe.py',
     'tasks/desert-rv/scripts/journey_pouncer_support_reports.py',
-    'tasks/desert-rv/scripts/journey_r3_continuous_contact_report.py',
-    'tasks/desert-rv/scripts/prepare_runner.sh',
     'tasks/desert-rv/scripts/test_journey_pouncer_ground_support_probe.py',
     'tasks/desert-rv/scripts/test_journey_pouncer_support_reports.py',
-    'tasks/desert-rv/scripts/test_journey_r3_continuous_contact_report.py',
-    'tasks/desert-rv/scripts/verify_evidence.py',
-    'tasks/desert-rv/unity/Assets/DesertRV/Editor/JourneyCandidateAssetIntegration.cs',
-    'tasks/desert-rv/unity/Assets/DesertRV/Runtime/BeastActor.cs',
-    'tasks/desert-rv/unity/Assets/DesertRV/Runtime/PouncerGroundSupport.cs',
-    'tasks/desert-rv/unity/Assets/DesertRV/Runtime/PouncerGroundSupport.cs.meta',
-    'tasks/desert-rv/unity/Assets/DesertRV/Runtime/PouncerPawContactConstraint.cs',
-    'tasks/desert-rv/unity/Assets/DesertRV/Runtime/RegionBinding.cs',
     'tasks/desert-rv/unity/Assets/DesertRV/Tests/CandidateArt/PouncerPawContactConstraintTests.cs',
     'tasks/desert-rv/unity/Assets/DesertRV/Tests/EditMode/JourneyPouncerSupportBindingTests.cs',
-    'tasks/desert-rv/unity/Assets/DesertRV/Tests/EditMode/JourneyPouncerSupportBindingTests.cs.meta',
-    'tasks/desert-rv/unity/Assets/DesertRV/Tests/PlayMode/JourneyPouncerPreparedSupportTests.cs',
-    'tasks/desert-rv/unity/Assets/DesertRV/Tests/PlayMode/JourneyPouncerPreparedSupportTests.cs.meta',
-    'tasks/desert-rv/unity/Assets/DesertRV/Tests/PlayMode/JourneyR3ContinuousContactTests.cs',
-    'tasks/desert-rv/unity/Assets/DesertRV/Tests/PlayMode/JourneyR3ContinuousContactTests.cs.meta',
-    'tasks/desert-rv/unity/Assets/DesertRV/Tests/PouncerGround.meta',
-    'tasks/desert-rv/unity/Assets/DesertRV/Tests/PouncerGround/DesertRV.PouncerGroundTests.asmdef',
-    'tasks/desert-rv/unity/Assets/DesertRV/Tests/PouncerGround/DesertRV.PouncerGroundTests.asmdef.meta',
     'tasks/desert-rv/unity/Assets/DesertRV/Tests/PouncerGround/PouncerGroundSupportTests.cs',
-    'tasks/desert-rv/unity/Assets/DesertRV/Tests/PouncerGround/PouncerGroundSupportTests.cs.meta',
 })
 
 

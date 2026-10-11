@@ -235,7 +235,7 @@ class ActualRunnerShellRoute(unittest.TestCase):
 
     def test_prepared_producer_is_separate_from_r1_consumer_parent(self):
         self.assertEqual(probe.PRODUCER['commit'],probe.PRODUCTION_BASE)
-        self.assertEqual(probe.BASE,probe.PRODUCTION_BASE)
+        self.assertNotEqual(probe.BASE,probe.PRODUCTION_BASE)
         self.assertEqual(probe.PRODUCER['runId'],38091066745)
         self.assertNotEqual(identity_fixture()[2],probe.PRODUCER['commit'])
 

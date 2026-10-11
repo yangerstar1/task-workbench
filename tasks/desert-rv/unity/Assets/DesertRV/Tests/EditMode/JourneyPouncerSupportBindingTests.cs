@@ -60,13 +60,16 @@ namespace DesertRV.Tests
         }
         [Serializable] public sealed class AuthorResult
         {
-            public int schema = 1;
-            public string status = "INCOMPLETE_DERIVED_SCENES_UNREVIEWED", sourceCommit, inputSha256, unityVersion, failureStage, failureCode;
+            public int schema = 2;
+            public string status = "INCOMPLETE_DERIVED_SCENES_UNREVIEWED", sourceCommit = string.Empty, inputSha256 = string.Empty, unityVersion = string.Empty, failureStage = string.Empty, failureCode = string.Empty;
+            public string cleanupCode = string.Empty, failureExceptionClass = string.Empty, failureMessageSha256 = string.Empty, failureStackSha256 = string.Empty, failureSourceMethod = string.Empty;
+            public int failureSourceLine, initialSceneCount, initialUntitledCount, initialDirtyCount, initialRootCount, recoverySceneCount;
+            public bool initialSetupRestorable, initialScenesProtected;
             public bool approved, saved, reloaded, bindingsValid, posesUnchanged, colliderGeometryUnchanged,
                 healthUnchanged, approvalFlagsUnchanged, sceneMetasUnchanged, sourcesUnchanged, existingSerializedStateUnchanged;
             public SceneResult[] scenes = Array.Empty<SceneResult>();
         }
-        sealed class GateFailure : Exception { internal readonly string code; internal GateFailure(string code) { this.code = code; } }
+        sealed class GateFailure : Exception { internal readonly string code; internal GateFailure(string code) : base(code) { this.code = code; } }
         sealed class SceneState
         {
             internal Dictionary<string, string> poses, colliders, health, serialized;
@@ -81,6 +84,137 @@ namespace DesertRV.Tests
         {
             using (var sha = SHA256.Create()) using (var file = File.OpenRead(path))
                 return BitConverter.ToString(sha.ComputeHash(file)).Replace("-", "").ToLowerInvariant();
+        }
+        static string HashText(string text)
+        {
+            using (var sha = SHA256.Create()) return BitConverter.ToString(sha.ComputeHash(System.Text.Encoding.UTF8.GetBytes(text ?? ""))).Replace("-", "").ToLowerInvariant();
+        }
+        static Exception Cause(Exception error)
+        {
+            while (error is TargetInvocationException && error.InnerException != null) error = error.InnerException;
+            return error;
+        }
+        static void FirstFailure(AuthorResult result, Exception error, string stage)
+        {
+            if (!string.IsNullOrEmpty(result.failureCode)) return;
+            error = Cause(error);
+            result.status = "INCOMPLETE_DERIVED_SCENES_UNREVIEWED";
+            result.failureStage = stage;
+            result.failureCode = error is GateFailure gate ? gate.code : "NATIVE_OPERATION_FAILED";
+            string kind = error.GetType().FullName;
+            var classes = new[] { "System.InvalidOperationException", "System.ArgumentException", "System.ArgumentNullException", "System.NullReferenceException", "System.NotSupportedException", "System.IndexOutOfRangeException", "System.Collections.Generic.KeyNotFoundException", "System.IO.IOException", "System.IO.FileNotFoundException", "System.IO.DirectoryNotFoundException", "System.UnauthorizedAccessException", "NUnit.Framework.AssertionException" };
+            result.failureExceptionClass = error is GateFailure ? "GateFailure" : classes.Contains(kind) ? kind : "Other";
+            result.failureMessageSha256 = HashText(error.Message); result.failureStackSha256 = HashText(error.StackTrace);
+            var methods = new[] { "BindPinnedPreparedScenes_SaveReloadPreservesSourceAndPoses", "Snapshot", "BindingState", "Actors", "Binding", "ExistingSerializedState", "NormalizedReference", "SerializedState", "OmitAuthorizedArray", "ColliderState", "Pose", "VerifyBindings", "Ordinary", "CheckSources", "Hash", "WriteResult" };
+            foreach (var frame in new System.Diagnostics.StackTrace(error, true).GetFrames() ?? Array.Empty<System.Diagnostics.StackFrame>())
+            {
+                var method = frame.GetMethod(); string file = frame.GetFileName(); int line = frame.GetFileLineNumber();
+                if (method == null || string.IsNullOrEmpty(file) || line <= 0 ||
+                    !file.Replace('\\', '/').EndsWith("/Assets/DesertRV/Tests/EditMode/JourneyPouncerSupportBindingTests.cs", StringComparison.Ordinal)) continue;
+                string member = method.DeclaringType == typeof(InitialSceneFixture) ? "InitialSceneFixture." + method.Name : method.Name;
+                if (method.DeclaringType == typeof(JourneyPouncerSupportBindingTests) && methods.Contains(member) ||
+                    method.DeclaringType == typeof(InitialSceneFixture) && new[] { "InitialSceneFixture.Prepare", "InitialSceneFixture.Restore", "InitialSceneFixture.Verify" }.Contains(member))
+                { result.failureSourceMethod = member; result.failureSourceLine = line; break; }
+            }
+        }
+        // Match the native-passed JourneyTracerMaterialTests fixture policy. Save-as-copy
+        // preserves unsaved content before an isolated batch scene identity is replaced.
+        sealed class InitialSceneFixture
+        {
+            readonly AuthorResult result;
+            readonly SceneSetup[] setup = EditorSceneManager.GetSceneManagerSetup();
+            readonly Scene[] previous = Enumerable.Range(0, SceneManager.sceneCount).Select(SceneManager.GetSceneAt).ToArray();
+            readonly Dictionary<string, byte[]> originalFiles = new Dictionary<string, byte[]>(), recoveryFiles = new Dictionary<string, byte[]>();
+            readonly Dictionary<string, Dictionary<string, string>> originalStates = new Dictionary<string, Dictionary<string, string>>();
+            readonly List<string> temporaryCopies = new List<string>();
+            readonly string id = Guid.NewGuid().ToString("N");
+            readonly int loadedCount, activeHandle;
+            readonly bool[] dirty;
+            readonly int[][] rootIds;
+            bool replaced;
+            internal InitialSceneFixture(AuthorResult result)
+            {
+                this.result = result;
+                loadedCount = previous.Count(s => s.isLoaded); activeHandle = SceneManager.GetActiveScene().handle;
+                dirty = previous.Select(s => s.isDirty).ToArray();
+                rootIds = previous.Select(s => s.isLoaded ? s.GetRootGameObjects().Select(r => r.GetInstanceID()).ToArray() : Array.Empty<int>()).ToArray();
+                result.initialSceneCount = previous.Length;
+                result.initialUntitledCount = previous.Count(s => string.IsNullOrEmpty(s.path));
+                result.initialDirtyCount = previous.Count(s => s.isLoaded && s.isDirty);
+                result.initialRootCount = previous.Where(s => s.isLoaded).Sum(s => s.rootCount);
+                Check(previous.Length <= 16 && result.initialRootCount <= 100000, "INITIAL_SCENE_INVENTORY_BOUND");
+                result.initialSetupRestorable = setup.Any(s => s.isLoaded && s.isActive) &&
+                    setup.All(s => !string.IsNullOrEmpty(s.path) && File.Exists(s.path)) && previous.All(s => !s.isLoaded || !s.isDirty);
+                Check(result.initialSetupRestorable || previous.Length == 0 || Application.isBatchMode, "INITIAL_SCENE_REQUIRES_BATCH_RECOVERY");
+                foreach (string path in setup.Select(s => s.path).Where(p => !string.IsNullOrEmpty(p)).SelectMany(p => new[] { p, p + ".meta" }).Distinct().Where(File.Exists))
+                    originalFiles.Add(path, File.ReadAllBytes(path));
+            }
+            internal void Prepare()
+            {
+                if (result.initialSetupRestorable)
+                    foreach (var scene in previous.Where(s => s.isLoaded)) originalStates.Add(scene.path, ExistingSerializedState(scene));
+                else if (previous.Any(s => s.isLoaded))
+                {
+                    string recovery = "Library/DesertRVPouncerAuthorFixture/" + id;
+                    Check(!Directory.Exists(recovery), "INITIAL_RECOVERY_ALREADY_EXISTS"); Directory.CreateDirectory(recovery);
+                    for (int i = 0; i < previous.Length; i++)
+                    {
+                        var scene = previous[i]; if (!scene.isLoaded) continue;
+                        string originalPath = scene.path; bool dirty = scene.isDirty;
+                        string copy = "Assets/JourneyPouncerAuthorInitial_" + id + "_" + i + ".unity";
+                        Check(!File.Exists(copy) && !File.Exists(copy + ".meta"), "INITIAL_RECOVERY_COPY_EXISTS"); temporaryCopies.Add(copy);
+                        Check(!EditorSceneManager.IsPreviewScene(scene) && EditorSceneManager.SaveScene(scene, copy, true), "INITIAL_RECOVERY_SAVE_FAILED");
+                        foreach (string suffix in new[] { "", ".meta" })
+                        {
+                            string destination = recovery + "/Initial-" + i + ".unity" + suffix;
+                            byte[] bytes = File.ReadAllBytes(copy + suffix); File.WriteAllBytes(destination, bytes); recoveryFiles.Add(destination, bytes);
+                            Check(File.ReadAllBytes(destination).SequenceEqual(bytes), "INITIAL_RECOVERY_BYTES_CHANGED");
+                        }
+                        Check(scene.path == originalPath && scene.isDirty == dirty, "INITIAL_SAVE_COPY_CHANGED_SOURCE");
+                        result.recoverySceneCount++;
+                        Check(AssetDatabase.DeleteAsset(copy) && !File.Exists(copy) && !File.Exists(copy + ".meta"), "INITIAL_RECOVERY_TEMP_DELETE_FAILED");
+                    }
+                }
+                replaced = true; EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
+            }
+            internal void Restore(Action<Action> attempt)
+            {
+                if (replaced) attempt(() => {
+                    EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
+                    if (result.initialSetupRestorable) EditorSceneManager.RestoreSceneManagerSetup(setup);
+                });
+                foreach (string copy in temporaryCopies)
+                    attempt(() => { if (File.Exists(copy) || File.Exists(copy + ".meta"))
+                        Check(AssetDatabase.DeleteAsset(copy) && !File.Exists(copy) && !File.Exists(copy + ".meta"), "INITIAL_RECOVERY_TEMP_DELETE_FAILED");
+                    });
+                attempt(Verify);
+            }
+            internal void Verify()
+            {
+                foreach (var pair in originalFiles) Check(File.ReadAllBytes(pair.Key).SequenceEqual(pair.Value), "INITIAL_ORIGINAL_BYTES_CHANGED");
+                foreach (var pair in recoveryFiles) Check(File.ReadAllBytes(pair.Key).SequenceEqual(pair.Value), "INITIAL_RECOVERY_BYTES_CHANGED");
+                if (!replaced)
+                {
+                    Check(SceneManager.sceneCount == previous.Length && previous.Select((s, i) => s.handle == SceneManager.GetSceneAt(i).handle && s.isDirty == dirty[i] &&
+                        (!s.isLoaded || s.GetRootGameObjects().Select(r => r.GetInstanceID()).SequenceEqual(rootIds[i]))).All(v => v) &&
+                        SceneManager.GetActiveScene().handle == activeHandle, "INITIAL_UNREPLACED_SETUP_CHANGED");
+                    result.initialScenesProtected = true; return;
+                }
+                if (result.initialSetupRestorable)
+                {
+                    var after = EditorSceneManager.GetSceneManagerSetup();
+                    Check(setup.Length == after.Length && setup.Zip(after, (a, b) => a.path == b.path && a.isLoaded == b.isLoaded && a.isActive == b.isActive).All(v => v), "INITIAL_NAMED_SETUP_CHANGED");
+                    foreach (var pair in originalStates) Check(Equal(pair.Value, ExistingSerializedState(SceneManager.GetSceneByPath(pair.Key))), "INITIAL_NAMED_CONTENT_CHANGED");
+                }
+                else
+                {
+                    var empty = SceneManager.GetActiveScene();
+                    Check(SceneManager.sceneCount == 1 && empty.IsValid() && empty.isLoaded && string.IsNullOrEmpty(empty.path) && empty.rootCount == 0, "INITIAL_BATCH_FINAL_SCENE_INVALID");
+                    Check(result.recoverySceneCount == loadedCount && recoveryFiles.Count == 2 * result.recoverySceneCount, "INITIAL_RECOVERY_INCOMPLETE");
+                }
+                Check(Enumerable.Range(0, SceneManager.sceneCount).Select(SceneManager.GetSceneAt).All(s => !s.isLoaded || !s.isDirty), "INITIAL_FINAL_SCENE_DIRTY");
+                result.initialScenesProtected = true;
+            }
         }
         static string Number(float value)
         {
@@ -154,33 +288,53 @@ namespace DesertRV.Tests
             }
             return string.Join("\n", values);
         }
-        static string OmitAuthorizedArray(string json, string name)
+        static string OmitAuthorizedArray(string json, SerializedObject serialized, string name)
         {
             // Only these two known top-level reference arrays are omitted. The complete
             // original ordered GameObject component list is independently included below.
-            string pattern = "\"" + name + "\"\\s*:\\s*(?:null|\\[[^\\[\\]]*\\])";
+            var property = serialized.FindProperty(name);
+            Check((name == "m_Component" || name == "pouncerSupportSurfaces") && property != null && property.isArray,
+                "AUTHORIZED_SERIALIZED_ARRAY_NOT_FOUND");
+            string key = "\"" + name + "\"\\s*:";
+            int occurrences = Regex.Matches(json, key).Count;
+            Check(occurrences <= 1, "AUTHORIZED_SERIALIZED_ARRAY_NOT_FOUND");
+            if (occurrences == 0) return json; // Scene-reference arrays may be omitted by EditorJsonUtility.
+            string pattern = key + "\\s*(?:null|\\[[^\\[\\]]*\\])(?=\\s*[,}])";
             Check(Regex.Matches(json, pattern).Count == 1, "AUTHORIZED_SERIALIZED_ARRAY_NOT_FOUND");
-            return Regex.Replace(json, pattern, "\"" + name + "\":[]");
+            return Regex.Replace(json, "(?:,\\s*" + pattern + "|" + pattern + "\\s*,?)", "");
         }
         static string SerializedState(Object value, Func<Object, string> normalize)
         {
             string json = EditorJsonUtility.ToJson(value);
             string componentInventory = "";
+            var references = new List<string>();
+            // EditorJsonUtility documents asset GUID/local IDs but omits scene-object
+            // references. Read every actual ObjectReference from SerializedObject too.
+            var serialized = new SerializedObject(value); var property = serialized.GetIterator();
+            while (property.Next(true))
+            {
+                if (value is GameObject && (property.propertyPath == "m_Component" || property.propertyPath.StartsWith("m_Component.", StringComparison.Ordinal))) continue;
+                if (value.GetType() == Runtime("RegionBinding") && (property.propertyPath == "pouncerSupportSurfaces" || property.propertyPath.StartsWith("pouncerSupportSurfaces.", StringComparison.Ordinal))) continue;
+                if (property.propertyType != SerializedPropertyType.ObjectReference) continue;
+                var referenced = property.objectReferenceValue;
+                Check(referenced || property.objectReferenceInstanceIDValue == 0, "SERIALIZED_OBJECT_REFERENCE_UNRESOLVED");
+                references.Add(property.propertyPath + "=" + normalize(referenced));
+            }
             if (value is GameObject go)
             {
                 var components = go.GetComponents<Component>();
                 Check(components.All(c => c), "EXISTING_COMPONENT_MISSING");
                 componentInventory = string.Join("|", components.Where(c => c.GetType() != Runtime("PouncerGroundSupport")).Select(c => normalize(c)));
-                json = OmitAuthorizedArray(json, "m_Component");
+                json = OmitAuthorizedArray(json, serialized, "m_Component");
             }
-            if (value.GetType() == Runtime("RegionBinding")) json = OmitAuthorizedArray(json, "pouncerSupportSurfaces");
+            if (value.GetType() == Runtime("RegionBinding")) json = OmitAuthorizedArray(json, serialized, "pouncerSupportSurfaces");
             json = Regex.Replace(json, "\"instanceID\"\\s*:\\s*(-?[0-9]+)", match => {
                 int id = int.Parse(match.Groups[1].Value, CultureInfo.InvariantCulture);
                 var referenced = id == 0 ? null : EditorUtility.InstanceIDToObject(id);
                 Check(id == 0 || referenced, "SERIALIZED_OBJECT_REFERENCE_UNRESOLVED");
                 return "\"stableObjectId\":\"" + normalize(referenced) + "\"";
             });
-            return json + "\noriginalComponents=" + componentInventory;
+            return json + "\noriginalComponents=" + componentInventory + "\nobjectReferences=" + string.Join("\n", references);
         }
         static Dictionary<string, string> ExistingSerializedState(Scene scene)
         {
@@ -270,19 +424,29 @@ namespace DesertRV.Tests
         [Test, Explicit("Requires isolated pinned prepared scenes; writes only three derived scene files."), Timeout(600000)]
         public void BindPinnedPreparedScenes_SaveReloadPreservesSourceAndPoses()
         {
-            var result = new AuthorResult { sourceCommit = Environment.GetEnvironmentVariable("GITHUB_SHA"), unityVersion = Application.unityVersion, failureStage = "input" };
+            var result = new AuthorResult { sourceCommit = Environment.GetEnvironmentVariable("GITHUB_SHA") ?? string.Empty, unityVersion = Application.unityVersion, failureStage = "input" };
             var rows = new List<SceneResult>(); string dependencies = "[]"; Scene opened = default;
-            var initial = EditorSceneManager.GetSceneManagerSetup(); var active = SceneManager.GetActiveScene();
-            var initialScenes = Enumerable.Range(0, SceneManager.sceneCount).Select(SceneManager.GetSceneAt).ToArray();
-            var initialDirty = initialScenes.Select(s => s.isDirty).ToArray();
-            var initialRoots = initialScenes.Select(s => s.isLoaded ? s.GetRootGameObjects().Select(r => r.GetInstanceID()).ToArray() : Array.Empty<int>()).ToArray();
+            InitialSceneFixture initial = null;
+            System.Runtime.ExceptionServices.ExceptionDispatchInfo primaryFailure = null, cleanupFailure = null;
+            void Cleanup(Action action, string stage = "scene-lifecycle", string fallback = "INITIAL_SCENE_SETUP_NOT_RESTORED")
+            {
+                try { action(); }
+                catch (Exception error)
+                {
+                    if (cleanupFailure == null)
+                    {
+                        var cause = Cause(error);
+                        result.cleanupCode = cause is GateFailure gate ? gate.code : fallback;
+                        cleanupFailure = System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(error);
+                    }
+                    FirstFailure(result, error, stage);
+                }
+            }
             Check(!File.Exists(OutputPath), "OUTPUT_ALREADY_EXISTS");
             Directory.CreateDirectory(Folder); WriteResult(result, dependencies);
             try
             {
                 Check(Application.isBatchMode && !Application.isPlaying && !BuildPipeline.isBuildingPlayer && Application.unityVersion == "6000.3.19f1", "PINNED_BATCH_EDITMODE_REQUIRED");
-                // Additive lifecycle preserves even dirty/unsaved initial content. Only
-                // owned ordinary targets close; their handles must not exist beforehand.
                 Check(ScenePaths.All(p => !SceneManager.GetSceneByPath(p).IsValid()), "INITIAL_SCENE_STATE_NOT_ISOLATED");
                 result.inputSha256 = File.ReadAllText(Folder + "/author-input.sha256").Trim();
                 Check(Sha(result.inputSha256) && Hash(InputPath) == result.inputSha256, "AUTHOR_INPUT_HASH_INVALID");
@@ -295,26 +459,32 @@ namespace DesertRV.Tests
                     input.scenes[i].metaSha256 == MetaHashes[i] && Hash(ScenePaths[i]) == SceneHashes[i] && Hash(ScenePaths[i] + ".meta") == MetaHashes[i], "PREPARED_SCENE_PIN_CHANGED");
                 var binder = Editor("JourneyCandidateAssetIntegration").GetMethod("BindPouncerGroundSupport", BindingFlags.Public | BindingFlags.Static);
                 Check(binder != null && binder.ReturnType == typeof(void), "PRODUCTION_BINDER_ABSENT");
+                result.failureStage = "initial-protection"; initial = new InitialSceneFixture(result); initial.Prepare();
                 for (int i = 0; i < 3; i++)
                 {
-                    result.failureStage = "scene-authoring";
-                    opened = EditorSceneManager.OpenScene(ScenePaths[i], OpenSceneMode.Additive); Ordinary(opened, ScenePaths[i]);
+                    result.failureStage = "scene-open";
+                    opened = EditorSceneManager.OpenScene(ScenePaths[i], OpenSceneMode.Single); Ordinary(opened, ScenePaths[i]);
+                    result.failureStage = "before-snapshot";
                     var binding = Binding(opened, i + 1); var before = Snapshot(opened, binding);
                     Check(All(opened, Runtime("PouncerGroundSupport")).Length == 0, "PREPARED_SCENE_ALREADY_DERIVED");
-                    binder.Invoke(null, new object[] { binding }); VerifyBindings(opened, binding); Unchanged(before, Snapshot(opened, binding));
+                    result.failureStage = "binder"; binder.Invoke(null, new object[] { binding }); VerifyBindings(opened, binding);
+                    result.failureStage = "after-snapshot"; Unchanged(before, Snapshot(opened, binding));
+                    result.failureStage = "scene-save";
                     EditorSceneManager.MarkSceneDirty(opened);
                     Check(EditorSceneManager.SaveScene(opened, ScenePaths[i]), "DERIVED_SCENE_SAVE_FAILED");
                     string after = Hash(ScenePaths[i]); Check(after != SceneHashes[i], "DERIVED_SCENE_WAS_NOT_WRITTEN");
-                    Check(EditorSceneManager.CloseScene(opened, true), "DERIVED_SCENE_CLOSE_FAILED"); opened = default;
-                    Check(!SceneManager.GetSceneByPath(ScenePaths[i]).IsValid(), "DERIVED_SCENE_REMAINS_LOADED");
+                    // The native-passed ordinary Single reopen closes the old scene and
+                    // reads the saved bytes without attempting to close the last scene.
                     result.failureStage = "scene-reload";
-                    opened = EditorSceneManager.OpenScene(ScenePaths[i], OpenSceneMode.Additive); Ordinary(opened, ScenePaths[i]);
+                    EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
+                    Check(!SceneManager.GetSceneByPath(ScenePaths[i]).IsValid(), "DERIVED_SCENE_REMAINS_LOADED");
+                    opened = EditorSceneManager.OpenScene(ScenePaths[i], OpenSceneMode.Single); Ordinary(opened, ScenePaths[i]);
+                    result.failureStage = "reloaded-snapshot";
                     binding = Binding(opened, i + 1); VerifyBindings(opened, binding); Unchanged(before, Snapshot(opened, binding));
                     Check(!opened.isDirty && Hash(ScenePaths[i]) == after && Hash(ScenePaths[i] + ".meta") == MetaHashes[i], "RELOADED_SCENE_OR_META_CHANGED");
                     var actors = Actors(opened, binding);
                     rows.Add(new SceneResult { path = ScenePaths[i], beforeSha256 = SceneHashes[i], afterSha256 = after, actorCount = actors.Length,
                         pouncerCount = actors.Count(a => !(bool)Field(a, "armored")), supportCount = All(opened, Runtime("PouncerGroundSupport")).Length });
-                    Check(EditorSceneManager.CloseScene(opened, true), "RELOADED_SCENE_CLOSE_FAILED"); opened = default;
                 }
                 result.failureStage = "source-safety";
                 CheckSources(input); result.sourcesUnchanged = true;
@@ -330,32 +500,23 @@ namespace DesertRV.Tests
                 Check(rows.All(row => Hash(row.path) == row.afterSha256) && ScenePaths.Select((p, i) => Hash(p + ".meta") == MetaHashes[i]).All(v => v), "FINAL_SCENE_PIN_CHANGED");
                 result.saved = result.reloaded = result.bindingsValid = result.posesUnchanged = result.colliderGeometryUnchanged = result.healthUnchanged = result.approvalFlagsUnchanged = result.existingSerializedStateUnchanged = true;
             }
-            catch (GateFailure error) { result.failureCode = error.code; }
-            catch (Exception) { result.failureCode = "NATIVE_OPERATION_FAILED"; }
+            catch (Exception error)
+            {
+                FirstFailure(result, error, result.failureStage);
+                primaryFailure = System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(error);
+            }
             finally
             {
-                try
-                {
-                    if (opened.IsValid() && opened.isLoaded) Check(EditorSceneManager.CloseScene(opened, true), "OWNED_SCENE_CLOSE_FAILED");
-                    if (active.IsValid() && active.isLoaded) Check(SceneManager.SetActiveScene(active), "INITIAL_ACTIVE_SCENE_RESTORE_FAILED");
-                    var after = EditorSceneManager.GetSceneManagerSetup();
-                    Check(initial.Length == after.Length && initial.Zip(after, (a, b) => a.path == b.path && a.isLoaded == b.isLoaded && a.isActive == b.isActive).All(v => v), "INITIAL_SCENE_SETUP_CHANGED");
-                    Check(SceneManager.sceneCount == initialScenes.Length, "INITIAL_SCENE_COUNT_CHANGED");
-                    for (int i = 0; i < initialScenes.Length; i++)
-                    {
-                        var scene = SceneManager.GetSceneAt(i);
-                        Check(scene.handle == initialScenes[i].handle && scene.isDirty == initialDirty[i] &&
-                            (!scene.isLoaded || scene.GetRootGameObjects().Select(r => r.GetInstanceID()).SequenceEqual(initialRoots[i])), "INITIAL_SCENE_CONTENT_CHANGED");
-                    }
-                    Check(SceneManager.GetActiveScene().handle == active.handle, "INITIAL_ACTIVE_SCENE_CHANGED");
-                }
-                catch (Exception) { result.failureStage = "scene-lifecycle"; result.failureCode = "INITIAL_SCENE_SETUP_NOT_RESTORED"; }
+                if (initial != null) initial.Restore(action => Cleanup(action));
                 result.scenes = rows.ToArray();
-                if (string.IsNullOrEmpty(result.failureCode) && rows.Count == 3)
+                if (primaryFailure == null && cleanupFailure == null && result.initialScenesProtected && rows.Count == 3)
                 { result.status = "COMPLETED_DERIVED_SCENES_UNREVIEWED"; result.failureStage = ""; result.failureCode = ""; }
                 else dependencies = "[]";
-                WriteResult(result, dependencies);
+                // Receipt IO must not replace the authentic earlier NUnit exception.
+                Cleanup(() => WriteResult(result, dependencies), "receipt-write", "AUTHOR_RECEIPT_WRITE_FAILED");
             }
+            if (primaryFailure != null) primaryFailure.Throw();
+            if (cleanupFailure != null) cleanupFailure.Throw();
             Assert.That(result.status, Is.EqualTo("COMPLETED_DERIVED_SCENES_UNREVIEWED"), "Pouncer support authoring incomplete: " + result.failureStage + "/" + result.failureCode);
         }
     }

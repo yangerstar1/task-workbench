@@ -1,6 +1,7 @@
 """Host validation tests use synthetic records; they are not native Unity proof."""
 import copy
 import math
+import json
 import unittest
 
 import journey_pouncer_support_reports as reports
@@ -16,10 +17,22 @@ def author_fixture():
                     'packageName': '', 'packageVersion': '', 'bytes': 100 + i}
                    for i, p in enumerate(pins)], key=lambda p: p['path'])
     value = dict.fromkeys(reports.AUTHOR_FLAGS, True)
-    value.update(schema=1, status=reports.AUTHOR_COMPLETE, sourceCommit=SOURCE, inputSha256=INPUT,
+    value.update(dict.fromkeys(reports.AUTHOR_DIAGNOSTICS, ''))
+    value.update(dict.fromkeys(reports.AUTHOR_COUNTS, 0))
+    value.update(initialSceneCount=1, initialUntitledCount=1, recoverySceneCount=1, initialSetupRestorable=False)
+    value.update(schema=2, status=reports.AUTHOR_COMPLETE, sourceCommit=SOURCE, inputSha256=INPUT,
                  unityVersion=reports.UNITY, failureStage='', failureCode='', approved=False,
                  scenes=[dict(p, actorCount=3, pouncerCount=2, supportCount=2) for p in pins], dependencies=copy.deepcopy(deps))
     return value, deps, pins
+
+
+def author_failure(value, stage='before-snapshot', code='NATIVE_OPERATION_FAILED', **changes):
+    value.update(status=reports.AUTHOR_INCOMPLETE, failureStage=stage, failureCode=code,
+                 failureExceptionClass='GateFailure' if code != 'NATIVE_OPERATION_FAILED' else 'Other',
+                 failureMessageSha256='a' * 64, failureStackSha256='b' * 64,
+                 failureSourceMethod='Snapshot', failureSourceLine=400)
+    value.update(changes)
+    return value
 
 
 def focused_case(index):
@@ -76,8 +89,7 @@ class AuthorReportTests(unittest.TestCase):
         for count in range(4):
             with self.subTest(count=count):
                 value, _, _ = author_fixture()
-                value.update(status=reports.AUTHOR_INCOMPLETE, failureStage='scene-reload', failureCode='NATIVE_OPERATION_FAILED',
-                             scenes=value['scenes'][:count], dependencies=[])
+                author_failure(value, stage='scene-reload', scenes=value['scenes'][:count], dependencies=[])
                 for flag in reports.AUTHOR_FLAGS:
                     value[flag] = False
                 self.assertFalse(self.verify(value, complete=False))
@@ -126,7 +138,7 @@ class AuthorReportTests(unittest.TestCase):
         with self.assertRaises(ValueError): self.verify(value)
 
     def test_incomplete_nonempty_dependencies_still_match_and_strings_stay_bounded(self):
-        value, _, _ = author_fixture(); value.update(status=reports.AUTHOR_INCOMPLETE, failureStage='dependencies', failureCode='NATIVE_OPERATION_FAILED')
+        value, _, _ = author_fixture(); author_failure(value, stage='dependencies')
         self.assertFalse(self.verify(value, complete=False))
         value['dependencies'][0]['bytes'] += 1
         with self.assertRaises(ValueError): self.verify(value, complete=False)
@@ -147,6 +159,74 @@ class AuthorReportTests(unittest.TestCase):
         for key, replacement in [('packageName', 'com.evil.tool'), ('packageVersion', '../1.0'), ('bytes', -1)]:
             changed = copy.deepcopy(rows); changed[0][key] = replacement
             with self.subTest(key=key), self.assertRaises(ValueError): reports.dependencies(changed)
+
+
+    def test_named_restore_and_batch_recovery_success_json_roundtrip(self):
+        value, _, _ = author_fixture()
+        for named in (False, True):
+            value.update(initialSetupRestorable=named, initialUntitledCount=0 if named else 1,
+                         recoverySceneCount=0 if named else 1, initialDirtyCount=0)
+            self.assertTrue(self.verify(json.loads(json.dumps(value))))
+
+    def test_initialized_earliest_report_and_all_failure_codes_roundtrip(self):
+        value, _, _ = author_fixture()
+        value.update(dict.fromkeys(reports.AUTHOR_FLAGS, False))
+        value.update(dict.fromkeys(reports.AUTHOR_COUNTS, 0))
+        value.update(initialSetupRestorable=False, inputSha256='', sourceCommit='',
+                     scenes=[], dependencies=[], status=reports.AUTHOR_INCOMPLETE,
+                     failureStage='input', failureCode='')
+        self.assertFalse(self.verify(json.loads(json.dumps(value)), complete=False))
+        for stage in reports.AUTHOR_STAGES:
+            for code in reports.AUTHOR_CODES:
+                candidate = copy.deepcopy(value)
+                author_failure(candidate, stage=stage, code=code, inputSha256=INPUT, sourceCommit=SOURCE)
+                with self.subTest(stage=stage, code=code):
+                    self.assertFalse(self.verify(json.loads(json.dumps(candidate)), complete=False))
+
+    def test_primary_cleanup_and_safe_unknown_frame_roundtrip(self):
+        for cleanup in sorted(reports.AUTHOR_CLEANUP_CODES):
+            value, _, _ = author_fixture()
+            author_failure(value, code='UNSTABLE_SERIALIZED_OBJECT_REFERENCE',
+                           cleanupCode=cleanup, failureSourceMethod='', failureSourceLine=0)
+            with self.subTest(cleanup=cleanup):
+                self.assertFalse(self.verify(json.loads(json.dumps(value)), complete=False))
+                self.assertEqual(value['failureCode'], 'UNSTABLE_SERIALIZED_OBJECT_REFERENCE')
+        value, _, _ = author_fixture()
+        author_failure(value, stage='scene-lifecycle', code='INITIAL_NAMED_SETUP_CHANGED',
+                       cleanupCode='INITIAL_NAMED_SETUP_CHANGED')
+        self.assertFalse(self.verify(value, complete=False))
+        value, _, _ = author_fixture()
+        author_failure(value, stage='receipt-write', cleanupCode='AUTHOR_RECEIPT_WRITE_FAILED')
+        self.assertFalse(self.verify(value, complete=False))
+
+    def test_inventory_overflow_remains_safe_incomplete_evidence(self):
+        value, _, _ = author_fixture()
+        author_failure(value, stage='initial-protection', code='INITIAL_SCENE_INVENTORY_BOUND',
+                       initialSceneCount=2**31 - 1, initialUntitledCount=17, initialRootCount=2**31 - 1,
+                       initialDirtyCount=1, recoverySceneCount=0, initialScenesProtected=False)
+        self.assertFalse(self.verify(json.loads(json.dumps(value)), complete=False))
+        for name in reports.AUTHOR_COUNTS:
+            invalid = copy.deepcopy(value); invalid[name] = 2**31
+            with self.subTest(name=name), self.assertRaises(ValueError): self.verify(invalid, complete=False)
+        value, _, _ = author_fixture(); value['initialSceneCount'] = 17
+        with self.assertRaises(ValueError): self.verify(value)
+        value, _, _ = author_fixture(); value['initialRootCount'] = 100001
+        with self.assertRaises(ValueError): self.verify(value)
+
+    def test_schema2_diagnostics_fail_closed(self):
+        mutations = [('schema', 1), ('initialSetupRestorable', 1), ('cleanupCode', 'private-path'),
+                     ('failureExceptionClass', 'Runtime.PrivateType'), ('failureMessageSha256', '/private/error'),
+                     ('failureStackSha256', ''), ('failureSourceMethod', 'SomeMethod'), ('failureSourceLine', 0),
+                     ('initialSceneCount', -1), ('initialRootCount', True), ('recoverySceneCount', 2),
+                     ('initialDirtyCount', 2), ('initialUntitledCount', 2)]
+        for key, replacement in mutations:
+            value, _, _ = author_fixture(); author_failure(value); value[key] = replacement
+            with self.subTest(key=key), self.assertRaises(ValueError): self.verify(value, complete=False)
+        for name in reports.AUTHOR_DIAGNOSTICS:
+            value, _, _ = author_fixture(); value[name] = None
+            with self.subTest(null=name), self.assertRaises(ValueError): self.verify(value)
+        value, _, _ = author_fixture(); value['initialSetupRestorable'] = True
+        with self.assertRaises(ValueError): self.verify(value)
 
 
 class FocusedReportTests(unittest.TestCase):

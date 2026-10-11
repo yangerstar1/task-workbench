@@ -146,11 +146,11 @@ namespace DesertRV.Tests
             AnimationClip clip;
             bool disposed;
             int rawPoseEvaluation;
-            readonly bool isolatedPhysics;
+            readonly bool ordinaryEditorScene;
 
-            public Fixture(bool nonuniformAncestor = false, bool withFloor = true, bool isolatedPhysics = false)
+            public Fixture(bool nonuniformAncestor = false, bool withFloor = true, bool ordinaryEditorScene = false)
             {
-                this.isolatedPhysics = isolatedPhysics;
+                this.ordinaryEditorScene = ordinaryEditorScene;
                 originalActive = SceneManager.GetActiveScene(); QualitySettings.skinWeights = SkinWeights.Unlimited;
                 try
                 {
@@ -244,16 +244,27 @@ namespace DesertRV.Tests
                     }
                     AssertRawNativeGeometry();
                 }
-                catch { Dispose(); throw; }
+                catch (Exception primary)
+                {
+                    try { Dispose(); }
+                    catch (Exception cleanup) { throw new AggregateException("Paw fixture construction failed; cleanup also failed.", primary, cleanup); }
+                    throw;
+                }
             }
+            public bool OwnsScene(Scene scene) => ownedScenes.Exists(owned => owned.handle == scene.handle);
             public Scene CreateOwnedScene()
             {
-                // Preview scenes preserve the caller's unsaved active scene. Both owners still
-                // contain real colliders; actual PhysicsScene equality is observed, not assumed.
-                var scene = isolatedPhysics
-                    ? SceneManager.CreateScene("PouncerGroundPhysics_" + Guid.NewGuid().ToString("N"), new CreateSceneParameters(LocalPhysicsMode.Physics3D))
+                // Original model tests retain their proven preview path. Capsule tests opt
+                // into ordinary Editor scenes inside a separate batch-safe recovery scope.
+                var scene = ordinaryEditorScene
+                    ? EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Additive)
                     : EditorSceneManager.NewPreviewScene();
-                ownedScenes.Add(scene);
+                ownedScenes.Add(scene); // Register before any validation or object creation.
+                if (ordinaryEditorScene)
+                {
+                    Assert.That(!EditorSceneManager.IsPreviewScene(scene) && scene.GetPhysicsScene().Equals(Physics.defaultPhysicsScene), Is.True);
+                    Assert.That(SceneManager.SetActiveScene(scene), Is.True, "Owned ordinary scene must receive newly constructed objects.");
+                }
                 return scene;
             }
             public BoxCollider AddFloor(Scene scene, float top, string name)
@@ -409,20 +420,43 @@ namespace DesertRV.Tests
             public void Dispose()
             {
                 if (disposed) return; disposed = true;
-                if (Root) UnityEngine.Object.DestroyImmediate(Root);
-                if (Source) UnityEngine.Object.DestroyImmediate(Source);
-                if (ClawSource) UnityEngine.Object.DestroyImmediate(ClawSource);
-                QualitySettings.skinWeights=originalWeights;
-                if (!string.IsNullOrEmpty(AssetDatabase.AssetPathToGUID(controllerPath))) AssetDatabase.DeleteAsset(controllerPath);
-                else if (clip) UnityEngine.Object.DestroyImmediate(clip);
-                if (originalActive.IsValid() && originalActive.isLoaded) SceneManager.SetActiveScene(originalActive);
+                var errors = new List<Exception>();
+                void Attempt(Action action) { try { action(); } catch (Exception error) { errors.Add(error); } }
+                // Never try to close the last ordinary scene. An empty initial Untitled can
+                // be replaced by Unity when adding a scene; the outer batch scope restores
+                // the named setup or keeps its verified recovery copy plus an empty scene.
+                if (ordinaryEditorScene) Attempt(() => {
+                    if (originalActive.IsValid() && originalActive.isLoaded && !OwnsScene(originalActive))
+                        Assert.That(SceneManager.SetActiveScene(originalActive), Is.True);
+                    else
+                    {
+                        var keeper = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Additive);
+                        Assert.That(SceneManager.SetActiveScene(keeper), Is.True);
+                    }
+                });
+                Attempt(() => { if (Root) UnityEngine.Object.DestroyImmediate(Root); });
+                Attempt(() => { if (Source) UnityEngine.Object.DestroyImmediate(Source); });
+                Attempt(() => { if (ClawSource) UnityEngine.Object.DestroyImmediate(ClawSource); });
+                Attempt(() => QualitySettings.skinWeights = originalWeights);
+                Attempt(() => {
+                    if (!string.IsNullOrEmpty(AssetDatabase.AssetPathToGUID(controllerPath)))
+                        Assert.That(AssetDatabase.DeleteAsset(controllerPath), Is.True, "Owned controller deletion failed.");
+                    else if (clip) UnityEngine.Object.DestroyImmediate(clip);
+                });
+                if (!ordinaryEditorScene) Attempt(() => {
+                    if (originalActive.IsValid() && originalActive.isLoaded) Assert.That(SceneManager.SetActiveScene(originalActive), Is.True);
+                });
                 for (int i = ownedScenes.Count - 1; i >= 0; i--)
                 {
                     var scene = ownedScenes[i];
-                    if (!scene.IsValid() || !scene.isLoaded) continue;
-                    if (EditorSceneManager.IsPreviewScene(scene)) EditorSceneManager.ClosePreviewScene(scene);
-                    else EditorSceneManager.CloseScene(scene, true);
+                    Attempt(() => {
+                        if (!scene.IsValid() || !scene.isLoaded) return;
+                        if (EditorSceneManager.IsPreviewScene(scene)) EditorSceneManager.ClosePreviewScene(scene);
+                        else Assert.That(EditorSceneManager.CloseScene(scene, true), Is.True, "Owned ordinary scene close failed.");
+                        Assert.That(!scene.IsValid() || !scene.isLoaded, Is.True, "Owned scene remains loaded after cleanup.");
+                    });
                 }
+                if (errors.Count != 0) throw new AggregateException("Paw fixture cleanup failed.", errors);
             }
         }
 

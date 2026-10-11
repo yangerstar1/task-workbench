@@ -17,10 +17,19 @@ BEFORE = (
     '4ab0e61c56b1a922cfd33473f69d8c74fcd4899da5bfb0d8020680e723e70de7',
     'f491acb525b971fa78f3dda56e859da839b3fca2d3af395ac4b31066b62e7e33',
 )
-AUTHOR_FLAGS = set('saved reloaded bindingsValid posesUnchanged colliderGeometryUnchanged healthUnchanged approvalFlagsUnchanged sceneMetasUnchanged sourcesUnchanged existingSerializedStateUnchanged'.split())
-AUTHOR_KEYS = AUTHOR_FLAGS | set('schema status sourceCommit inputSha256 unityVersion failureStage failureCode approved scenes dependencies'.split())
-AUTHOR_STAGES = set('input scene-authoring scene-reload source-safety dependencies final-pins scene-lifecycle'.split())
-AUTHOR_CODES = set('''NONFINITE_SCENE_VALUE UNSTABLE_SERIALIZED_ASSET_REFERENCE UNSTABLE_SERIALIZED_OBJECT_REFERENCE REGION_INVENTORY_CHANGED ACTOR_INVENTORY_CHANGED PREPARED_ACTORS_REQUIRED UNEXPECTED_COLLIDER_TYPE APPROVAL_GATE_OPENED REGION_STRUCTURE_INVALID PRODUCTION_APPROVAL_OPENED NONFINITE_REGION_VALUE AUTHORIZED_SERIALIZED_ARRAY_NOT_FOUND EXISTING_COMPONENT_MISSING SERIALIZED_OBJECT_REFERENCE_UNRESOLVED SCENE_COLLIDERS_ABSENT ROOT_POSES_CHANGED COLLIDER_GEOMETRY_CHANGED ACTOR_HEALTH_CHANGED EXISTING_REGION_BINDING_CHANGED EXISTING_SERIALIZED_STATE_CHANGED EXACT_SUPPORT_BOXES_ABSENT SERIALIZED_SUPPORT_REFERENCES_INVALID SUPPORT_COMPONENT_INVENTORY_INVALID SUPPORT_ARRAY_NOT_SERIALIZED SUPPORT_BOX_NOT_SERIALIZED ARMORED_SUPPORT_WAS_ADDED POUNCER_SUPPORT_NOT_UNIQUE SUPPORT_OBJECT_REFERENCES_INVALID SUPPORT_REFERENCE_NOT_SERIALIZED PRODUCTION_SUPPORT_VALIDATION_FAILED CROSS_SCENE_ACTOR_REFERENCE_ADDED SOURCE_PIN_INVENTORY_INVALID SOURCE_PIN_CHANGED ORDINARY_RESTORED_SCENE_REQUIRED PINNED_BATCH_EDITMODE_REQUIRED INITIAL_SCENE_STATE_NOT_ISOLATED AUTHOR_INPUT_HASH_INVALID AUTHOR_INPUT_IDENTITY_INVALID SCENE_PIN_INVENTORY_INVALID PREPARED_SCENE_PIN_CHANGED PRODUCTION_BINDER_ABSENT PREPARED_SCENE_ALREADY_DERIVED DERIVED_SCENE_SAVE_FAILED DERIVED_SCENE_WAS_NOT_WRITTEN DERIVED_SCENE_CLOSE_FAILED DERIVED_SCENE_REMAINS_LOADED RELOADED_SCENE_OR_META_CHANGED RELOADED_SCENE_CLOSE_FAILED AUTHOR_INPUT_CHANGED SCENE_META_CHANGED NATIVE_DEPENDENCY_SNAPSHOT_INVALID FINAL_SCENE_PIN_CHANGED NATIVE_OPERATION_FAILED INITIAL_SCENE_SETUP_NOT_RESTORED'''.split())
+AUTHOR_FLAGS = set('saved reloaded bindingsValid posesUnchanged colliderGeometryUnchanged healthUnchanged approvalFlagsUnchanged sceneMetasUnchanged sourcesUnchanged existingSerializedStateUnchanged initialScenesProtected'.split())
+AUTHOR_DIAGNOSTICS = set('cleanupCode failureExceptionClass failureMessageSha256 failureStackSha256 failureSourceMethod'.split())
+AUTHOR_COUNTS = set('failureSourceLine initialSceneCount initialUntitledCount initialDirtyCount initialRootCount recoverySceneCount'.split())
+AUTHOR_KEYS = AUTHOR_FLAGS | AUTHOR_DIAGNOSTICS | AUTHOR_COUNTS | set('schema status sourceCommit inputSha256 unityVersion failureStage failureCode approved scenes dependencies initialSetupRestorable'.split())
+AUTHOR_STAGES = set('input initial-protection scene-open before-snapshot binder after-snapshot scene-save scene-reload reloaded-snapshot source-safety dependencies final-pins scene-lifecycle receipt-write'.split())
+AUTHOR_INITIAL_CODES = set('INITIAL_SCENE_INVENTORY_BOUND INITIAL_SCENE_REQUIRES_BATCH_RECOVERY INITIAL_RECOVERY_ALREADY_EXISTS INITIAL_RECOVERY_COPY_EXISTS INITIAL_RECOVERY_SAVE_FAILED INITIAL_RECOVERY_BYTES_CHANGED INITIAL_SAVE_COPY_CHANGED_SOURCE INITIAL_RECOVERY_TEMP_DELETE_FAILED INITIAL_ORIGINAL_BYTES_CHANGED INITIAL_UNREPLACED_SETUP_CHANGED INITIAL_NAMED_SETUP_CHANGED INITIAL_NAMED_CONTENT_CHANGED INITIAL_BATCH_FINAL_SCENE_INVALID INITIAL_RECOVERY_INCOMPLETE INITIAL_FINAL_SCENE_DIRTY'.split())
+AUTHOR_CLEANUP_CODES = set('INITIAL_SCENE_SETUP_NOT_RESTORED INITIAL_RECOVERY_TEMP_DELETE_FAILED INITIAL_ORIGINAL_BYTES_CHANGED INITIAL_RECOVERY_BYTES_CHANGED INITIAL_UNREPLACED_SETUP_CHANGED INITIAL_NAMED_SETUP_CHANGED INITIAL_NAMED_CONTENT_CHANGED INITIAL_BATCH_FINAL_SCENE_INVALID INITIAL_RECOVERY_INCOMPLETE INITIAL_FINAL_SCENE_DIRTY AUTHOR_RECEIPT_WRITE_FAILED'.split())
+AUTHOR_EXCEPTION_CLASSES = {'GateFailure', 'Other'} | set('System.InvalidOperationException System.ArgumentException System.ArgumentNullException System.NullReferenceException System.NotSupportedException System.IndexOutOfRangeException System.Collections.Generic.KeyNotFoundException System.IO.IOException System.IO.FileNotFoundException System.IO.DirectoryNotFoundException System.UnauthorizedAccessException NUnit.Framework.AssertionException'.split())
+AUTHOR_METHODS = set('BindPinnedPreparedScenes_SaveReloadPreservesSourceAndPoses Snapshot BindingState Actors Binding ExistingSerializedState NormalizedReference SerializedState OmitAuthorizedArray ColliderState Pose VerifyBindings Ordinary CheckSources Hash WriteResult InitialSceneFixture.Prepare InitialSceneFixture.Restore InitialSceneFixture.Verify'.split())
+AUTHOR_CODES = set('''NONFINITE_SCENE_VALUE UNSTABLE_SERIALIZED_ASSET_REFERENCE UNSTABLE_SERIALIZED_OBJECT_REFERENCE REGION_INVENTORY_CHANGED ACTOR_INVENTORY_CHANGED PREPARED_ACTORS_REQUIRED UNEXPECTED_COLLIDER_TYPE APPROVAL_GATE_OPENED REGION_STRUCTURE_INVALID PRODUCTION_APPROVAL_OPENED NONFINITE_REGION_VALUE AUTHORIZED_SERIALIZED_ARRAY_NOT_FOUND EXISTING_COMPONENT_MISSING SERIALIZED_OBJECT_REFERENCE_UNRESOLVED SCENE_COLLIDERS_ABSENT ROOT_POSES_CHANGED COLLIDER_GEOMETRY_CHANGED ACTOR_HEALTH_CHANGED EXISTING_REGION_BINDING_CHANGED EXISTING_SERIALIZED_STATE_CHANGED EXACT_SUPPORT_BOXES_ABSENT SERIALIZED_SUPPORT_REFERENCES_INVALID SUPPORT_COMPONENT_INVENTORY_INVALID SUPPORT_ARRAY_NOT_SERIALIZED SUPPORT_BOX_NOT_SERIALIZED ARMORED_SUPPORT_WAS_ADDED POUNCER_SUPPORT_NOT_UNIQUE SUPPORT_OBJECT_REFERENCES_INVALID SUPPORT_REFERENCE_NOT_SERIALIZED PRODUCTION_SUPPORT_VALIDATION_FAILED CROSS_SCENE_ACTOR_REFERENCE_ADDED SOURCE_PIN_INVENTORY_INVALID SOURCE_PIN_CHANGED ORDINARY_RESTORED_SCENE_REQUIRED PINNED_BATCH_EDITMODE_REQUIRED INITIAL_SCENE_STATE_NOT_ISOLATED AUTHOR_INPUT_HASH_INVALID AUTHOR_INPUT_IDENTITY_INVALID SCENE_PIN_INVENTORY_INVALID PREPARED_SCENE_PIN_CHANGED PRODUCTION_BINDER_ABSENT PREPARED_SCENE_ALREADY_DERIVED DERIVED_SCENE_SAVE_FAILED DERIVED_SCENE_WAS_NOT_WRITTEN DERIVED_SCENE_REMAINS_LOADED RELOADED_SCENE_OR_META_CHANGED AUTHOR_INPUT_CHANGED SCENE_META_CHANGED NATIVE_DEPENDENCY_SNAPSHOT_INVALID FINAL_SCENE_PIN_CHANGED NATIVE_OPERATION_FAILED INITIAL_SCENE_SETUP_NOT_RESTORED'''.split())
+AUTHOR_CODES |= AUTHOR_INITIAL_CODES
+# Restored named scenes use these same guarded serialization helpers.
+AUTHOR_CLEANUP_CODES |= set('UNSTABLE_SERIALIZED_ASSET_REFERENCE UNSTABLE_SERIALIZED_OBJECT_REFERENCE AUTHORIZED_SERIALIZED_ARRAY_NOT_FOUND EXISTING_COMPONENT_MISSING SERIALIZED_OBJECT_REFERENCE_UNRESOLVED'.split())
 DEP_KEYS = set('path sha256 kind packageName packageVersion bytes'.split())
 BUILTINS = {'Resources/unity_builtin_extra', 'Library/unity default resources'}
 AUTHOR_COMPLETE = 'COMPLETED_DERIVED_SCENES_UNREVIEWED'
@@ -65,10 +74,10 @@ def path(value):
             all(part not in ('', '.', '..') for part in value.split('/')))
 
 
-def identity(value, expectation, input_sha, early=False):
+def identity(value, expectation, input_sha, early=False, schema=1):
     require(type(expectation) is dict and digest(expectation.get('sourceCommit'), 40) and
             expectation.get('unityVersion') == UNITY and digest(input_sha), 'EXPECTED_IDENTITY')
-    require(type(value['schema']) is int and value['schema'] == 1 and value['unityVersion'] == UNITY and
+    require(type(value['schema']) is int and value['schema'] == schema and value['unityVersion'] == UNITY and
             value['approved'] is False, 'IDENTITY')
     require(value['sourceCommit'] == expectation['sourceCommit'] or early and value['sourceCommit'] == '', 'SOURCE_IDENTITY')
     require(value['inputSha256'] == input_sha or early and value['inputSha256'] == '', 'INPUT_IDENTITY')
@@ -105,9 +114,22 @@ def verify_author_report(value, expectation, input_sha, actual_dependencies, sce
     require(not complete or done, 'AUTHOR_INCOMPLETE')
     require(type(value['scenes']) is list and len(value['scenes']) <= 3, 'AUTHOR_SCENES')
     early = not done and value['failureStage'] == 'input' and not value['scenes']
-    identity(value, expectation, input_sha, early=early)
+    identity(value, expectation, input_sha, early=early, schema=2)
     require(type(value['failureStage']) is str and type(value['failureCode']) is str, 'AUTHOR_FAILURE_TYPES')
     require(all(type(value[name]) is bool for name in AUTHOR_FLAGS), 'AUTHOR_FLAG_TYPES')
+    require(type(value['initialSetupRestorable']) is bool and all(type(value[n]) is str for n in AUTHOR_DIAGNOSTICS) and
+            all(integer(value[n]) for n in AUTHOR_COUNTS), 'AUTHOR_DIAGNOSTIC_TYPES')
+    require(value['initialUntitledCount'] <= value['initialSceneCount'] and value['initialDirtyCount'] <= value['initialSceneCount'] and
+            value['recoverySceneCount'] <= value['initialSceneCount'], 'AUTHOR_INITIAL_COUNTS')
+    require(not value['initialSetupRestorable'] or value['initialSceneCount'] > 0 and value['initialUntitledCount'] == value['initialDirtyCount'] == value['recoverySceneCount'] == 0, 'AUTHOR_NAMED_SETUP')
+    require(value['cleanupCode'] == '' or value['cleanupCode'] in AUTHOR_CLEANUP_CODES, 'AUTHOR_CLEANUP_CODE')
+    if value['failureCode']:
+        require(value['failureExceptionClass'] in AUTHOR_EXCEPTION_CLASSES and digest(value['failureMessageSha256']) and
+                digest(value['failureStackSha256']), 'AUTHOR_FIRST_EXCEPTION')
+        require((value['failureSourceMethod'] == '' and value['failureSourceLine'] == 0) or
+                value['failureSourceMethod'] in AUTHOR_METHODS and value['failureSourceLine'] > 0, 'AUTHOR_OWNED_SOURCE_FRAME')
+    else:
+        require(all(value[n] == '' for n in AUTHOR_DIAGNOSTICS) and value['failureSourceLine'] == 0, 'AUTHOR_EMPTY_FAILURE_DIAGNOSTICS')
     require(type(scene_pins) is list and len(scene_pins) == 3, 'EXPECTED_SCENE_PINS')
     for i, pin in enumerate(scene_pins):
         keys(pin, {'path', 'beforeSha256', 'afterSha256'}, 'EXPECTED_SCENE_KEYS')
@@ -126,6 +148,8 @@ def verify_author_report(value, expectation, input_sha, actual_dependencies, sce
         require(len(value['scenes']) == 3 and all(value[name] for name in AUTHOR_FLAGS) and
                 value['failureStage'] == value['failureCode'] == '' and value['dependencies'] and
                 value['dependencies'] == actual_dependencies, 'AUTHOR_COMPLETION')
+        require(value['initialSceneCount'] <= 16 and value['initialRootCount'] <= 100000 and
+                (value['initialSetupRestorable'] or value['recoverySceneCount'] > 0 or value['initialSceneCount'] == 0), 'AUTHOR_RECOVERY_COMPLETION')
     else:
         require(value['failureStage'] in AUTHOR_STAGES and (value['failureCode'] == '' or value['failureCode'] in AUTHOR_CODES), 'AUTHOR_FAILURE_CODE')
     return done

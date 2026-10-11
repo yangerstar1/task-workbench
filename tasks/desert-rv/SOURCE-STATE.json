@@ -76,8 +76,8 @@
     },
     {
       "path": ".github/workflows/desert-rv-pouncer-ground-support.yml",
-      "sha256": "d3f1846563dd47fa7bd8f761994243902ddb68bebe0d65ed21c7d3811916dc99",
-      "size": 10402
+      "sha256": "121fde92e4e0d959f8a852b6c0d57164ce9a7bdf55984077c5045368f12c350f",
+      "size": 10408
     },
     {
       "path": ".github/workflows/desert-rv-rendered-smoke.yml",
@@ -506,13 +506,13 @@
     },
     {
       "path": "tasks/desert-rv/scripts/journey_pouncer_ground_support_probe.py",
-      "sha256": "99325a0c5057a6fb6cc8f5eea59f30dcd169fc02f0c6f0c2025edb5542d9ae86",
-      "size": 54036
+      "sha256": "f3a6ae1dc36af2d84cabfde0f09a3daee6fef7fcb6431f5a11e2e8e177cce42d",
+      "size": 52522
     },
     {
       "path": "tasks/desert-rv/scripts/journey_pouncer_support_reports.py",
-      "sha256": "00fe52e01d03ed6c24c9c391fea0a68bfd5bc050d9c7366bb5f8a46d463f2b90",
-      "size": 18219
+      "sha256": "6dfcaa759268d0bf292e3f27c9bc0b6c10c6e675dc5a88ea7c67b9d8e3ebb083",
+      "size": 22260
     },
     {
       "path": "tasks/desert-rv/scripts/journey_r3_continuous_contact_report.py",
@@ -756,13 +756,13 @@
     },
     {
       "path": "tasks/desert-rv/scripts/test_journey_pouncer_ground_support_probe.py",
-      "sha256": "16f0af8bc8c03e545d16c284536ea25a6b71fc4b8414715afc97a4a41b5fa96c",
-      "size": 48022
+      "sha256": "a7b72b2751306c5b82c176bca0ca48e3a60d7cd65b095f689f5e6796434e656d",
+      "size": 48025
     },
     {
       "path": "tasks/desert-rv/scripts/test_journey_pouncer_support_reports.py",
-      "sha256": "6a89a8eb0b4a7057bb004c161b65e70f81cb40a40bc92aa14b95c4530cef2bfb",
-      "size": 15167
+      "sha256": "7dde5d40b97dbcc9e85a2783c93bf7205e3bec8951ce2376757b36b49c504880",
+      "size": 20261
     },
     {
       "path": "tasks/desert-rv/scripts/test_journey_r3_continuous_contact_report.py",
@@ -5246,8 +5246,8 @@
     },
     {
       "path": "tasks/desert-rv/unity/Assets/DesertRV/Tests/CandidateArt/PouncerPawContactConstraintTests.cs",
-      "sha256": "9ba4e03403eb8f2f735aaff8b796e60549ca83ca891d53b221c99f59c3689cc9",
-      "size": 43991
+      "sha256": "2749a383f891071ac8b63dbe9db4853a32187533f71a36a3063b9ae0c2d8c4b9",
+      "size": 46401
     },
     {
       "path": "tasks/desert-rv/unity/Assets/DesertRV/Tests/CandidateArt/PouncerPawContactConstraintTests.cs.meta",
@@ -5386,8 +5386,8 @@
     },
     {
       "path": "tasks/desert-rv/unity/Assets/DesertRV/Tests/EditMode/JourneyPouncerSupportBindingTests.cs",
-      "sha256": "aaca1f3ab88b3e544c3b879b6e9d685ddfba923959164a80e8589dea89551235",
-      "size": 28268
+      "sha256": "d8280512117d5de7c93aa93c01a8a59f8e71cea68fadffe3503faab6b5227b69",
+      "size": 40924
     },
     {
       "path": "tasks/desert-rv/unity/Assets/DesertRV/Tests/EditMode/JourneyPouncerSupportBindingTests.cs.meta",
@@ -5701,8 +5701,8 @@
     },
     {
       "path": "tasks/desert-rv/unity/Assets/DesertRV/Tests/PouncerGround/PouncerGroundSupportTests.cs",
-      "sha256": "5d4dade730b42736fa13bb6fa16942bdd5334a6e0d406ed3e4ba8502271327b4",
-      "size": 18114
+      "sha256": "1f79e9a77d2e0cfb37c12300cb2529f37adf31ad9e4969b0935b43d5a32fec26",
+      "size": 27042
     },
     {
       "path": "tasks/desert-rv/unity/Assets/DesertRV/Tests/PouncerGround/PouncerGroundSupportTests.cs.meta",

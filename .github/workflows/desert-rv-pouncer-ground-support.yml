@@ -2,12 +2,12 @@ name: Desert RV Pouncer production support and bounded R3 validation
 on:
   push:
     branches: [journey-pouncer-ground-support-2915]
-    paths: [.github/dispatch/desert-rv-pouncer-ground-support-2915-20261011.json]
+    paths: [.github/dispatch/desert-rv-pouncer-ground-support-2915-r1-20261011.json]
 permissions:
   contents: read
   actions: read
 concurrency:
-  group: desert-rv-pouncer-ground-support-2915-once
+  group: desert-rv-pouncer-ground-support-2915-r1-once
   cancel-in-progress: false
 jobs:
   diagnose:
