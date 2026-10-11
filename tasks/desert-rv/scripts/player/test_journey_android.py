@@ -212,4 +212,35 @@ class AndroidPreparedInputTests(unittest.TestCase):
         a.prepare();path=a.PROJECT/'Assets/Original.cs';path.write_bytes(path.read_bytes()+b'changed')
         with self.assertRaises(Exception):a.verify()
 
+class AndroidRestoredDispatchTests(AndroidDispatchTests):
+    def setUp(self):
+        for key,value in dict(REQUEST='.github/dispatch/desert-rv-journey-android-c15-restored-r1-20261011.json',REQUEST_ID=a.RESTORE_REQUEST_ID).items():
+            changed=patch.object(a,key,value);changed.start();self.addCleanup(changed.stop)
+        super().setUp()
+        changed=patch.object(a,'RESTORED',True);changed.start();self.addCleanup(changed.stop)
+        policy=self.root/a.RESTORE_POLICY;policy.write_text('{"schema":1}')
+        request=self.root/a.REQUEST;value=json.loads(request.read_text());value['restorationPolicySha256']=a.sha(policy);request.write_text(json.dumps(value))
+        self.command('add','.');self.command('commit','--quiet','--amend','--no-edit');self.head=self.command('rev-parse','HEAD').strip()
+        self.event['after']=self.head;self.event['head_commit']['id']=self.head;self.write_event()
+        self.env.update(GITHUB_SHA=self.head,JOURNEY_ANDROID_RESTORATION=a.RESTORE_REQUEST_ID)
+    def test_restored_policy_bytes_and_explicit_route_are_required(self):
+        a.dispatch(self.env)
+        with self.assertRaisesRegex(Exception,'ANDROID_RESTORATION_ROUTE'):
+            a.dispatch(dict(self.env,JOURNEY_ANDROID_RESTORATION='other'))
+        (self.root/a.RESTORE_POLICY).write_text('{"changed":true}')
+        with self.assertRaisesRegex(Exception,'ANDROID_REQUEST'):a.dispatch(self.env)
+
+class AndroidRestoredReceiptTests(unittest.TestCase):
+    def test_current_receipt_requires_exact_separate_restoration_identity(self):
+        fixture=linux_fixtures.JourneyLinuxExportTests();fixture.setUp();self.addCleanup(fixture.tearDown)
+        native=fixture.receipt();native.update(label=a.LABEL,target='Android',backend='IL2CPP',define='DESERTRV_CANDIDATE_ANDROID',executable=a.APK,temporarySettingsApiFields=a.FIELDS,
+            restorationProof=dict(path='tasks/desert-rv/unity/JourneyEvidence/JourneyPreparation/restoration-revalidated.json',sha256='e'*64),
+            assetProducerSourceCommit='9c95f1009a597cf4573e286d0098b7bc47a62321',assetProducerRunUrl='https://github.com/yangerstar1/task-workbench/actions/runs/38135035401',restorationNativeXmlSha256='f'*64)
+        with patch.object(a,'RESTORED',True),patch.object(a,'verify',return_value=copy.deepcopy(native)):
+            self.assertEqual(a.native_receipt(native),native)
+            for key,bad in [('assetProducerSourceCommit','a'*40),('assetProducerRunUrl',a.linux.producer_url()),('restorationProof',None),('restorationNativeXmlSha256','0'*64)]:
+                altered=copy.deepcopy(native);altered[key]=bad
+                with self.subTest(key=key),self.assertRaisesRegex(Exception,'ANDROID_RESTORATION_PROOF'):a.native_receipt(altered)
+        with patch.object(a,'RESTORED',False),self.assertRaisesRegex(Exception,'ANDROID_FRESH_ONLY'):a.native_receipt(native)
+
 if __name__=='__main__':unittest.main()

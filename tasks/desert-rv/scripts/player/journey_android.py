@@ -25,11 +25,12 @@ read_json=source.read_json
 
 def load_build_modules():
     # Identity admission must remain stdlib-only before the hosted dependency install.
-    global prepared,linux,recovery,atomic,safe,sha,read_json,mobile_hud
+    global prepared,linux,recovery,atomic,safe,sha,read_json,mobile_hud,restoration
     import linux_build_input as prepared
     import journey_linux_export as linux
     import player_window_smoke as recovery
     import journey_mobile_hud_native as mobile_hud
+    import restore_preparation as restoration
     from capture_game_window import atomic
     from prepare_safe_diagnostic_export import safe,sha,read_json
 
@@ -43,6 +44,13 @@ REQUEST_ID = 'desert-rv-journey-android-c15-r2-20261011-once'
 SOURCE = 'tasks/desert-rv/SOURCE-STATE.json'
 SELECTION = 'tasks/desert-rv/art/journey-preparation/three-strict-candidates.json'
 IMAGE = 'unityci/editor@sha256:1e98c949ff728e6ff627b5c55ef65975125a6dc47cf27060601b79a141cc8692'
+RESTORE_REQUEST_ID = 'desert-rv-journey-android-c15-restored-r1-20261011-once'
+RESTORED = os.environ.get('JOURNEY_ANDROID_RESTORATION') == RESTORE_REQUEST_ID
+RESTORE_POLICY = 'tasks/desert-rv/art/journey-preparation/android-restoration-transition.json'
+if RESTORED:
+    BASE = '9c95f1009a597cf4573e286d0098b7bc47a62321'
+    REQUEST = '.github/dispatch/desert-rv-journey-android-c15-restored-r1-20261011.json'
+    REQUEST_ID = RESTORE_REQUEST_ID
 STATE = PROJECT/'JourneyEvidence/JourneyPreparation'
 INPUT = STATE/'android-build-input.json'
 BUILD = TASK/'journey-android-private-build'
@@ -70,6 +78,8 @@ FAILURE_CODES=frozenset((
     'ANDROID_EXPORT_EXISTS',
     'ANDROID_EXPORT_PIN',
     'ANDROID_FRESH_ONLY',
+    'ANDROID_RESTORATION_ROUTE',
+    'ANDROID_RESTORATION_PROOF',
     'ANDROID_FRESH_REQUEST',
     'ANDROID_GATES_CHANGED',
     'ANDROID_GATES_EXIST',
@@ -137,7 +147,7 @@ def git(*args):
     return subprocess.check_output(['git', *args], cwd=ROOT, stderr=subprocess.DEVNULL)
 
 def validate(env, event, head, parents, request_raw, tracked_raw, request_in_parent,
-             changed_paths, source_sha, selection_sha):
+             changed_paths, source_sha, selection_sha, policy_sha=None):
     """Exact Android admission, also usable with HEAD bytes for read-only diagnostics."""
     require(env.get('GITHUB_ACTIONS') == 'true' and env.get('RUNNER_ENVIRONMENT') == 'github-hosted' and
             env.get('RUNNER_OS') == 'Linux' and env.get('GITHUB_REPOSITORY') == REPO and
@@ -156,9 +166,13 @@ def validate(env, event, head, parents, request_raw, tracked_raw, request_in_par
             repo.get('default_branch') == 'main' and repo.get('owner',{}).get('login') == 'yangerstar1', 'ANDROID_REPOSITORY')
     require(type(request_raw) is bytes and 0 < len(request_raw) <= 4096, 'ANDROID_REQUEST')
     request = json.loads(request_raw, object_pairs_hook=unique, parse_constant=lambda _: require(False, 'JSON_CONSTANT'))
-    require(type(request) is dict and type(request.get('schema')) is int and
-            request == dict(schema=1, requestId=REQUEST_ID, baseCommit=BASE,
-            sourceStateSha256=source_sha, selection=SELECTION, selectionSha256=selection_sha, image=IMAGE), 'ANDROID_REQUEST')
+    expected = dict(schema=1, requestId=REQUEST_ID, baseCommit=BASE,
+                    sourceStateSha256=source_sha, selection=SELECTION, selectionSha256=selection_sha, image=IMAGE)
+    if RESTORED:
+        require(env.get('JOURNEY_ANDROID_RESTORATION')==RESTORE_REQUEST_ID and
+                isinstance(policy_sha,str) and re.fullmatch('[a-f0-9]{64}',policy_sha),'ANDROID_RESTORATION_ROUTE')
+        expected['restorationPolicySha256']=policy_sha
+    require(type(request) is dict and type(request.get('schema')) is int and request == expected, 'ANDROID_REQUEST')
     require(request_raw == tracked_raw, 'ANDROID_TRACKED_INPUT')
     require(request_in_parent is False and REQUEST in changed_paths, 'ANDROID_FRESH_REQUEST')
     return request
@@ -174,8 +188,8 @@ def dispatch(env=None):
     request = validate(env, sealed(Path(env['GITHUB_EVENT_PATH'])), head, parents, request_raw,
         git('show','HEAD:'+REQUEST), subprocess.run(['git','cat-file','-e',BASE+':'+REQUEST],cwd=ROOT,
         stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL).returncode == 0,
-        git('diff-tree','--no-commit-id','--name-only','-r','HEAD').decode().splitlines(), sha(ROOT/SOURCE), sha(ROOT/SELECTION))
-    for name in (SOURCE, SELECTION):
+        git('diff-tree','--no-commit-id','--name-only','-r','HEAD').decode().splitlines(), sha(ROOT/SOURCE), sha(ROOT/SELECTION), sha(ROOT/RESTORE_POLICY) if RESTORED else None)
+    for name in (SOURCE, SELECTION, RESTORE_POLICY) if RESTORED else (SOURCE, SELECTION):
         require(safe(ROOT/name).read_bytes() == git('show','HEAD:'+name), 'ANDROID_TRACKED_INPUT')
     return request
 
@@ -194,6 +208,18 @@ def exact_xml(folder, names):
     return dict(path=str(paths[0].relative_to(ROOT)),sha256=sha(paths[0]),cases=sorted(names),count=len(names))
 
 def gate_values():
+    if RESTORED:
+        _, _, proof = restoration.verify()
+        return dict(schema=1,scope='RESTORED_CONSUMER_WITH_SEPARATE_IMMUTABLE_PRODUCER_EVIDENCE',
+                    sourceCommit=os.environ['GITHUB_SHA'],runId=os.environ['GITHUB_RUN_ID'],runAttempt=os.environ['GITHUB_RUN_ATTEMPT'],
+                    assetProducer=dict(**restoration.PRODUCER,apiEvidence=restoration.pin(restoration.PRODUCER_API),
+                        generatedReceipt=restoration.pin(restoration.PUBLIC/'generated/receipt.json'),
+                        strictReceipts=[restoration.pin(restoration.PUBLIC/k/'receipt.json') for k in ('armored','pouncer','weapon')],
+                        mobileHud=restoration.producer_hud_evidence(),nativeHistory=restoration.producer_native_history()),
+                    currentConsumer=dict(restorationNativeCases=1,restorationNativeXml=proof['nativeXml'],
+                        restorationReport=restoration.pin(restoration.REPORT),boundaryNativeCases=17,
+                        boundaryNativeXml=proof['boundaryNativeXml'],worldHud=mobile_hud.verify_world()),
+                    deviceExecuted=False,approved=False)
     from journey_pouncer_ground_support_probe import GENERIC_TESTS
     return dict(schema=1,sourceCommit=os.environ['GITHUB_SHA'],runId=os.environ['GITHUB_RUN_ID'],runAttempt=os.environ['GITHUB_RUN_ATTEMPT'],
                 playmode=exact_xml(TASK/'artifacts/journey-android-playmode',source.expected_cases('playmode')),
@@ -210,6 +236,10 @@ def request_expected():
     require(sealed(GATES)==native_gates, 'ANDROID_GATES_CHANGED')
     for path in (STATE/'linux-build-input.json', GATES):
         result['files'].append(dict(path=str(path.relative_to(ROOT)),sha256=sha(path)))
+    if RESTORED:
+        for row in [restoration.pin(restoration.PRODUCER_API), *restoration.producer_hud_pins(), *mobile_hud.verify_world()]:
+            result['files'].append(dict(path=row['path'],sha256=row['sha256']))
+        return result
     for name in ('playmode','groundSupport'):
         row=native_gates[name]; result['files'].append(dict(path=row['path'],sha256=row['sha256']))
     hud=native_gates['mobileHud']
@@ -219,7 +249,11 @@ def request_expected():
     return result
 
 def prepare():
-    prepared.prepare(); require(not INPUT.exists(), 'ANDROID_REQUEST_EXISTS')
+    if RESTORED:
+        prepared.prepare_restored()
+        require(not GATES.exists(),'ANDROID_GATES_EXIST');atomic(GATES,gate_values())
+    else:prepared.prepare()
+    require(not INPUT.exists(), 'ANDROID_REQUEST_EXISTS')
     value=request_expected(); atomic(INPUT,value); INPUT.with_suffix('.sha256').write_text(sha(INPUT)+'\n'); verify()
 
 def verify():
@@ -244,7 +278,12 @@ def native_receipt(value):
     for key in ('candidateOnly','development','detailedBuildReport','performanceTestResourcesExcluded','settingsRestored','sourceBytesUnchanged'): require(value[key] is True,'ANDROID_RECEIPT_FLAGS')
     for key in ('approved','visualReviewed','gameplayReviewed','audioAuditioned'): require(value[key] is False,'ANDROID_UNREVIEWED')
     for key in ('generatedReceiptSha256','requestSha256','executableSha256','boundaryNativeXmlSha256'): require(re.fullmatch('[a-f0-9]{64}', value[key] or ''),'ANDROID_RECEIPT_HASH')
-    require(value['restorationProof'] in (None,{'path':'','sha256':''}) and all(value[k] in ('',None) for k in ('assetProducerSourceCommit','assetProducerRunUrl','restorationNativeXmlSha256')), 'ANDROID_FRESH_ONLY')
+    if RESTORED:
+        expected=verify()
+        require(all(value[k]==expected[k] for k in ('restorationProof','assetProducerSourceCommit','assetProducerRunUrl','restorationNativeXmlSha256',
+                                                  'generatedReceiptSha256','boundaryNativeXmlSha256')),'ANDROID_RESTORATION_PROOF')
+    else:
+        require(value['restorationProof'] in (None,{'path':'','sha256':''}) and all(value[k] in ('',None) for k in ('assetProducerSourceCommit','assetProducerRunUrl','restorationNativeXmlSha256')), 'ANDROID_FRESH_ONLY')
     return value
 
 def apk_shader(apk):
@@ -316,7 +355,7 @@ def stage():
     apk=safe(BUILD/APK); info=source.inspect_apk_bytes(apk); require(native['executableSha256']==info['apkSha256'],'ANDROID_APK_PIN')
     observe(phase='APK_IDENTITY');identity=apk_identity(apk)
     observe(phase='SHADER_REGISTRY');shader_report=apk_shader(apk)
-    shader_report['nativeDependencies']=shader.dependency_proof(TASK/'journey-preparation-export/generated',PROJECT,linux,native)
+    shader_report['nativeDependencies']=shader.dependency_proof(TASK/'journey-preparation-export/generated',PROJECT,linux,native,restored_android=RESTORED)
     require(not STAGED.exists(),'ANDROID_STAGE_EXISTS'); temporary=Path(tempfile.mkdtemp(prefix='journey-android-stage-',dir=TASK))
     try:
         shutil.copyfile(apk,temporary/APK); require(sha(temporary/APK)==info['apkSha256'],'ANDROID_COPY')
@@ -392,7 +431,7 @@ def validate_manifest(manifest, native):
     diagnostic=linux.native_diagnostic(manifest['nativeDiagnostic'],platform='ANDROID')
     require(linux.diagnostic_success(diagnostic,target='ANDROID'),'ANDROID_NATIVE_BUILD_FAILED')
     report=apk_shader(STAGED/APK)
-    report['nativeDependencies']=shader.dependency_proof(TASK/'journey-preparation-export/generated',PROJECT,linux,native)
+    report['nativeDependencies']=shader.dependency_proof(TASK/'journey-preparation-export/generated',PROJECT,linux,native,restored_android=RESTORED)
     require(manifest['shaderRegistry']==report,'ANDROID_SHADER_REPORT_CHANGED')
     return manifest
 
@@ -416,6 +455,7 @@ def main():
     try:
         if command=='dispatch':
             value=dispatch();output(selection=SELECTION,selection_sha256=value['selectionSha256'],playmode_filter=';'.join(sorted(source.expected_cases('playmode'))))
+            if RESTORED:output(transition_sha256=value['restorationPolicySha256'])
         elif command=='gates':gates()
         elif command=='prepare':prepare()
         elif command=='verify':verify()

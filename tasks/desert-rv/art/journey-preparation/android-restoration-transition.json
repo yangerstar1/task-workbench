@@ -1,0 +1,95 @@
+{
+  "schema": 1,
+  "status": "REVIEWED_DIAGNOSTIC_RESTORATION_SOURCE_ONLY",
+  "producer": {
+    "repository": "yangerstar1/task-workbench",
+    "runId": 38135035401,
+    "runAttempt": 1,
+    "sourceCommit": "9c95f1009a597cf4573e286d0098b7bc47a62321",
+    "artifactId": 11702226815,
+    "artifactName": "journey-preparation-UNREVIEWED-38135035401-1",
+    "artifactSha256": "e79829bca28ad709b22822c86d5106ff2710d3356ee20b2fb462ca03c699d91f",
+    "artifactBytes": 21350895,
+    "generatedReceiptSha256": "742af42d6c4a5f7d366a562f9afbbd9e560c744863c866123565c2cd38ee1f58",
+    "sourceStateSha256": "2e90d5f2ca98fdcc8c09eb9040d3b314d65d256e0c73d37c63dcf10735fc5e21"
+  },
+  "changes": [
+    {
+      "path": ".github/workflows/desert-rv-journey-android.yml",
+      "beforeSha256": "963979866e1f137142deb66ac32d14ae025d819a4e90d625af29bd568cf0f239",
+      "beforeBytes": 38603,
+      "afterSha256": "3c981dd9ad7dfe4deb972db253d8a34ba3af8318ebfd18c808410d460220e4fe",
+      "afterBytes": 14736
+    },
+    {
+      "path": "tasks/desert-rv/art/journey-preparation/android-producer-native-history.json",
+      "beforeSha256": "",
+      "beforeBytes": 0,
+      "afterSha256": "ffce6a5f9873d3619f242a5fb5be4df674be21d6b3c04ee269920670df900d90",
+      "afterBytes": 6658
+    },
+    {
+      "path": "tasks/desert-rv/art/journey-preparation/restore_preparation.py",
+      "beforeSha256": "4b7c8313e02ae2cd190231edfd2f835f83c27975104ca23b2096928014839bb6",
+      "beforeBytes": 39157,
+      "afterSha256": "a6e598fdabb4645aee59d4c6dece2ab3d38b58790b8ed6cc2a03952b02910fc1",
+      "afterBytes": 50764
+    },
+    {
+      "path": "tasks/desert-rv/scripts/journey_mobile_hud_native.py",
+      "beforeSha256": "ca7f03b8ebdff77ad776b0dba10a6aaaa5b1149cd83849b7f0c5c27d99cbad2b",
+      "beforeBytes": 10055,
+      "afterSha256": "a1e48e5cd42e94bff7960b79268ed5bc4cd9e6bcae0fb10cc032561843ab630f",
+      "afterBytes": 20972
+    },
+    {
+      "path": "tasks/desert-rv/scripts/player/journey_android.py",
+      "beforeSha256": "f24299fcab2c20e4dcf15d4df0cfac2da434017c43f1c077868517ba46e65929",
+      "beforeBytes": 28630,
+      "afterSha256": "340cac598ed5e68a6297bdc1713ea3fccf0f0a93adc13902e08d0bb4df9cff7a",
+      "afterBytes": 31617
+    },
+    {
+      "path": "tasks/desert-rv/scripts/player/test_journey_android.py",
+      "beforeSha256": "53e7c663ad4d96ec903aae035dcf20a8f6b0896b547349185bcbe8e7bbd13b94",
+      "beforeBytes": 18347,
+      "afterSha256": "caa0a70dcc8cbbe3c8ebbc4b5191c2e728a4e2f7c77c21b7cef920a738244a88",
+      "afterBytes": 21213
+    },
+    {
+      "path": "tasks/desert-rv/scripts/player/verify_tracer_shader.py",
+      "beforeSha256": "31d4380509e6a0b469bc7534bccfdc6961e8a3b3cecbb99d7c24c35ea0b2cc7c",
+      "beforeBytes": 24938,
+      "afterSha256": "eadc3f2439495dff1916dbd360fb7a7ad90e3e4f99141f07ae710e3368fdd96c",
+      "afterBytes": 26555
+    },
+    {
+      "path": "tasks/desert-rv/scripts/test_journey_mobile_hud_native.py",
+      "beforeSha256": "3956195a2536984d4ea6b21e7c8f4d42c933229021d6ea95d9156bfb7bb3a738",
+      "beforeBytes": 5772,
+      "afterSha256": "899ccf4b5dd4eb00b2be2e2cacc9143090f5396b058d26e9a96eb2507f89b868",
+      "afterBytes": 21251
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Editor/JourneyCandidateRestoration.cs",
+      "beforeSha256": "5eae3718ac2d06678c37b8ddea3fb9efc126b35b040e52733126af796f9c6f96",
+      "beforeBytes": 39633,
+      "afterSha256": "ce40c5fb91ea89d34b25225c71a27b2d0ad71be0e120fdc2b10723ac04dfeb68",
+      "afterBytes": 41084
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Editor/JourneyHudCapture.cs",
+      "beforeSha256": "b63f438e3a8938f5256917404b027b771c17ab6bc62975151b897da85810d95d",
+      "beforeBytes": 13244,
+      "afterSha256": "bbfc938c72f4cfe1c52d4629ea0efd75dbd7e81436509084d28b207409067667",
+      "afterBytes": 14511
+    },
+    {
+      "path": "tasks/desert-rv/unity/Assets/DesertRV/Editor/JourneySceneAuthoring.cs",
+      "beforeSha256": "b813fbf42b44f9453a2d308f37c541899f350bf35a37005b05d55410352549de",
+      "beforeBytes": 67105,
+      "afterSha256": "7a88517ee95967f916ce7179bd1476a76f56aadc51db7ff07f596a330c809113",
+      "afterBytes": 74735
+    }
+  ]
+}

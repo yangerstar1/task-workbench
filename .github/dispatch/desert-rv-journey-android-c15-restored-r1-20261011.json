@@ -1,0 +1,10 @@
+{
+  "schema": 1,
+  "requestId": "desert-rv-journey-android-c15-restored-r1-20261011-once",
+  "baseCommit": "9c95f1009a597cf4573e286d0098b7bc47a62321",
+  "sourceStateSha256": "4f0db1331758b998000c00298a636297f6e02531bb2312e5da128f7898eb7ef6",
+  "selection": "tasks/desert-rv/art/journey-preparation/three-strict-candidates.json",
+  "selectionSha256": "e46d71b118dbf614cb183928528992037a4f8e4d408bf5359484716106457b05",
+  "image": "unityci/editor@sha256:1e98c949ff728e6ff627b5c55ef65975125a6dc47cf27060601b79a141cc8692",
+  "restorationPolicySha256": "5a45a3c342817cb69258f6f59db55f994786d1d5a0107936c2268e411a2b1b66"
+}

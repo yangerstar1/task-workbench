@@ -122,6 +122,111 @@ namespace DesertRV.Editor
         public static void AuthorAndCaptureEnvironmentCandidates()
         { AuthorCandidateScenes(); JourneyContentChecks.CheckCandidateLayout(); CaptureEnvironmentCandidates(); }
 
+        // Explicit restored-world entry: only two 960x540 production HUD renders.
+        // No authoring, scene saves, gameplay startup, or environment-lighting replacement.
+        public static void CapturePreparedWorldHud()
+        {
+            if (Application.isPlaying || EditorApplication.isPlayingOrWillChangePlaymode || BuildPipeline.isBuildingPlayer)
+                throw new InvalidOperationException("Prepared world HUD capture requires Edit Mode.");
+            if (SystemInfo.graphicsDeviceType == GraphicsDeviceType.Null)
+                throw new InvalidOperationException("Actual graphics device required for prepared world HUD capture.");
+            var setup = EditorSceneManager.GetSceneManagerSetup();
+            if (setup.Any(s => s.isLoaded && SceneManager.GetSceneByPath(s.path).isDirty))
+                throw new InvalidOperationException("Save/discard scene edits before capture.");
+            foreach (string path in new[] { BootstrapPath }.Concat(RegionPaths))
+                if (!File.Exists(path)) throw new InvalidOperationException("Prepared scene missing.");
+            if (Directory.Exists("JourneyEvidence/MobileHudWorld"))
+                throw new InvalidOperationException("Prepared world HUD output already exists.");
+            var protectedFiles = SnapshotProtectedFiles(true);
+            var dependencies = new HashSet<string>(AssetDatabase.GetDependencies(
+                new[] { BootstrapPath, ManifestPath }.Concat(RegionPaths).ToArray(), true), StringComparer.Ordinal);
+            var dirtyAssets = DirtyPersistentCaptureAssets(dependencies);
+            CheckCaptureAssetLifecycle(dependencies, dirtyAssets, "before");
+            int captured = 0;
+            var failures = new List<Exception>();
+            void AttemptCleanup(Action action)
+            {
+                try { action(); } catch (Exception error) { failures.Add(error); }
+            }
+            try
+            {
+                foreach (int index in new[] { 0, 2 })
+                {
+                    var boot = EditorSceneManager.OpenScene(BootstrapPath, OpenSceneMode.Single);
+                    var env = EditorSceneManager.OpenScene(RegionPaths[index], OpenSceneMode.Additive);
+                    if (SceneManager.GetActiveScene().handle != env.handle) SceneManager.SetActiveScene(env);
+                    var active = SceneManager.GetActiveScene();
+                    if (!active.IsValid() || !active.isLoaded || active.handle != env.handle || active.path != RegionPaths[index])
+                        throw new InvalidOperationException("Cannot activate prepared region.");
+                    var motor = Components<JourneyMotor>(boot).Single();
+                    var binding = Components<RegionBinding>(env).Single();
+                    if (binding.region != index + 1 || !motor.vehicle || !motor.view || !motor.entryStep)
+                        throw new InvalidOperationException("Prepared walker bindings missing.");
+                    motor.vehicle.SetPositionAndRotation(binding.spawn.position, binding.spawn.rotation);
+                    var camera = motor.view;
+                    camera.enabled = false; camera.clearFlags = CameraClearFlags.Skybox;
+                    camera.farClipPlane = 450; camera.allowHDR = true;
+                    PlaceWalkingCaptureCamera(motor);
+                    foreach (var particle in Components<ParticleSystem>(env)) particle.Simulate(7, true, true, true);
+                    Physics.SyncTransforms();
+                    // Capture owns and destroys all of its buffers before the next Single scene unload.
+                    JourneyHudCapture.CaptureOverWorld(camera, "region-" + binding.region);
+                    CheckCaptureAssetLifecycle(dependencies, dirtyAssets, "after-region-" + binding.region);
+                    captured++;
+                    Debug.Log("JOURNEY_WORLD_HUD_CAPTURED region=" + binding.region + "; width=960; height=540; fieldOfView=66; controlledFixtureData=true");
+                }
+            }
+            catch (Exception error) { failures.Add(error); }
+            finally
+            {
+                // Every cleanup/protection operation runs; the capture failure remains first.
+                AttemptCleanup(() => RestoreSceneSetup(setup));
+                AttemptCleanup(() => CheckCaptureAssetLifecycle(dependencies, dirtyAssets, "after-scene-restoration"));
+                AttemptCleanup(() => VerifyProtectedFiles(protectedFiles, true));
+            }
+            if (failures.Count == 1) System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(failures[0]).Throw();
+            if (failures.Count > 1) throw new AggregateException("Prepared world HUD capture and cleanup failed; primary failure first.", failures);
+            if (captured != 2) throw new InvalidOperationException("Incomplete prepared world HUD capture.");
+            Debug.Log("JOURNEY_WORLD_HUD_CAPTURE_COMPLETE captures=2; originalAndPreparedBytesUnchanged=true; sceneSetupRestored=true; buffersReleasedBeforeSceneUnload=true");
+        }
+        static HashSet<string> DirtyPersistentCaptureAssets(HashSet<string> dependencies)
+        {
+            var result = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var asset in Resources.FindObjectsOfTypeAll<Object>())
+                if (asset && EditorUtility.IsPersistent(asset) && dependencies.Contains(AssetDatabase.GetAssetPath(asset)) && EditorUtility.IsDirty(asset) &&
+                    AssetDatabase.TryGetGUIDAndLocalFileIdentifier(asset, out string guid, out long localId))
+                    result.Add(guid + ":" + localId);
+            return result;
+        }
+        static void CheckCaptureAssetLifecycle(HashSet<string> dependencies, HashSet<string> before, string phase)
+        {
+            var dirty = DirtyPersistentCaptureAssets(dependencies);
+            int added = dirty.Count(id => !before.Contains(id));
+            // This exact generated material had an earlier, separate render-lifecycle regression.
+            // Observe its loaded state without loading, changing keywords, or saving it.
+            var sample = Resources.FindObjectsOfTypeAll<Material>().FirstOrDefault(m =>
+                AssetDatabase.GetAssetPath(m) == Folder + "/Layout-FFC261.mat");
+            Debug.Log("JOURNEY_WORLD_HUD_ASSET_LIFECYCLE phase=" + phase + "; dirtyDependencyAssets=" + dirty.Count +
+                "; newlyDirty=" + added + "; trackedMaterialLoaded=" + (sample ? "true" : "false") +
+                "; trackedMaterialDirty=" + (sample && EditorUtility.IsDirty(sample) ? "true" : "false") +
+                "; trackedEmission=" + (sample && sample.IsKeywordEnabled("_EMISSION") ? "true" : "false") +
+                "; trackedLightmapFlags=" + (sample ? ((int)sample.globalIlluminationFlags).ToString() : "unloaded"));
+            if (phase == "before" && dirty.Count != 0)
+                throw new InvalidOperationException("Prepared world capture requires clean persistent dependency assets.");
+            if (added != 0) throw new InvalidOperationException("Prepared world capture dirtied persistent dependency assets.");
+        }
+        // The existing environment regression and minimal HUD entry share the same legal dismount view.
+        static void PlaceWalkingCaptureCamera(JourneyMotor motor)
+        {
+            var camera = motor.view; camera.fieldOfView = 66; camera.nearClipPlane = .045f;
+            Vector3 entry = motor.entryStep.GetComponent<Renderer>().bounds.center;
+            Vector3 right = Vector3.Cross(Vector3.up, motor.Forward);
+            Vector3 outward = right * Mathf.Sign(Vector3.Dot(entry - motor.vehicle.position, right));
+            Vector3 feet = entry + outward * .95f; feet.y = motor.vehicle.position.y + .04f;
+            camera.transform.position = feet + Vector3.up * 1.52f;
+            camera.transform.LookAt(camera.transform.position + motor.Forward);
+        }
+
         [Serializable] sealed class ImageRecord { public string region, view, path, sceneHash, cameraModel; public int width,height; public float minimum,maximum,fieldOfView; }
         [Serializable] sealed class ImageReport { public string status="captured-environment-only-not-gameplay-acceptance"; public string graphicsDeviceType, graphicsDeviceName; public int bufferSceneTransitionsChecked; public bool captureBuffersReleased; public ImageRecord[] images; }
         public static void CaptureEnvironmentCandidates()
@@ -171,11 +276,8 @@ namespace DesertRV.Editor
                         }
                         else if(key=="motor-walking-editor")
                         {
-                            camera.fieldOfView=66;camera.nearClipPlane=.045f;
-                            Vector3 entry=motor.entryStep.GetComponent<Renderer>().bounds.center;Vector3 right=Vector3.Cross(Vector3.up,motor.Forward);
-                            Vector3 outward=right*Mathf.Sign(Vector3.Dot(entry-motor.vehicle.position,right));
-                            Vector3 feet=entry+outward*.95f;feet.y=motor.vehicle.position.y+.04f;
-                            at=feet+Vector3.up*1.52f;look=at+motor.Forward; // A legal level forward look after dismount, not a running controller.
+                            PlaceWalkingCaptureCamera(motor);
+                            at=camera.transform.position;look=at+motor.Forward; // A legal level forward look after dismount, not a running controller.
                         }
                         else { at=motor.vehicle.position+Vector3.forward*.55f+Vector3.up*2.38f;look=at-Vector3.forward*3-Vector3.up*.35f; }
                         camera.transform.position=at;camera.transform.LookAt(look);Physics.SyncTransforms();
@@ -226,23 +328,23 @@ namespace DesertRV.Editor
             if (restorable) EditorSceneManager.RestoreSceneManagerSetup(setup);
             else EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
         }
-        static Dictionary<string,string> SnapshotProtectedFiles()
+        static Dictionary<string,string> SnapshotProtectedFiles(bool includeJourney = false)
         {
             var result=new Dictionary<string,string>();
             foreach(string folder in new[]{"Assets","ProjectSettings","Packages"})
                 if(Directory.Exists(folder)) foreach(string path in Directory.GetFiles(folder,"*",SearchOption.AllDirectories))
-                { string p=path.Replace('\\','/');if(!p.StartsWith(Folder+"/",StringComparison.Ordinal)&&p!=Folder+".meta") result[p]=HashFile(p); }
+                { string p=path.Replace('\\','/');if(includeJourney || !p.StartsWith(Folder+"/",StringComparison.Ordinal)&&p!=Folder+".meta") result[p]=HashFile(p); }
             return result;
         }
         static string HashFile(string path)
         { using(var sha=SHA256.Create()) using(var file=File.OpenRead(path)) return BitConverter.ToString(sha.ComputeHash(file)).Replace("-","").ToLowerInvariant(); }
-        static void VerifyProtectedFiles(Dictionary<string,string> before)
+        static void VerifyProtectedFiles(Dictionary<string,string> before, bool includeJourney = false)
         {
-            var after=SnapshotProtectedFiles();
+            var after=SnapshotProtectedFiles(includeJourney);
             var changed=before.Keys.Union(after.Keys).Where(p=>!before.ContainsKey(p)||!after.ContainsKey(p)||before[p]!=after[p]).ToArray();
             Directory.CreateDirectory("JourneyEvidence");
             File.WriteAllLines("JourneyEvidence/protected-source-sha256.txt",before.OrderBy(x=>x.Key).Select(x=>x.Value+"  "+x.Key));
-            if(changed.Length>0) throw new InvalidOperationException("Protected source/settings were changed outside new Journey folder: "+string.Join(", ",changed));
+            if(changed.Length>0) throw new InvalidOperationException("Protected source/settings were changed: "+string.Join(", ",changed));
         }
         static void SetAtmosphere(Scene scene,int region)
         {

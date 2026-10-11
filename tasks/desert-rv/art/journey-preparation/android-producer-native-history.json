@@ -1,0 +1,160 @@
+{
+  "schema": 1,
+  "scope": "DERIVED_HISTORICAL_PRODUCER_TEST_EVIDENCE_NOT_A_NATIVE_ARTIFACT_OR_CONSUMER_EXECUTION",
+  "repository": "yangerstar1/task-workbench",
+  "sourceCommit": "9c95f1009a597cf4573e286d0098b7bc47a62321",
+  "runId": 38135035401,
+  "runAttempt": 1,
+  "jobId": 114457054726,
+  "runUrl": "https://github.com/yangerstar1/task-workbench/actions/runs/38135035401",
+  "sourceStateSha256": "2e90d5f2ca98fdcc8c09eb9040d3b314d65d256e0c73d37c63dcf10735fc5e21",
+  "extraction": "Official run log ZIP; remove Actions per-line timestamps; XML declaration through first closing test-run; LF, no BOM or final newline. This file is a bounded projection, not the XML bytes.",
+  "tests": [
+    {
+      "kind": "playmode",
+      "stepNumber": 23,
+      "stepName": "Native current thirteen baseline PlayMode cases",
+      "logArchiveSha256": "337d56f3af35604c4887dbde4a92704b00bfd5070b1bc39c958a9141a9226c1b",
+      "logMember": "prepare/23_Native current thirteen baseline PlayMode cases.txt",
+      "logMemberSha256": "d3832c82bbc9d2aedee41fc02ae769614d6a161946889368145c18627ea7a970",
+      "xmlBytes": 13049,
+      "xmlSha256": "463e5a4f363fb0dace00ae242276de54894e878c427091871ff4f591e7b0f403",
+      "independentExportedNativeHashAvailable": false,
+      "result": "Passed",
+      "counts": {
+        "total": 13,
+        "passed": 13,
+        "failed": 0,
+        "skipped": 0,
+        "inconclusive": 0
+      },
+      "cases": [
+        {
+          "fullname": "DesertRV.Tests.JourneyLoaderPlayModeTests.MissingRegion_RemainsLoadingAndSameTicketCanRetry",
+          "result": "Passed"
+        },
+        {
+          "fullname": "DesertRV.Tests.JourneyReplayInputTests.ContextCancellation_HeldReplayRequiresLiftBeforeRepress",
+          "result": "Passed"
+        },
+        {
+          "fullname": "DesertRV.Tests.JourneyReplayInputTests.HeldFire_SurvivesAdapterSampleWithoutNewPressedEdge",
+          "result": "Passed"
+        },
+        {
+          "fullname": "DesertRV.Tests.JourneyReplayInputTests.KeyboardLook_ContextAndRelease",
+          "result": "Passed"
+        },
+        {
+          "fullname": "DesertRV.Tests.JourneyReplayInputTests.KeyboardLook_EditorReplayIsExclusive",
+          "result": "Passed"
+        },
+        {
+          "fullname": "DesertRV.Tests.JourneyReplayInputTests.KeyboardLook_PreservesExistingSources",
+          "result": "Passed"
+        },
+        {
+          "fullname": "DesertRV.Tests.JourneyReplayInputTests.KeyboardLook_RateAndBounds",
+          "result": "Passed"
+        },
+        {
+          "fullname": "DesertRV.Tests.JourneyReplayInputTests.ScopeRequestHashChange_InvalidatesAndCloseClearsCapability",
+          "result": "Passed"
+        },
+        {
+          "fullname": "DesertRV.Tests.RegionLoaderActiveSceneTests.LoadedRegion_IsActiveWithItsRenderSettingsBeforeReady",
+          "result": "Passed"
+        },
+        {
+          "fullname": "DesertRV.Tests.RegionLoaderActiveSceneTests.ReadyException_RestoresActiveReleasesBusyAndKeepsTicket",
+          "result": "Passed"
+        },
+        {
+          "fullname": "DesertRV.Tests.RegionLoaderActiveSceneTests.RejectedSameNameReload_RestoresPreviousActiveAndAllowsSameTicketRetry",
+          "result": "Passed"
+        },
+        {
+          "fullname": "DesertRV.Tests.RegionLoaderActiveSceneTests.StaleGenerationLoad_DoesNotStealNewerActiveScene",
+          "result": "Passed"
+        },
+        {
+          "fullname": "DesertRV.Tests.RegionLoaderActiveSceneTests.UnloadedScene_ActivationFailsWithoutChangingActiveScene",
+          "result": "Passed"
+        }
+      ]
+    },
+    {
+      "kind": "groundSupport",
+      "stepNumber": 24,
+      "stepName": "Native thirteen current Pouncer ground support regressions",
+      "logArchiveSha256": "337d56f3af35604c4887dbde4a92704b00bfd5070b1bc39c958a9141a9226c1b",
+      "logMember": "prepare/24_Native thirteen current Pouncer ground support regressions.txt",
+      "logMemberSha256": "b1ef287218885cd8798348494083e95e62b88ec9d3d8cc8d34142871cb42f69b",
+      "xmlBytes": 13502,
+      "xmlSha256": "c917fda1e6b99717ae009587af09499c3e1f5c847e74f8425fccb2cc07c279b4",
+      "independentExportedNativeHashAvailable": false,
+      "result": "Passed",
+      "counts": {
+        "total": 13,
+        "passed": 13,
+        "failed": 0,
+        "skipped": 0,
+        "inconclusive": 0
+      },
+      "cases": [
+        {
+          "fullname": "DesertRV.Tests.PouncerGroundSupportTests.BlocksWallAndCeilingBeforeAnyRootWrite",
+          "result": "Passed"
+        },
+        {
+          "fullname": "DesertRV.Tests.PouncerGroundSupportTests.DeathKeepsDisabledCapsuleAndResetRestoresGroundedLifecycle",
+          "result": "Passed"
+        },
+        {
+          "fullname": "DesertRV.Tests.PouncerGroundSupportTests.FollowsRaisedRoadUpAndDownAtLowMovementCadence",
+          "result": "Passed"
+        },
+        {
+          "fullname": "DesertRV.Tests.PouncerGroundSupportTests.FollowsRaisedRoadUpAndDownAtNormalMovementCadence",
+          "result": "Passed"
+        },
+        {
+          "fullname": "DesertRV.Tests.PouncerGroundSupportTests.GentleSlopesMatchNativeBoxFacesAndSteepUnsupportedSlopesReject",
+          "result": "Passed"
+        },
+        {
+          "fullname": "DesertRV.Tests.PouncerGroundSupportTests.InvalidDynamicForeignDisabledAndTriggerBindingsFailWithoutWrites",
+          "result": "Passed"
+        },
+        {
+          "fullname": "DesertRV.Tests.PouncerGroundSupportTests.MixedSoleUsesFiniteHighSideInsteadOfExtrapolatedPawCenterPlane",
+          "result": "Passed"
+        },
+        {
+          "fullname": "DesertRV.Tests.PouncerGroundSupportTests.PausedBoundPoseDoesNotMoveAndSupportFailureRequiresExplicitReset",
+          "result": "Passed"
+        },
+        {
+          "fullname": "DesertRV.Tests.PouncerGroundSupportTests.RejectsExcessiveRiseDropAndMissingSupportTransactionally",
+          "result": "Passed"
+        },
+        {
+          "fullname": "DesertRV.Tests.PouncerGroundSupportTests.SafeDropKeepsFifteenMillimeterRoadClearanceWithoutExtraVerticalLookAhead",
+          "result": "Passed"
+        },
+        {
+          "fullname": "DesertRV.Tests.PouncerGroundSupportTests.StationarySupportDoesNotTurnExistingBodyContactIntoPawFailure",
+          "result": "Passed"
+        },
+        {
+          "fullname": "DesertRV.Tests.PouncerGroundSupportTests.SuccessfulRootMoveSynchronizesColliderWithoutAutomaticPhysicsSync",
+          "result": "Passed"
+        },
+        {
+          "fullname": "DesertRV.Tests.PouncerGroundSupportTests.UnboundPropIsNotSupportAndStillBlocksCapsuleMovement",
+          "result": "Passed"
+        }
+      ]
+    }
+  ]
+}

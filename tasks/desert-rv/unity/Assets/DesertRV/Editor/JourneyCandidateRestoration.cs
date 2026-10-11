@@ -26,6 +26,13 @@ namespace DesertRV.Editor
         const string ProducerReceiptSha = "2b5e06b3b5dfcfb5a53afc3ff750b4eb8f460b222dc1abdca5974fc6c4702526";
         const string SelectionPath = "tasks/desert-rv/art/journey-preparation/three-strict-candidates.json";
         const string SelectionSha = "dfbc3b9a5959350b69544828ab3e6dbb5cfb7f01895fa985c0eefdb38e051f24";
+        static bool AndroidProducer(Request request) => request != null &&
+            request.assetProducerSourceCommit == "9c95f1009a597cf4573e286d0098b7bc47a62321" &&
+            request.assetProducerRunUrl == "https://github.com/yangerstar1/task-workbench/actions/runs/38135035401" &&
+            request.generatedReceiptSha256 == "742af42d6c4a5f7d366a562f9afbbd9e560c744863c866123565c2cd38ee1f58";
+        static string SelectionDigest(Request request) => AndroidProducer(request) ? "e46d71b118dbf614cb183928528992037a4f8e4d408bf5359484716106457b05" : SelectionSha;
+        static bool KnownProducer(Request request) => AndroidProducer(request) || request != null &&
+            request.assetProducerSourceCommit == ProducerCommit && request.assetProducerRunUrl == ProducerRun && request.generatedReceiptSha256 == ProducerReceiptSha;
         [Serializable] public sealed class Request
         {
             public int schema;
@@ -158,9 +165,9 @@ namespace DesertRV.Editor
             var proof = JsonUtility.FromJson<SourceProof>(File.ReadAllText(Pin(request.sourceTransitionProof)));
             Check(proof != null && proof.schema == 1 && proof.label == "REVIEWED_RESTORATION_SOURCE_TRANSITION" &&
                 proof.sourceCommit == request.sourceCommit && proof.producerRunUrl == request.producerRunUrl &&
-                proof.assetProducerSourceCommit == ProducerCommit && proof.assetProducerRunUrl == ProducerRun && proof.originalAssetsUnchanged && !proof.scopeReused,
+                proof.assetProducerSourceCommit == request.assetProducerSourceCommit && proof.assetProducerRunUrl == request.assetProducerRunUrl && proof.originalAssetsUnchanged && !proof.scopeReused,
                 "Reviewed producer-to-consumer source proof identity changed.");
-            Check(proof.policy != null && proof.policy.path == "tasks/desert-rv/art/journey-preparation/restoration-transition.json" &&
+            Check(proof.policy != null && proof.policy.path == (AndroidProducer(request) ? "tasks/desert-rv/art/journey-preparation/android-restoration-transition.json" : "tasks/desert-rv/art/journey-preparation/restoration-transition.json") &&
                 proof.producerSource != null && proof.producerSource.path == Prefix + Folder + "/producer-SOURCE-STATE.json" &&
                 proof.producerSource.sha256 == generated.sourceStateSha256 && proof.consumerSource != null && proof.consumerSource.path == "tasks/desert-rv/SOURCE-STATE.json",
                 "Fixed policy and original/current source manifests required.");
@@ -197,7 +204,7 @@ namespace DesertRV.Editor
                 var receiptPin = new FilePin { path = publicRoot + "/" + pin.path, sha256 = pin.sha256 }; BoundPin(receiptPin, files);
                 var receipt = JsonUtility.FromJson<StrictReceipt>(File.ReadAllText(Pin(receiptPin)));
                 Check(receipt != null && receipt.kind == pin.kind && receipt.status == "STRICT_CANDIDATE_CAPTURED_NOT_ACCEPTED" && !receipt.approved &&
-                    receipt.mode == "STRICT_BINDING" && receipt.scope == "FULL_CANDIDATE" && receipt.importCommit == ProducerCommit && receipt.importRunUrl == ProducerRun &&
+                    receipt.mode == "STRICT_BINDING" && receipt.scope == "FULL_CANDIDATE" && receipt.importCommit == request.assetProducerSourceCommit && receipt.importRunUrl == request.assetProducerRunUrl &&
                     receipt.nativeCases == 26 && receipt.nativeXmlSha256 == pin.nativeXmlSha256 && receipt.protectedSource == "UNCHANGED" && receipt.files != null &&
                     receipt.files.All(p => p != null) && receipt.files.Select(p => p.path).Distinct().Count() == receipt.files.Length,
                     "Original strict receipt does not prove the pinned unapproved full native result.");
@@ -274,10 +281,10 @@ namespace DesertRV.Editor
         static IEnumerable<JourneyCandidateAssetIntegration.EnemyPlacement> Rows(JourneyCandidateAssetIntegration.Request r) => r.regions.OrderBy(p => p.region)
             .SelectMany(p => p.guards.Concat(p.roadBeasts).Concat(p.waves.SelectMany(w => w.enemies)));
         static bool VectorEqual(Vector3 a, Vector3 b) => Vector3.Distance(a, b) < .00001f;
-        static void MatchGrounding(JourneyCandidateAssetIntegration.SpawnGroundingReport actual, JourneyCandidateAssetIntegration.SpawnGroundingReport original)
+        static void MatchGrounding(Request request, JourneyCandidateAssetIntegration.SpawnGroundingReport actual, JourneyCandidateAssetIntegration.SpawnGroundingReport original)
         {
-            Check(original != null && original.schema == 1 && original.status == "ACTUAL_NATIVE_ROOT_GROUNDING_UNREVIEWED" && original.sourceCommit == ProducerCommit &&
-                original.source == "scene-physical-floor" && original.selectionSha256 == SelectionSha && !original.approved && original.rows != null && original.rows.Length == 9 &&
+            Check(original != null && original.schema == 1 && original.status == "ACTUAL_NATIVE_ROOT_GROUNDING_UNREVIEWED" && original.sourceCommit == request.assetProducerSourceCommit &&
+                original.source == "scene-physical-floor" && original.selectionSha256 == SelectionDigest(request) && !original.approved && original.rows != null && original.rows.Length == 9 &&
                 actual.rows != null && actual.rows.Length == 9 && original.rows.Select(p => p.id).Distinct().Count() == 9, "Original nine-root native evidence is incomplete.");
             var old = original.rows.ToDictionary(p => p.id);
             foreach (var row in actual.rows)
@@ -344,7 +351,7 @@ namespace DesertRV.Editor
             Check(request != null && request.schema == 1 && request.label == "RESTORE_PINNED_JOURNEY_FOR_NATIVE_REVALIDATION" &&
                 Digest(request.sourceCommit, 40) && request.sourceCommit == Environment.GetEnvironmentVariable("GITHUB_SHA") &&
                 request.producerRunUrl == "https://github.com/yangerstar1/task-workbench/actions/runs/" + run &&
-                request.assetProducerSourceCommit == ProducerCommit && request.assetProducerRunUrl == ProducerRun && request.generatedReceiptSha256 == ProducerReceiptSha &&
+                KnownProducer(request) && (!AndroidProducer(request) || EditorUserBuildSettings.activeBuildTarget == BuildTarget.Android) &&
                 request.files != null && request.files.Length > 100 && request.files.All(p => p != null) && request.files.Select(p => p.path).Distinct().Count() == request.files.Length &&
                 request.directories != null && request.directories.Distinct().Count() == request.directories.Length, "Current consumer and immutable producer identities required.");
             diagnostic.producerRunUrl = request.producerRunUrl; diagnostic.consumerIdentityMatched = true;
@@ -357,11 +364,11 @@ namespace DesertRV.Editor
             {
                 diagnostic.stage = "INVENTORY"; VerifyInventory(request);
                 foreach (var pin in new[] { request.selection, request.originalGeneratedReceipt, request.originalNativeManifest, request.originalGrounding }) BoundPin(pin, files);
-                Check(request.selection.path == SelectionPath && request.selection.sha256 == SelectionSha && request.originalGeneratedReceipt.sha256 == ProducerReceiptSha,
+                Check(request.selection.path == SelectionPath && request.selection.sha256 == SelectionDigest(request) && request.originalGeneratedReceipt.sha256 == request.generatedReceiptSha256,
                     "Pinned original selector and generated producer receipt required.");
                 var generated = JsonUtility.FromJson<GeneratedReceipt>(File.ReadAllText(Pin(request.originalGeneratedReceipt)));
                 Check(generated != null && generated.schema == "desert-rv-generated-journey/v1" && generated.status == "GENERATED_JOURNEY_SAVED_UNREVIEWED" &&
-                    generated.sourceCommit == ProducerCommit && generated.importRunUrl == ProducerRun && generated.unityVersion == Application.unityVersion &&
+                    generated.sourceCommit == request.assetProducerSourceCommit && generated.importRunUrl == request.assetProducerRunUrl && generated.unityVersion == Application.unityVersion &&
                     !generated.approved && !generated.scopeReusable && !generated.visualReviewed && !generated.gameplayReviewed && !generated.audioAuditioned &&
                     request.originalNativeManifest.sha256 == generated.nativeManifestSha256 && request.originalGrounding.sha256 == generated.spawnGroundingSha256,
                     "Original generated receipt/provenance is not exact.");
@@ -369,12 +376,13 @@ namespace DesertRV.Editor
                 Check(request.integration != null, "Restoration integration selection required.");
                 diagnostic.stage = "STRICT_BUNDLES"; VerifyStrictBundles(request, generated, files);
                 var native = JsonUtility.FromJson<JourneyCandidatePreparation.AuthoredAssets>(File.ReadAllText(Pin(request.originalNativeManifest)));
-                Check(native != null && native.schema == 3 && native.status == "ACTUAL_NATIVE_JOURNEY_ASSETS_UNREVIEWED" && native.sourceCommit == ProducerCommit &&
-                    native.importRunUrl == ProducerRun && native.unityVersion == Application.unityVersion && !native.approved, "Original native authored inventory required.");
+                Check(native != null && native.schema == 3 && native.status == "ACTUAL_NATIVE_JOURNEY_ASSETS_UNREVIEWED" && native.sourceCommit == request.assetProducerSourceCommit &&
+                    native.importRunUrl == request.assetProducerRunUrl && native.unityVersion == Application.unityVersion && !native.approved, "Original native authored inventory required.");
                 diagnostic.stage = "DEPENDENCIES"; MatchDependencies(request.expectedDependencies, native.dependencies);
                 var dependencies = JourneyCandidatePreparation.DependencySnapshot(); MatchDependencies(dependencies, native.dependencies, diagnostic); dependenciesValidated = true;
                 diagnostic.stage = "GENERATED_BYTES"; var restored = generated.files.Where(p => p.path.StartsWith("Assets/", StringComparison.Ordinal)).ToArray();
-                Check(restored.Length == 75 && restored.Select(p => p.path).Distinct().Count() == 75, "Exactly 75 immutable generated files required.");
+                int expectedGenerated = AndroidProducer(request) ? 314 : 75;
+                Check(restored.Length == expectedGenerated && restored.Select(p => p.path).Distinct().Count() == expectedGenerated, "Exact immutable producer generated file count required.");
                 foreach (var file in restored)
                 {
                     var repoPin = new FilePin { path = Prefix + file.path, sha256 = file.sha256 }; BoundPin(repoPin, files);
@@ -394,8 +402,8 @@ namespace DesertRV.Editor
                 Check(poses.sourceCommit == request.sourceCommit && !poses.gameplayCameraReviewed && !poses.reticleReviewed && poses.requiredWalkingVerticalFov == 66,
                     "Readonly scene pose proposal must preserve unreviewed 66-degree walking projection.");
                 integration.arcModulePose = JourneyCandidateAssetIntegration.ResolveArcModulePose("scene-geometry", integration.arcModulePose, poses.arcModulePose);
-                diagnostic.stage = "GROUNDING"; var grounding = JourneyCandidateAssetIntegration.ResolveSpawnRootHeights(integration, "scene-physical-floor", SelectionSha, requestHash);
-                MatchGrounding(grounding, JsonUtility.FromJson<JourneyCandidateAssetIntegration.SpawnGroundingReport>(File.ReadAllText(Pin(request.originalGrounding))));
+                diagnostic.stage = "GROUNDING"; var grounding = JourneyCandidateAssetIntegration.ResolveSpawnRootHeights(integration, "scene-physical-floor", SelectionDigest(request), requestHash);
+                MatchGrounding(request, grounding, JsonUtility.FromJson<JourneyCandidateAssetIntegration.SpawnGroundingReport>(File.ReadAllText(Pin(request.originalGrounding))));
                 diagnostic.stage = "IMPORTER_IDENTITIES"; var identities = new List<ImporterIdentity>();
                 foreach (var candidate in integration.candidates)
                 {
@@ -421,10 +429,11 @@ namespace DesertRV.Editor
                 integration.muzzleFlashPrefab = MeasureAsset(integration.muzzleFlashPrefab); integration.arcPresentationPrefab = MeasureAsset(integration.arcPresentationPrefab);
                 foreach (var sound in integration.sounds) sound.clip = MeasureAsset(sound.clip);
                 diagnostic.stage = "SAVED_BINDINGS"; JourneyCandidateAssetIntegration.VerifyRestoredSavedContent(integration);
+                if (AndroidProducer(request)) { diagnostic.stage = "WORLD_HUD_CAPTURE"; JourneySceneAuthoring.CapturePreparedWorldHud(); }
                 var outputs = integration.savedInputs.Select(p => new JourneyCandidateAssetIntegration.OutputFile { path = p.path, sha256 = Hash(p.path),
                     dependencyHash = AssetDatabase.GetAssetDependencyHash(p.path).ToString(), dependencySha256 = JourneyContentChecks.DependencySha256(p.path) }).ToArray();
-                proof = new Proof { sourceCommit = request.sourceCommit, producerRunUrl = request.producerRunUrl, assetProducerSourceCommit = ProducerCommit, assetProducerRunUrl = ProducerRun,
-                    generatedReceiptSha256 = ProducerReceiptSha, sourceTransitionProof = request.sourceTransitionProof, requestSha256 = requestHash, unityVersion = Application.unityVersion,
+                proof = new Proof { sourceCommit = request.sourceCommit, producerRunUrl = request.producerRunUrl, assetProducerSourceCommit = request.assetProducerSourceCommit, assetProducerRunUrl = request.assetProducerRunUrl,
+                    generatedReceiptSha256 = request.generatedReceiptSha256, sourceTransitionProof = request.sourceTransitionProof, requestSha256 = requestHash, unityVersion = Application.unityVersion,
                     sourceBytesUnchanged = true, originalAssetsUnchanged = true, structureValidated = true, productionApprovalRejected = true, approved = false, scopeReused = false,
                     scenes = outputs, dependencies = dependencies, grounding = grounding };
             }

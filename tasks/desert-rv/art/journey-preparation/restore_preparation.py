@@ -16,7 +16,24 @@ import verify_evidence as original
 PRODUCER=dict(repository='yangerstar1/task-workbench',runId=37923953772,runAttempt=1,sourceCommit='7e134d4bbc4a349e5c71b27980dea90d85ff538e',artifactId=11613499060,
  artifactName='journey-preparation-UNREVIEWED-37923953772-1',artifactSha256='81998b540f4b8e51260d5aaffdafec885bbd45215ebb978ed6a60e2dc53bfead',artifactBytes=15840786,
  generatedReceiptSha256='2b5e06b3b5dfcfb5a53afc3ff750b4eb8f460b222dc1abdca5974fc6c4702526',sourceStateSha256='c33b884bd4caaf3fb8d310cebbc0b8de62b52c61cd483cd39a846e245425205b')
+# This is the sole additional consumer: one reviewed Android request and producer.
+# The historical Linux profile remains byte-for-byte pinned below this selection.
+ANDROID_REQUEST_ID = 'desert-rv-journey-android-c15-restored-r1-20261011-once'
+ANDROID = os.environ.get('JOURNEY_ANDROID_RESTORATION') == ANDROID_REQUEST_ID
+if ANDROID:
+ POLICY='tasks/desert-rv/art/journey-preparation/android-restoration-transition.json'
+ PRODUCER=dict(repository='yangerstar1/task-workbench',runId=38135035401,runAttempt=1,sourceCommit='9c95f1009a597cf4573e286d0098b7bc47a62321',artifactId=11702226815,
+  artifactName='journey-preparation-UNREVIEWED-38135035401-1',artifactSha256='e79829bca28ad709b22822c86d5106ff2710d3356ee20b2fb462ca03c699d91f',artifactBytes=21350895,
+  generatedReceiptSha256='742af42d6c4a5f7d366a562f9afbbd9e560c744863c866123565c2cd38ee1f58',sourceStateSha256='2e90d5f2ca98fdcc8c09eb9040d3b314d65d256e0c73d37c63dcf10735fc5e21')
 RUN_URL='https://github.com/yangerstar1/task-workbench/actions/runs/'+str(PRODUCER['runId'])
+PRODUCER_API=PRIVATE/'producer-api-evidence.json'
+PRODUCER_NATIVE=ROOT/'tasks/desert-rv/art/journey-preparation/android-producer-native-history.json'
+PRODUCER_NATIVE_SHA='ffce6a5f9873d3619f242a5fb5be4df674be21d6b3c04ee269920670df900d90'
+PRODUCER_HUD=TASK/'journey-producer-mobile-hud'
+HUD=dict(artifactId=11701099423,artifactName='journey-mobile-hud-native-38135035401-1',artifactBytes=2393601,
+ artifactSha256='c4be4ee89b87b0733319fa95319f0c89e5bb3ff8d12384d8d50314c9b96bf3fa',
+ reportSha256='0cb1e60c7c03fee43e21731e6ebc6cc455a3908af8dec0b6576abf3fe225ba15')
+
 NATIVE_NAME='DesertRV.Tests.JourneyRestorationTests.RevalidatePinnedRestoredJourney'
 # Exact reviewed entry/diagnostic paths only. No runtime, original asset, import contract, package or selector prefix exception.
 _ALLOWED=(
@@ -45,6 +62,8 @@ _ALLOWED=(
  'tasks/desert-rv/unity/Assets/DesertRV/Tests/JourneyRestoration/JourneyRestorationTests.cs',
  'tasks/desert-rv/unity/Assets/DesertRV/Tests/JourneyRestoration/JourneyRestorationTests.cs.meta')
 ALLOWED_SOURCE_CHANGES=frozenset(_ALLOWED)
+if ANDROID:
+ ALLOWED_SOURCE_CHANGES=frozenset(('tasks/desert-rv/scripts/player/verify_tracer_shader.py','tasks/desert-rv/scripts/player/test_verify_tracer_shader.py','tasks/desert-rv/art/journey-preparation/android-producer-native-history.json',)+('.github/workflows/desert-rv-journey-android.yml', 'tasks/desert-rv/art/journey-preparation/restore_preparation.py', 'tasks/desert-rv/art/journey-preparation/test_restore_preparation.py', 'tasks/desert-rv/scripts/player/journey_android.py', 'tasks/desert-rv/scripts/player/test_journey_android.py', 'tasks/desert-rv/scripts/player/journey_android_container.sh', 'tasks/desert-rv/scripts/journey_mobile_hud_native.py', 'tasks/desert-rv/scripts/test_journey_mobile_hud_native.py', 'tasks/desert-rv/unity/Assets/DesertRV/Editor/JourneyCandidateRestoration.cs', 'tasks/desert-rv/unity/Assets/DesertRV/Editor/JourneySceneAuthoring.cs', 'tasks/desert-rv/unity/Assets/DesertRV/Editor/JourneyHudCapture.cs'))
 
 def pin(path):return dict(path=str(path.relative_to(ROOT)),sha256=sha(path))
 def write_fresh(path,value):
@@ -54,7 +73,7 @@ def source_transition(policy,before,after,policy_sha):
  require(set(policy)=={'schema','status','producer','changes'} and type(policy['schema']) is int and policy['schema']==1 and policy['status']=='REVIEWED_DIAGNOSTIC_RESTORATION_SOURCE_ONLY' and policy['producer']==PRODUCER,'RESTORE_POLICY_IDENTITY')
  require(digest(policy_sha) and isinstance(policy['changes'],list),'RESTORE_POLICY_HASH')
  require(before['restoredFiles']==after['restoredFiles'] and before['coverageRoots']==after['coverageRoots'],'RESTORE_SOURCE_DOMAIN_CHANGED')
- expected_coverage=before['coverageFiles']+['.github/workflows/desert-rv-journey-rebuild.yml']
+ expected_coverage=before['coverageFiles'] if ANDROID else before['coverageFiles']+['.github/workflows/desert-rv-journey-rebuild.yml']
  require(after['coverageFiles']==expected_coverage,'RESTORE_SOURCE_COVERAGE_CHANGED')
  require({k:v for k,v in before.items() if k not in ('files','coverageFiles')}=={k:v for k,v in after.items() if k not in ('files','coverageFiles')},'RESTORE_SOURCE_METADATA_CHANGED')
  old={x['path']:x for x in before['files']};new={x['path']:x for x in after['files']}
@@ -74,8 +93,8 @@ def source_transition(policy,before,after,policy_sha):
 
 def validate_producer_api(run,artifact,jobs):
  require(run.get('id')==PRODUCER['runId'] and run.get('run_attempt')==1 and run.get('head_sha')==PRODUCER['sourceCommit'] and
-         run.get('status')=='completed' and run.get('head_branch')=='main' and run.get('event')=='workflow_dispatch' and
-         run.get('path')=='.github/workflows/desert-rv-journey-prepare.yml','RESTORE_PRODUCER_RUN')
+         run.get('status')=='completed' and run.get('head_branch')==('journey-android-c15' if ANDROID else 'main') and run.get('event')==('push' if ANDROID else 'workflow_dispatch') and
+         run.get('path')==('.github/workflows/desert-rv-journey-android.yml' if ANDROID else '.github/workflows/desert-rv-journey-prepare.yml'),'RESTORE_PRODUCER_RUN')
  require(artifact.get('id')==PRODUCER['artifactId'] and artifact.get('name')==PRODUCER['artifactName'] and artifact.get('expired') is False and
          artifact.get('size_in_bytes')==PRODUCER['artifactBytes'] and artifact.get('digest')=='sha256:'+PRODUCER['artifactSha256'] and
          artifact.get('workflow_run',{}).get('id')==PRODUCER['runId'] and artifact['workflow_run'].get('head_sha')==PRODUCER['sourceCommit'],'RESTORE_PRODUCER_ARTIFACT')
@@ -83,16 +102,54 @@ def validate_producer_api(run,artifact,jobs):
  require(len(candidates)==1,'RESTORE_PRODUCER_JOB')
  steps={s['number']:s for s in candidates[0]['steps']}
  required={7:'Native strict armored import and actual capture',8:'Reuse exact strict quality gate and preserve armored reports',10:'Native strict pouncer import and actual capture',11:'Reuse exact strict quality gate and preserve pouncer reports',13:'Native strict weapon import and actual capture',14:'Reuse exact strict quality gate and preserve weapon reports',15:'Require exact three-candidate union and freeze real selections',16:'Native exact candidate Linux boundary tests',17:'Require exact seventeen passing candidate boundary cases',18:'Native original FX, four scenes, integration and diagnostic scope',19:'Verify actual preparation test, saved outputs and final scope pins'}
+ if ANDROID:required={3: 'Verify one-use Android candidate source identity', 4: 'Verify current source before fixed Android-image readiness', 5: 'Verify fixed Android-image readiness with at most one bounded fallback pull', 6: 'Validate bounded image observation and actual step outcome', 7: 'Upload only validated fixed Android image availability observation', 8: 'Prepare official validators and source before snapshot', 9: 'Validate ordered selection and snapshot protected source', 10: 'Verify non-root host union across real root-owned bytecode caches', 11: 'Prepare existing licensed runner after input validation', 12: 'Native exact ten tracer material cases before strict imports', 13: 'Diagnose original source and import union even after failed native tests', 14: 'Upload bounded original source and fixture residue diagnostics', 15: 'Require exact ten passes and unchanged initial source and import union', 16: 'Upload bounded validated tracer native status', 17: 'Create exact same-commit isolated keyboard look project', 18: 'Native exact four keyboard look PlayMode cases before strict imports', 19: 'Diagnose actual RV entry across five timesteps independently', 20: 'Native exact one region HUD lifecycle PlayMode case in the isolated project', 21: 'Native exact ten production mobile HUD layout and render cases', 22: 'Native exact seven combat feedback EditMode cases in the isolated project', 23: 'Native current thirteen baseline PlayMode cases', 24: 'Native thirteen current Pouncer ground support regressions', 25: 'Preserve isolated project source and complete safe settings diff', 26: 'Upload bounded isolated keyboard look project diagnostics', 27: 'Diagnose source and union independently after keyboard look native tests', 28: 'Upload bounded keyboard look source diagnostics', 29: 'Require exact four keyboard look passes and unchanged initial source', 30: 'Upload bounded keyboard look native result evidence', 31: 'Preserve separate keyboard look reports in preparation evidence', 32: 'Preserve complete safe cabin physics observations even on native failure', 33: 'Upload bounded validated cabin physics diagnosis', 34: 'Require the separate exact HUD pass with same-job source and isolation evidence', 35: 'Upload bounded validated region HUD native status', 36: 'Preserve separate bounded region HUD evidence in the fresh preparation', 37: 'Require fresh exact-seven feedback passes and same-job source and isolation evidence', 38: 'Upload bounded validated combat feedback native status', 39: 'Preserve bounded combat feedback evidence in the fresh preparation', 40: 'Require exact mobile HUD cases and preserve bounded production render fixtures', 41: 'Upload only verified thirteen HUD captures and native fit evidence', 42: 'Pin exact baseline ground support and mobile HUD evidence before authoring or building', 43: 'Remove only the owned isolated keyboard look project', 44: 'Stage verified armored source archive', 45: 'Native strict armored import and actual capture', 46: 'Reuse exact strict quality gate and preserve armored reports', 47: 'Stage verified pouncer source archive', 48: 'Native strict pouncer import and actual capture', 49: 'Reuse exact strict quality gate and preserve pouncer reports', 50: 'Stage verified weapon source archive', 51: 'Native strict weapon import and actual capture', 52: 'Reuse exact strict quality gate and preserve weapon reports', 53: 'Require exact three-candidate union and freeze real selections', 54: 'Native exact candidate Linux boundary tests', 55: 'Require exact seventeen passing candidate boundary cases', 56: 'Native original FX, four scenes, integration and diagnostic scope', 57: 'Verify actual preparation test, saved outputs and final scope pins', 69: 'Prove tracked original source was not edited', 70: 'Upload only existing strict-safe exports and bounded preparation status'}
  require(all(steps.get(n,{}).get('name')==name and steps[n].get('conclusion')=='success' for n,name in required.items()),'RESTORE_PRODUCER_AUTHORING_NOT_PASSED')
  # A later Linux failure does not rewrite the actual successful producer stages.
 
-def extract_original(zip_path,destination):
- require(sha(zip_path)==PRODUCER['artifactSha256'] and zip_path.stat().st_size==PRODUCER['artifactBytes'] and not destination.exists(),'RESTORE_ZIP_IDENTITY')
+def extract_original(zip_path,destination,artifact=None):
+ artifact=PRODUCER if artifact is None else artifact
+ require(sha(zip_path)==artifact['artifactSha256'] and zip_path.stat().st_size==artifact['artifactBytes'] and not destination.exists(),'RESTORE_ZIP_IDENTITY')
  with zipfile.ZipFile(zip_path) as archive:
   rows=archive.infolist();require(len(rows)==len({x.filename for x in rows}) and sum(x.file_size for x in rows)<=256*1024**2,'RESTORE_ZIP_BOUNDS')
   for row in rows:
    p=PurePosixPath(row.filename);require(not p.is_absolute() and p.parts and '..' not in p.parts and p.as_posix()==row.filename.rstrip('/') and '\\' not in row.filename and not stat.S_ISLNK(row.external_attr>>16) and (stat.S_IFMT(row.external_attr>>16) in (0,stat.S_IFREG,stat.S_IFDIR)),'RESTORE_ZIP_PATH')
   archive.extractall(destination)
+
+def producer_native_history():
+ require(ANDROID and sha(PRODUCER_NATIVE)==PRODUCER_NATIVE_SHA,'RESTORE_PRODUCER_NATIVE_HISTORY_PIN')
+ value=read(PRODUCER_NATIVE)
+ require(value['sourceCommit']==PRODUCER['sourceCommit'] and value['runId']==PRODUCER['runId'] and value['runAttempt']==1 and
+         value['sourceStateSha256']==PRODUCER['sourceStateSha256'],'RESTORE_PRODUCER_NATIVE_HISTORY_IDENTITY')
+ from journey_pouncer_ground_support_probe import GENERIC_TESTS
+ expected={'playmode':original.expected_cases('playmode'),'groundSupport':GENERIC_TESTS}
+ require([row['kind'] for row in value['tests']]==['playmode','groundSupport'],'RESTORE_PRODUCER_NATIVE_HISTORY_SET')
+ for row in value['tests']:
+  names=[case['fullname'] for case in row['cases']]
+  require(row['result']=='Passed' and row['counts']==dict(total=13,passed=13,failed=0,skipped=0,inconclusive=0) and
+          len(names)==len(set(names))==13 and set(names)==set(expected[row['kind']]) and all(c['result']=='Passed' for c in row['cases']) and
+          row['independentExportedNativeHashAvailable'] is False,'RESTORE_PRODUCER_NATIVE_HISTORY_CASES')
+ return dict(sourceCommit=PRODUCER['sourceCommit'],runId=PRODUCER['runId'],runAttempt=1,scope=value['scope'],
+             evidence=pin(PRODUCER_NATIVE),tests=value['tests'],executedInConsumer=False)
+
+def producer_hud_evidence():
+ require(ANDROID,'RESTORE_ANDROID_ONLY')
+ sys.path.insert(0,str(TASK/'scripts'));import journey_mobile_hud_native as hud
+ report=read(PRODUCER_HUD/'native-report.json')
+ require(sha(PRIVATE/'producer-hud.zip')==HUD['artifactSha256'] and (PRIVATE/'producer-hud.zip').stat().st_size==HUD['artifactBytes'] and
+         sha(PRODUCER_HUD/'native-report.json')==HUD['reportSha256'],'RESTORE_PRODUCER_HUD_PIN')
+ require({p.name for p in PRODUCER_HUD.iterdir()}=={'native-report.json','captures'} and report['sourceCommit']==PRODUCER['sourceCommit'] and
+         report['runId']==str(PRODUCER['runId']) and report['runAttempt']=='1' and report['sourceStateSha256']==PRODUCER['sourceStateSha256'] and
+         report['status']=='EXACT_TEN_AND_13_RENDER_FIXTURES_VERIFIED' and report['scope']==hud.SCOPE and
+         all(report[k] is False for k in ('deviceExecuted','gameplayAccepted','approved')),'RESTORE_PRODUCER_HUD_IDENTITY')
+ actual=hud.capture_inventory(PRODUCER_HUD/'captures')
+ def rows(values):return sorted((Path(r['path']).name,r['sha256'],r['bytes']) for r in values)
+ require(rows(actual)==rows(report['captures']),'RESTORE_PRODUCER_HUD_CAPTURE_PINS')
+ return dict(sourceCommit=PRODUCER['sourceCommit'],runId=str(PRODUCER['runId']),runAttempt='1',
+             artifact=HUD,report=pin(PRODUCER_HUD/'native-report.json'),scope=report['scope'],originalNativeXml=report['nativeXml'],
+             captures=actual,executedInConsumer=False)
+
+def producer_hud_pins():
+ value=producer_hud_evidence();return [value['report'],*value['captures']]
 
 def validate_bundles(folder,producer_source):
  public_tree(folder)
@@ -120,6 +177,9 @@ def validate_bundles(folder,producer_source):
  for name,h in exported.items():assets[name]=h;paths[name]=folder/'generated'/name
  known={kind+'/'+x.relative_to(folder/kind).as_posix() for kind in generated.KINDS for x in (folder/kind).rglob('*') if x.is_file()}
  known.update('generated/'+x.relative_to(folder/'generated').as_posix() for x in (folder/'generated').rglob('*') if x.is_file());known.add('preparation.json')
+ if ANDROID:
+  extra={'keyboard-look/native-report.json': '24ab29ca896483996c474e2a41cc3ba837084c09cc95ec5a2525cc34f344bf5a', 'keyboard-look/source-report.json': '34a42f77f3bcd759b2b2cf58b7e1eb6cb739c9990512bae7a0faab828622f8ab', 'keyboard-look/isolation-report.json': 'a5fa0b8d4dd4cddee3463918283c3fb01f559b508cd352dc06199f32b9978e07', 'combat-feedback/native-report.json': '74f4cf99affbec0d746e54f7a87c08de57f7ba76f9065ba17ca1192f169b6ef0', 'region-hud/native-report.json': 'e06c18721be98fcec8dcec8b88e6bb84ad541eacfb03a462bc5d75a7b0e50f97'}
+  require(all(sha(folder/name)==h for name,h in extra.items()),'RESTORE_PRODUCER_DIAGNOSTIC_PIN');known.update(extra)
  require({x.relative_to(folder).as_posix() for x in folder.rglob('*') if x.is_file()}==known and all(not x.is_symlink() for x in folder.rglob('*')),'RESTORE_TOPLEVEL_ALLOWLIST')
  summary=read(folder/'preparation.json');require(summary['sourceCommit']==PRODUCER['sourceCommit'] and summary['status']=='PREPARED_EDITOR_SCOPE_UNREVIEWED' and summary['generatedExport']['sha256']==PRODUCER['generatedReceiptSha256'] and summary['nativeXmlSha256']==r['nativeAuthoringXmlSha256'],'RESTORE_PRODUCER_SUMMARY')
  prefix='tasks/desert-rv/unity/';source={x['path'][len(prefix):]:x['sha256'] for x in producer_source['files']+producer_source['restoredFiles'] if x['path'].startswith(prefix)}
@@ -204,6 +264,9 @@ def restore_assets(bundle):
   require(sha(target)==bundle['assets'][name],'RESTORE_ASSET_COPY_CHANGED')
 
 def stage(policy_sha):
+ if ANDROID:
+  sys.path.insert(0,str(TASK/'scripts/player'));import journey_android
+  journey_android.dispatch()
  guard();require(digest(policy_sha) and sha(ROOT/POLICY)==policy_sha,'RESTORE_DISPATCH_POLICY_PIN')
  subprocess.run(['git','ls-files','--error-unmatch',POLICY],cwd=ROOT,check=True,stdout=subprocess.DEVNULL)
  require(not PRIVATE.exists() and not PUBLIC.exists() and not EXPORT.exists() and not (PROJECT/'JourneyEvidence/CandidateArt').exists() and not (PROJECT/'Assets/DesertRV/Scenes/Journey').exists() and not (PROJECT/'Assets/DesertRV/CandidateArtImports').exists() and not (PROJECT/'CandidatePackageSnapshot').exists(),'RESTORE_FRESH_WORKSPACE')
@@ -219,6 +282,18 @@ def stage(policy_sha):
  data=base64.b64decode(fetched['content'],validate=False);require(hashlib.sha256(data).hexdigest()==PRODUCER['sourceStateSha256'],'RESTORE_PRODUCER_SOURCE_PIN')
  before=json.loads(data);changes=source_transition(policy,before,source,policy_sha)
  PRIVATE.mkdir(parents=True);PRODUCER_SOURCE.write_bytes(data)
+ if ANDROID:
+  evidence=dict(schema=1,sourceCommit=PRODUCER['sourceCommit'],runId=PRODUCER['runId'],runAttempt=1,
+                scope='ORIGINAL_PRODUCER_API_OBSERVATION_NOT_CURRENT_NATIVE_EXECUTION',run=run,artifact=artifact,jobs=jobs)
+  write_fresh(PRODUCER_API,evidence)
+  hud=api('/repos/'+PRODUCER['repository']+'/actions/artifacts/'+str(HUD['artifactId']))
+  require(hud.get('id')==HUD['artifactId'] and hud.get('name')==HUD['artifactName'] and hud.get('size_in_bytes')==HUD['artifactBytes'] and
+          hud.get('digest')=='sha256:'+HUD['artifactSha256'] and hud.get('expired') is False and hud.get('workflow_run',{}).get('id')==PRODUCER['runId'] and
+          hud['workflow_run'].get('head_sha')==PRODUCER['sourceCommit'],'RESTORE_PRODUCER_HUD_ARTIFACT')
+  with (PRIVATE/'producer-hud.zip').open('xb') as stream:
+   subprocess.run(['gh','api','/repos/'+PRODUCER['repository']+'/actions/artifacts/'+str(HUD['artifactId'])+'/zip'],stdout=stream,check=True)
+  extract_original(PRIVATE/'producer-hud.zip',PRODUCER_HUD,HUD);producer_hud_evidence()
+
  zip_path=PRIVATE/'producer-artifact.zip'
  with zip_path.open('xb') as stream:subprocess.run(['gh','api','/repos/'+PRODUCER['repository']+'/actions/artifacts/'+str(PRODUCER['artifactId'])+'/zip'],stdout=stream,check=True)
  extract_original(zip_path,PUBLIC);public_pins=public_tree(PUBLIC);bundle=validate_bundles(PUBLIC,before)
@@ -230,11 +305,17 @@ def stage(policy_sha):
  proof=dict(schema=1,label=SOURCE_LABEL,sourceCommit=os.environ['GITHUB_SHA'],producerRunUrl=current_run(),assetProducerSourceCommit=PRODUCER['sourceCommit'],assetProducerRunUrl=RUN_URL,
   producer=PRODUCER,policy=pin(ROOT/POLICY),producerSource=pin(PRODUCER_SOURCE),consumerSource=pin(TASK/'SOURCE-STATE.json'),changes=changes,originalAssetsUnchanged=True,scopeReused=False)
  write_fresh(SOURCE_PROOF,proof);payload=request_payload(bundle,source,proof);write_fresh(INPUT,payload);INPUT.with_suffix('.sha256').write_text(sha(INPUT)+'\n')
- write_fresh(STATE,dict(schema=1,sourceCommit=os.environ['GITHUB_SHA'],producerRunUrl=current_run(),initialIdentity=identity,initialSourceDirectories=initial_dirs,addedAssets=bundle['assets'],publicFiles=public_pins,policySha256=policy_sha,sourceProof=pin(SOURCE_PROOF),input=pin(INPUT),producerSource=pin(PRODUCER_SOURCE)))
+ state=dict(schema=1,sourceCommit=os.environ['GITHUB_SHA'],producerRunUrl=current_run(),initialIdentity=identity,initialSourceDirectories=initial_dirs,addedAssets=bundle['assets'],publicFiles=public_pins,policySha256=policy_sha,sourceProof=pin(SOURCE_PROOF),input=pin(INPUT),producerSource=pin(PRODUCER_SOURCE))
+ if ANDROID:state['producerApi']=pin(PRODUCER_API)
+ write_fresh(STATE,state)
  verify_assets();print('JOURNEY_RESTORED_BYTES_AWAIT_FRESH_NATIVE_REVALIDATION')
 
 def verify_assets():
  s=read(STATE);require(s['schema']==1 and s['sourceCommit']==os.environ['GITHUB_SHA'] and s['producerRunUrl']==current_run(),'RESTORE_CONSUMER_IDENTITY')
+ if ANDROID:
+  require(s['producerApi']==pin(PRODUCER_API),'RESTORE_PRODUCER_API_CHANGED')
+  evidence=read(PRODUCER_API);validate_producer_api(evidence['run'],evidence['artifact'],evidence['jobs']);producer_hud_evidence();producer_native_history()
+
  for name in ('sourceProof','input','producerSource'):
   expected={'sourceProof':SOURCE_PROOF,'input':INPUT,'producerSource':PRODUCER_SOURCE}[name]
   require(s[name]==pin(expected),'RESTORE_PRIVATE_PROOF_CHANGED')
@@ -305,7 +386,7 @@ def finish(native):
 
 DIAGNOSTIC=PRIVATE/'restoration-diagnostic.json'
 HOST_STATUS=TASK/'journey-restoration-status.json'
-DIAGNOSTIC_STAGES={'INPUT','INVENTORY','SOURCE_PROOF','STRICT_BUNDLES','DEPENDENCIES','GENERATED_BYTES','SELECTION','POSES','GROUNDING','IMPORTER_IDENTITIES','SAVED_BINDINGS','FINAL_PROTECTION','PROOF','COMPLETED'}
+DIAGNOSTIC_STAGES={'INPUT','INVENTORY','SOURCE_PROOF','STRICT_BUNDLES','DEPENDENCIES','GENERATED_BYTES','SELECTION','POSES','GROUNDING','IMPORTER_IDENTITIES','SAVED_BINDINGS','WORLD_HUD_CAPTURE','FINAL_PROTECTION','PROOF','COMPLETED'}
 DIAGNOSTIC_ERRORS={'RUN_ID_ARGUMENT','NONE','IMPORTER_IDENTITY','DEPENDENCY_BYTES','VALIDATION','IO','UNAUTHORIZED','OTHER'}
 def bounded_native_diagnostic(value):
  keys={'schema','label','sourceCommit','producerRunUrl','stage','completed','importerIdentities','dependencyDifferences','errorClass','dependencyExpectedCount','dependencyActualCount','dependencyAddedCount','dependencyMissingCount','runIdentity','consumerIdentityMatched'}

@@ -42,7 +42,7 @@ namespace DesertRV.Editor
             }
             File.WriteAllText(Path.Combine(output,"capture-manifest.json"),JsonUtility.ToJson(manifest,true));
         }
-        // Optional call from an already loaded, authored world's existing capture loop.
+        // Capture an already loaded, authored world using its existing camera view.
         // Camera/world/scene state is read only. HUD values remain fixture values, not live gameplay.
         public static void CaptureOverWorld(Camera sourceCamera,string label)
         {
@@ -51,7 +51,7 @@ namespace DesertRV.Editor
                 throw new ArgumentException("Use a simple capture label.",nameof(label));
             string output=Path.GetFullPath("JourneyEvidence/MobileHudWorld");Directory.CreateDirectory(output);
             Capture(output,"desktop","foot",label,sourceCamera);
-            File.WriteAllText(Path.Combine(output,"EVIDENCE.txt"),"Authored, loaded world camera + production UGUI layout fixture. HUD values are controlled fixture data. Not live gameplay or physical-device acceptance. No scenes opened, saved or replaced.\n");
+            File.WriteAllText(Path.Combine(output,"EVIDENCE.txt"),"Authored, loaded world camera + production UGUI layout fixture. HUD values are controlled fixture data. Not live gameplay or physical-device acceptance. Saved scenes opened read-only for capture; no scenes saved or replaced.\n");
         }
         [Serializable] sealed class CaptureManifest { public string source,evidence; public List<CaptureFile> files; }
         [Serializable] sealed class CaptureFile { public string name,sha256; public int bytes; }
@@ -62,14 +62,22 @@ namespace DesertRV.Editor
             float scale=profile=="desktop"?1.125f:3;
             Rect safe=profile=="small"?new Rect(108,72,1704,888):profile=="desktop"?new Rect(0,0,width,height):new Rect(profile=="compact"?48:96,36,width-(profile=="compact"?96:192),height-36);
             GameObject root=null,cameraObject=null;RenderTexture target=null;Texture2D pixels=null;
+            string stem=Path.Combine(output,profile+"-"+mode+"-"+background);
+            if(File.Exists(stem+".png") || File.Exists(stem+"-fit.csv"))
+                throw new InvalidOperationException("Capture output already exists.");
             var previous=RenderTexture.active;
+            var failures=new List<Exception>();
+            void AttemptCleanup(Action action)
+            {
+                try{action();}catch(Exception error){failures.Add(error);}
+            }
             try
             {
                 root=new GameObject("Native HUD render fixture",typeof(RectTransform));
                 cameraObject=new GameObject("HUD render camera");
-                target=new RenderTexture(width,height,24);
+                target=new RenderTexture(width,height,24){hideFlags=HideFlags.HideAndDontSave};
                 if(!target.Create())throw new InvalidOperationException("Failed to create HUD capture target.");
-                pixels=new Texture2D(width,height,TextureFormat.RGB24,false);
+                pixels=new Texture2D(width,height,TextureFormat.RGB24,false){hideFlags=HideFlags.HideAndDontSave};
                 var hud=root.AddComponent<JourneyHud>(); hud.enabled=false;
                 hud.font=AssetDatabase.LoadAssetAtPath<Font>("Assets/DesertRV/UI/Fonts/NotoSansCJKsc-Regular.otf");
                 if(!hud.font)throw new InvalidOperationException("Restore and verify the pinned production font first.");
@@ -87,7 +95,7 @@ namespace DesertRV.Editor
                     camera.clearFlags=CameraClearFlags.SolidColor;camera.cullingMask=1<<31;
                     camera.backgroundColor=background=="night"?new Color(.035f,.045f,.065f):background=="glare"?new Color(1,.95f,.8f):new Color(.64f,.72f,.75f);
                 }
-                camera.enabled=false;camera.targetTexture=target;
+                camera.enabled=false;camera.targetTexture=target;camera.aspect=(float)width/height;
                 var canvas=root.GetComponent<Canvas>(); canvas.renderMode=RenderMode.ScreenSpaceCamera; canvas.worldCamera=camera; canvas.planeDistance=1; canvas.scaleFactor=scale;
                 hud.ConfigureLayoutPreview(width,height,safe,scale,profile=="desktop"&&mode=="pause");
                 bool playing=mode=="foot"||mode=="drive";
@@ -147,7 +155,6 @@ namespace DesertRV.Editor
                     if(preferred>text.rectTransform.rect.height+1)
                         fitFailure=$"Text is clipped: {profile}/{mode}/{text.name}: {preferred} > {text.rectTransform.rect.height}: {text.text}";
                 }
-                string stem=Path.Combine(output,profile+"-"+mode+"-"+background);
                 File.WriteAllText(stem+"-fit.csv",report.ToString());
                 var request=new UniversalRenderPipeline.SingleCameraRequest{destination=target};
                 if(!RenderPipeline.SupportsRenderRequest(camera,request))throw new InvalidOperationException("URP native capture is unavailable.");
@@ -156,12 +163,20 @@ namespace DesertRV.Editor
                 File.WriteAllBytes(stem+".png",pixels.EncodeToPNG());
                 if(fitFailure!=null)throw new InvalidOperationException(fitFailure);
             }
+            catch(Exception error){failures.Add(error);}
             finally
             {
-                RenderTexture.active=previous;
-                if(root)Object.DestroyImmediate(root);if(cameraObject)Object.DestroyImmediate(cameraObject);
-                if(target){target.Release();Object.DestroyImmediate(target);}if(pixels)Object.DestroyImmediate(pixels);
+                // A failed target restore/release must not skip any other cleanup or hide the render error.
+                AttemptCleanup(()=>{RenderTexture.active=previous;});
+                AttemptCleanup(()=>{if(root)Object.DestroyImmediate(root);});
+                AttemptCleanup(()=>{if(cameraObject)Object.DestroyImmediate(cameraObject);});
+                AttemptCleanup(()=>{if(pixels)Object.DestroyImmediate(pixels);});
+                AttemptCleanup(()=>{if(target)target.Release();});
+                AttemptCleanup(()=>{if(target)Object.DestroyImmediate(target);});
+                AttemptCleanup(()=>{if(root || cameraObject || target || pixels)throw new InvalidOperationException("HUD capture resources were not released.");});
             }
+            if(failures.Count==1)System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(failures[0]).Throw();
+            if(failures.Count>1)throw new AggregateException("HUD capture and cleanup failed; primary failure first.",failures);
         }
     }
 }
