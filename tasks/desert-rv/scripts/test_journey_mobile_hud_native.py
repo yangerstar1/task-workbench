@@ -94,7 +94,7 @@ class MobileHudWorldRoundtripTests(unittest.TestCase):
   self.world.mkdir(parents=True);self.prep.parent.mkdir(parents=True)
   self.commit='a'*40;self.run='123';self.output=self.root/'output.txt'
   self.env=dict(GITHUB_SHA=self.commit,GITHUB_RUN_ID=self.run,GITHUB_RUN_ATTEMPT='1',NATIVE_OUTCOME='success',GITHUB_OUTPUT=str(self.output),WORLD_CAPTURE_MODE='same-workspace')
-  for name,value in [('ROOT',self.root),('TASK',self.task),('WORLD_SOURCE',self.world),('WORLD_EXPORT',self.export),('WORLD_DIAGNOSTIC',self.task/'mobile-hud-world-diagnostic/world-diagnostic.json')]:
+  for name,value in [('ROOT',self.root),('TASK',self.task),('WORLD_SOURCE',self.world),('WORLD_EXPORT',self.export),('WORLD_FAILURE_EXPORT',self.task/'mobile-hud-world-failure-export'),('WORLD_DIAGNOSTIC',self.task/'mobile-hud-world-diagnostic/world-diagnostic.json')]:
    change=patch.object(gate,name,value);change.start();self.addCleanup(change.stop)
   change=patch.dict(os.environ,self.env);change.start();self.addCleanup(change.stop)
   self.preparation=dict(sourceCommit=self.commit,status='PREPARED_EDITOR_SCOPE_UNREVIEWED',visualApproved=False,gameplayAccepted=False,
@@ -240,12 +240,13 @@ class MobileHudWorldRoundtripTests(unittest.TestCase):
  def restored_fixture(self):
   os.environ['WORLD_CAPTURE_MODE']='restored';self.preparation['sourceCommit']='b'*40;self.prep.write_text(json.dumps(self.preparation))
   report=self.task/'unity/JourneyEvidence/JourneyPreparation/restoration-revalidated.json';report.parent.mkdir()
-  value=dict(label='RESTORED_JOURNEY_NATIVE_REVALIDATED_UNREVIEWED',sourceCommit=self.commit,
+  value=dict(label='DERIVED_JOURNEY_NATIVE_REVALIDATED_UNREVIEWED',sourceCommit=self.commit,
    producerRunUrl='https://github.com/yangerstar1/task-workbench/actions/runs/'+self.run,
    assetProducerSourceCommit='b'*40,assetProducerRunUrl='https://github.com/yangerstar1/task-workbench/actions/runs/100',
-   generatedReceiptSha256='c'*64,sourceBytesUnchanged=True,originalAssetsUnchanged=True,structureValidated=True,approved=False,scopeReused=False)
+   generatedReceiptSha256='c'*64,sourceBytesUnchanged=True,originalAssetsUnchanged=False,originalBeforeAuthoringVerified=True,exactMaterialDelta=True,derivedBindingsValidated=True,structureValidated=True,approved=False,scopeReused=False)
   report.write_text(json.dumps(value));checks=[]
-  module=SimpleNamespace(REPORT=report,RUN_URL=value['assetProducerRunUrl'],PRODUCER=dict(generatedReceiptSha256='c'*64),verify=lambda:checks.append('verified'))
+  derived=self.task/'derived-receipt.json';derived.write_text('{"synthetic":true}')
+  module=SimpleNamespace(REPORT=report,DERIVED_RECEIPT=derived,RUN_URL=value['assetProducerRunUrl'],PRODUCER=dict(generatedReceiptSha256='c'*64),verify=lambda:checks.append('verified'))
   return module,value,checks
  def test_restored_branch_keeps_distinct_producer_and_consumer_and_calls_native_gate(self):
   # Boundary stub only; all world reads, images, CSVs, copies, pins, reports and outputs are real.
@@ -275,6 +276,21 @@ class MobileHudWorldRoundtripTests(unittest.TestCase):
   restore.verify=verify
   with patch.object(gate,'load_restoration',return_value=restore):self.fail('RESTORATION_VERIFY','RESTORE_PUBLIC_BUNDLE_CHANGED')
   self.assertFalse((self.export/'world-report.json').exists())
+ def test_failed_native_preserves_fixed_world_images_only_as_nonbuildable_diagnostics(self):
+  restore,value,checks=self.restored_fixture();os.environ['NATIVE_OUTCOME']='failure'
+  self.fail('NATIVE_OUTCOME','MOBILE_HUD_WORLD_NATIVE_OUTCOME')
+  receipt=json.loads((gate.WORLD_FAILURE_EXPORT/'receipt.json').read_text())
+  self.assertEqual('WORLD_CAPTURES_DIAGNOSTIC_ONLY',receipt['status']);self.assertFalse(receipt['buildReady']);self.assertFalse(receipt['restorationPassed'])
+  self.assertEqual(5,len(receipt['files']));self.assertFalse(self.export.exists())
+  self.assertIn('world_failure_captures_written=true',self.output.read_text());self.assertNotIn('export_ready=true',self.output.read_text())
+  self.assertEqual({p.name:p.read_bytes() for p in self.world.iterdir()},{p.name:p.read_bytes() for p in (gate.WORLD_FAILURE_EXPORT/'captures').iterdir()})
+ def test_failed_native_with_unknown_extra_cannot_export_diagnostic_captures(self):
+  self.restored_fixture();os.environ['NATIVE_OUTCOME']='failure';(self.world/'unknown.txt').write_text('private')
+  self.fail('NATIVE_OUTCOME','MOBILE_HUD_WORLD_NATIVE_OUTCOME');self.assertFalse(gate.WORLD_FAILURE_EXPORT.exists())
+ def test_failure_capture_destination_never_overwritten(self):
+  self.restored_fixture();os.environ['NATIVE_OUTCOME']='failure';gate.WORLD_FAILURE_EXPORT.mkdir();(gate.WORLD_FAILURE_EXPORT/'existing').write_text('keep')
+  self.fail('NATIVE_OUTCOME','MOBILE_HUD_WORLD_NATIVE_OUTCOME');self.assertEqual('keep',(gate.WORLD_FAILURE_EXPORT/'existing').read_text())
+  self.assertNotIn('world_failure_captures_written=true',self.output.read_text())
  def test_restored_branch_rejects_relabelled_original_producer(self):
   restore,value,checks=self.restored_fixture();value['assetProducerSourceCommit']=self.commit;restore.REPORT.write_text(json.dumps(value))
   with patch.object(gate,'load_restoration',return_value=restore):self.fail('RESTORATION_VERIFY','MOBILE_HUD_WORLD_RESTORATION')

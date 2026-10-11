@@ -6,6 +6,14 @@ PRIVATE=PROJECT/'JourneyEvidence/JourneyPreparation';PUBLIC=TASK/'journey-prepar
 POLICY='tasks/desert-rv/art/journey-preparation/restoration-transition.json'
 STATE=PRIVATE/'restoration-state.json';SOURCE_PROOF=PRIVATE/'restoration-source-proof.json'
 INPUT=PRIVATE/'restoration-input.json';REPORT=PRIVATE/'restoration-revalidated.json';VERIFIED=PRIVATE/'restoration-native-verified.json'
+DERIVATION_FOLDER=PRIVATE/'MaterialDerivation'
+DERIVATION_RECORD=DERIVATION_FOLDER/'native-material-derivation.json'
+DERIVED_EXPORT=TASK/'journey-derived-preparation-export'
+DERIVED_RECEIPT=DERIVED_EXPORT/'receipt.json'
+MATERIAL='Assets/DesertRV/Scenes/Journey/Layout-FFC261.mat'
+MATERIAL_BEFORE_SHA='ef01bab64fa8fe3f2ebe42a59ed43ddf426e1e8f0c3a5a3401a7dd0fe5202395'
+DERIVATION_OPERATION='PINNED_WARM_LIT_BAKED_EMISSION_V1'
+DERIVED_LABEL='DERIVED_JOURNEY_NATIVE_REVALIDATED_UNREVIEWED'
 sys.path[:0]=[str(TASK/'art/import-candidate'),str(TASK/'scripts/rendered'),str(TASK/'scripts')]
 from strict_output import read,sha,require,digest,rel,verify_staged_inventory
 from prepare_input import api
@@ -18,7 +26,7 @@ PRODUCER=dict(repository='yangerstar1/task-workbench',runId=37923953772,runAttem
  generatedReceiptSha256='2b5e06b3b5dfcfb5a53afc3ff750b4eb8f460b222dc1abdca5974fc6c4702526',sourceStateSha256='c33b884bd4caaf3fb8d310cebbc0b8de62b52c61cd483cd39a846e245425205b')
 # This is the sole additional consumer: one reviewed Android request and producer.
 # The historical Linux profile remains byte-for-byte pinned below this selection.
-ANDROID_REQUEST_ID = 'desert-rv-journey-android-c15-restored-r3-20261011-once'
+ANDROID_REQUEST_ID = 'desert-rv-journey-android-c15-restored-r4-20261011-once'
 ANDROID = os.environ.get('JOURNEY_ANDROID_RESTORATION') == ANDROID_REQUEST_ID
 if ANDROID:
  POLICY='tasks/desert-rv/art/journey-preparation/android-restoration-transition.json'
@@ -63,14 +71,152 @@ _ALLOWED=(
  'tasks/desert-rv/unity/Assets/DesertRV/Tests/JourneyRestoration/JourneyRestorationTests.cs.meta')
 ALLOWED_SOURCE_CHANGES=frozenset(_ALLOWED)
 if ANDROID:
- ALLOWED_SOURCE_CHANGES=frozenset(('tasks/desert-rv/unity/Assets/DesertRV/Tests/JourneyRestoration/JourneyRestorationTests.cs','tasks/desert-rv/scripts/player/verify_tracer_shader.py','tasks/desert-rv/scripts/player/test_verify_tracer_shader.py','tasks/desert-rv/art/journey-preparation/android-producer-native-history.json',)+('.github/workflows/desert-rv-journey-android.yml', 'tasks/desert-rv/art/journey-preparation/restore_preparation.py', 'tasks/desert-rv/art/journey-preparation/test_restore_preparation.py', 'tasks/desert-rv/scripts/player/journey_android.py', 'tasks/desert-rv/scripts/player/test_journey_android.py', 'tasks/desert-rv/scripts/player/journey_android_container.sh', 'tasks/desert-rv/scripts/journey_mobile_hud_native.py', 'tasks/desert-rv/scripts/test_journey_mobile_hud_native.py', 'tasks/desert-rv/unity/Assets/DesertRV/Editor/JourneyCandidateRestoration.cs', 'tasks/desert-rv/unity/Assets/DesertRV/Editor/JourneySceneAuthoring.cs', 'tasks/desert-rv/unity/Assets/DesertRV/Editor/JourneyHudCapture.cs'))
+ ALLOWED_SOURCE_CHANGES=frozenset(('tasks/desert-rv/art/journey-preparation/linux_build_input.py','tasks/desert-rv/unity/Assets/DesertRV/Editor/JourneyCandidateLinuxBuild.cs','tasks/desert-rv/unity/Assets/DesertRV/Tests/JourneyRestoration/JourneyRestorationTests.cs','tasks/desert-rv/scripts/player/verify_tracer_shader.py','tasks/desert-rv/scripts/player/test_verify_tracer_shader.py','tasks/desert-rv/art/journey-preparation/android-producer-native-history.json',)+('.github/workflows/desert-rv-journey-android.yml', 'tasks/desert-rv/art/journey-preparation/restore_preparation.py', 'tasks/desert-rv/art/journey-preparation/test_restore_preparation.py', 'tasks/desert-rv/scripts/player/journey_android.py', 'tasks/desert-rv/scripts/player/test_journey_android.py', 'tasks/desert-rv/scripts/player/journey_android_container.sh', 'tasks/desert-rv/scripts/journey_mobile_hud_native.py', 'tasks/desert-rv/scripts/test_journey_mobile_hud_native.py', 'tasks/desert-rv/unity/Assets/DesertRV/Editor/JourneyCandidateRestoration.cs', 'tasks/desert-rv/unity/Assets/DesertRV/Editor/JourneySceneAuthoring.cs', 'tasks/desert-rv/unity/Assets/DesertRV/Editor/JourneyHudCapture.cs'))
 
 def pin(path):return dict(path=str(path.relative_to(ROOT)),sha256=sha(path))
 def write_fresh(path,value):
  require(not path.exists(),'RESTORE_OUTPUT_EXISTS');path.parent.mkdir(parents=True,exist_ok=True)
  with path.open('x') as stream:json.dump(value,stream,indent=2);stream.write('\n')
+
+def material_semantics(raw):
+ # Only this owned, bounded Unity Material is decoded. No YAML object constructors.
+ import yaml
+ require(type(raw) is bytes and 0<len(raw)<=65536,'DERIVE_MATERIAL_SIZE')
+ text=raw.decode('utf-8');require('\x00' not in text,'DERIVE_MATERIAL_YAML')
+ class UniqueLoader(yaml.SafeLoader):pass
+ def mapping(loader,node,deep=False):
+  value={}
+  for key_node,value_node in node.value:
+   key=loader.construct_object(key_node,deep=deep)
+   require(isinstance(key,str) and key not in value,'DERIVE_MATERIAL_DUPLICATE_KEY')
+   value[key]=loader.construct_object(value_node,deep=deep)
+  return value
+ UniqueLoader.add_constructor(yaml.resolver.BaseResolver.DEFAULT_MAPPING_TAG,mapping)
+ # Unity's per-document !u! tags are type IDs, never executable YAML constructors.
+ headers=re.findall(r'^--- !u!(\d+) &(\d+)\s*$',text,re.M)
+ require(headers==[('21','2100000'),('114','2086780894777222751')],'DERIVE_MATERIAL_DOCUMENTS')
+ plain=re.sub(r'^%TAG !u! tag:unity3d.com,2011:\s*\n','',text,flags=re.M)
+ plain=re.sub(r'^--- !u!\d+ &\d+\s*$', '---',plain,flags=re.M)
+ value=list(yaml.load_all(plain,Loader=UniqueLoader))
+ require(len(value)==2 and set(value[0])=={'Material'} and set(value[1])=={'MonoBehaviour'},'DERIVE_MATERIAL_DOCUMENTS')
+ return value
+
+def validate_material_delta(before_raw,after_raw):
+ import copy
+ require(hashlib.sha256(before_raw).hexdigest()==MATERIAL_BEFORE_SHA and len(before_raw)==3845,'DERIVE_PARENT_MATERIAL')
+ require(before_raw!=after_raw,'DERIVE_MATERIAL_UNCHANGED')
+ before=material_semantics(before_raw);after=material_semantics(after_raw);expected=copy.deepcopy(before)
+ original=before[0]['Material'];current=after[0]['Material'];wanted=expected[0]['Material']
+ require(original['m_LightmapFlags']==4 and current['m_LightmapFlags']==2,'DERIVE_MATERIAL_GI')
+ require(original['m_Shader']=={'fileID':4800000,'guid':'933532a4fcc9baf4fa0491de14d08ed7','type':3} and original['m_ValidKeywords']==['_EMISSION'],'DERIVE_MATERIAL_LIT')
+ colors=original['m_SavedProperties']['m_Colors']
+ require(isinstance(colors,list) and all(isinstance(row,dict) and len(row)==1 for row in colors) and len({next(iter(row)) for row in colors})==len(colors),'DERIVE_MATERIAL_COLORS')
+ table={k:v for row in colors for k,v in row.items()}
+ require(set(table['_BaseColor'])=={'r','g','b','a'} and table['_BaseColor']=={'r':1,'g':.76,'b':.38,'a':1} and table['_EmissionColor']=={'r':2.5,'g':1.9,'b':.95,'a':2.5},'DERIVE_MATERIAL_COLOR_PIN')
+ wanted['m_LightmapFlags']=2
+ normalized=copy.deepcopy(expected)
+ for row in normalized[0]['Material']['m_SavedProperties']['m_Colors']:
+  if '_Color' in row:row['_Color']=copy.deepcopy(table['_BaseColor'])
+ require(after==expected or after==normalized,'DERIVE_MATERIAL_UNAUTHORIZED_PROPERTY')
+ alias=after!=expected
+ return dict(changedProperties=['m_LightmapFlags']+(['m_SavedProperties.m_Colors._Color'] if alias else []),beforeGi=4,afterGi=2,
+             baseColor=table['_BaseColor'],emissionColor=table['_EmissionColor'],beforeLegacyColor=table['_Color'],afterLegacyColor=table['_BaseColor'] if alias else table['_Color'])
+
+def material_derivation():
+ from strict_output import safe
+ value=read(DERIVATION_RECORD)
+ require(ANDROID and set(value)=={'schema','label','sourceCommit','producerRunUrl','assetProducerSourceCommit','assetProducerRunUrl','parentGeneratedReceipt','requestSha256','originalBeforeAuthoringVerified','material'} and
+         value['schema']==1 and value['label']=='EXACT_WARM_MATERIAL_DERIVATION_NATIVE' and value['sourceCommit']==os.environ['GITHUB_SHA'] and value['producerRunUrl']==current_run() and
+         value['assetProducerSourceCommit']==PRODUCER['sourceCommit'] and value['assetProducerRunUrl']==RUN_URL and value['parentGeneratedReceipt']==pin(PUBLIC/'generated/receipt.json') and
+         value['requestSha256']==sha(INPUT) and value['originalBeforeAuthoringVerified'] is True,'DERIVE_NATIVE_IDENTITY')
+ material=value['material'];require(type(material) is dict,'DERIVE_NATIVE_MATERIAL')
+ keys={'schema','status','path','guid','localId','beforeSha256','beforeBytes','afterSha256','afterBytes','metaSha256','metaBytes','source','loaded','authored','reloaded','loadedDirtyBeforeAuthoring','unloadVerified','reloadedClean','bytesStableAfterReload','semanticChanges'}
+ require(set(material)==keys and type(material['schema']) is int and material['schema']==1 and material['status']=='DERIVED_WARM_LAMP_MATERIAL_UNREVIEWED' and
+         material['path']==MATERIAL and material['guid']=='7807e70b78cd80b04b21bf136de97aaf' and type(material['localId']) is int and material['localId']==2100000,'DERIVE_NATIVE_MATERIAL')
+ before_path=safe(DERIVATION_FOLDER/'before.mat');after_path=safe(DERIVATION_FOLDER/'after.mat')
+ require(before_path.stat().st_size<=65536 and after_path.stat().st_size<=65536,'DERIVE_MATERIAL_SIZE')
+ before=before_path.read_bytes();after=after_path.read_bytes()
+ semantic=validate_material_delta(before,after)
+ require(before==safe(PUBLIC/'generated'/MATERIAL).read_bytes() and after==safe(PROJECT/MATERIAL).read_bytes(),'DERIVE_MATERIAL_COPY_CHANGED')
+ for label,data in [('before',before),('after',after)]:
+  require(material[label+'Sha256']==hashlib.sha256(data).hexdigest() and type(material[label+'Bytes']) is int and material[label+'Bytes']==len(data),'DERIVE_MATERIAL_PIN')
+ meta=safe(PROJECT/(MATERIAL+'.meta'));require(meta.read_bytes()==safe(PUBLIC/'generated'/(MATERIAL+'.meta')).read_bytes() and material['metaSha256']==sha(meta) and material['metaBytes']==meta.stat().st_size,'DERIVE_META_CHANGED')
+ require(material['loadedDirtyBeforeAuthoring'] is False and all(material[k] is True for k in ('unloadVerified','reloadedClean','bytesStableAfterReload')),'DERIVE_RELOAD_NOT_VERIFIED')
+ expected_colors={'baseColor':semantic['baseColor'],'emissionColor':semantic['emissionColor']}
+ for name in ('source','loaded','authored','reloaded'):
+  state=material[name]
+  require(type(state) is dict and set(state)=={'giFlags','emissionKeyword','baseColor','emissionColor','legacyColor'} and type(state['giFlags']) is int and type(state['emissionKeyword']) is bool and (name=='loaded' or state['emissionKeyword'] is True),'DERIVE_NATIVE_STATE')
+  require(all(set(state[k])=={'r','g','b','a'} and all(type(x) in (float,int) and __import__('math').isfinite(x) for x in state[k].values()) for k in ('baseColor','emissionColor','legacyColor')),'DERIVE_NATIVE_COLOR')
+  require(all(all(abs(state[k][c]-v[c])<=0.000001 for c in v) for k,v in expected_colors.items()),'DERIVE_NATIVE_STATE')
+  expected_gi=4 if name in ('source','loaded') else 2
+  require(state['giFlags']==expected_gi and state['giFlags'] in (2,4),'DERIVE_NATIVE_STATE')
+  color=semantic['beforeLegacyColor'] if name in ('source','loaded') else semantic['afterLegacyColor']
+  require(all(abs(state['legacyColor'][c]-color[c])<=0.000001 for c in color),'DERIVE_NATIVE_STATE')
+ require(material['authored']==material['reloaded'],'DERIVE_RELOAD_CHANGED')
+ require(material['semanticChanges']==['GLOBAL_ILLUMINATION_FLAGS_4_TO_2']+(['LEGACY_COLOR_SYNCHRONIZED_TO_BASE_COLOR'] if len(semantic['changedProperties'])==2 else []),'DERIVE_SEMANTIC_CHANGES')
+ return value
+
+def derived_dependencies(bundle,material):
+ rows=__import__('copy').deepcopy(bundle['native']['dependencies']);matches=[row for row in rows if row['path']==MATERIAL]
+ require(len(rows)==1040 and len(matches)==1 and matches[0]['sha256']==MATERIAL_BEFORE_SHA and matches[0]['bytes']==3845 and matches[0]['kind']=='asset','DERIVE_PARENT_DEPENDENCY')
+ matches[0].update(sha256=material['afterSha256'],bytes=material['afterBytes'])
+ return rows
+
+def derived_receipt_value(xml,boundary,files):
+ material=material_derivation()['material']
+ return dict(schema=1,status='DERIVED_JOURNEY_PREPARED_UNREVIEWED',sourceCommit=os.environ['GITHUB_SHA'],producerRunUrl=current_run(),
+  assetProducerSourceCommit=PRODUCER['sourceCommit'],assetProducerRunUrl=RUN_URL,parentGeneratedReceipt=pin(PUBLIC/'generated/receipt.json'),
+  nativeDerivation=pin(DERIVATION_RECORD),nativeRestoration=pin(REPORT),restorationNativeXml=xml,boundaryNativeXml=boundary,
+  sourceState=pin(TASK/'SOURCE-STATE.json'),sourceTransition=pin(SOURCE_PROOF),originalBeforeAuthoringVerified=True,exactMaterialDelta=True,editorExited=True,
+  changes=[{k:material[k] for k in ('path','guid','localId','beforeSha256','beforeBytes','afterSha256','afterBytes','metaSha256','metaBytes')}],
+  inheritedEvidenceScope='PARENT_155_ONLY_NOT_CURRENT_DERIVED_ASSET_VALIDATION',approved=False,scopeReusable=False,files=files)
+
+def verify_derived_export():
+ import linux_build_input as linux
+ value=read(DERIVED_RECEIPT);verify_staged_inventory(DERIVED_EXPORT,value['files'],sha(DERIVED_RECEIPT))
+ expected_files=[]
+ for source,name in ((DERIVATION_FOLDER/'before.mat','parent-material.mat'),(PROJECT/MATERIAL,MATERIAL),(DERIVATION_RECORD,'native-material-derivation.json'),(REPORT,'native-restoration.json')):
+  target=DERIVED_EXPORT/name;require(target.read_bytes()==source.read_bytes(),'DERIVE_EXPORT_COPY_CHANGED');expected_files.append(generated.record(target,name))
+ require(value==derived_receipt_value(native_evidence(),linux.boundary_evidence()['nativeXml'],expected_files),'DERIVE_RECEIPT_CHANGED')
+ return value
+
+def export_derived(xml,boundary):
+ require(not DERIVED_EXPORT.exists(),'DERIVE_EXPORT_EXISTS');DERIVED_EXPORT.mkdir()
+ files=[]
+ for source,name in ((DERIVATION_FOLDER/'before.mat','parent-material.mat'),(PROJECT/MATERIAL,MATERIAL),(DERIVATION_RECORD,'native-material-derivation.json'),(REPORT,'native-restoration.json')):
+  target=DERIVED_EXPORT/name;target.parent.mkdir(parents=True,exist_ok=True);shutil.copyfile(source,target);require(target.read_bytes()==source.read_bytes(),'DERIVE_EXPORT_COPY_CHANGED');files.append(generated.record(target,name))
+ write_fresh(DERIVED_RECEIPT,derived_receipt_value(xml,boundary,files));verify_derived_export()
+
+def export_material_diagnostic():
+ from strict_output import safe
+ if not ANDROID or not (DERIVATION_FOLDER/'before.mat').exists():return []
+ request=read(INPUT)
+ require(request['sourceCommit']==os.environ['GITHUB_SHA'] and request['producerRunUrl']==current_run() and request.get('materialDerivation')==DERIVATION_OPERATION,'DERIVE_DIAGNOSTIC_IDENTITY')
+ before_path=safe(DERIVATION_FOLDER/'before.mat');require(before_path.stat().st_size==3845,'DERIVE_PARENT_MATERIAL');before=before_path.read_bytes()
+ require(len(before)==3845 and hashlib.sha256(before).hexdigest()==MATERIAL_BEFORE_SHA,'DERIVE_PARENT_MATERIAL')
+ rows=[];pending=[]
+ def copy(data,name):
+  pending.append((data,name))
+ copy(before,'material-before.mat')
+ value=dict(schema=1,status='MATERIAL_CONTENT_DIAGNOSTIC_ONLY',sourceCommit=os.environ['GITHUB_SHA'],producerRunUrl=current_run(),path=MATERIAL,
+            beforeSha256=MATERIAL_BEFORE_SHA,beforeBytes=len(before),afterSha256='',afterBytes=0,afterState='MISSING',semanticChanges=[],buildReady=False,approved=False)
+ if (DERIVATION_FOLDER/'after.mat').exists():
+  path=safe(DERIVATION_FOLDER/'after.mat');require(path.stat().st_size<=65536,'DERIVE_MATERIAL_SIZE');after=path.read_bytes()
+  value.update(afterSha256=hashlib.sha256(after).hexdigest(),afterBytes=len(after),afterState='UNAUTHORIZED_SEMANTIC_DELTA')
+  if after==before:value['afterState']='UNCHANGED_PARENT';copy(after,'material-after.mat')
+  else:
+   try:semantic=validate_material_delta(before,after)
+   except Exception:pass
+   else:
+    value.update(afterState='EXACT_AUTHORIZED_SEMANTIC_DELTA',semanticChanges=semantic['changedProperties']);copy(after,'material-after.mat')
+ for data,name in pending:
+  path=EXPORT/name
+  with path.open('xb') as stream:stream.write(data)
+  require(path.read_bytes()==data,'DERIVE_DIAGNOSTIC_COPY_CHANGED');rows.append(generated.record(path,name))
+ write_fresh(EXPORT/'material-diagnostic.json',value);rows.append(generated.record(EXPORT/'material-diagnostic.json','material-diagnostic.json'))
+ return rows
 def source_transition(policy,before,after,policy_sha):
- require(set(policy)=={'schema','status','producer','changes'} and type(policy['schema']) is int and policy['schema']==1 and policy['status']=='REVIEWED_DIAGNOSTIC_RESTORATION_SOURCE_ONLY' and policy['producer']==PRODUCER,'RESTORE_POLICY_IDENTITY')
+ require(set(policy)=={'schema','status','producer','changes'} and type(policy['schema']) is int and policy['schema']==1 and policy['status']==('REVIEWED_EXACT_MATERIAL_DERIVATION_SOURCE' if ANDROID else 'REVIEWED_DIAGNOSTIC_RESTORATION_SOURCE_ONLY') and policy['producer']==PRODUCER,'RESTORE_POLICY_IDENTITY')
  require(digest(policy_sha) and isinstance(policy['changes'],list),'RESTORE_POLICY_HASH')
  require(before['restoredFiles']==after['restoredFiles'] and before['coverageRoots']==after['coverageRoots'],'RESTORE_SOURCE_DOMAIN_CHANGED')
  expected_coverage=before['coverageFiles'] if ANDROID else before['coverageFiles']+['.github/workflows/desert-rv-journey-rebuild.yml']
@@ -249,11 +395,13 @@ def request_payload(bundle,source,source_proof):
  extras += [PUBLIC/k/'receipt.json' for k in (*generated.KINDS,'generated')]
  extras += [PROJECT/'JourneyEvidence/CandidateArt'/k/'import-report.json' for k in generated.KINDS]
  for path in extras:records[str(path.relative_to(ROOT))]=pin(path)
- return dict(schema=1,label=INPUT_LABEL,sourceCommit=os.environ['GITHUB_SHA'],producerRunUrl=current_run(),assetProducerSourceCommit=PRODUCER['sourceCommit'],assetProducerRunUrl=RUN_URL,
+ result=dict(schema=1,label=INPUT_LABEL,sourceCommit=os.environ['GITHUB_SHA'],producerRunUrl=current_run(),assetProducerSourceCommit=PRODUCER['sourceCommit'],assetProducerRunUrl=RUN_URL,
   generatedReceiptSha256=PRODUCER['generatedReceiptSha256'],sourceTransitionProof=pin(SOURCE_PROOF),selection=pin(ROOT/SELECTION),
   originalGeneratedReceipt=pin(PUBLIC/'generated/receipt.json'),originalNativeManifest=pin(PUBLIC/'generated/native-authored-assets.json'),originalGrounding=pin(PUBLIC/'generated'/generated.GROUND_EXPORT),
   files=[records[n] for n in sorted(records)],integration=integration,expectedDependencies=bundle['native']['dependencies'],
   directories=sorted(name+'/'+d for name in ('Assets','Packages','ProjectSettings') for d in directories(PROJECT/name)))
+ if ANDROID:result.update(schema=2,label='RESTORE_AND_DERIVE_PINNED_WARM_MATERIAL',materialDerivation=DERIVATION_OPERATION)
+ return result
 
 def restore_assets(bundle):
  # Exact new Assets only. Never copy Library, private snapshots, old scope, packages or Settings.
@@ -310,7 +458,8 @@ def stage(policy_sha):
  write_fresh(STATE,state)
  verify_assets();print('JOURNEY_RESTORED_BYTES_AWAIT_FRESH_NATIVE_REVALIDATION')
 
-def verify_assets():
+def verify_assets(derived=False):
+ require(not derived or ANDROID,'DERIVE_ANDROID_ONLY')
  s=read(STATE);require(s['schema']==1 and s['sourceCommit']==os.environ['GITHUB_SHA'] and s['producerRunUrl']==current_run(),'RESTORE_CONSUMER_IDENTITY')
  if ANDROID:
   require(s['producerApi']==pin(PRODUCER_API),'RESTORE_PRODUCER_API_CHANGED')
@@ -328,7 +477,16 @@ def verify_assets():
   producer=PRODUCER,policy=pin(ROOT/POLICY),producerSource=pin(PRODUCER_SOURCE),consumerSource=pin(TASK/'SOURCE-STATE.json'),changes=changes,originalAssetsUnchanged=True,scopeReused=False)
  require(proof==expected,'RESTORE_SOURCE_TRANSITION_CHANGED')
  bundle=validate_bundles(PUBLIC,before);require(bundle['assets']==s['addedAssets'],'RESTORE_ASSET_INVENTORY_CHANGED')
- prepared_source.verify_asset_union(source,s['initialSourceDirectories'],s['addedAssets']);check_bundle_closure(bundle,source)
+ if derived:
+  material=material_derivation()['material'];effective=dict(s['addedAssets']);effective[MATERIAL]=material['afterSha256']
+  prepared_source.verify_asset_union(source,s['initialSourceDirectories'],effective)
+  # Parent ZIP/native manifest remain immutable. The effective closure differs in exactly one declared asset row.
+  expected=derived_dependencies(bundle,material)
+  for row in expected:
+   if row['kind']=='asset':require(generated.record(PROJECT/row['path'],row['path'])=={k:row[k] for k in ('path','sha256','bytes')},'DERIVE_DEPENDENCY_BYTES')
+  for row in bundle['receipt']['packageControls']:require(generated.record(PROJECT/row['path'],row['path'])==row,'RESTORE_PACKAGE_CONTROLS')
+ else:
+  prepared_source.verify_asset_union(source,s['initialSourceDirectories'],s['addedAssets']);check_bundle_closure(bundle,source)
  require(not (PROJECT/'JourneyEvidence/journey-diagnostic-scope.json').exists(),'RESTORE_OLD_SCOPE_FORBIDDEN')
  for kind in generated.KINDS:require(sha(PROJECT/'JourneyEvidence/CandidateArt'/kind/'import-report.json')==sha(PUBLIC/kind/'import-report.json'),'RESTORE_SAFE_REPORT_CHANGED')
  require(INPUT.with_suffix('.sha256').read_text().strip()==sha(INPUT) and read(INPUT)==request_payload(bundle,source,proof),'RESTORE_NATIVE_INPUT_CHANGED')
@@ -348,13 +506,16 @@ def native_evidence():
 
 REPORT_KEYS={'schema','label','sourceCommit','producerRunUrl','assetProducerSourceCommit','assetProducerRunUrl','generatedReceiptSha256','sourceTransitionProof','requestSha256','unityVersion','sourceBytesUnchanged','originalAssetsUnchanged','structureValidated','productionApprovalRejected','approved','scopeReused','scenes','dependencies','grounding'}
 def validate_native_report(report,bundle):
- require(set(report)==REPORT_KEYS and type(report['schema']) is int and report['schema']==1 and report['label']==REPORT_LABEL and report['sourceCommit']==os.environ['GITHUB_SHA'] and report['producerRunUrl']==current_run() and report['assetProducerSourceCommit']==PRODUCER['sourceCommit'] and report['assetProducerRunUrl']==RUN_URL and report['generatedReceiptSha256']==PRODUCER['generatedReceiptSha256'] and report['sourceTransitionProof']==pin(SOURCE_PROOF) and report['requestSha256']==sha(INPUT) and report['unityVersion']==generated.UNITY,'RESTORE_NATIVE_REPORT_IDENTITY')
- require(all(report[k] is True for k in ('sourceBytesUnchanged','originalAssetsUnchanged','structureValidated','productionApprovalRejected')) and report['approved'] is False and report['scopeReused'] is False,'RESTORE_NATIVE_REPORT_NOT_READY')
+ keys=REPORT_KEYS|({'derivation','originalBeforeAuthoringVerified','exactMaterialDelta','derivedBindingsValidated'} if ANDROID else set())
+ require(set(report)==keys and type(report['schema']) is int and report['schema']==(2 if ANDROID else 1) and report['label']==(DERIVED_LABEL if ANDROID else REPORT_LABEL) and report['sourceCommit']==os.environ['GITHUB_SHA'] and report['producerRunUrl']==current_run() and report['assetProducerSourceCommit']==PRODUCER['sourceCommit'] and report['assetProducerRunUrl']==RUN_URL and report['generatedReceiptSha256']==PRODUCER['generatedReceiptSha256'] and report['sourceTransitionProof']==pin(SOURCE_PROOF) and report['requestSha256']==sha(INPUT) and report['unityVersion']==generated.UNITY,'RESTORE_NATIVE_REPORT_IDENTITY')
+ require(all(report[k] is True for k in ('sourceBytesUnchanged','structureValidated','productionApprovalRejected')) and report['originalAssetsUnchanged'] is (not ANDROID) and report['approved'] is False and report['scopeReused'] is False,'RESTORE_NATIVE_REPORT_NOT_READY')
+ if ANDROID:require(report['derivation']==pin(DERIVATION_RECORD) and report['originalBeforeAuthoringVerified'] is True and report['exactMaterialDelta'] is True and report['derivedBindingsValidated'] is True,'DERIVE_NATIVE_PROOF')
  original_outputs={r['path']:r for r in bundle['receipt']['integrationOutputs']};scenes=report['scenes']
  require(len(scenes)==5 and len({r['path'] for r in scenes})==5 and {r['path'] for r in scenes}==set(original_outputs),'RESTORE_NATIVE_SCENE_SET')
  for row in scenes:require(set(row)=={'path','sha256','dependencyHash','dependencySha256'} and row['sha256']==original_outputs[row['path']]['sha256']==sha(PROJECT/row['path']) and digest(row['dependencyHash'],32) and digest(row['dependencySha256']),'RESTORE_NATIVE_SCENE_PIN')
  # Approved changes are Editor/entry diagnostics only. Actual dependency byte closure stays exact.
- require(report['dependencies']==bundle['native']['dependencies'],'RESTORE_NATIVE_DEPENDENCY_BYTES_CHANGED')
+ expected=derived_dependencies(bundle,material_derivation()['material']) if ANDROID else bundle['native']['dependencies']
+ require(report['dependencies']==expected,'RESTORE_NATIVE_DEPENDENCY_BYTES_CHANGED')
  check_grounding(report['grounding'],read(ROOT/SELECTION),os.environ['GITHUB_SHA'],sha(ROOT/SELECTION),sha(INPUT))
  require(len(report['grounding']['rows'])==len(bundle['ground']['rows']),'RESTORE_NATIVE_GROUNDING_CHANGED')
  oldrows={x['id']:x for x in bundle['ground']['rows']}
@@ -365,30 +526,35 @@ def validate_native_report(report,bundle):
 
 def verify():
  import linux_build_input as linux
- s,bundle=verify_assets();linux.bound_boundary();actual=native_evidence();proof=read(VERIFIED)
- require(proof==dict(schema=1,label='CURRENT_RESTORATION_NATIVE_PASSED',sourceCommit=os.environ['GITHUB_SHA'],producerRunUrl=current_run(),nativeXml=actual,nativeReport=pin(REPORT),sourceProof=pin(SOURCE_PROOF),input=pin(INPUT),boundaryNativeXml=linux.boundary_evidence()['nativeXml']),'RESTORE_NATIVE_PROOF_CHANGED')
+ s,bundle=verify_assets(derived=ANDROID);linux.bound_boundary();actual=native_evidence();proof=read(VERIFIED)
+ expected=dict(schema=1,label='CURRENT_DERIVED_RESTORATION_NATIVE_PASSED' if ANDROID else 'CURRENT_RESTORATION_NATIVE_PASSED',sourceCommit=os.environ['GITHUB_SHA'],producerRunUrl=current_run(),nativeXml=actual,nativeReport=pin(REPORT),sourceProof=pin(SOURCE_PROOF),input=pin(INPUT),boundaryNativeXml=linux.boundary_evidence()['nativeXml'])
+ if ANDROID:verify_derived_export();expected['derivedReceipt']=pin(DERIVED_RECEIPT)
+ require(proof==expected,'RESTORE_NATIVE_PROOF_CHANGED')
  validate_native_report(read(REPORT),bundle)
  return s,bundle,proof
 
 def finish(native):
  import linux_build_input as linux
- require(native=='success','RESTORE_NATIVE_STEP_FAILED');s,bundle=verify_assets();boundary=linux.bound_boundary();xml=native_evidence();report=validate_native_report(read(REPORT),bundle)
- write_fresh(VERIFIED,dict(schema=1,label='CURRENT_RESTORATION_NATIVE_PASSED',sourceCommit=os.environ['GITHUB_SHA'],producerRunUrl=current_run(),nativeXml=xml,nativeReport=pin(REPORT),sourceProof=pin(SOURCE_PROOF),input=pin(INPUT),boundaryNativeXml=boundary['nativeXml']))
+ require(native=='success','RESTORE_NATIVE_STEP_FAILED');s,bundle=verify_assets(derived=ANDROID);boundary=linux.bound_boundary();xml=native_evidence();report=validate_native_report(read(REPORT),bundle)
+ proof=dict(schema=1,label='CURRENT_DERIVED_RESTORATION_NATIVE_PASSED' if ANDROID else 'CURRENT_RESTORATION_NATIVE_PASSED',sourceCommit=os.environ['GITHUB_SHA'],producerRunUrl=current_run(),nativeXml=xml,nativeReport=pin(REPORT),sourceProof=pin(SOURCE_PROOF),input=pin(INPUT),boundaryNativeXml=boundary['nativeXml'])
+ if ANDROID:export_derived(xml,boundary['nativeXml']);proof['derivedReceipt']=pin(DERIVED_RECEIPT)
+ write_fresh(VERIFIED,proof)
  verify();require(not EXPORT.exists(),'RESTORE_PUBLIC_DESTINATION_EXISTS');EXPORT.mkdir()
  evidence=[]
  for path,name in ((REPORT,'native-restoration.json'),(SOURCE_PROOF,'source-transition.json'),(INPUT,'native-input.json')):
   shutil.copyfile(path,EXPORT/name);evidence.append(generated.record(EXPORT/name,name));require(sha(EXPORT/name)==sha(path),'RESTORE_PUBLIC_COPY_CHANGED')
  receipt=dict(schema=1,status=REPORT_LABEL,sourceCommit=os.environ['GITHUB_SHA'],producerRunUrl=current_run(),assetProducer=PRODUCER,generatedReceiptSha256=PRODUCER['generatedReceiptSha256'],nativeXmlSha256=xml['sha256'],boundaryNativeXmlSha256=boundary['nativeXml']['sha256'],nativeCases=1,boundaryNativeCases=17,approved=False,scopeReusable=False,files=evidence)
+ if ANDROID:receipt.update(status=DERIVED_LABEL,derivedReceipt=pin(DERIVED_RECEIPT),inheritedEvidenceScope='PARENT_155_ONLY_NOT_CURRENT_DERIVED_ASSET_VALIDATION')
  write_fresh(EXPORT/'receipt.json',receipt);verify_staged_inventory(EXPORT,evidence,sha(EXPORT/'receipt.json'))
  if os.environ.get('GITHUB_OUTPUT'):
   with open(os.environ['GITHUB_OUTPUT'],'a') as f:f.write('export_ready=true\n')
- print('JOURNEY_RESTORATION_EXACT_NATIVE_PASSED_UNREVIEWED')
+ print('JOURNEY_DERIVED_RESTORATION_EXACT_NATIVE_PASSED_UNREVIEWED' if ANDROID else 'JOURNEY_RESTORATION_EXACT_NATIVE_PASSED_UNREVIEWED')
 
 DIAGNOSTIC=PRIVATE/'restoration-diagnostic.json'
 HOST_STATUS=TASK/'journey-restoration-status.json'
-DIAGNOSTIC_STAGES={'INPUT','INVENTORY','SOURCE_PROOF','STRICT_BUNDLES','DEPENDENCIES','GENERATED_BYTES','SELECTION','POSES','GROUNDING','IMPORTER_IDENTITIES','SAVED_BINDINGS','WORLD_HUD_CAPTURE','FINAL_PROTECTION','PROOF','COMPLETED'}
-DIAGNOSTIC_ERRORS={'CACHE_PACKAGE_IDENTITY','CACHE_ASSET_BYTES','CACHE_META_BYTES','CACHE_SUBASSET_RELATION','CACHE_FONT_NOT_LOADED','CACHE_FONT_IDENTITY','CACHE_FONT_NOT_DYNAMIC','CACHE_FONT_ATLAS_LINK','DIAGNOSTIC_ARGUMENT','RUN_ID_ARGUMENT','NONE','IMPORTER_IDENTITY','DEPENDENCY_BYTES','DIRTY_DEPENDENCY','ASSET_LIFECYCLE','VALIDATION','IO','UNAUTHORIZED','OTHER'}
-ASSET_LIFECYCLE_ORDER=('RESTORATION_ENTRY','DEPENDENCIES_BEFORE','DEPENDENCIES_AFTER','POSES_BEFORE','POSES_AFTER','GROUNDING_BEFORE','GROUNDING_AFTER','IMPORTER_IDENTITIES_BEFORE','IMPORTER_IDENTITIES_AFTER','SAVED_ROOT_IDENTITIES_BEFORE','SAVED_ROOT_IDENTITIES_AFTER','SAVED_BINDINGS_BEFORE','SAVED_BINDINGS_AFTER','CAPTURE_ENTRY','CAPTURE_GATE_BEFORE','CAPTURE_GATE_AFTER','CAPTURE_REGION_1_BEFORE','CAPTURE_REGION_1_AFTER','CAPTURE_REGION_3_BEFORE','CAPTURE_REGION_3_AFTER','CAPTURE_SCENE_RESTORE_BEFORE','CAPTURE_SCENE_RESTORE_AFTER','RESTORATION_SCENE_RESTORE_BEFORE','RESTORATION_SCENE_RESTORE_AFTER','FINAL_PROTECTION_BEFORE','FINAL_PROTECTION_AFTER')
+DIAGNOSTIC_STAGES={'INPUT','INVENTORY','SOURCE_PROOF','STRICT_BUNDLES','DEPENDENCIES','GENERATED_BYTES','SELECTION','POSES','GROUNDING','IMPORTER_IDENTITIES','SAVED_BINDINGS','MATERIAL_DERIVATION','DERIVED_BINDINGS','WORLD_HUD_CAPTURE','FINAL_PROTECTION','PROOF','COMPLETED'}
+DIAGNOSTIC_ERRORS={'WARM_LAMP_CONTEXT','WARM_LAMP_SOURCE_PIN','WARM_LAMP_META_PIN','WARM_LAMP_SOURCE_FORMAT','WARM_LAMP_SOURCE_SEMANTICS','WARM_LAMP_IDENTITY','WARM_LAMP_SUBASSET_IDENTITY','WARM_LAMP_SUBASSET_DIRTY','WARM_LAMP_SUBASSET_CHANGED','WARM_LAMP_LOADED_DIRTY','WARM_LAMP_LOADED_SOURCE','WARM_LAMP_SERIALIZED_LAYOUT','WARM_LAMP_GI','WARM_LAMP_KEYWORD','WARM_LAMP_ALIAS','WARM_LAMP_RUNTIME_VALUES','WARM_LAMP_UNDECLARED_RUNTIME_CHANGE','WARM_LAMP_UNDECLARED_SERIALIZED_CHANGE','WARM_LAMP_SCENE_CHANGED','WARM_LAMP_OTHER_ASSET_DIRTY','WARM_LAMP_PROTECTION','WARM_LAMP_IMPORT_BYTES','WARM_LAMP_UNLOAD','WARM_LAMP_RELOAD_DIRTY','WARM_LAMP_RELOAD_BYTES','WARM_LAMP_NATIVE_INPUT','WARM_LAMP_NATIVE_LOAD','WARM_LAMP_NATIVE_AUTHOR','WARM_LAMP_NATIVE_SAVE','WARM_LAMP_NATIVE_IMPORT','WARM_LAMP_NATIVE_UNLOAD','WARM_LAMP_NATIVE_RELOAD','DERIVE_PARENT_IDENTITY','DERIVE_MATERIAL_EVIDENCE','DERIVE_MATERIAL_RECORD','DERIVE_BINDINGS','CACHE_PACKAGE_IDENTITY','CACHE_ASSET_BYTES','CACHE_META_BYTES','CACHE_SUBASSET_RELATION','CACHE_FONT_NOT_LOADED','CACHE_FONT_IDENTITY','CACHE_FONT_NOT_DYNAMIC','CACHE_FONT_ATLAS_LINK','DIAGNOSTIC_ARGUMENT','RUN_ID_ARGUMENT','NONE','IMPORTER_IDENTITY','DEPENDENCY_BYTES','DIRTY_DEPENDENCY','ASSET_LIFECYCLE','VALIDATION','IO','UNAUTHORIZED','OTHER'}
+ASSET_LIFECYCLE_ORDER=('RESTORATION_ENTRY','DEPENDENCIES_BEFORE','DEPENDENCIES_AFTER','POSES_BEFORE','POSES_AFTER','GROUNDING_BEFORE','GROUNDING_AFTER','IMPORTER_IDENTITIES_BEFORE','IMPORTER_IDENTITIES_AFTER','SAVED_ROOT_IDENTITIES_BEFORE','SAVED_ROOT_IDENTITIES_AFTER','SAVED_BINDINGS_BEFORE','SAVED_BINDINGS_AFTER','MATERIAL_DERIVATION_BEFORE','MATERIAL_DERIVATION_AFTER','CAPTURE_ENTRY','CAPTURE_GATE_BEFORE','CAPTURE_GATE_AFTER','CAPTURE_REGION_1_BEFORE','CAPTURE_REGION_1_AFTER','CAPTURE_REGION_3_BEFORE','CAPTURE_REGION_3_AFTER','CAPTURE_SCENE_RESTORE_BEFORE','CAPTURE_SCENE_RESTORE_AFTER','RESTORATION_SCENE_RESTORE_BEFORE','RESTORATION_SCENE_RESTORE_AFTER','FINAL_PROTECTION_BEFORE','FINAL_PROTECTION_AFTER')
 ASSET_LIFECYCLE_STAGES=frozenset(ASSET_LIFECYCLE_ORDER)
 BUILTIN_DEPENDENCIES=frozenset(('Resources/unity_builtin_extra','Library/unity default resources'))
 def diagnostic_dependencies():
@@ -502,7 +668,7 @@ def bounded_native_diagnostic(value):
 def diagnose():
  # A failure has no reusable proof. Export fixed status and strictly projected public identities only.
  if EXPORT.exists():
-  receipt=read(EXPORT/'receipt.json');require(receipt.get('status')==REPORT_LABEL,'RESTORE_EXISTING_PUBLIC_STATUS')
+  receipt=read(EXPORT/'receipt.json');require(receipt.get('status')==(DERIVED_LABEL if ANDROID else REPORT_LABEL),'RESTORE_EXISTING_PUBLIC_STATUS')
   verify_staged_inventory(EXPORT,receipt['files'],sha(EXPORT/'receipt.json'))
  else:
   status=dict(command='none',errorCode='NATIVE_OR_PREFLIGHT_NOT_READY')
@@ -522,6 +688,9 @@ def diagnose():
   EXPORT.mkdir()
   if diagnostic is not None:
    write_fresh(EXPORT/'native-diagnostic.json',diagnostic);files.append(generated.record(EXPORT/'native-diagnostic.json','native-diagnostic.json'))
+  if ANDROID:
+   try:files.extend(export_material_diagnostic())
+   except Exception as error:status=dict(command='finish',errorCode=str(error) if re.fullmatch('[A-Z][A-Z0-9_]{0,100}',str(error)) else 'DERIVE_MATERIAL_DIAGNOSTIC_REJECTED')
   receipt=dict(schema=1,status='RESTORATION_NOT_READY',sourceCommit=os.environ['GITHUB_SHA'],producerRunUrl=current_run(),assetProducer=PRODUCER,approved=False,scopeReusable=False,buildReady=False,failure=status,files=files)
   write_fresh(EXPORT/'receipt.json',receipt);verify_staged_inventory(EXPORT,files,sha(EXPORT/'receipt.json'))
  if os.environ.get('GITHUB_OUTPUT'):

@@ -2,7 +2,7 @@ name: Desert RV restored Journey Android development candidate
 on:
   push:
     branches: [journey-android-c15]
-    paths: [.github/dispatch/desert-rv-journey-android-c15-restored-r3-20261011.json]
+    paths: [.github/dispatch/desert-rv-journey-android-c15-restored-r4-20261011.json]
 permissions:
   contents: read
   actions: read
@@ -19,7 +19,7 @@ jobs:
     timeout-minutes: 170
     env:
       GITHUB_REPOSITORY_VISIBILITY: ${{ github.event.repository.visibility }}
-      JOURNEY_ANDROID_RESTORATION: desert-rv-journey-android-c15-restored-r3-20261011-once
+      JOURNEY_ANDROID_RESTORATION: desert-rv-journey-android-c15-restored-r4-20261011-once
       WORLD_CAPTURE_MODE: restored
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
@@ -128,7 +128,7 @@ jobs:
           dockerMemoryLimit: 12g
       - name: Require current consumer boundary evidence and immutable restored input
         run: python3 tasks/desert-rv/art/journey-preparation/restore_preparation.py verify-boundary
-      - name: Native current restoration and two saved world HUD captures
+      - name: Native parent verification one material derivation and two world HUD captures
         id: restore_native
         uses: game-ci/unity-test-runner@0ff419b913a3630032cbe0de48a0099b5a9f0ed9
         env:
@@ -144,7 +144,7 @@ jobs:
           customParameters: -assemblyNames DesertRV.JourneyRestorationTests -journeyRestorationDiagnosticSchema 2 -journeyRestorationRunId ${{ github.run_id }} -buildTarget Android -force-glcore -job-worker-count 2
           dockerCpuLimit: 2
           dockerMemoryLimit: 12g
-      - name: Verify current restoration1 and unchanged original producer bytes
+      - name: Verify current derived restoration1 and exact one material change after Editor exit
         id: restore_finish
         if: always() && steps.restore_native.outcome != 'skipped'
         env:
@@ -172,7 +172,23 @@ jobs:
           path: tasks/desert-rv/mobile-hud-world-diagnostic/world-diagnostic.json
           if-no-files-found: error
           retention-days: 7
-      - name: Prepare restored Android input with separate original producer and current native evidence
+      - name: Preserve fixed failed world captures as diagnostic only
+        if: always() && steps.mobile_hud_world.outputs.world_failure_captures_written == 'true'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: journey-mobile-hud-world-DIAGNOSTIC-ONLY-${{ github.run_id }}-${{ github.run_attempt }}
+          path: tasks/desert-rv/mobile-hud-world-failure-export/
+          if-no-files-found: error
+          retention-days: 7
+      - name: Upload only post-exit verified one material derived preparation
+        if: always() && steps.restore_finish.outcome == 'success'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: journey-derived-preparation-UNREVIEWED-${{ github.run_id }}-${{ github.run_attempt }}
+          path: tasks/desert-rv/journey-derived-preparation-export/
+          if-no-files-found: error
+          retention-days: 7
+      - name: Prepare derived Android input with separate original producer and current native evidence
         id: android_input
         if: success() && steps.restore_finish.outcome == 'success' && steps.mobile_hud_world.outcome == 'success' && steps.mobile_hud_world.outputs.world_verified == 'true'
         run: python3 tasks/desert-rv/scripts/player/journey_android.py prepare

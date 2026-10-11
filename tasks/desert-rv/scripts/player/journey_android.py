@@ -44,12 +44,12 @@ REQUEST_ID = 'desert-rv-journey-android-c15-r2-20261011-once'
 SOURCE = 'tasks/desert-rv/SOURCE-STATE.json'
 SELECTION = 'tasks/desert-rv/art/journey-preparation/three-strict-candidates.json'
 IMAGE = 'unityci/editor@sha256:1e98c949ff728e6ff627b5c55ef65975125a6dc47cf27060601b79a141cc8692'
-RESTORE_REQUEST_ID = 'desert-rv-journey-android-c15-restored-r3-20261011-once'
+RESTORE_REQUEST_ID = 'desert-rv-journey-android-c15-restored-r4-20261011-once'
 RESTORED = os.environ.get('JOURNEY_ANDROID_RESTORATION') == RESTORE_REQUEST_ID
 RESTORE_POLICY = 'tasks/desert-rv/art/journey-preparation/android-restoration-transition.json'
 if RESTORED:
-    BASE = '8cbb913f19e464529ddaa34c401418037f70f790'
-    REQUEST = '.github/dispatch/desert-rv-journey-android-c15-restored-r3-20261011.json'
+    BASE = 'e3bf1c13030365cbef0ec7f852c8b7b69ab15436'
+    REQUEST = '.github/dispatch/desert-rv-journey-android-c15-restored-r4-20261011.json'
     REQUEST_ID = RESTORE_REQUEST_ID
 STATE = PROJECT/'JourneyEvidence/JourneyPreparation'
 INPUT = STATE/'android-build-input.json'
@@ -210,13 +210,15 @@ def exact_xml(folder, names):
 def gate_values():
     if RESTORED:
         _, _, proof = restoration.verify()
-        return dict(schema=1,scope='RESTORED_CONSUMER_WITH_SEPARATE_IMMUTABLE_PRODUCER_EVIDENCE',
+        return dict(schema=1,scope='EXACT_ONE_MATERIAL_DERIVED_CONSUMER_WITH_SEPARATE_PARENT_EVIDENCE',
                     sourceCommit=os.environ['GITHUB_SHA'],runId=os.environ['GITHUB_RUN_ID'],runAttempt=os.environ['GITHUB_RUN_ATTEMPT'],
                     assetProducer=dict(**restoration.PRODUCER,apiEvidence=restoration.pin(restoration.PRODUCER_API),
                         generatedReceipt=restoration.pin(restoration.PUBLIC/'generated/receipt.json'),
                         strictReceipts=[restoration.pin(restoration.PUBLIC/k/'receipt.json') for k in ('armored','pouncer','weapon')],
                         mobileHud=restoration.producer_hud_evidence(),nativeHistory=restoration.producer_native_history()),
                     currentConsumer=dict(restorationNativeCases=1,restorationNativeXml=proof['nativeXml'],
+                        derivedPreparation=restoration.pin(restoration.DERIVED_RECEIPT),
+                        parentEvidenceScope='PARENT_155_ONLY_NOT_CURRENT_DERIVED_ASSET_VALIDATION',
                         restorationReport=restoration.pin(restoration.REPORT),boundaryNativeCases=17,
                         boundaryNativeXml=proof['boundaryNativeXml'],worldHud=mobile_hud.verify_world()),
                     deviceExecuted=False,approved=False)

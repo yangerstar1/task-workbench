@@ -51,10 +51,52 @@ namespace DesertRV.Tests
                 }
             }
         }
+        static void VerifyWarmLampSerializedContract()
+        {
+            var authoring = Type.GetType("DesertRV.Editor.JourneySceneAuthoring, Assembly-CSharp-Editor", true);
+            var validate = authoring.GetMethod("ValidateWarmLampSerializedChange", BindingFlags.NonPublic | BindingFlags.Static);
+            Assert.That(validate, Is.Not.Null);
+            // Pure text fixture using the pinned source's actual fields; no asset is loaded or written.
+            const string before = "Material:\n  m_Shader: {fileID: 4800000, guid: 933532a4fcc9baf4fa0491de14d08ed7, type: 3}\n" +
+                "  m_ValidKeywords:\n  - _EMISSION\n  m_InvalidKeywords: []\n  m_LightmapFlags: 4\n  m_CustomRenderQueue: -1\n" +
+                "  disabledShaderPasses:\n  - MOTIONVECTORS\n  m_SavedProperties:\n    m_TexEnvs:\n    - _BaseMap:\n        m_Texture: {fileID: 0}\n" +
+                "    m_Floats:\n    - _Metallic: 0\n    - _Smoothness: 0.12\n    m_Colors:\n" +
+                "    - _BaseColor: {r: 1, g: 0.76, b: 0.38, a: 1}\n    - _Color: {r: 1, g: 0.76, b: 0.37999994, a: 1}\n" +
+                "    - _EmissionColor: {r: 2.5, g: 1.9, b: 0.95, a: 2.5}\n--- !u!114 &2086780894777222751\nMonoBehaviour:\n  version: 10\n";
+            string giOnly = before.Replace("m_LightmapFlags: 4", "m_LightmapFlags: 2");
+            string authored = giOnly.Replace("_Color: {r: 1, g: 0.76, b: 0.37999994, a: 1}", "_Color: {r: 1, g: 0.76, b: 0.38, a: 1}");
+            Assert.That(validate.Invoke(null, new object[] { before, giOnly }), Is.EqualTo(new[] { "GLOBAL_ILLUMINATION_FLAGS_4_TO_2" }));
+            Assert.That(validate.Invoke(null, new object[] { before, authored }), Is.EqualTo(new[] { "GLOBAL_ILLUMINATION_FLAGS_4_TO_2", "LEGACY_COLOR_SYNCHRONIZED_TO_BASE_COLOR" }));
+            var rejected = new[] {
+                new[] { before, "GI" },
+                new[] { authored.Replace("m_LightmapFlags: 2", "m_LightmapFlags: 0"), "GI" },
+                new[] { authored.Replace("  - _EMISSION\n", ""), "KEYWORD" },
+                new[] { authored.Replace("  - _EMISSION\n", "  - _EMISSION\n  - _NORMALMAP\n"), "UNDECLARED_SERIALIZED_CHANGE" },
+                new[] { authored.Replace("m_InvalidKeywords: []", "m_InvalidKeywords: [_UNKNOWN]"), "UNDECLARED_SERIALIZED_CHANGE" },
+                new[] { authored.Replace("_BaseColor: {r: 1", "_BaseColor: {r: 0.9"), "UNDECLARED_SERIALIZED_CHANGE" },
+                new[] { authored.Replace("_EmissionColor: {r: 2.5", "_EmissionColor: {r: 2.6"), "UNDECLARED_SERIALIZED_CHANGE" },
+                new[] { authored.Replace("_Color: {r: 1, g: 0.76, b: 0.38", "_Color: {r: 1, g: 0.76, b: 0.38000001"), "ALIAS" },
+                new[] { authored.Replace("_Metallic: 0", "_Metallic: 0.2"), "UNDECLARED_SERIALIZED_CHANGE" },
+                new[] { authored.Replace("_Smoothness: 0.12", "_Smoothness: 0.2"), "UNDECLARED_SERIALIZED_CHANGE" },
+                new[] { authored.Replace("m_Texture: {fileID: 0}", "m_Texture: {fileID: 2800000, guid: 00000000000000000000000000000000, type: 3}"), "UNDECLARED_SERIALIZED_CHANGE" },
+                new[] { authored.Replace("m_CustomRenderQueue: -1", "m_CustomRenderQueue: 2000"), "UNDECLARED_SERIALIZED_CHANGE" },
+                new[] { authored.Replace("MOTIONVECTORS", "DEPTHONLY"), "UNDECLARED_SERIALIZED_CHANGE" },
+                new[] { authored.Replace("933532a4fcc9baf4fa0491de14d08ed7", "00000000000000000000000000000000"), "UNDECLARED_SERIALIZED_CHANGE" },
+                new[] { authored.Replace("version: 10", "version: 11"), "UNDECLARED_SERIALIZED_CHANGE" },
+                new[] { authored.Replace("2086780894777222751", "2086780894777222752"), "UNDECLARED_SERIALIZED_CHANGE" },
+            };
+            foreach (var row in rejected)
+            {
+                var error = Assert.Throws<TargetInvocationException>(() => validate.Invoke(null, new object[] { before, row[0] }));
+                Assert.That(error.InnerException, Is.TypeOf<InvalidOperationException>());
+                Assert.That(error.InnerException.Message, Is.EqualTo("JOURNEY_WARM_LAMP_" + row[1]));
+            }
+        }
         [Test, Timeout(600000)]
         public void RevalidatePinnedRestoredJourney()
         {
             VerifyPinnedCaptureCacheClassification();
+            VerifyWarmLampSerializedContract();
             var type = Type.GetType("DesertRV.Editor.JourneyCandidateRestoration, Assembly-CSharp-Editor", true);
             var parser = type.GetMethod("ParseConsumerRunId", BindingFlags.Public | BindingFlags.Static);
             Assert.That(parser, Is.Not.Null);

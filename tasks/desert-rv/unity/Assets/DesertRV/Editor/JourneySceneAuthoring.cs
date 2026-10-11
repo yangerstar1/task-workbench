@@ -788,6 +788,286 @@ namespace DesertRV.Editor
             go.transform.position=(start+end)*.5f;go.transform.rotation=Quaternion.FromToRotation(Vector3.up,end-start);
             go.transform.localScale=new Vector3(radius*2,(end-start).magnitude*.5f,radius*2);go.GetComponent<Renderer>().sharedMaterial=LayoutMaterial(color,null,Vector2.one);
         }
+        public const string WarmLampMaterialPath = Folder + "/Layout-FFC261.mat";
+        const string WarmLampMaterialGuid = "7807e70b78cd80b04b21bf136de97aaf";
+        const string WarmLampOriginalSha = "ef01bab64fa8fe3f2ebe42a59ed43ddf426e1e8f0c3a5a3401a7dd0fe5202395";
+        const string WarmLampMetaSha = "3114cac24a6efaddb06b5ee3aaaaefd50d2bee2b98c295d5661f57484b509a21";
+        [Serializable] public sealed class WarmLampState
+        {
+            public int giFlags;
+            public bool emissionKeyword;
+            public Color baseColor, emissionColor, legacyColor;
+        }
+        [Serializable] public sealed class WarmLampDerivation
+        {
+            public int schema = 1;
+            public string status = "DERIVED_WARM_LAMP_MATERIAL_UNREVIEWED";
+            public string path = WarmLampMaterialPath, guid = WarmLampMaterialGuid, beforeSha256, afterSha256, metaSha256;
+            public long localId = 2100000, beforeBytes, afterBytes, metaBytes;
+            public WarmLampState source, loaded, authored, reloaded;
+            public bool loadedDirtyBeforeAuthoring, unloadVerified, reloadedClean, bytesStableAfterReload;
+            public string[] semanticChanges;
+        }
+        static void WarmLampRequire(bool valid, string code)
+        {
+            if (valid) return;
+            throw new InvalidOperationException("JOURNEY_WARM_LAMP_" + code);
+        }
+        static bool WarmLampColorEqual(Color left, Color right) =>
+            Mathf.Abs(left.r - right.r) <= 0.000001f && Mathf.Abs(left.g - right.g) <= 0.000001f &&
+            Mathf.Abs(left.b - right.b) <= 0.000001f && Mathf.Abs(left.a - right.a) <= 0.000001f;
+        static string WarmLampColorLine(string text, string property)
+        {
+            var rows = System.Text.RegularExpressions.Regex.Matches(text, "^    - " + System.Text.RegularExpressions.Regex.Escape(property) + @": \{r: ([^,]+), g: ([^,]+), b: ([^,]+), a: ([^}]+)\}$", System.Text.RegularExpressions.RegexOptions.Multiline);
+            WarmLampRequire(rows.Count == 1, "SOURCE_FORMAT");
+            return rows[0].Value;
+        }
+        static Color WarmLampSourceColor(string text, string property)
+        {
+            string line = WarmLampColorLine(text, property);
+            var matches = System.Text.RegularExpressions.Regex.Matches(line, @"[rgba]: ([^,}]+)");
+            WarmLampRequire(matches.Count == 4, "SOURCE_FORMAT");
+            var values = new float[4];
+            for (int i = 0; i < 4; i++)
+                WarmLampRequire(float.TryParse(matches[i].Groups[1].Value, System.Globalization.NumberStyles.Float,
+                    System.Globalization.CultureInfo.InvariantCulture, out values[i]) && !float.IsNaN(values[i]) && !float.IsInfinity(values[i]), "SOURCE_FORMAT");
+            return new Color(values[0], values[1], values[2], values[3]);
+        }
+        // Pure whole-file constraint: every other line and every AssetVersion document stays exact.
+        internal static string[] ValidateWarmLampSerializedChange(string before, string after)
+        {
+            var flags = new System.Text.RegularExpressions.Regex(@"^  m_LightmapFlags: ([0-9]+)$", System.Text.RegularExpressions.RegexOptions.Multiline);
+            WarmLampRequire(flags.Matches(before).Count == 1 && flags.Match(before).Groups[1].Value == "4", "SOURCE_SEMANTICS");
+            WarmLampRequire(flags.Matches(after).Count == 1 && flags.Match(after).Groups[1].Value == "2", "GI");
+            var keywords = new System.Text.RegularExpressions.Regex(@"^  m_ValidKeywords:\n  - _EMISSION\n", System.Text.RegularExpressions.RegexOptions.Multiline);
+            WarmLampRequire(keywords.Matches(before).Count == 1 && keywords.Matches(after).Count == 1, "KEYWORD");
+            string oldAlias = WarmLampColorLine(before, "_Color"), newAlias = WarmLampColorLine(after, "_Color");
+            string synchronizedAlias = WarmLampColorLine(before, "_BaseColor").Replace("_BaseColor:", "_Color:");
+            WarmLampRequire(newAlias == oldAlias || newAlias == synchronizedAlias, "ALIAS");
+            string oldNormalized = flags.Replace(before, "  m_LightmapFlags: AUTHORED").Replace(oldAlias, "    - _Color: AUTHORED_ALIAS");
+            string newNormalized = flags.Replace(after, "  m_LightmapFlags: AUTHORED").Replace(newAlias, "    - _Color: AUTHORED_ALIAS");
+            WarmLampRequire(oldNormalized == newNormalized, "UNDECLARED_SERIALIZED_CHANGE");
+            return oldAlias == newAlias ? new[] { "GLOBAL_ILLUMINATION_FLAGS_4_TO_2" } :
+                new[] { "GLOBAL_ILLUMINATION_FLAGS_4_TO_2", "LEGACY_COLOR_SYNCHRONIZED_TO_BASE_COLOR" };
+        }
+        static WarmLampState ReadWarmLampState(Material material) => new WarmLampState {
+            giFlags = (int)material.globalIlluminationFlags, emissionKeyword = material.IsKeywordEnabled("_EMISSION"),
+            baseColor = material.GetColor("_BaseColor"), emissionColor = material.GetColor("_EmissionColor"), legacyColor = material.GetColor("_Color") };
+        static void RequireWarmLampAuthoredState(WarmLampState before, WarmLampState after)
+        {
+            WarmLampRequire(after.giFlags == (int)MaterialGlobalIlluminationFlags.BakedEmissive, "GI");
+            WarmLampRequire(after.emissionKeyword, "KEYWORD");
+            WarmLampRequire(WarmLampColorEqual(before.baseColor, after.baseColor) && WarmLampColorEqual(before.emissionColor, after.emissionColor), "RUNTIME_VALUES");
+            WarmLampRequire(WarmLampColorEqual(before.baseColor, after.legacyColor), "ALIAS");
+        }
+        static void AuthorLitEmission(Material material)
+        {
+            // Explicit author intent, including eligibility for a future bake. No lighting bake is run here.
+            material.globalIlluminationFlags = MaterialGlobalIlluminationFlags.BakedEmissive;
+            BaseShaderGUI.SetMaterialKeywords(material, UnityEditor.Rendering.Universal.ShaderGUI.LitGUI.SetMaterialKeywords);
+        }
+        static string WarmLampAliasProperty(SerializedObject value)
+        {
+            var colors = value.FindProperty("m_SavedProperties.m_Colors");
+            WarmLampRequire(colors != null && colors.isArray, "SERIALIZED_LAYOUT");
+            string result = null;
+            for (int i = 0; i < colors.arraySize; i++)
+            {
+                var row = colors.GetArrayElementAtIndex(i);
+                if (row.FindPropertyRelative("first").stringValue != "_Color") continue;
+                WarmLampRequire(result == null, "SERIALIZED_LAYOUT");
+                result = row.FindPropertyRelative("second").propertyPath;
+            }
+            WarmLampRequire(result != null, "SERIALIZED_LAYOUT"); return result;
+        }
+        static void RequireWarmLampOnlyAuthoredProperties(SerializedObject before, SerializedObject after)
+        {
+            string alias = WarmLampAliasProperty(before);
+            WarmLampRequire(alias == WarmLampAliasProperty(after), "SERIALIZED_LAYOUT");
+            bool Allowed(string path) => path == "m_LightmapFlags" || path == alias || path.StartsWith(alias + ".", StringComparison.Ordinal) ||
+                path == "m_ValidKeywords" || path.StartsWith("m_ValidKeywords.", StringComparison.Ordinal) || path == "m_ShaderKeywords";
+            var names = new HashSet<string>(StringComparer.Ordinal);
+            var left = before.GetIterator();
+            while (left.Next(true))
+            {
+                names.Add(left.propertyPath);
+                var right = after.FindProperty(left.propertyPath);
+                WarmLampRequire(right != null && right.propertyType == left.propertyType, "UNDECLARED_RUNTIME_CHANGE");
+                if (left.propertyType == SerializedPropertyType.Generic || Allowed(left.propertyPath)) continue;
+                if (!SerializedProperty.DataEquals(left, right))
+                {
+                    Debug.LogError("JOURNEY_WARM_LAMP_UNDECLARED_RUNTIME_CHANGE property=" + left.propertyPath);
+                    WarmLampRequire(false, "UNDECLARED_RUNTIME_CHANGE");
+                }
+            }
+            var current = after.GetIterator();
+            while (current.Next(true)) WarmLampRequire(names.Contains(current.propertyPath) || Allowed(current.propertyPath), "UNDECLARED_RUNTIME_CHANGE");
+        }
+        static void RequireWarmLampIdentity(Material material)
+        {
+            WarmLampRequire(material, "IDENTITY");
+            bool persistent = EditorUtility.IsPersistent(material), main = AssetDatabase.IsMainAsset(material), pathMatched = AssetDatabase.GetAssetPath(material) == WarmLampMaterialPath;
+            bool identity = AssetDatabase.TryGetGUIDAndLocalFileIdentifier(material, out string guid, out long id);
+            bool shaderIdentity = material.shader && AssetDatabase.TryGetGUIDAndLocalFileIdentifier(material.shader, out _, out _);
+            Debug.Log("JOURNEY_WARM_LAMP_IDENTITY persistent=" + persistent + "; main=" + main + "; pathMatched=" + pathMatched +
+                "; identityAvailable=" + identity + "; guidMatched=" + (guid == WarmLampMaterialGuid) + "; localId=" + id + "; shaderIdentityAvailable=" + shaderIdentity);
+            WarmLampRequire(persistent && main && pathMatched && identity && guid == WarmLampMaterialGuid && id == 2100000 && material.shader &&
+                AssetDatabase.TryGetGUIDAndLocalFileIdentifier(material.shader, out string shaderGuid, out long shaderId) &&
+                shaderGuid == "933532a4fcc9baf4fa0491de14d08ed7" && shaderId == 4800000, "IDENTITY");
+        }
+        static Object RequireWarmLampSubassets(Object[] assets, Material material, long versionId, bool allClean)
+        {
+            WarmLampRequire(assets.Length == 2 && assets.Contains(material), "SUBASSET_IDENTITY");
+            var version = assets.Single(a => a != material);
+            WarmLampRequire(version && version.GetType().FullName == "UnityEditor.Rendering.Universal.AssetVersion" &&
+                AssetDatabase.GetAssetPath(version) == WarmLampMaterialPath && AssetDatabase.IsSubAsset(version) &&
+                AssetDatabase.TryGetGUIDAndLocalFileIdentifier(version, out string guid, out long id) && guid == WarmLampMaterialGuid && id == versionId, "SUBASSET_IDENTITY");
+            using (var data = new SerializedObject(version))
+            {
+                data.Update(); var property = data.FindProperty("version");
+                WarmLampRequire(property != null && property.intValue == 10, "SUBASSET_IDENTITY");
+            }
+            WarmLampRequire(!EditorUtility.IsDirty(version) && (!allClean || !EditorUtility.IsDirty(material)), allClean ? "RELOAD_DIRTY" : "SUBASSET_DIRTY");
+            return version;
+        }
+        static Dictionary<int, string> WarmLampSceneState()
+        {
+            var result = new Dictionary<int, string>();
+            for (int index = 0; index < SceneManager.sceneCount; index++)
+            {
+                var scene = SceneManager.GetSceneAt(index);
+                WarmLampRequire(scene.IsValid(), "SCENE_CHANGED");
+                result.Add(scene.handle, scene.path + "|" + scene.isLoaded + "|" + scene.isDirty);
+            }
+            return result;
+        }
+        static void RequireWarmLampOtherAssetsClean(Material owned, Dictionary<int, string> sceneState)
+        {
+            var currentScenes = WarmLampSceneState();
+            WarmLampRequire(sceneState.Count == currentScenes.Count && sceneState.All(pair => currentScenes.TryGetValue(pair.Key, out string state) && state == pair.Value), "SCENE_CHANGED");
+            foreach (var asset in Resources.FindObjectsOfTypeAll<Object>())
+            {
+                if (!asset || asset == owned || !EditorUtility.IsPersistent(asset) || !(asset is Material || asset is AssetImporter)) continue;
+                string path = AssetDatabase.GetAssetPath(asset);
+                if (!path.StartsWith("Assets/", StringComparison.Ordinal) && !path.StartsWith("Packages/", StringComparison.Ordinal)) continue;
+                WarmLampRequire(!EditorUtility.IsDirty(asset), "OTHER_ASSET_DIRTY");
+            }
+        }
+        static void RequireWarmLampOtherBytesUnchanged(Dictionary<string, string> before, bool allowOwnedChange)
+        {
+            var after = SnapshotProtectedFiles(true);
+            WarmLampRequire(new HashSet<string>(before.Keys, StringComparer.Ordinal).SetEquals(after.Keys) && before.All(pair =>
+                allowOwnedChange && pair.Key == WarmLampMaterialPath || after[pair.Key] == pair.Value), "PROTECTION");
+        }
+        public static WarmLampDerivation AuthorPinnedWarmLamp()
+        {
+            string phase = "INPUT";
+            Dictionary<string, string> protectedFiles = null;
+            var failures = new List<Exception>(); WarmLampDerivation record = null;
+            try
+            {
+                WarmLampRequire(!Application.isPlaying && !BuildPipeline.isBuildingPlayer && Application.unityVersion == "6000.3.19f1", "CONTEXT");
+                WarmLampRequire(JourneyDiagnosticScope.IsPinnedPathSafe(WarmLampMaterialPath, out _) &&
+                    new FileInfo(WarmLampMaterialPath).Length == 3845 && HashFile(WarmLampMaterialPath) == WarmLampOriginalSha, "SOURCE_PIN");
+                WarmLampRequire(JourneyDiagnosticScope.IsPinnedPathSafe(WarmLampMaterialPath + ".meta", out _) &&
+                    new FileInfo(WarmLampMaterialPath + ".meta").Length == 188 && HashFile(WarmLampMaterialPath + ".meta") == WarmLampMetaSha, "META_PIN");
+                protectedFiles = SnapshotProtectedFiles(true);
+                var sceneState = WarmLampSceneState();
+                string original = File.ReadAllText(WarmLampMaterialPath);
+                var originalFlags = System.Text.RegularExpressions.Regex.Matches(original, @"^  m_LightmapFlags: ([0-9]+)$", System.Text.RegularExpressions.RegexOptions.Multiline);
+                var versionRows = System.Text.RegularExpressions.Regex.Matches(original, @"^--- !u!114 &([0-9]+)$", System.Text.RegularExpressions.RegexOptions.Multiline);
+                WarmLampRequire(originalFlags.Count == 1 && originalFlags[0].Groups[1].Value == "4" && versionRows.Count == 1, "SOURCE_FORMAT");
+                long versionId = long.Parse(versionRows[0].Groups[1].Value, System.Globalization.CultureInfo.InvariantCulture);
+                record = new WarmLampDerivation { beforeSha256 = WarmLampOriginalSha, beforeBytes = 3845, metaSha256 = WarmLampMetaSha, metaBytes = 188,
+                    source = new WarmLampState { giFlags = int.Parse(originalFlags[0].Groups[1].Value), emissionKeyword = original.Contains("  m_ValidKeywords:\n  - _EMISSION\n"), baseColor = WarmLampSourceColor(original, "_BaseColor"),
+                        emissionColor = WarmLampSourceColor(original, "_EmissionColor"), legacyColor = WarmLampSourceColor(original, "_Color") } };
+                phase = "LOAD";
+                foreach (var existing in Resources.FindObjectsOfTypeAll<Material>())
+                    if (existing && EditorUtility.IsPersistent(existing) && AssetDatabase.GetAssetPath(existing) == WarmLampMaterialPath)
+                    {
+                        RequireWarmLampIdentity(existing);
+                        Debug.Log("JOURNEY_WARM_LAMP_EXISTING dirty=" + EditorUtility.IsDirty(existing) + "; state=" + JsonUtility.ToJson(ReadWarmLampState(existing)));
+                        WarmLampRequire(!EditorUtility.IsDirty(existing), "LOADED_DIRTY");
+                    }
+                var material = AssetDatabase.LoadAssetAtPath<Material>(WarmLampMaterialPath); RequireWarmLampIdentity(material);
+                var subassets = AssetDatabase.LoadAllAssetsAtPath(WarmLampMaterialPath);
+                var version = RequireWarmLampSubassets(subassets, material, versionId, false);
+                string versionState = EditorJsonUtility.ToJson(version);
+                record.loaded = ReadWarmLampState(material); record.loadedDirtyBeforeAuthoring = EditorUtility.IsDirty(material);
+                Debug.Log("JOURNEY_WARM_LAMP_BEFORE source=" + JsonUtility.ToJson(record.source) + "; loaded=" + JsonUtility.ToJson(record.loaded) + "; loadedDirty=" + record.loadedDirtyBeforeAuthoring);
+                // A dirty loaded object is not a trustworthy copy of the pinned source. Never save it.
+                WarmLampRequire(!record.loadedDirtyBeforeAuthoring, "LOADED_DIRTY");
+                WarmLampRequire(record.loaded.giFlags == record.source.giFlags &&
+                    WarmLampColorEqual(record.loaded.baseColor, record.source.baseColor) &&
+                    WarmLampColorEqual(record.loaded.emissionColor, record.source.emissionColor) &&
+                    (WarmLampColorEqual(record.loaded.legacyColor, record.source.legacyColor) || WarmLampColorEqual(record.loaded.legacyColor, record.source.baseColor)), "LOADED_SOURCE");
+                RequireWarmLampOtherAssetsClean(material, sceneState);
+                phase = "AUTHOR";
+                using (var before = new SerializedObject(material))
+                {
+                    before.Update();
+                    AuthorLitEmission(material);
+                    record.authored = ReadWarmLampState(material);
+                    Debug.Log("JOURNEY_WARM_LAMP_AUTHORED " + JsonUtility.ToJson(record.authored));
+                    RequireWarmLampAuthoredState(record.loaded, record.authored);
+                    WarmLampRequire(material.shaderKeywords.Length == 1 && material.shaderKeywords[0] == "_EMISSION", "KEYWORD");
+                    using (var after = new SerializedObject(material)) { after.Update(); RequireWarmLampOnlyAuthoredProperties(before, after); }
+                }
+                RequireWarmLampOtherAssetsClean(material, sceneState);
+                RequireWarmLampSubassets(subassets, material, versionId, false);
+                WarmLampRequire(EditorJsonUtility.ToJson(version) == versionState, "SUBASSET_CHANGED");
+                RequireWarmLampOtherBytesUnchanged(protectedFiles, false);
+                phase = "SAVE";
+                EditorUtility.SetDirty(material);
+                AssetDatabase.SaveAssetIfDirty(AssetDatabase.GUIDFromAssetPath(WarmLampMaterialPath));
+                string saved = File.ReadAllText(WarmLampMaterialPath);
+                record.semanticChanges = ValidateWarmLampSerializedChange(original, saved);
+                record.afterSha256 = HashFile(WarmLampMaterialPath); record.afterBytes = new FileInfo(WarmLampMaterialPath).Length;
+                RequireWarmLampOtherBytesUnchanged(protectedFiles, true);
+                phase = "IMPORT";
+                AssetDatabase.ImportAsset(WarmLampMaterialPath, ImportAssetOptions.ForceSynchronousImport | ImportAssetOptions.ForceUpdate);
+                WarmLampRequire(HashFile(WarmLampMaterialPath) == record.afterSha256, "IMPORT_BYTES");
+                subassets = AssetDatabase.LoadAllAssetsAtPath(WarmLampMaterialPath);
+                material = AssetDatabase.LoadAssetAtPath<Material>(WarmLampMaterialPath); RequireWarmLampIdentity(material);
+                RequireWarmLampSubassets(subassets, material, versionId, true);
+                phase = "UNLOAD";
+                // Explicitly release this exact owned asset file's objects; never use instance-ID equality as a reload test.
+                foreach (var asset in subassets) if (asset) Resources.UnloadAsset(asset);
+                record.unloadVerified = subassets.All(a => !a);
+                WarmLampRequire(record.unloadVerified, "UNLOAD");
+                phase = "RELOAD";
+                material = AssetDatabase.LoadAssetAtPath<Material>(WarmLampMaterialPath); RequireWarmLampIdentity(material);
+                subassets = AssetDatabase.LoadAllAssetsAtPath(WarmLampMaterialPath);
+                RequireWarmLampSubassets(subassets, material, versionId, true);
+                record.reloaded = ReadWarmLampState(material);
+                record.reloadedClean = subassets.Length > 0 && subassets.All(a => a && !EditorUtility.IsDirty(a));
+                Debug.Log("JOURNEY_WARM_LAMP_RELOADED " + JsonUtility.ToJson(record.reloaded) + "; clean=" + record.reloadedClean + "; unloaded=" + record.unloadVerified);
+                RequireWarmLampAuthoredState(record.loaded, record.reloaded);
+                WarmLampRequire(material.shaderKeywords.Length == 1 && material.shaderKeywords[0] == "_EMISSION", "KEYWORD");
+                WarmLampRequire(record.reloadedClean, "RELOAD_DIRTY");
+                record.bytesStableAfterReload = HashFile(WarmLampMaterialPath) == record.afterSha256 && new FileInfo(WarmLampMaterialPath).Length == record.afterBytes;
+                WarmLampRequire(record.bytesStableAfterReload, "RELOAD_BYTES");
+                ValidateWarmLampSerializedChange(original, File.ReadAllText(WarmLampMaterialPath));
+                RequireWarmLampOtherAssetsClean(material, sceneState);
+            }
+            catch (Exception error)
+            {
+                Exception failure = error is InvalidOperationException && error.Message.StartsWith("JOURNEY_WARM_LAMP_", StringComparison.Ordinal) ? error :
+                    new InvalidOperationException("JOURNEY_WARM_LAMP_NATIVE_" + phase, error);
+                Debug.LogError("JOURNEY_WARM_LAMP_FAILURE phase=" + phase + "; code=" + failure.Message);
+                failures.Add(failure);
+            }
+            finally
+            {
+                if (protectedFiles != null)
+                    try { RequireWarmLampOtherBytesUnchanged(protectedFiles, true); }
+                    catch (Exception error) { failures.Add(error is InvalidOperationException && error.Message == "JOURNEY_WARM_LAMP_PROTECTION" ? error : new InvalidOperationException("JOURNEY_WARM_LAMP_PROTECTION", error)); }
+            }
+            if (failures.Count == 1) System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(failures[0]).Throw();
+            if (failures.Count > 1) throw new AggregateException("Warm material authoring and protection failed; primary first.", failures);
+            return record;
+        }
+
         static Material LayoutMaterial(Color color,string tile,Vector2 tiling,bool emission=false)
         {
             string path=Folder+"/Layout-"+ColorUtility.ToHtmlStringRGB(color)+".mat";
@@ -799,7 +1079,7 @@ namespace DesertRV.Editor
             }
             // This path is generated-only. Never mutate a shared source material or its importer.
             if(tile!=null){var tex=AssetDatabase.LoadAssetAtPath<Texture2D>(tile=="painted-sand"?"Assets/DesertRV/Art/sand-handpainted-v1.png":"Assets/DesertRV/Art/Textures/polish-"+tile+"-albedo.png");if(!tex)throw new InvalidOperationException("Existing texture missing: "+tile);material.SetColor("_BaseColor",Color.white);material.SetTexture("_BaseMap",tex);material.SetTextureScale("_BaseMap",tiling);}
-            if(emission){material.EnableKeyword("_EMISSION");material.SetColor("_EmissionColor",color*2.5f);}
+            if(emission){material.SetColor("_EmissionColor",color*2.5f);if(path==WarmLampMaterialPath)AuthorLitEmission(material);else material.EnableKeyword("_EMISSION");}
             EditorUtility.SetDirty(material);return material;
         }
         static Transform CopySized(Scene source,Transform parent,string name,Vector3 at,Vector3 maximum,params string[] prefixes)

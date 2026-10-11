@@ -321,4 +321,38 @@ class NativeReportTests(unittest.TestCase):
   self.report['privateLog']='do not export'
   with self.assertRaisesRegex(Exception,'REPORT_IDENTITY'):self.check()
 
+class ExactMaterialDerivationTests(unittest.TestCase):
+ def setUp(self):
+  # Synthetic semantic fixture. The full real producer material is separately used in the physical host replay.
+  raw=("%YAML 1.1\n%TAG !u! tag:unity3d.com,2011:\n--- !u!21 &2100000\nMaterial:\n"
+       "  m_Shader: {fileID: 4800000, guid: 933532a4fcc9baf4fa0491de14d08ed7, type: 3}\n"
+       "  m_ValidKeywords: [_EMISSION]\n  m_LightmapFlags: 4\n  m_CustomRenderQueue: -1\n"
+       "  m_SavedProperties:\n    m_TexEnvs: [{_BaseMap: {m_Texture: {fileID: 0}}}]\n    m_Colors:\n"
+       "    - _BaseColor: {r: 1, g: 0.76, b: 0.38, a: 1}\n    - _Color: {r: 1, g: 0.76, b: 0.37999994, a: 1}\n"
+       "    - _EmissionColor: {r: 2.5, g: 1.9, b: 0.95, a: 2.5}\n"
+       "--- !u!114 &2086780894777222751\nMonoBehaviour: {version: 10}\n").encode()
+  self.before=raw+b'#'+b'x'*(3845-len(raw)-2)+b'\n'
+  self.after=self.before.replace(b'm_LightmapFlags: 4',b'm_LightmapFlags: 2')
+  change=mock.patch.object(r,'MATERIAL_BEFORE_SHA',hashlib.sha256(self.before).hexdigest());change.start();self.addCleanup(change.stop)
+ def test_only_fixed_gi_and_optional_legacy_alias_are_allowed(self):
+  self.assertEqual(['m_LightmapFlags'],r.validate_material_delta(self.before,self.after)['changedProperties'])
+  normalized=self.after.replace(b'b: 0.37999994',b'b: 0.38')
+  self.assertEqual(2,len(r.validate_material_delta(self.before,normalized)['changedProperties']))
+ def test_same_material_cannot_hide_other_property_changes(self):
+  mutations=[(b'fileID: 4800000',b'fileID: 4800001'),(b'_EMISSION',b'_OTHER'),(b'm_CustomRenderQueue: -1',b'm_CustomRenderQueue: 2000'),
+             (b'm_Texture: {fileID: 0}',b'm_Texture: {fileID: 1}'),(b'g: 1.9',b'g: 1.8'),(b'g: 0.76',b'g: 0.75'),(b'version: 10',b'version: 11')]
+  for old,new in mutations:
+   with self.subTest(property=old),self.assertRaises(Exception):r.validate_material_delta(self.before,self.after.replace(old,new))
+ def test_duplicate_yaml_keys_and_unknown_documents_reject(self):
+  for bad in (self.after.replace(b'Material:\n',b'Material:\n  m_LightmapFlags: 2\n'),self.after+b'--- !u!21 &2100001\nMaterial: {}\n'):
+   with self.assertRaises(Exception):r.validate_material_delta(self.before,bad)
+ def test_delta_is_exactly_one_parent_dependency(self):
+  rows=[dict(path='Assets/fixture/'+str(i),sha256='a'*64,bytes=1,kind='asset',packageName='',packageVersion='') for i in range(1040)]
+  rows[7].update(path=r.MATERIAL,sha256=r.MATERIAL_BEFORE_SHA,bytes=3845)
+  material=dict(afterSha256='b'*64,afterBytes=3839);bundle=dict(native=dict(dependencies=rows))
+  changed=r.derived_dependencies(bundle,material);self.assertEqual(1,sum(a!=b for a,b in zip(rows,changed)))
+  self.assertEqual(r.MATERIAL_BEFORE_SHA,rows[7]['sha256']);self.assertEqual('b'*64,changed[7]['sha256'])
+  rows.pop()
+  with self.assertRaisesRegex(Exception,'PARENT_DEPENDENCY'):r.derived_dependencies(bundle,material)
+
 if __name__=='__main__':unittest.main(verbosity=2)

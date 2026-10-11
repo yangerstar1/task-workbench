@@ -454,9 +454,24 @@ namespace DesertRV.Editor
             public int schema; public string label,sourceCommit,producerRunUrl,assetProducerSourceCommit,assetProducerRunUrl,generatedReceiptSha256,requestSha256,unityVersion;
             public JourneyCandidateAssetIntegration.FilePin sourceTransitionProof;
             public bool sourceBytesUnchanged,originalAssetsUnchanged,structureValidated,productionApprovalRejected,approved,scopeReused;
+            public JourneyCandidateAssetIntegration.FilePin derivation;
+            public bool originalBeforeAuthoringVerified,exactMaterialDelta,derivedBindingsValidated;
             public JourneyCandidateAssetIntegration.OutputFile[] scenes;
             public Dependency[] dependencies;
             public JourneyCandidateAssetIntegration.SpawnGroundingReport grounding;
+        }
+        [Serializable] sealed class DerivedChange
+        {
+            public string path,guid,beforeSha256,afterSha256,metaSha256;
+            public long localId,beforeBytes,afterBytes,metaBytes;
+        }
+        [Serializable] sealed class DerivedReceipt
+        {
+            public int schema;
+            public string status,sourceCommit,producerRunUrl,assetProducerSourceCommit,assetProducerRunUrl,inheritedEvidenceScope;
+            public JourneyCandidateAssetIntegration.FilePin parentGeneratedReceipt,nativeDerivation,nativeRestoration,restorationNativeXml,boundaryNativeXml,sourceState,sourceTransition;
+            public bool originalBeforeAuthoringVerified,exactMaterialDelta,editorExited,approved,scopeReusable;
+            public DerivedChange[] changes;
         }
         static bool Pinned(Request request,string path,string hash) => request.files.Count(p=>p.path==path && p.sha256==hash)==1 && Hash(RepoFile(path))==hash;
         static string DependencyKey(Dependency d) => string.Join("|",new[]{d.path,d.sha256,d.bytes.ToString(System.Globalization.CultureInfo.InvariantCulture),d.kind,d.packageName ?? "",d.packageVersion ?? ""});
@@ -472,12 +487,16 @@ namespace DesertRV.Editor
             const string transitionPath="tasks/desert-rv/unity/JourneyEvidence/JourneyPreparation/restoration-source-proof.json";
             Check(request.restorationProof.path==proofPath && Regex.IsMatch(request.restorationProof.sha256 ?? "","^[a-f0-9]{64}$") && Pinned(request,proofPath,request.restorationProof.sha256) && new FileInfo(RepoFile(proofPath)).Length<=16*1024*1024,"RESTORATION_PROOF");
             var proof=JsonUtility.FromJson<RestorationReport>(File.ReadAllText(RepoFile(proofPath)));
-            Check(proof!=null && proof.schema==1 && proof.label=="RESTORED_JOURNEY_NATIVE_REVALIDATED_UNREVIEWED" && proof.unityVersion=="6000.3.19f1" &&
+            bool derived=request.target=="Android" && proof!=null && proof.schema==2 && proof.label=="DERIVED_JOURNEY_NATIVE_REVALIDATED_UNREVIEWED";
+            Check(proof!=null && (request.target!="Android" || derived) && (derived || proof.schema==1 && proof.label=="RESTORED_JOURNEY_NATIVE_REVALIDATED_UNREVIEWED") && proof.unityVersion=="6000.3.19f1" &&
                 proof.sourceCommit==request.sourceCommit && proof.producerRunUrl==request.producerRunUrl && proof.assetProducerSourceCommit==request.assetProducerSourceCommit && proof.assetProducerRunUrl==request.assetProducerRunUrl &&
                 Regex.IsMatch(proof.assetProducerSourceCommit ?? "","^[a-f0-9]{40}$") && Regex.IsMatch(proof.assetProducerRunUrl ?? "",@"^https://github\.com/yangerstar1/task-workbench/actions/runs/[1-9][0-9]*$") &&
-                proof.generatedReceiptSha256==request.generatedReceiptSha256 && proof.sourceBytesUnchanged && proof.originalAssetsUnchanged && proof.structureValidated && proof.productionApprovalRejected && !proof.approved && !proof.scopeReused &&
+                proof.generatedReceiptSha256==request.generatedReceiptSha256 && proof.sourceBytesUnchanged &&
+                (derived ? !proof.originalAssetsUnchanged && proof.originalBeforeAuthoringVerified && proof.exactMaterialDelta && proof.derivedBindingsValidated : proof.originalAssetsUnchanged) &&
+                proof.structureValidated && proof.productionApprovalRejected && !proof.approved && !proof.scopeReused &&
                 proof.sourceTransitionProof!=null && proof.sourceTransitionProof.path==transitionPath && Regex.IsMatch(proof.sourceTransitionProof.sha256 ?? "","^[a-f0-9]{64}$") && Pinned(request,transitionPath,proof.sourceTransitionProof.sha256) &&
                 Regex.IsMatch(proof.requestSha256 ?? "","^[a-f0-9]{64}$") && Pinned(request,inputPath,proof.requestSha256),"RESTORATION_PROOF");
+            if(derived) VerifyMaterialDerivation(request,proof);
             Check(proof.scenes!=null && proof.scenes.Length==5 && proof.scenes.Select(p=>p.path).Distinct().Count()==5 &&
                 proof.scenes.All(p=>request.scenes.Any(q=>p.path==q.path && p.sha256==q.sha256 && p.dependencyHash==q.dependencyHash && p.dependencySha256==q.dependencySha256)) &&
                 proof.dependencies!=null && proof.dependencies.Select(DependencyKey).OrderBy(x=>x,StringComparer.Ordinal).SequenceEqual(request.dependencies.Select(DependencyKey).OrderBy(x=>x,StringComparer.Ordinal)) &&
@@ -489,6 +508,57 @@ namespace DesertRV.Editor
             var root=document.DocumentElement;var cases=document.GetElementsByTagName("test-case");
             Check(root!=null && root.Name=="test-run" && root.GetAttribute("result")=="Passed" && root.GetAttribute("total")=="1" && root.GetAttribute("passed")=="1" && root.GetAttribute("failed")=="0" && root.GetAttribute("skipped")=="0" && root.GetAttribute("inconclusive")=="0" && cases.Count==1 &&
                 ((XmlElement)cases[0]).GetAttribute("fullname")=="DesertRV.Tests.JourneyRestorationTests.RevalidatePinnedRestoredJourney" && ((XmlElement)cases[0]).GetAttribute("result")=="Passed","RESTORATION_XML");
+        }
+        static void VerifyMaterialDerivation(Request request,RestorationReport proof)
+        {
+            const string receiptPath="tasks/desert-rv/journey-derived-preparation-export/receipt.json";
+            const string materialPath="Assets/DesertRV/Scenes/Journey/Layout-FFC261.mat";
+            const string parentSha="ef01bab64fa8fe3f2ebe42a59ed43ddf426e1e8f0c3a5a3401a7dd0fe5202395";
+            const string derivationPath="tasks/desert-rv/unity/JourneyEvidence/JourneyPreparation/MaterialDerivation/native-material-derivation.json";
+            Check(request.target=="Android" && request.assetProducerSourceCommit=="9c95f1009a597cf4573e286d0098b7bc47a62321" &&
+                request.assetProducerRunUrl=="https://github.com/yangerstar1/task-workbench/actions/runs/38135035401" &&
+                request.generatedReceiptSha256=="742af42d6c4a5f7d366a562f9afbbd9e560c744863c866123565c2cd38ee1f58" &&
+                proof.derivation!=null && proof.derivation.path==derivationPath && Pinned(request,derivationPath,proof.derivation.sha256),"RESTORATION_PROOF");
+            var receiptPin=request.files.SingleOrDefault(p=>p.path==receiptPath);
+            Check(receiptPin!=null && Pinned(request,receiptPath,receiptPin.sha256),"RESTORATION_PROOF");
+            var receipt=JsonUtility.FromJson<DerivedReceipt>(File.ReadAllText(RepoFile(receiptPath)));
+            var native=JsonUtility.FromJson<JourneyCandidateRestoration.NativeMaterialDerivation>(File.ReadAllText(RepoFile(derivationPath)));
+            Check(receipt!=null && receipt.schema==1 && receipt.status=="DERIVED_JOURNEY_PREPARED_UNREVIEWED" && receipt.sourceCommit==request.sourceCommit &&
+                receipt.producerRunUrl==request.producerRunUrl && receipt.assetProducerSourceCommit==request.assetProducerSourceCommit && receipt.assetProducerRunUrl==request.assetProducerRunUrl &&
+                receipt.originalBeforeAuthoringVerified && receipt.exactMaterialDelta && receipt.editorExited && !receipt.approved && !receipt.scopeReusable &&
+                receipt.inheritedEvidenceScope=="PARENT_155_ONLY_NOT_CURRENT_DERIVED_ASSET_VALIDATION" && receipt.changes!=null && receipt.changes.Length==1,"RESTORATION_PROOF");
+            foreach(var pin in new[]{receipt.parentGeneratedReceipt,receipt.nativeDerivation,receipt.nativeRestoration,receipt.restorationNativeXml,receipt.boundaryNativeXml,receipt.sourceState,receipt.sourceTransition})
+                Check(pin!=null && Pinned(request,pin.path,pin.sha256),"RESTORATION_PROOF");
+            Check(receipt.parentGeneratedReceipt.path=="tasks/desert-rv/journey-preparation-export/generated/receipt.json" && receipt.parentGeneratedReceipt.sha256==request.generatedReceiptSha256 &&
+                receipt.nativeDerivation.path==derivationPath && receipt.nativeDerivation.sha256==proof.derivation.sha256 &&
+                receipt.nativeRestoration.path==request.restorationProof.path && receipt.nativeRestoration.sha256==request.restorationProof.sha256 &&
+                receipt.restorationNativeXml.sha256==request.restorationNativeXmlSha256 && receipt.boundaryNativeXml.sha256==request.boundaryNativeXmlSha256 &&
+                receipt.sourceState.path=="tasks/desert-rv/SOURCE-STATE.json" && receipt.sourceTransition.path==proof.sourceTransitionProof.path && receipt.sourceTransition.sha256==proof.sourceTransitionProof.sha256,"RESTORATION_PROOF");
+            Check(native!=null && native.schema==1 && native.label=="EXACT_WARM_MATERIAL_DERIVATION_NATIVE" && native.sourceCommit==request.sourceCommit && native.producerRunUrl==request.producerRunUrl &&
+                native.assetProducerSourceCommit==request.assetProducerSourceCommit && native.assetProducerRunUrl==request.assetProducerRunUrl && native.originalBeforeAuthoringVerified &&
+                native.parentGeneratedReceipt!=null && native.parentGeneratedReceipt.path==receipt.parentGeneratedReceipt.path && native.parentGeneratedReceipt.sha256==request.generatedReceiptSha256 &&
+                native.requestSha256==proof.requestSha256 && native.material!=null,"RESTORATION_PROOF");
+            var material=native.material;var change=receipt.changes[0];
+            Check(material.path==materialPath && material.guid=="7807e70b78cd80b04b21bf136de97aaf" && material.localId==2100000 && material.beforeSha256==parentSha && material.beforeBytes==3845 &&
+                material.afterSha256!=parentSha && material.afterSha256==Hash(materialPath) && material.afterBytes==new FileInfo(materialPath).Length &&
+                !material.loadedDirtyBeforeAuthoring && material.source!=null && material.loaded!=null && material.authored!=null && material.reloaded!=null &&
+                material.source.giFlags==4 && material.loaded.giFlags==4 && material.authored.giFlags==2 && material.reloaded.giFlags==2 && material.authored.emissionKeyword && material.reloaded.emissionKeyword &&
+                material.metaSha256==Hash(materialPath+".meta") && material.metaBytes==new FileInfo(materialPath+".meta").Length && material.unloadVerified && material.reloadedClean && material.bytesStableAfterReload &&
+                change.path==material.path && change.guid==material.guid && change.localId==material.localId && change.beforeSha256==material.beforeSha256 && change.beforeBytes==material.beforeBytes &&
+                change.afterSha256==material.afterSha256 && change.afterBytes==material.afterBytes && change.metaSha256==material.metaSha256 && change.metaBytes==material.metaBytes,"RESTORATION_PROOF");
+            var original=JsonUtility.FromJson<JourneyCandidateRestoration.Request>(File.ReadAllText(RepoFile("tasks/desert-rv/unity/JourneyEvidence/JourneyPreparation/restoration-input.json")));
+            Check(original!=null && original.schema==2 && original.materialDerivation=="PINNED_WARM_LIT_BAKED_EMISSION_V1" && original.sourceCommit==request.sourceCommit && original.producerRunUrl==request.producerRunUrl &&
+                original.assetProducerSourceCommit==request.assetProducerSourceCommit && original.assetProducerRunUrl==request.assetProducerRunUrl && original.generatedReceiptSha256==request.generatedReceiptSha256 &&
+                original.expectedDependencies!=null && original.expectedDependencies.Length==1040 && proof.dependencies!=null && proof.dependencies.Length==1040,"RESTORATION_PROOF");
+            foreach(var prior in original.expectedDependencies)
+            {
+                var now=proof.dependencies.SingleOrDefault(p=>p.path==prior.path);
+                if(prior.path==materialPath) Check(prior.sha256==parentSha && prior.bytes==3845,"RESTORATION_PROOF");
+                if(prior.path==materialPath+".meta") Check(prior.sha256==material.metaSha256 && prior.bytes==material.metaBytes,"RESTORATION_PROOF");
+                Check(now!=null && now.kind==prior.kind && now.packageName==prior.packageName && now.packageVersion==prior.packageVersion &&
+                    now.sha256==(prior.path==materialPath ? material.afterSha256 : prior.sha256) && now.bytes==(prior.path==materialPath ? material.afterBytes : prior.bytes),"RESTORATION_PROOF");
+            }
+            Check(original.integration!=null && original.integration.savedInputs!=null && original.integration.savedInputs.Length==5 && proof.scenes!=null && proof.scenes.Length==5 && proof.scenes.All(p=>original.integration.savedInputs.Any(q=>p.path==q.path && p.sha256==q.sha256)),"RESTORATION_PROOF");
         }
         static void Verify(Lease lease, bool building)
         {

@@ -243,16 +243,23 @@ def empty_report():
 def dependency_proof(folder, project, exporter, native, restored_android=False):
     asset_commit, asset_run = native['sourceCommit'], native['producerRunUrl']
     if restored_android:
+        import sys
+        sys.path.insert(0,str(project.parent/'art/journey-preparation'))
+        import restore_preparation as restoration
+        check(restoration.ANDROID,'DEPENDENCY_INVALID')
+        _,_,current_proof=restoration.verify()
+        check(current_proof.get('derivedReceipt')==restoration.pin(restoration.DERIVED_RECEIPT),'DEPENDENCY_INVALID')
         check(native.get('target')=='Android' and native.get('assetProducerSourceCommit')=='9c95f1009a597cf4573e286d0098b7bc47a62321' and
               native.get('assetProducerRunUrl')=='https://github.com/yangerstar1/task-workbench/actions/runs/38135035401' and
               native.get('generatedReceiptSha256')=='742af42d6c4a5f7d366a562f9afbbd9e560c744863c866123565c2cd38ee1f58','DEPENDENCY_INVALID')
         proof_path='tasks/desert-rv/unity/JourneyEvidence/JourneyPreparation/restoration-revalidated.json'
         proof_raw, proof=read_sealed(project/'JourneyEvidence/JourneyPreparation/restoration-revalidated.json',exporter)
         check(native.get('restorationProof')==dict(path=proof_path,sha256=sha_bytes(proof_raw)) and
-              proof.get('label')=='RESTORED_JOURNEY_NATIVE_REVALIDATED_UNREVIEWED' and proof.get('sourceCommit')==native['sourceCommit'] and
+              proof.get('label')=='DERIVED_JOURNEY_NATIVE_REVALIDATED_UNREVIEWED' and proof.get('sourceCommit')==native['sourceCommit'] and
               proof.get('producerRunUrl')==native['producerRunUrl'] and proof.get('assetProducerSourceCommit')==native['assetProducerSourceCommit'] and
               proof.get('assetProducerRunUrl')==native['assetProducerRunUrl'] and proof.get('generatedReceiptSha256')==native['generatedReceiptSha256'] and
-              all(proof.get(k) is True for k in ('sourceBytesUnchanged','originalAssetsUnchanged','structureValidated','productionApprovalRejected')) and
+              all(proof.get(k) is True for k in ('sourceBytesUnchanged','originalBeforeAuthoringVerified','exactMaterialDelta','derivedBindingsValidated','structureValidated','productionApprovalRejected')) and
+              proof.get('originalAssetsUnchanged') is False and proof.get('derivation')==restoration.pin(restoration.DERIVATION_RECORD) and
               proof.get('approved') is False and proof.get('scopeReused') is False,'DEPENDENCY_INVALID')
         asset_commit, asset_run=native['assetProducerSourceCommit'],native['assetProducerRunUrl']
     raw, generated = read_sealed(folder / 'receipt.json', exporter)

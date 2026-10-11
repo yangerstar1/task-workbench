@@ -87,6 +87,12 @@ def prepare_restored():
     import restore_preparation as restore
     state,bundle,verified=restore.verify();boundary=bound_boundary();report=read(restore.REPORT)
     records={r['path']:r for r in read(restore.INPUT)['files']}
+    if restore.ANDROID:
+        material=restore.material_derivation()['material'];name='tasks/desert-rv/unity/'+restore.MATERIAL
+        require(name in records and records[name]['sha256']==material['beforeSha256'],'LINUX_DERIVED_PARENT_PIN')
+        records[name]=dict(path=name,sha256=material['afterSha256'])
+        for path in (restore.DERIVED_RECEIPT,restore.DERIVATION_RECORD,restore.DERIVATION_FOLDER/'before.mat',restore.DERIVATION_FOLDER/'after.mat'):
+            item=restore.pin(path);records[item['path']]=item
     for path in (restore.INPUT,restore.REPORT,restore.VERIFIED,restore.SOURCE_PROOF,PROJECT/'JourneyEvidence/JourneyPreparation/linux-boundary-verified.json'):
         item=restore.pin(path);records[item['path']]=item
     for item in (verified['nativeXml'],boundary['nativeXml']):records[item['path']]=item
@@ -94,7 +100,7 @@ def prepare_restored():
         boundaryNativeXmlSha256=boundary['nativeXml']['sha256'],boundaryNativeCases=17,restorationProof=restore.pin(restore.REPORT),restorationNativeXmlSha256=verified['nativeXml']['sha256'],
         assetProducerSourceCommit=restore.PRODUCER['sourceCommit'],assetProducerRunUrl=restore.RUN_URL,
         define='DESERTRV_CANDIDATE_LINUX',target='StandaloneLinux64',development=True,approved=False,files=[records[n] for n in sorted(records)],
-        dependencies=bundle['receipt']['dependencies'],scenes=report['scenes'],directories=read(restore.INPUT)['directories'])
+        dependencies=[dict(row,owner=next(old['owner'] for old in bundle['receipt']['dependencies'] if old['path']==row['path'])) for row in report['dependencies']] if restore.ANDROID else bundle['receipt']['dependencies'],scenes=report['scenes'],directories=read(restore.INPUT)['directories'])
     destination=PROJECT/'JourneyEvidence/JourneyPreparation/linux-build-input.json';require(not destination.exists(),'LINUX_BUILD_REQUEST_EXISTS')
     restore.verify();destination.write_text(json.dumps(request,indent=2)+'\n');destination.with_suffix('.sha256').write_text(sha(destination)+'\n')
     verify();return request

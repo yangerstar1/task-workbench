@@ -85,12 +85,14 @@ def validate_image_fit(folder,stem,profile,mode,background):
 WORLD_SOURCE=TASK/'unity/JourneyEvidence/MobileHudWorld'
 WORLD_EXPORT=TASK/'mobile-hud-world-export'
 WORLD_DIAGNOSTIC=TASK/'mobile-hud-world-diagnostic/world-diagnostic.json'
+WORLD_FAILURE_EXPORT=TASK/'mobile-hud-world-failure-export'
 WORLD_STEMS=('desktop-foot-region-1','desktop-foot-region-3')
 WORLD_FILES=frozenset(['EVIDENCE.txt']+[stem+suffix for stem in WORLD_STEMS for suffix in ('.png','-fit.csv')])
 WORLD_EVIDENCE='Authored, loaded world camera + production UGUI layout fixture. HUD values are controlled fixture data. Not live gameplay or physical-device acceptance. Saved scenes opened read-only for capture; no scenes saved or replaced.\n'
 
 # Diagnostics expose only fixed phases and codes, never arbitrary exception text/paths.
 SAFE_ERROR_CODES=frozenset({
+ 'DERIVE_DIAGNOSTIC_IDENTITY','DERIVE_ANDROID_ONLY','DERIVE_DEPENDENCY_BYTES','DERIVE_DIAGNOSTIC_COPY_CHANGED','DERIVE_EXPORT_COPY_CHANGED','DERIVE_EXPORT_EXISTS','DERIVE_MATERIAL_COLORS','DERIVE_MATERIAL_COLOR_PIN','DERIVE_MATERIAL_COPY_CHANGED','DERIVE_MATERIAL_DIAGNOSTIC_REJECTED','DERIVE_MATERIAL_DOCUMENTS','DERIVE_MATERIAL_DUPLICATE_KEY','DERIVE_MATERIAL_GI','DERIVE_MATERIAL_LIT','DERIVE_MATERIAL_PIN','DERIVE_MATERIAL_SIZE','DERIVE_MATERIAL_UNAUTHORIZED_PROPERTY','DERIVE_MATERIAL_UNCHANGED','DERIVE_MATERIAL_YAML','DERIVE_META_CHANGED','DERIVE_NATIVE_COLOR','DERIVE_NATIVE_IDENTITY','DERIVE_NATIVE_MATERIAL','DERIVE_NATIVE_PROOF','DERIVE_NATIVE_STATE','DERIVE_PARENT_DEPENDENCY','DERIVE_PARENT_MATERIAL','DERIVE_RECEIPT_CHANGED','DERIVE_RELOAD_CHANGED','DERIVE_RELOAD_NOT_VERIFIED','DERIVE_SEMANTIC_CHANGES',
  'MOBILE_HUD_ARGUMENTS','MOBILE_HUD_WORLD_NATIVE_OUTCOME','MOBILE_HUD_WORLD_MODE',
  'MOBILE_HUD_WORLD_SOURCE_MISSING','MOBILE_HUD_WORLD_INVENTORY','MOBILE_HUD_WORLD_SCOPE',
  'MOBILE_HUD_WORLD_PREPARATION','MOBILE_HUD_WORLD_RESTORATION','MOBILE_HUD_WORLD_EXPORT_EXISTS',
@@ -233,17 +235,18 @@ def world_report(folder):
   with gate_phase('RESTORATION_VERIFY'):
    restore=load_restoration();restore.verify()
    restored=source.json_bytes(raw(restore.REPORT,1024**2))
-   require(restored.get('label')=='RESTORED_JOURNEY_NATIVE_REVALIDATED_UNREVIEWED' and
+   require(restored.get('label')=='DERIVED_JOURNEY_NATIVE_REVALIDATED_UNREVIEWED' and
            restored.get('sourceCommit')==identity['sourceCommit'] and
            restored.get('producerRunUrl')=='https://github.com/yangerstar1/task-workbench/actions/runs/'+identity['runId'] and
            restored.get('assetProducerSourceCommit')==value.get('sourceCommit') and
            restored.get('assetProducerRunUrl')==restore.RUN_URL and
            restored.get('generatedReceiptSha256')==value.get('generatedExport',{}).get('sha256')==restore.PRODUCER['generatedReceiptSha256'] and
-           restored.get('sourceBytesUnchanged') is True and restored.get('originalAssetsUnchanged') is True and
+           restored.get('sourceBytesUnchanged') is True and restored.get('originalAssetsUnchanged') is False and
+           restored.get('originalBeforeAuthoringVerified') is True and restored.get('exactMaterialDelta') is True and restored.get('derivedBindingsValidated') is True and
            restored.get('structureValidated') is True and restored.get('approved') is False and restored.get('scopeReused') is False,
            'MOBILE_HUD_WORLD_RESTORATION')
    lineage=dict(assetProducerSourceCommit=restored['assetProducerSourceCommit'],assetProducerRunUrl=restored['assetProducerRunUrl'],
-                restoration=pin(restore.REPORT))
+                restoration=pin(restore.REPORT),derivedPreparation=pin(restore.DERIVED_RECEIPT))
  with gate_phase('CAPTURE_VALIDATION'):files=world_inventory(folder)
  with gate_phase('PREPARATION_PIN'):preparation_pin=pin(preparation)
  return dict(schema=1,**identity,scope='AUTHORED_WORLD_CAMERA_WITH_PRODUCTION_HUD_FIXTURE_NOT_GAMEPLAY',
@@ -278,6 +281,25 @@ def world():
   isolated.write_new(WORLD_EXPORT/'world-report.json',copied,16384)
  verify_world()
  with gate_phase('OUTPUT_WRITE'):isolated.output(os.environ,'world_verified=true\nexport_ready=true\n')
+
+def preserve_failed_world(phase,code):
+ # Fixed five files only. No restoration proof, successful export flag, or build input.
+ require(os.environ.get('WORLD_CAPTURE_MODE')=='restored','MOBILE_HUD_WORLD_MODE')
+ identity=isolated.owner_identity(os.environ);original=world_inventory(WORLD_SOURCE)
+ isolated.safe_path(WORLD_FAILURE_EXPORT);require(not WORLD_FAILURE_EXPORT.exists(),'MOBILE_HUD_WORLD_EXPORT_EXISTS')
+ WORLD_FAILURE_EXPORT.mkdir();destination=WORLD_FAILURE_EXPORT/'captures';destination.mkdir()
+ for row in original:
+  name=Path(row['path']).name;data=raw(WORLD_SOURCE/name)
+  require(sha(data)==row['sha256'] and len(data)==row['bytes'],'MOBILE_HUD_WORLD_COPY_CHANGED')
+  with (destination/name).open('xb') as stream:stream.write(data)
+ files=world_inventory(destination)
+ require([(Path(r['path']).name,r['sha256'],r['bytes']) for r in original]==[(Path(r['path']).name,r['sha256'],r['bytes']) for r in files],'MOBILE_HUD_WORLD_COPY_CHANGED')
+ receipt=dict(schema=1,status='WORLD_CAPTURES_DIAGNOSTIC_ONLY',**identity,phase=phase,code=code,files=files,
+              nativeOutcome=os.environ.get('NATIVE_OUTCOME') if os.environ.get('NATIVE_OUTCOME') in ('success','failure','cancelled','skipped') else 'unknown',
+              buildReady=False,restorationPassed=False,approved=False,deviceExecuted=False,gameplayAccepted=False)
+ isolated.write_new(WORLD_FAILURE_EXPORT/'receipt.json',receipt,16384)
+ require(source.json_bytes(raw(WORLD_FAILURE_EXPORT/'receipt.json',16384))==receipt and world_inventory(destination)==files,'MOBILE_HUD_WORLD_REPORT_CHANGED')
+ isolated.output(os.environ,'world_failure_captures_written=true\n')
 
 def current_report(folder):
  identity=isolated.owner_identity(os.environ)
@@ -320,6 +342,10 @@ def main():
    try:write_world_diagnostic(error.phase,error.code)
    except Exception as diagnostic_error:
     print('MOBILE_HUD_DIAGNOSTIC_NOT_PUBLISHED code='+safe_error_code(diagnostic_error))
+   if os.environ.get('WORLD_CAPTURE_MODE')=='restored':
+    try:preserve_failed_world(error.phase,error.code)
+    except Exception as capture_error:
+     print('MOBILE_HUD_FAILURE_CAPTURES_NOT_PUBLISHED code='+safe_error_code(capture_error))
   return 2
  print('MOBILE_HUD_'+sys.argv[1].upper()+'_VERIFIED');return 0
 if __name__=='__main__':raise SystemExit(main())

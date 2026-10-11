@@ -13,13 +13,17 @@ using DependencyPin = DesertRV.Editor.JourneyCandidatePreparation.DependencyPin;
 
 namespace DesertRV.Editor
 {
-    // A separate native read-only consumer of immutable public producer bundles.
-    // This never imports/authors assets, activates an old diagnostic scope or grants a build lease.
+    // Immutable parent verification, then one explicitly authorized material derivation.
+    // The old Linux path remains read-only; no old diagnostic scope grants a build lease.
     public static class JourneyCandidateRestoration
     {
         public const string Folder = "JourneyEvidence/JourneyPreparation";
         public const string InputPath = Folder + "/restoration-input.json";
         public const string ProofPath = Folder + "/restoration-revalidated.json";
+        public const string DerivationFolder = Folder + "/MaterialDerivation";
+        public const string DerivationPath = DerivationFolder + "/native-material-derivation.json";
+        const string WarmMaterial = "Assets/DesertRV/Scenes/Journey/Layout-FFC261.mat";
+        const string WarmMaterialSha = "ef01bab64fa8fe3f2ebe42a59ed43ddf426e1e8f0c3a5a3401a7dd0fe5202395";
         const string Prefix = "tasks/desert-rv/unity/";
         const string ProducerCommit = "7e134d4bbc4a349e5c71b27980dea90d85ff538e";
         const string ProducerRun = "https://github.com/yangerstar1/task-workbench/actions/runs/37923953772";
@@ -37,6 +41,7 @@ namespace DesertRV.Editor
         {
             public int schema;
             public string label, sourceCommit, producerRunUrl, assetProducerSourceCommit, assetProducerRunUrl, generatedReceiptSha256;
+            public string materialDerivation;
             public FilePin sourceTransitionProof, selection, originalGeneratedReceipt, originalNativeManifest, originalGrounding;
             public FilePin[] files;
             public string[] directories;
@@ -47,7 +52,7 @@ namespace DesertRV.Editor
         {
             public string kind, path, producerDependencyHash, currentDependencyHash, producerDependencySha256, currentDependencySha256;
         }
-        [Serializable] public sealed class Proof
+        [Serializable] public class Proof
         {
             public int schema = 1;
             public string label = "RESTORED_JOURNEY_NATIVE_REVALIDATED_UNREVIEWED";
@@ -57,6 +62,20 @@ namespace DesertRV.Editor
             public JourneyCandidateAssetIntegration.OutputFile[] scenes;
             public DependencyPin[] dependencies;
             public JourneyCandidateAssetIntegration.SpawnGroundingReport grounding;
+        }
+        [Serializable] public sealed class DerivedProof : Proof
+        {
+            public FilePin derivation;
+            public bool originalBeforeAuthoringVerified, exactMaterialDelta, derivedBindingsValidated;
+        }
+        [Serializable] public sealed class NativeMaterialDerivation
+        {
+            public int schema = 1;
+            public string label = "EXACT_WARM_MATERIAL_DERIVATION_NATIVE";
+            public string sourceCommit, producerRunUrl, assetProducerSourceCommit, assetProducerRunUrl, requestSha256;
+            public FilePin parentGeneratedReceipt;
+            public bool originalBeforeAuthoringVerified;
+            public JourneySceneAuthoring.WarmLampDerivation material;
         }
         [Serializable] public sealed class DependencyDifference
         {
@@ -116,7 +135,7 @@ namespace DesertRV.Editor
             static readonly HashSet<string> Stages = new HashSet<string>(new[] {
                 "RESTORATION_ENTRY", "DEPENDENCIES_BEFORE", "DEPENDENCIES_AFTER", "POSES_BEFORE", "POSES_AFTER",
                 "GROUNDING_BEFORE", "GROUNDING_AFTER", "IMPORTER_IDENTITIES_BEFORE", "IMPORTER_IDENTITIES_AFTER",
-                "SAVED_ROOT_IDENTITIES_BEFORE", "SAVED_ROOT_IDENTITIES_AFTER", "SAVED_BINDINGS_BEFORE", "SAVED_BINDINGS_AFTER",
+                "SAVED_ROOT_IDENTITIES_BEFORE", "SAVED_ROOT_IDENTITIES_AFTER", "SAVED_BINDINGS_BEFORE", "SAVED_BINDINGS_AFTER", "MATERIAL_DERIVATION_BEFORE", "MATERIAL_DERIVATION_AFTER",
                 "CAPTURE_ENTRY", "CAPTURE_GATE_BEFORE", "CAPTURE_GATE_AFTER", "CAPTURE_REGION_1_BEFORE", "CAPTURE_REGION_1_AFTER", "CAPTURE_REGION_3_BEFORE", "CAPTURE_REGION_3_AFTER",
                 "CAPTURE_SCENE_RESTORE_BEFORE", "CAPTURE_SCENE_RESTORE_AFTER", "RESTORATION_SCENE_RESTORE_BEFORE",
                 "RESTORATION_SCENE_RESTORE_AFTER", "FINAL_PROTECTION_BEFORE", "FINAL_PROTECTION_AFTER" }, StringComparer.Ordinal);
@@ -254,6 +273,10 @@ namespace DesertRV.Editor
         }
         static string ErrorClass(Exception error)
         {
+            foreach (string code in new[] { "CONTEXT", "SOURCE_PIN", "META_PIN", "SOURCE_FORMAT", "SOURCE_SEMANTICS", "IDENTITY", "SUBASSET_IDENTITY", "SUBASSET_DIRTY", "SUBASSET_CHANGED", "LOADED_DIRTY", "LOADED_SOURCE", "SERIALIZED_LAYOUT", "GI", "KEYWORD", "ALIAS", "RUNTIME_VALUES", "UNDECLARED_RUNTIME_CHANGE", "UNDECLARED_SERIALIZED_CHANGE", "SCENE_CHANGED", "OTHER_ASSET_DIRTY", "PROTECTION", "IMPORT_BYTES", "UNLOAD", "RELOAD_DIRTY", "RELOAD_BYTES", "NATIVE_INPUT", "NATIVE_LOAD", "NATIVE_AUTHOR", "NATIVE_SAVE", "NATIVE_IMPORT", "NATIVE_UNLOAD", "NATIVE_RELOAD" })
+                if (error.Message == "JOURNEY_WARM_LAMP_" + code) return "WARM_LAMP_" + code;
+            foreach (string code in new[] { "PARENT_IDENTITY", "MATERIAL_EVIDENCE", "MATERIAL_RECORD", "BINDINGS" })
+                if (error.Message == "JOURNEY_DERIVE_" + code) return "DERIVE_" + code;
             foreach (string code in new[] { "CACHE_PACKAGE_IDENTITY", "CACHE_ASSET_BYTES", "CACHE_META_BYTES", "CACHE_SUBASSET_RELATION",
                 "CACHE_FONT_NOT_LOADED", "CACHE_FONT_IDENTITY", "CACHE_FONT_NOT_DYNAMIC", "CACHE_FONT_ATLAS_LINK" })
                 if (error.Message == "JOURNEY_WORLD_HUD_" + code) return code;
@@ -367,7 +390,7 @@ namespace DesertRV.Editor
                 "Fixed policy and original/current source manifests required.");
             BoundPin(proof.policy, files); BoundPin(proof.producerSource, files); BoundPin(proof.consumerSource, files);
             var policy = JsonUtility.FromJson<TransitionPolicy>(File.ReadAllText(Pin(proof.policy)));
-            Check(policy != null && policy.schema == 1 && policy.status == "REVIEWED_DIAGNOSTIC_RESTORATION_SOURCE_ONLY" && policy.changes != null && proof.changes != null &&
+            Check(policy != null && policy.schema == 1 && policy.status == (AndroidProducer(request) ? "REVIEWED_EXACT_MATERIAL_DERIVATION_SOURCE" : "REVIEWED_DIAGNOSTIC_RESTORATION_SOURCE_ONLY") && policy.changes != null && proof.changes != null &&
                 policy.changes.Select(p => JsonUtility.ToJson(p)).SequenceEqual(proof.changes.Select(p => JsonUtility.ToJson(p))), "Reviewed transition policy and exact source proof differ.");
             var before = SourceFiles(JsonUtility.FromJson<SourceState>(File.ReadAllText(Pin(proof.producerSource))));
             var after = SourceFiles(JsonUtility.FromJson<SourceState>(File.ReadAllText(Pin(proof.consumerSource))));
@@ -445,7 +468,7 @@ namespace DesertRV.Editor
         }
         static bool SameDependency(DependencyPin a, DependencyPin b) => a != null && b != null && a.path == b.path && a.sha256 == b.sha256 && a.bytes == b.bytes &&
             a.kind == b.kind && a.packageName == b.packageName && a.packageVersion == b.packageVersion;
-        static void MatchDependencies(DependencyPin[] actual, DependencyPin[] expected, Diagnostic diagnostic = null)
+        static void MatchDependencies(DependencyPin[] actual, DependencyPin[] expected, Diagnostic diagnostic = null, DependencyPin[] originalForDiagnostic = null)
         {
             Check(actual != null && expected != null && expected.Length > 0 &&
                 actual.All(p => p != null) && expected.All(p => p != null) && actual.Select(p => p.path).Distinct().Count() == actual.Length && expected.Select(p => p.path).Distinct().Count() == expected.Length,
@@ -459,7 +482,9 @@ namespace DesertRV.Editor
                 diagnostic.dependencyActualCount = actual.Length;
                 diagnostic.dependencyAddedCount = indexed.Keys.Count(p => !expectedPaths.Contains(p));
                 diagnostic.dependencyMissingCount = expectedPaths.Count(p => !indexed.ContainsKey(p));
-                diagnostic.dependencyDifferences = right.Where(p => !indexed.TryGetValue(p.path, out var current) || !SameDependency(current, p)).Take(32)
+                var baseline = originalForDiagnostic ?? right;
+                Check(baseline.Length == right.Length && new HashSet<string>(baseline.Select(p => p.path)).SetEquals(expectedPaths), "Complete diagnostic parent inventory required.");
+                diagnostic.dependencyDifferences = baseline.OrderBy(p => p.path, StringComparer.Ordinal).Where(p => !indexed.TryGetValue(p.path, out var current) || !SameDependency(current, p)).Take(32)
                     .Select(p => { indexed.TryGetValue(p.path, out var current); return new DependencyDifference { path = p.path, producerSha256 = p.sha256,
                         currentSha256 = current?.sha256 ?? "", producerBytes = p.bytes, currentBytes = current?.bytes ?? 0 }; }).ToArray();
             }
@@ -491,6 +516,45 @@ namespace DesertRV.Editor
         {
             using (var stream = new FileStream(path, FileMode.CreateNew, FileAccess.Write))
             using (var writer = new StreamWriter(stream)) writer.Write(JsonUtility.ToJson(value, true));
+        }
+        static void CopyWarmMaterial(string target)
+        {
+            Check(JourneyDiagnosticScope.IsPinnedPathSafe(WarmMaterial, out _) && new FileInfo(WarmMaterial).Length <= 65536,
+                "JOURNEY_DERIVE_MATERIAL_EVIDENCE");
+            byte[] bytes = File.ReadAllBytes(WarmMaterial);
+            using (var stream = new FileStream(target, FileMode.CreateNew, FileAccess.Write)) stream.Write(bytes, 0, bytes.Length);
+            Check(Hash(target) == Hash(WarmMaterial), "JOURNEY_DERIVE_MATERIAL_EVIDENCE");
+        }
+        static Request DeriveWarmMaterial(Request request, string requestHash)
+        {
+            Check(AndroidProducer(request) && request.schema == 2 && request.materialDerivation == "PINNED_WARM_LIT_BAKED_EMISSION_V1" &&
+                Hash(WarmMaterial) == WarmMaterialSha && new FileInfo(WarmMaterial).Length == 3845 && !Directory.Exists(DerivationFolder),
+                "JOURNEY_DERIVE_PARENT_IDENTITY");
+            VerifyInventory(request); MatchDependencies(JourneyCandidatePreparation.DependencySnapshot(), request.expectedDependencies);
+            Directory.CreateDirectory(DerivationFolder);
+            Check(JourneyDiagnosticScope.IsPinnedPathSafe(DerivationFolder, out _), "JOURNEY_DERIVE_MATERIAL_EVIDENCE");
+            CopyWarmMaterial(DerivationFolder + "/before.mat");
+            JourneySceneAuthoring.WarmLampDerivation material = null; var failures = new List<Exception>();
+            try { material = JourneySceneAuthoring.AuthorPinnedWarmLamp(); }
+            catch (Exception error) { failures.Add(error); }
+            finally { try { CopyWarmMaterial(DerivationFolder + "/after.mat"); } catch (Exception error) { failures.Add(error); } }
+            if (failures.Count == 1) System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(failures[0]).Throw();
+            if (failures.Count > 1) throw new AggregateException("Exact material authoring failed; primary failure first.", failures);
+            Check(material != null && material.path == WarmMaterial && material.beforeSha256 == WarmMaterialSha && material.beforeBytes == 3845 &&
+                material.afterSha256 == Hash(WarmMaterial) && material.afterBytes == new FileInfo(WarmMaterial).Length && material.afterSha256 != WarmMaterialSha &&
+                material.metaSha256 == Hash(WarmMaterial + ".meta") && material.metaBytes == new FileInfo(WarmMaterial + ".meta").Length &&
+                material.unloadVerified && material.reloadedClean && material.bytesStableAfterReload, "JOURNEY_DERIVE_MATERIAL_RECORD");
+            var effective = JsonUtility.FromJson<Request>(JsonUtility.ToJson(request));
+            var file = effective.files.Single(p => p.path == Prefix + WarmMaterial);
+            Check(file.sha256 == material.beforeSha256, "JOURNEY_DERIVE_PARENT_IDENTITY"); file.sha256 = material.afterSha256;
+            var dependency = effective.expectedDependencies.Single(p => p.path == WarmMaterial);
+            Check(dependency.sha256 == material.beforeSha256 && dependency.bytes == material.beforeBytes && dependency.kind == "asset", "JOURNEY_DERIVE_PARENT_IDENTITY");
+            dependency.sha256 = material.afterSha256; dependency.bytes = material.afterBytes;
+            VerifyInventory(effective); MatchDependencies(JourneyCandidatePreparation.DependencySnapshot(), effective.expectedDependencies);
+            WriteFresh(DerivationPath, new NativeMaterialDerivation { sourceCommit = request.sourceCommit, producerRunUrl = request.producerRunUrl,
+                assetProducerSourceCommit = request.assetProducerSourceCommit, assetProducerRunUrl = request.assetProducerRunUrl,
+                parentGeneratedReceipt = request.originalGeneratedReceipt, requestSha256 = requestHash, originalBeforeAuthoringVerified = true, material = material });
+            return effective;
         }
         // The pinned GameCI runner forwards GITHUB_SHA but not GITHUB_RUN_ID.
         // The trusted workflow passes this one explicit argument; never infer it from old producer data.
@@ -556,7 +620,9 @@ namespace DesertRV.Editor
             var request = JsonUtility.FromJson<Request>(File.ReadAllText(InputPath));
             string run = ParseConsumerRunId(Environment.GetCommandLineArgs(), request?.producerRunUrl);
             diagnostic.runIdentity = "MATCHED";
-            Check(request != null && request.schema == 1 && request.label == "RESTORE_PINNED_JOURNEY_FOR_NATIVE_REVALIDATION" &&
+            Check(request != null && request.schema == (AndroidProducer(request) ? 2 : 1) &&
+                request.label == (AndroidProducer(request) ? "RESTORE_AND_DERIVE_PINNED_WARM_MATERIAL" : "RESTORE_PINNED_JOURNEY_FOR_NATIVE_REVALIDATION") &&
+                (!AndroidProducer(request) || request.materialDerivation == "PINNED_WARM_LIT_BAKED_EMISSION_V1") &&
                 Digest(request.sourceCommit, 40) && request.sourceCommit == Environment.GetEnvironmentVariable("GITHUB_SHA") &&
                 request.producerRunUrl == "https://github.com/yangerstar1/task-workbench/actions/runs/" + run &&
                 KnownProducer(request) && (!AndroidProducer(request) || EditorUserBuildSettings.activeBuildTarget == BuildTarget.Android) &&
@@ -567,6 +633,7 @@ namespace DesertRV.Editor
             var setup = EditorSceneManager.GetSceneManagerSetup();
             Check(!setup.Any(s => s.isLoaded && SceneManager.GetSceneByPath(s.path).isDirty), "Restoration cannot discard existing scene edits.");
             var files = request.files.ToDictionary(p => p.path, StringComparer.Ordinal); Proof proof = null; var failures = new List<Exception>();
+            Request protectedRequest = request;
             bool dependenciesValidated = false;
             AssetLifecycleProbe lifecycle = null;
             void ObserveStage(string stage, Action action, bool cleanup = false)
@@ -655,6 +722,20 @@ namespace DesertRV.Editor
                 foreach (var sound in integration.sounds) sound.clip = MeasureAsset(sound.clip);
                 });
                 diagnostic.stage = "SAVED_BINDINGS"; ObserveStage("SAVED_BINDINGS", () => JourneyCandidateAssetIntegration.VerifyRestoredSavedContent(integration));
+                if (AndroidProducer(request))
+                {
+                    diagnostic.stage = "MATERIAL_DERIVATION";
+                    ObserveStage("MATERIAL_DERIVATION", () => { protectedRequest = DeriveWarmMaterial(request, requestHash); });
+                    dependencies = JourneyCandidatePreparation.DependencySnapshot(); MatchDependencies(dependencies, protectedRequest.expectedDependencies, diagnostic, request.expectedDependencies);
+                    diagnostic.stage = "DERIVED_BINDINGS";
+                    try
+                    {
+                        integration.savedInputs = integration.savedInputs.Select(MeasureAsset).ToArray();
+                        JourneyCandidateAssetIntegration.VerifyRestoredSavedContent(integration);
+                    }
+                    catch (Exception error) { throw new InvalidOperationException("JOURNEY_DERIVE_BINDINGS", error); }
+                    Debug.Log("JOURNEY_DERIVED_SAVED_BINDINGS_VERIFIED roots=5; rootBytesInherited=true; dependencyIdentity=currentDerived; authoring=false");
+                }
                 if (AndroidProducer(request)) { diagnostic.stage = "WORLD_HUD_CAPTURE"; JourneySceneAuthoring.CapturePreparedWorldHudObserved(lifecycle.Observe, lifecycle.BindCaptureGate); }
                 var outputs = integration.savedInputs.Select(p => new JourneyCandidateAssetIntegration.OutputFile { path = p.path, sha256 = Hash(p.path),
                     dependencyHash = AssetDatabase.GetAssetDependencyHash(p.path).ToString(), dependencySha256 = JourneyContentChecks.DependencySha256(p.path) }).ToArray();
@@ -662,6 +743,12 @@ namespace DesertRV.Editor
                     generatedReceiptSha256 = request.generatedReceiptSha256, sourceTransitionProof = request.sourceTransitionProof, requestSha256 = requestHash, unityVersion = Application.unityVersion,
                     sourceBytesUnchanged = true, originalAssetsUnchanged = true, structureValidated = true, productionApprovalRejected = true, approved = false, scopeReused = false,
                     scenes = outputs, dependencies = dependencies, grounding = grounding };
+                if (AndroidProducer(request))
+                {
+                    var derived = JsonUtility.FromJson<DerivedProof>(JsonUtility.ToJson(proof)); derived.schema = 2; derived.label = "DERIVED_JOURNEY_NATIVE_REVALIDATED_UNREVIEWED";
+                    derived.originalAssetsUnchanged = false; derived.originalBeforeAuthoringVerified = true; derived.exactMaterialDelta = true; derived.derivedBindingsValidated = true;
+                    derived.derivation = new FilePin { path = Prefix + DerivationPath, sha256 = Hash(DerivationPath) }; proof = derived;
+                }
             }
             catch (Exception error) { failures.Add(error); }
             finally
@@ -671,8 +758,8 @@ namespace DesertRV.Editor
                 try
                 {
                     ObserveStage("FINAL_PROTECTION", () => {
-                    VerifyInventory(request);
-                    if (dependenciesValidated) MatchDependencies(JourneyCandidatePreparation.DependencySnapshot(), request.expectedDependencies, diagnostic);
+                    VerifyInventory(protectedRequest);
+                    if (dependenciesValidated) MatchDependencies(JourneyCandidatePreparation.DependencySnapshot(), protectedRequest.expectedDependencies, diagnostic, request.expectedDependencies);
                     Check(Hash(InputPath) == requestHash && File.ReadAllText(Folder + "/restoration-input.sha256").Trim() == requestHash && !File.Exists(JourneyCandidatePreparation.Scope), "Restoration input or forbidden live scope changed.");
                     }, true);
                 }
@@ -682,7 +769,8 @@ namespace DesertRV.Editor
             if (failures.Count > 1) throw new AggregateException("Restoration revalidation failed, including source/state protection.", failures);
             Check(proof != null, "Native restoration produced no proof.");
             diagnostic.stage = "PROOF"; WriteFresh(ProofPath, proof);
-            Debug.Log("RESTORED_JOURNEY_NATIVE_REVALIDATED_UNREVIEWED: exact saved bytes, strict bindings, nine original floor rays and production rejection verified; fresh native XML still required.");
+            Debug.Log(AndroidProducer(request) ? "DERIVED_JOURNEY_NATIVE_REVALIDATED_UNREVIEWED: parent verified before one material derivation; current derived capture/closure passed; host post-exit bytes and native XML still required." :
+                "RESTORED_JOURNEY_NATIVE_REVALIDATED_UNREVIEWED: exact saved bytes, strict bindings, nine original floor rays and production rejection verified; fresh native XML still required.");
         }
     }
 }
