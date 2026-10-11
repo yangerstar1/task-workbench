@@ -1,0 +1,16 @@
+{
+  "name": "Lottery.Probe.Tests",
+  "references": [
+    "Lottery.Probe",
+    "Lottery.Probe.Editor",
+    "Unity.RenderPipelines.Universal.Runtime",
+    "Unity.RenderPipelines.Core.Runtime",
+    "Unity.InputSystem"
+  ],
+  "includePlatforms": [
+    "Editor"
+  ],
+  "optionalUnityReferences": [
+    "TestAssemblies"
+  ]
+}

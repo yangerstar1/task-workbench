@@ -1,0 +1,12 @@
+{
+  "name": "Lottery.Probe.Editor",
+  "references": [
+    "Lottery.Probe",
+    "Unity.RenderPipelines.Universal.Runtime",
+    "Unity.RenderPipelines.Core.Runtime",
+    "Unity.InputSystem"
+  ],
+  "includePlatforms": [
+    "Editor"
+  ]
+}

@@ -1,0 +1,6 @@
+{
+  "name": "Lottery.Probe",
+  "references": [
+    "Unity.InputSystem"
+  ]
+}

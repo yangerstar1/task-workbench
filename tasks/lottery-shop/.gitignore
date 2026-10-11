@@ -1,0 +1,15 @@
+unity/[Ll]ibrary/
+unity/[Tt]emp/
+unity/[Oo]bj/
+unity/[Ll]ogs/
+unity/[Uu]ser[Ss]ettings/
+unity/Assets/GeneratedProbe/
+unity/Assets/GeneratedProbe.meta
+unity/Assets/Resources/ProbeChinese.otf
+unity/Assets/Resources/ProbeChinese.otf.meta
+build/
+artifacts/
+*.csproj
+*.sln
+*.keystore
+*.ulf
