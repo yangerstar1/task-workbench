@@ -76,8 +76,8 @@
     },
     {
       "path": ".github/workflows/desert-rv-r3-natural-contact.yml",
-      "sha256": "d6aa729c9daddb73c688af10de2ca04b0a7fab0ed71bdaa1cd791bb34a8ebfa9",
-      "size": 8675
+      "sha256": "51f840656dd7a9a6d356cfd152f473edea483ef634c06845b0de93203b2a075b",
+      "size": 8681
     },
     {
       "path": ".github/workflows/desert-rv-rendered-smoke.yml",
@@ -496,13 +496,13 @@
     },
     {
       "path": "tasks/desert-rv/scripts/journey_r3_continuous_contact_report.py",
-      "sha256": "ea9b34c850efd396416c24212e76876c6e373d450e393fcef1c77c565ce6a871",
-      "size": 42650
+      "sha256": "42e3dcd2acfa32273197c0982357eb63d3299791aac246f9a679fb3da8734f34",
+      "size": 45558
     },
     {
       "path": "tasks/desert-rv/scripts/journey_r3_natural_contact_probe.py",
-      "sha256": "eaf08fbbf215ca78c7c00e08db29b3eb2397c38e33a70fbec49b0131dfb0fbed",
-      "size": 35172
+      "sha256": "e2f929ac049e572bdd051c97d366e443990d27c660c0ab3fa50b39565773aec4",
+      "size": 35924
     },
     {
       "path": "tasks/desert-rv/scripts/journey_rebuild_dispatch.py",
@@ -731,13 +731,13 @@
     },
     {
       "path": "tasks/desert-rv/scripts/test_journey_r3_continuous_contact_report.py",
-      "sha256": "ca535b4a1566b7905b938fed5a6331fabc9fc85be1ff86b2943754c5bb11ce77",
-      "size": 9023
+      "sha256": "7c9f59da155c69473d1548e4d4dd801a9377f2dd8ccc8a8ab9ee089ca5ab749c",
+      "size": 13589
     },
     {
       "path": "tasks/desert-rv/scripts/test_journey_r3_natural_contact_probe.py",
-      "sha256": "936899b303e7011c98d309558d2a8eaab747a7668aba09a00c774a683e72ff5f",
-      "size": 27893
+      "sha256": "51fc0aaf3af5d489993ca53e9300751b64f1f0206f76dc20cb935f9092fab0ac",
+      "size": 33170
     },
     {
       "path": "tasks/desert-rv/scripts/test_journey_rebuild_dispatch.py",

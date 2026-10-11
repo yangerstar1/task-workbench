@@ -110,6 +110,18 @@ class Boundaries(unittest.TestCase):
             safe=json.dumps(value)
             self.assertNotIn('hidden-secret',safe);self.assertNotIn('/github/private',safe);self.assertNotIn('/home/private',safe)
 
+    def test_unity_colon_stack_keeps_actual_paw_failure_as_failure(self):
+        xml=probe.ET.fromstring('<test-case><failure><message>[Error] POUNCER_PAW_CONTACT_FAILED: private event body</message><stack-trace>UnityEngine.Debug:LogError (object)\nDesertRV.PouncerPawContactConstraint:LateUpdate () (at Assets/DesertRV/Runtime/PouncerPawContactConstraint.cs:71)</stack-trace></failure></test-case>')
+        failure=probe.bounded_xml_failure(xml)
+        self.assertEqual(failure['assertionCodes'],['POUNCER_PAW_CONTACT_FAILED'])
+        self.assertEqual(failure['firstProjectStackFrame'],dict(method='DesertRV.PouncerPawContactConstraint.LateUpdate',sourceFile='Assets/DesertRV/Runtime/PouncerPawContactConstraint.cs',line=71))
+        self.assertNotIn('private event body',json.dumps(failure))
+
+    def test_preserves_owned_validator_code_without_arbitrary_exception_text(self):
+        self.assertEqual(probe.failure_code(ValueError('R3_CONTINUOUS_CLOSED_KEYS_BEAST')),'R3_CONTINUOUS_CLOSED_KEYS_BEAST')
+        for message in ('R3_CONTINUOUS_PRIVATE /home/account','R3_CONTINUOUS_BAD\nprivate','OtherError secret'):
+            self.assertEqual(probe.failure_code(ValueError(message)),'R3_NATURAL_CONTACT_EXCEPTION_VALUEERROR')
+
     def test_refuses_cleanup_without_matching_owner(self):
         with tempfile.TemporaryDirectory() as d:
             root=Path(d);copy_path=root/'journey-r3-natural-contact-project';copy_path.mkdir()
@@ -219,8 +231,9 @@ class ActualRunnerShellRoute(unittest.TestCase):
                 code,record=self.runner(self.source(),probe.REF,extra={key:value})
                 self.assertNotEqual(code,0);self.assertIsNone(record)
 
-    def test_prepared_producer_is_exact_parent_and_consumer_is_distinct(self):
-        self.assertEqual(probe.PRODUCER['commit'],probe.BASE)
+    def test_prepared_producer_is_separate_from_r1_consumer_parent(self):
+        self.assertEqual(probe.PRODUCER['commit'],probe.PRODUCTION_BASE)
+        self.assertNotEqual(probe.BASE,probe.PRODUCTION_BASE)
         self.assertEqual(probe.PRODUCER['runId'],38070456519)
         self.assertNotEqual(identity_fixture()[2],probe.PRODUCER['commit'])
 
@@ -263,7 +276,7 @@ class ExactCurrentProduction(unittest.TestCase):
             self.assertEqual(sum(r['kind']=='package' for r in result['dependencies']),24)
             self.assertEqual(result['dependencyChanges'],[])
             self.assertEqual(result['currentProductionCommit'],probe.PRODUCER['commit'])
-            self.assertEqual(result['producerCommit'],probe.BASE)
+            self.assertEqual(result['producerCommit'],probe.PRODUCTION_BASE)
             self.assertNotEqual(result['consumerCommit'],probe.BASE)
             self.assertEqual(receipt,original)
 
@@ -348,6 +361,50 @@ class OwnedCopyAndExport(unittest.TestCase):
         self.assertFalse(result['approved']);self.assertEqual(result['nativeOutcome'],'failure')
         self.assertNotIn(str(self.root),probe.REPORT.read_text())
         self.assertEqual({p.name for p in probe.EXPORT.iterdir()},{'report.json','consumer-SOURCE-STATE.json','consumer-input.json','source'})
+    def prepare_partial_report(self):
+        from test_journey_r3_continuous_contact_report import fixture
+        import journey_r3_continuous_contact_report as reports
+        native,expected,_,_=fixture()
+        self.expectation.update(producerCommit=probe.PRODUCER['commit'],producerRunId=str(probe.PRODUCER['runId']),dependencies=expected['dependencies'],dependencyChanges=[])
+        for base in reports.SOURCE_PATHS:
+            for name in (base,base+'.meta'):
+                path=self.project/name
+                if path.exists():continue
+                raw=b'public host fixture source';path.parent.mkdir(parents=True,exist_ok=True);path.write_bytes(raw)
+                self.rows.append(dict(path=probe.PREFIX+name,sha256=probe.sha(raw),size=len(raw)))
+        self.stage_fixture();owner=probe.load_owner()
+        pins={name:row['sha256'] for name,row in owner['union'].items()}
+        pins[probe.INPUT_REL]=owner['inputSha256']
+        pins[probe.INPUT_REL.replace('.json','.sha256')]=probe.sha(probe.file_bytes((self.copy/probe.INPUT_REL).with_suffix('.sha256')))
+        native.update(status='fixture-incomplete',consumerCommit=self.env['GITHUB_SHA'])
+        native['dependencyCheck']['inputSha256']=owner['inputSha256']
+        for row in native['sourceFiles']:row['sha256']=pins[row['path']]
+        native['sequences']=native['sequences'][:1];native['sequences'][0]['completed']=False;native['sequences'][0]['frames']=native['sequences'][0]['frames'][:5]
+        probe.ARTIFACTS.mkdir();(probe.ARTIFACTS/'result.xml').write_text(f'<test-run result="Failed" total="1" passed="0" failed="1" skipped="0" inconclusive="0"><test-case fullname="{probe.TEST}" result="Failed"><failure><message>POUNCER_PAW_CONTACT_FAILED</message><stack-trace>DesertRV.PouncerPawContactConstraint:LateUpdate () (at Assets/DesertRV/Runtime/PouncerPawContactConstraint.cs:71)</stack-trace></failure></test-case></test-run>')
+        return native
+
+    def test_partial_original_bytes_export_but_native_failure_still_fails(self):
+        native=self.prepare_partial_report();raw=(json.dumps(native,indent=1)+'\n').encode();(self.copy/probe.RAW_REL).write_bytes(raw)
+        with mock.patch.object(probe,'dispatch'),mock.patch.object(probe.source,'verify_source_state'),mock.patch.object(probe,'git',return_value=b''):
+            self.assertEqual(probe.finish(),2)
+        result=probe.read(probe.REPORT)
+        self.assertEqual(result['status'],'FAILED_OR_PARTIAL_DIAGNOSTIC_NOT_GAMEPLAY_ACCEPTANCE')
+        self.assertEqual(result['xml']['result'],'Failed');self.assertEqual(result['nativeOutcome'],'failure')
+        self.assertFalse(result['nativeSummary']['diagnosticComplete']);self.assertEqual(result['nativeSummary']['observedFrames'],5)
+        self.assertEqual((probe.EXPORT/'native-r3-continuous-contact.json').read_bytes(),raw)
+        self.assertIn('diagnostic_complete=false',(self.root/'output').read_text())
+
+    def test_unsafe_partial_is_not_exported_and_rejection_context_is_bounded(self):
+        native=self.prepare_partial_report();native['sequences'][0]['frames'][2]['motor']['privateExtra']='/private/account/secret'
+        (self.copy/probe.RAW_REL).write_text(json.dumps(native))
+        with mock.patch.object(probe,'dispatch'),mock.patch.object(probe.source,'verify_source_state'),mock.patch.object(probe,'git',return_value=b''):
+            self.assertEqual(probe.finish(),2)
+        result=probe.read(probe.REPORT);reason=result['nativeReportRejection']
+        self.assertIsNone(result['nativeReport']);self.assertFalse((probe.EXPORT/'native-r3-continuous-contact.json').exists())
+        self.assertEqual(reason['code'],'R3_CONTINUOUS_CLOSED_KEYS_MOTOROBSERVATION')
+        self.assertEqual(reason['location'],'$.sequences[0].frames[2].motor.<unknown>');self.assertEqual(len(reason['valueSha256']),64)
+        self.assertNotIn('/private/account',probe.REPORT.read_text());self.assertNotIn('privateExtra',probe.REPORT.read_text())
+
     def test_stage_failure_still_checks_formal_source_without_owner(self):
         with mock.patch.object(probe,'dispatch'),mock.patch.object(probe.source,'verify_source_state'),mock.patch.object(probe,'git',return_value=b''):
             self.assertEqual(probe.finish(),2)

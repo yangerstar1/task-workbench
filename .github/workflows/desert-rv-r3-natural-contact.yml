@@ -2,12 +2,12 @@ name: Desert RV bounded R3 continuous AI contact diagnostic
 on:
   push:
     branches: [journey-r3-natural-contact-probe-9dd]
-    paths: [.github/dispatch/desert-rv-r3-natural-contact-9dd-20261010.json]
+    paths: [.github/dispatch/desert-rv-r3-natural-contact-9dd-r1-20261010.json]
 permissions:
   contents: read
   actions: read
 concurrency:
-  group: desert-rv-r3-natural-contact-9dd-once
+  group: desert-rv-r3-natural-contact-9dd-r1-once
   cancel-in-progress: false
 jobs:
   diagnose:

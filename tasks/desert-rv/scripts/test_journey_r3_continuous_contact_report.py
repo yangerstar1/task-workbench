@@ -99,4 +99,66 @@ class Boundaries(unittest.TestCase):
         f=self.value['sequences'][2]['frames'][-1];f['status']='Failed';f['vehicleHealthAfter']=0;f['motor']['throttle']=0
         self.assertTrue(self.verify()['diagnosticComplete'])
 
+class PartialBoundaries(unittest.TestCase):
+    def setUp(self):
+        self.value,self.expected,self.digest,self.pins=fixture()
+        self.value['status']='fixture-incomplete'
+        self.value['sequences']=self.value['sequences'][:2]
+        self.value['sequences'][-1]['completed']=False
+        self.value['sequences'][-1]['frames']=self.value['sequences'][-1]['frames'][:251]
+    def verify(self): return verify_native_report(self.value,self.expected,self.digest,self.pins)
+    def test_exact_partial_prefix_preserves_observation_without_full_case_pass(self):
+        result=self.verify()
+        self.assertFalse(result['diagnosticComplete']);self.assertFalse(result['gameplayAccepted'])
+        self.assertEqual(result['status'],'FAILED_PARTIAL_OBSERVATION_NOT_ACCEPTANCE')
+        self.assertEqual(result['observedFrames'],491);self.assertEqual(result['expectedFrames'],1212)
+        self.assertEqual([s['completed'] for s in result['sequences']],[True,False])
+    def test_empty_recorded_prefix_is_explicitly_partial(self):
+        self.value['sequences']=[]
+        result=self.verify();self.assertEqual(result['observedFrames'],0);self.assertFalse(result['diagnosticComplete'])
+    def test_partial_cleanup_failure_stays_false_and_visible(self):
+        self.value['timeRestored']=False;self.value['sourceFilesUnchanged']=False
+        result=self.verify();self.assertFalse(result['cleanup']['timeRestored']);self.assertFalse(result['diagnosticComplete'])
+    def test_recorded_observer_exception_remains_partial_failure(self):
+        self.value['failureCode']='OBSERVER_NullReferenceException'
+        result=self.verify();self.assertEqual(result['failureCode'],'OBSERVER_NullReferenceException');self.assertFalse(result['diagnosticComplete'])
+    def test_partial_does_not_allow_extra_sequence_or_nonprefix_frames(self):
+        self.value['sequences'][0]['completed']=False
+        with self.assertRaisesRegex(ValueError,'PARTIAL_SEQUENCE_ORDER'):self.verify()
+        self.value['sequences'][0]['completed']=True
+        self.value['sequences'][-1]['frames'].pop(5)
+        with self.assertRaises(ValueError):self.verify()
+    def test_partial_completed_sequence_cannot_hide_missing_frames(self):
+        self.value['sequences'][-1]['completed']=True
+        with self.assertRaisesRegex(ValueError,'FRAME_COUNT'):self.verify()
+    def test_partial_unknown_nested_field_has_safe_location_and_value_hash(self):
+        self.value['sequences'][1]['frames'][3]['motor']['privateAccountName']='private account body'
+        with self.assertRaises(ValueError) as caught:self.verify()
+        error=caught.exception
+        self.assertEqual(str(error),'R3_CONTINUOUS_CLOSED_KEYS_MOTOROBSERVATION')
+        self.assertEqual(error.report_location,'$.sequences[1].frames[3].motor.<unknown>')
+        self.assertEqual(len(error.value_sha256),64)
+        self.assertNotIn('private',error.report_location)
+    def test_partial_private_path_has_exact_field_and_no_raw_value(self):
+        self.value['colliders']=[complete(dict(id=1,instanceId=100,path='/home/account/secret',type='MeshCollider',role='world',scene=''),'ColliderIdentity')]
+        with self.assertRaises(ValueError) as caught:self.verify()
+        error=caught.exception
+        self.assertEqual(str(error),'R3_CONTINUOUS_COLLIDER_PATH');self.assertEqual(error.report_location,'$.colliders[0].path')
+        self.assertEqual(error.value_sha256,hashlib.sha256(json.dumps('/home/account/secret',separators=(',',':')).encode()).hexdigest())
+    def test_partial_bad_field_type_and_nonfinite_have_precise_locations(self):
+        self.value['sequences'][1]['frames'][3]['dt']='secret'
+        with self.assertRaises(ValueError) as caught:self.verify()
+        self.assertEqual(caught.exception.report_location,'$.sequences[1].frames[3].dt')
+        self.value['sequences'][1]['frames'][3]['dt']=float('nan')
+        with self.assertRaises(ValueError) as caught:self.verify()
+        self.assertEqual(str(caught.exception),'R3_CONTINUOUS_NONFINITE');self.assertEqual(caught.exception.report_location,'$.sequences[1].frames[3].dt')
+        self.value['sequences'][1]['frames'][3]['dt']=1/30
+        self.value['sequences'][1]['frames'][3]['beforeAI']['x']=float('nan')
+        with self.assertRaises(ValueError) as caught:self.verify()
+        self.assertEqual(caught.exception.report_location,'$.sequences[1].frames[3].beforeAI.x')
+    def test_complete_claim_cannot_use_partial_relaxations(self):
+        self.value['status']='completed'
+        with self.assertRaises(ValueError):self.verify()
+
+
 if __name__=='__main__': unittest.main()

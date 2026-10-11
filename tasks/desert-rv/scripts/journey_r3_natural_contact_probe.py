@@ -24,15 +24,16 @@ from journey_keyboard_look_native import file_bytes, raw_pin, safe_path, protect
 from strict_output import verify_staged_inventory
 import generated_export as generated
 
-BASE = '9dd81678b649ac7a13eb7e47354afeaf62acf323'
+BASE = '162d610e9bfd1fbdc7a149fccd5138148d7a92cb'
+PRODUCTION_BASE = '9dd81678b649ac7a13eb7e47354afeaf62acf323'
 BRANCH = 'journey-r3-natural-contact-probe-9dd'
 REF = 'refs/heads/' + BRANCH
 REPOSITORY = 'yangerstar1/task-workbench'
 OWNER_NAME = 'yangerstar1'
 WORKFLOW = '.github/workflows/desert-rv-r3-natural-contact.yml'
-REQUEST = '.github/dispatch/desert-rv-r3-natural-contact-9dd-20261010.json'
-NONCE = 'desert-rv-r3-natural-contact-9dd-20261010-once'
-PRODUCER = dict(commit=BASE, runId=38070456519,
+REQUEST = '.github/dispatch/desert-rv-r3-natural-contact-9dd-r1-20261010.json'
+NONCE = 'desert-rv-r3-natural-contact-9dd-r1-20261010-once'
+PRODUCER = dict(commit=PRODUCTION_BASE, runId=38070456519,
     artifactId=11677987684, artifactName='journey-preparation-UNREVIEWED-38070456519-1',
     artifactBytes=19823499, artifactSha256='4050e0b700fcfe6f1cdaafebdc06ff4ab6c8bc7561a3fdd801c61e9b3294c15b',
     sourceStateSha256='e67aa315cef1dc2051ef25b1040162cbdb8c807a5b8c127efdced43a47ed44c3',
@@ -55,7 +56,7 @@ REPORT = EXPORT / 'report.json'
 SNAPSHOT_SOURCES = tuple('Assets/DesertRV/' + name for name in (
     'Runtime/JourneyMotor.cs', 'Runtime/BeastActor.cs', 'Runtime/JourneyDirector.cs',
     'Runtime/JourneySession.cs', 'Runtime/MobileInputAdapter.cs',
-    'Runtime/JourneyActions.cs', 'Runtime/JourneyActions.Geometry.cs',
+    'Runtime/JourneyActions.cs', 'Runtime/JourneyActions.Geometry.cs', 'Runtime/PouncerPawContactConstraint.cs',
     'Tests/PlayMode/JourneyR3ContinuousContactTests.cs'))
 TEST = 'DesertRV.Tests.JourneyR3ContinuousContactTests.RealR3_ContinuousAIAndStaticControl'
 SOURCE_NAME = 'tasks/desert-rv/SOURCE-STATE.json'
@@ -69,8 +70,7 @@ CHANGED_FILES = {WORKFLOW, REQUEST, SOURCE_NAME,
     'tasks/desert-rv/scripts/test_journey_r3_natural_contact_probe.py',
     'tasks/desert-rv/scripts/journey_r3_continuous_contact_report.py',
     'tasks/desert-rv/scripts/test_journey_r3_continuous_contact_report.py',
-    'tasks/desert-rv/scripts/prepare_runner.sh', 'tasks/desert-rv/scripts/verify_evidence.py',
-    *(PREFIX + name for name in TEST_ADDITIONS)}
+}
 
 
 def require(ok, code):
@@ -80,7 +80,7 @@ def require(ok, code):
 
 def failure_code(error):
     # Exact owned diagnostic codes only; never disclose arbitrary exception text.
-    if type(error) is ValueError and re.fullmatch(r'R3_NATURAL_CONTACT_[A-Z0-9_]{1,96}', str(error)):
+    if type(error) is ValueError and re.fullmatch(r'(?:R3_NATURAL_CONTACT|R3_CONTINUOUS)_[A-Z0-9_]{1,96}', str(error)):
         return str(error)
     name = type(error).__name__
     allowed = {'ValueError','StrictError','FileNotFoundError','PermissionError','OSError','KeyError','TypeError','TimeoutExpired','CalledProcessError'}
@@ -386,17 +386,17 @@ def bounded_xml_failure(case):
     exceptions = ('NullReferenceException', 'MissingMethodException', 'MissingFieldException',
         'TypeLoadException', 'TargetInvocationException', 'AssertionException', 'FileNotFoundException',
         'ArgumentException', 'InvalidOperationException', 'TimeoutException', 'IndexOutOfRangeException',
-        'KeyNotFoundException', 'NotSupportedException')
+        'KeyNotFoundException', 'NotSupportedException', 'UnhandledLogMessageException')
     codes = ('ACTUAL_CAPSULE_SHAPE', 'CLEANUP_OR_SOURCE_MUTATION', 'DELTA_BOUND',
         'DEPENDENCY_BYTES_DIFFER', 'DIRECTOR_OWNER', 'EXACTLY_ONE_OBSERVED_FRAME_PER_YIELD',
         'FIRST_WAVE_TWO_POUNCERS', 'FOREIGN_COLLIDER', 'FOREIGN_DIRECTOR', 'OBSERVER_ORDER',
-        'PIN_MISSING', 'PRODUCTION_BIND_R3', 'SOURCE_ALREADY_LOADED')
+        'PIN_MISSING', 'PRODUCTION_BIND_R3', 'SOURCE_ALREADY_LOADED', 'POUNCER_PAW_CONTACT_FAILED')
     frame = None
     for line in stacks.splitlines():
-        match = re.match(r'^\s*(?:at )?(DesertRV\.[A-Za-z0-9_.+<>`]{1,220})\s*\(', line)
+        match = re.match(r'^\s*(?:at )?(DesertRV\.[A-Za-z0-9_.+<>`:]{1,220})\s*\(', line)
         if not match:
             continue
-        frame = dict(method=match[1], sourceFile=None, line=None)
+        frame = dict(method=match[1].replace(':', '.'), sourceFile=None, line=None)
         for name in SNAPSHOT_SOURCES:
             location = re.search(r'(?:/|\\)' + re.escape(Path(name).name) + r':(?:line )?([1-9][0-9]{0,5})(?:\D|$)', line)
             if location:
@@ -467,7 +467,7 @@ def finish():
         approved=False, gameplayReviewed=False, scopeReusable=False,
         nativeOutcome=os.environ.get('NATIVE_OUTCOME','unknown'), sourceUnchanged=False,
         isolatedInputsVerified=False, inputUnchanged=False, xml=None, nativeReport=None,
-        nativeSummary=None, settings=None, changes=[], sourceSnapshots=[], checks=[])
+        nativeSummary=None, nativeReportRejection=None, settings=None, changes=[], sourceSnapshots=[], checks=[])
     require(value['nativeOutcome'] in {'success','failure','cancelled','skipped','unknown'}, 'OUTCOME')
     safe_path(EXPORT); require(not EXPORT.exists(), 'EXPORT_EXISTS')
     EXPORT.mkdir(mode=0o700)
@@ -514,7 +514,14 @@ def finish():
             # Keep the validated original bytes, never turn a host fixture into native evidence.
             with (EXPORT / 'native-r3-continuous-contact.json').open('xb') as stream: stream.write(raw)
         except Exception as error:
-            value['checks'].extend(('BOUNDED_ORIGINAL_NATIVE_REPORT_UNAVAILABLE', failure_code(error)))
+            code = failure_code(error)
+            value['nativeReportRejection'] = dict(code=code)
+            location = getattr(error, 'report_location', None)
+            digest = getattr(error, 'value_sha256', None)
+            if (type(location) is str and re.fullmatch(r'\$(?:\.[A-Za-z][A-Za-z0-9_]*|\.[<]unknown[>]|\[[0-9]{1,4}\]){0,32}', location) and
+                    type(digest) is str and re.fullmatch('[a-f0-9]{64}', digest)):
+                value['nativeReportRejection'].update(location=location, valueSha256=digest)
+            value['checks'].extend(('BOUNDED_ORIGINAL_NATIVE_REPORT_UNAVAILABLE', code))
     snapshots = [
         ('producer-SOURCE-STATE.json', PRIVATE / 'producer-SOURCE-STATE.json', PRODUCER['sourceStateSha256']),
         ('producer-generated-receipt.json', PRIVATE / 'prepared-input/generated/receipt.json', PRODUCER['generatedReceiptSha256']),
@@ -539,6 +546,8 @@ def finish():
         value['xml'] is not None and value['xml']['result'] == 'Passed' and value['nativeOutcome'] == 'success' and
         value['nativeSummary'] is not None and value['nativeSummary']['diagnosticComplete'] and not value['checks'])
     if complete: value['status'] = 'DIAGNOSTIC_COMPLETED_NOT_GAMEPLAY_ACCEPTANCE'
+    elif value['nativeReport'] is not None:
+        value['status'] = 'FAILED_OR_PARTIAL_DIAGNOSTIC_NOT_GAMEPLAY_ACCEPTANCE'
     write_new(REPORT, value)
     output('report_ready=true'); output('diagnostic_complete=' + str(complete).lower())
     return 0 if complete else 2
