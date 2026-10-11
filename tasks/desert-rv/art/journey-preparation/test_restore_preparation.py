@@ -185,7 +185,7 @@ class DiagnosticExportTests(unittest.TestCase):
   self.assertEqual(1,native['with']['customParameters'].count('-journeyRestorationRunId'));self.assertIn('-journeyRestorationRunId ${{ github.run_id }}',native['with']['customParameters'])
   linux=next(s for s in steps if s.get('id')=='linux_native')['run'];self.assertIn('--env GITHUB_SHA --env GITHUB_RUN_ID --env GITHUB_RUN_ATTEMPT',linux)
  def test_same_prefix_unknown_error_and_stage_rejected(self):
-  for key,val in [('stage','PRIVATE'),('errorClass','STACKTRACE')]:
+  for key,val in [('stage','PRIVATE'),('errorClass','STACKTRACE'),('errorClass','CACHE_UNKNOWN')]:
    changed=dict(self.value,**{key:val})
    with self.assertRaisesRegex(Exception,'DIAGNOSTIC_SCHEMA'):r.bounded_native_diagnostic(changed)
 
@@ -204,8 +204,10 @@ class AssetLifecycleDiagnosticTests(unittest.TestCase):
  def test_lifecycle_preserves_two_objects_one_path_and_unobserved_is_not_clean(self):
   retained=dict(self.first,transition='RETAINED');unloaded=dict(self.second,dirty='NOT_OBSERVED',transition='UNOBSERVED')
   self.value['assetLifecycle'].append(self.snapshot(1,'CAPTURE_ENTRY',[retained],unobserved=[unloaded]))
-  r.DIAGNOSTIC.write_text(json.dumps(self.value));receipt=r.diagnose()
-  self.assertFalse(receipt['buildReady']);self.assertEqual(1,len(receipt['files']));self.assertEqual(self.value,json.loads((r.EXPORT/'native-diagnostic.json').read_text()))
+  for code in ('DIRTY_DEPENDENCY', 'CACHE_PACKAGE_IDENTITY', 'CACHE_ASSET_BYTES', 'CACHE_META_BYTES', 'CACHE_SUBASSET_RELATION', 'CACHE_FONT_NOT_LOADED', 'CACHE_FONT_IDENTITY', 'CACHE_FONT_NOT_DYNAMIC', 'CACHE_FONT_ATLAS_LINK'):
+   with self.subTest(errorClass=code),mock.patch.object(r,'EXPORT',self.root/code):
+    self.value['errorClass']=code;r.DIAGNOSTIC.write_text(json.dumps(self.value));receipt=r.diagnose()
+    self.assertFalse(receipt['buildReady']);self.assertEqual(1,len(receipt['files']));self.assertEqual(self.value,json.loads((r.EXPORT/'native-diagnostic.json').read_text()))
  def test_lifecycle_can_report_cleared_only_as_observed_clean(self):
   cleared=[dict(x,dirty='CLEAN',transition='CLEARED') for x in (self.first,self.second)]
   self.value['assetLifecycle'].append(self.snapshot(1,'CAPTURE_ENTRY',cleared=cleared));r.bounded_native_diagnostic(self.value)

@@ -142,7 +142,7 @@ namespace DesertRV.Editor
             var protectedFiles = SnapshotProtectedFiles(true);
             var dependencies = new HashSet<string>(AssetDatabase.GetDependencies(
                 new[] { BootstrapPath, ManifestPath }.Concat(RegionPaths).ToArray(), true), StringComparer.Ordinal);
-            var dirtyAssets = DirtyPersistentCaptureAssets(dependencies);
+            var dirtyAssets = DirtyPersistentCaptureAssets(dependencies, out _, out _, out _);
             bindCaptureGate?.Invoke(new HashSet<string>(dependencies, StringComparer.Ordinal));
             ObserveCaptureStep(observe, "CAPTURE_GATE", () => CheckCaptureAssetLifecycle(dependencies, dirtyAssets, "before"));
             int captured = 0;
@@ -204,31 +204,142 @@ namespace DesertRV.Editor
             if (errors.Count == 1) System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(errors[0]).Throw();
             if (errors.Count > 1) throw new AggregateException("World capture operation and lifecycle observation failed; primary first.", errors);
         }
-        static HashSet<string> DirtyPersistentCaptureAssets(HashSet<string> dependencies)
+        sealed class CaptureCachePin
+        {
+            public string path, type, guid, assetSha256, metaSha256, packageName, packageVersion, classification;
+            public long localId, assetBytes, metaBytes;
+        }
+        // Exact objects observed in run 38144199976, with immutable producer 38135035401 bytes.
+        // Unity's shader compilation cache and dynamic Font atlas are generated engine state;
+        // this is not a general exemption for dirty Shader, Texture2D, Material or importer assets.
+        static readonly CaptureCachePin[] CaptureCachePins = {
+            new CaptureCachePin { path = "Assets/DesertRV/UI/Fonts/NotoSansCJKsc-Regular.otf", type = "UnityEngine.Texture2D", guid = "43a8f4976b2571d50b5bff0508efaab7", localId = 2800000, assetSha256 = "a6a530f3e7e7a2c299470c42efff2e109fcc0a5be92686b96d5e84a05f3ecb2b", assetBytes = 16437340, metaSha256 = "e4c83478e2ad31187b1c6dd2cce61e2630c06b57c4e5727c6303af491718d09e", metaBytes = 481, packageName = "", packageVersion = "", classification = "DYNAMIC_FONT_ATLAS_CACHE" },
+            new CaptureCachePin { path = "Packages/com.unity.render-pipelines.universal/Shaders/Lit.shader", type = "UnityEngine.Shader", guid = "933532a4fcc9baf4fa0491de14d08ed7", localId = 4800000, assetSha256 = "6f4648b6b5271132cfed1d7d7c771ba0a73ef7972470d6694047804d259c0997", assetBytes = 22877, metaSha256 = "f0db005307ffe5480c40a402ca5bfb0b3726259031a86e255e49626228ceb008", metaBytes = 217, packageName = "com.unity.render-pipelines.universal", packageVersion = "17.3.0", classification = "OFFICIAL_URP_SHADER_CACHE" },
+            new CaptureCachePin { path = "Packages/com.unity.render-pipelines.universal/Shaders/Particles/ParticlesSimpleLit.shader", type = "UnityEngine.Shader", guid = "8516d7a69675844a7a0b7095af7c46af", localId = 4800000, assetSha256 = "5bd621c3363a1eba55fdd9e3594b16116ede25d883e3717d80d58be2dcbe9bb5", assetBytes = 19403, metaSha256 = "06e436bf99c1e986f57625313f6c3320e92908c0acc671bf0afa8f9a42a739d0", metaBytes = 204, packageName = "com.unity.render-pipelines.universal", packageVersion = "17.3.0", classification = "OFFICIAL_URP_SHADER_CACHE" },
+            new CaptureCachePin { path = "Packages/com.unity.render-pipelines.universal/Shaders/Particles/ParticlesUnlit.shader", type = "UnityEngine.Shader", guid = "0406db5a14f94604a8c57ccfbc9f3b46", localId = 4800000, assetSha256 = "1cd8356cf8cb67f065b7d2f67b071190a675a98c8cdea5a45028c0cb3c9e1e18", assetBytes = 12430, metaSha256 = "122a44759a8ca196415d39727a270c5554553e8270b0cd7871cc45939cd996a4", metaBytes = 217, packageName = "com.unity.render-pipelines.universal", packageVersion = "17.3.0", classification = "OFFICIAL_URP_SHADER_CACHE" },
+            new CaptureCachePin { path = "Packages/com.unity.render-pipelines.universal/Shaders/Unlit.shader", type = "UnityEngine.Shader", guid = "650dd9526735d5b46b79224bc6e94025", localId = 4800000, assetSha256 = "37ef434d3bd626d59f2aa813fed56850eab15e3b759c2399212f2cc1a4d08964", assetBytes = 11416, metaSha256 = "367956a85cb4183e5f8afd33b78f3a048fe08d5767e42e11b4b127b780acfaf2", metaBytes = 195, packageName = "com.unity.render-pipelines.universal", packageVersion = "17.3.0", classification = "OFFICIAL_URP_SHADER_CACHE" },
+        };
+        // Pure predicate used by the existing single restoration case's positive/negative checks.
+        internal static string ClassifyPinnedCaptureCache(string path, string type, string guid, long localId,
+            string assetSha256, long assetBytes, string metaSha256, long metaBytes, string packageName,
+            string packageVersion, bool dynamicFontAtlasOwner, bool isSubAsset)
+        {
+            var pin = CaptureCachePins.SingleOrDefault(p => p.path == path && p.type == type && p.guid == guid && p.localId == localId);
+            if (pin == null || pin.assetSha256 != assetSha256 || pin.assetBytes != assetBytes || pin.metaSha256 != metaSha256 ||
+                pin.metaBytes != metaBytes || pin.packageName != packageName || pin.packageVersion != packageVersion)
+                return "AUTHORING_OR_UNKNOWN";
+            if (pin.classification == "DYNAMIC_FONT_ATLAS_CACHE" && (!dynamicFontAtlasOwner || !isSubAsset) ||
+                pin.classification == "OFFICIAL_URP_SHADER_CACHE" && isSubAsset) return "AUTHORING_OR_UNKNOWN";
+            return pin.classification;
+        }
+        static bool ExactCaptureCacheFile(string physical, string digest, long bytes)
+        {
+            try
+            {
+                string root = Path.GetFullPath(".").TrimEnd(Path.DirectorySeparatorChar), full = Path.GetFullPath(physical);
+                if (!full.StartsWith(root + Path.DirectorySeparatorChar, StringComparison.Ordinal)) return false;
+                for (string current = full; current != root; current = Path.GetDirectoryName(current))
+                    if ((File.GetAttributes(current) & FileAttributes.ReparsePoint) != 0) return false;
+                return new FileInfo(full).Length == bytes && HashFile(full) == digest;
+            }
+            catch (IOException) { return false; }
+            catch (UnauthorizedAccessException) { return false; }
+        }
+        static string CaptureDirtyClassification(Object asset, string path, string guid, long localId, out string knownGuid, out string reason)
+        {
+            const string blocked = "AUTHORING_OR_UNKNOWN";
+            knownGuid = "UNRECOGNIZED"; reason = "UNRECOGNIZED_OBJECT";
+            var pin = CaptureCachePins.SingleOrDefault(p => p.path == path && p.type == asset.GetType().FullName && p.guid == guid && p.localId == localId);
+            if (pin == null) return blocked;
+            knownGuid = pin.guid;
+            string physical = path, packageName = "", packageVersion = "";
+            if (path.StartsWith("Packages/", StringComparison.Ordinal))
+            {
+                var package = UnityEditor.PackageManager.PackageInfo.FindForAssetPath(path);
+                Debug.Log("JOURNEY_WORLD_HUD_CACHE_PACKAGE guid=" + pin.guid + "; packageFound=" + (package != null) +
+                    "; packageNameMatched=" + (package != null && package.name == pin.packageName) + "; packageVersionMatched=" + (package != null && package.version == pin.packageVersion));
+                if (package == null || package.name != pin.packageName || package.version != pin.packageVersion)
+                { reason = "PACKAGE_IDENTITY"; return blocked; }
+                packageName = package.name; packageVersion = package.version;
+                physical = Path.Combine(package.resolvedPath, path.Substring(("Packages/" + package.name + "/").Length));
+            }
+            bool assetPinMatched = ExactCaptureCacheFile(physical, pin.assetSha256, pin.assetBytes);
+            bool metaPinMatched = ExactCaptureCacheFile(physical + ".meta", pin.metaSha256, pin.metaBytes);
+            Debug.Log("JOURNEY_WORLD_HUD_CACHE_BYTES guid=" + pin.guid + "; assetPinMatched=" + assetPinMatched + "; metaPinMatched=" + metaPinMatched);
+            if (!assetPinMatched) { reason = "ASSET_BYTES"; return blocked; }
+            if (!metaPinMatched) { reason = "META_BYTES"; return blocked; }
+            bool isSubAsset = AssetDatabase.IsSubAsset(asset), atlasOwner = false;
+            Debug.Log("JOURNEY_WORLD_HUD_CACHE_SUBASSET guid=" + pin.guid + "; isSubAsset=" + isSubAsset + "; expectedSubAsset=" + (pin.classification == "DYNAMIC_FONT_ATLAS_CACHE"));
+            if (isSubAsset != (pin.classification == "DYNAMIC_FONT_ATLAS_CACHE")) { reason = "SUBASSET_RELATION"; return blocked; }
+            if (pin.classification == "DYNAMIC_FONT_ATLAS_CACHE")
+            {
+                int loadedFontCount = 0; long observedOwnerId = 0;
+                bool identityAvailable = false, identity = false, dynamicChecked = false, fontDynamic = false, atlasChecked = false;
+                foreach (var font in Resources.FindObjectsOfTypeAll<Font>())
+                {
+                    if (!font || !EditorUtility.IsPersistent(font) || AssetDatabase.GetAssetPath(font) != path) continue;
+                    loadedFontCount++;
+                    if (!AssetDatabase.TryGetGUIDAndLocalFileIdentifier(font, out string ownerGuid, out long ownerId)) continue;
+                    identityAvailable = true; observedOwnerId = ownerId;
+                    if (ownerGuid != guid || ownerId != 12800000) continue;
+                    identity = true;
+                    dynamicChecked = true; fontDynamic = font.dynamic;
+                    if (!fontDynamic) continue;
+                    var material = font.material; atlasChecked = true;
+                    if (material && material.mainTexture == asset) { atlasOwner = true; break; }
+                }
+                Debug.Log("JOURNEY_WORLD_HUD_FONT_CACHE_OWNER guid=" + pin.guid + "; loadedFontCount=" + loadedFontCount +
+                    "; ownerIdentityAvailable=" + identityAvailable + "; observedOwnerLocalId=" + observedOwnerId + "; ownerIdentityMatched=" + identity +
+                    "; dynamicChecked=" + dynamicChecked + "; fontDynamic=" + fontDynamic + "; atlasLinkChecked=" + atlasChecked + "; atlasLinked=" + atlasOwner);
+                if (!atlasOwner)
+                { reason = loadedFontCount == 0 ? "FONT_NOT_LOADED" : !identity ? "FONT_IDENTITY" : !fontDynamic ? "FONT_NOT_DYNAMIC" : "FONT_ATLAS_LINK"; return blocked; }
+            }
+            reason = "ALLOW";
+            return ClassifyPinnedCaptureCache(path, asset.GetType().FullName, guid, localId, pin.assetSha256, pin.assetBytes,
+                pin.metaSha256, pin.metaBytes, packageName, packageVersion, atlasOwner, isSubAsset);
+        }
+        static HashSet<string> DirtyPersistentCaptureAssets(HashSet<string> dependencies, out int shaderCaches, out int fontAtlasCaches, out string rejectionCode)
         {
             var result = new HashSet<string>(StringComparer.Ordinal);
+            shaderCaches = 0; fontAtlasCaches = 0; rejectionCode = null;
             foreach (var asset in Resources.FindObjectsOfTypeAll<Object>())
-                if (asset && EditorUtility.IsPersistent(asset) && dependencies.Contains(AssetDatabase.GetAssetPath(asset)) && EditorUtility.IsDirty(asset) &&
-                    AssetDatabase.TryGetGUIDAndLocalFileIdentifier(asset, out string guid, out long localId))
+            {
+                if (!asset || !EditorUtility.IsPersistent(asset) || !dependencies.Contains(AssetDatabase.GetAssetPath(asset)) || !EditorUtility.IsDirty(asset)) continue;
+                string path = AssetDatabase.GetAssetPath(asset);
+                if (!AssetDatabase.TryGetGUIDAndLocalFileIdentifier(asset, out string guid, out long localId))
+                {
+                    Debug.Log("JOURNEY_WORLD_HUD_DIRTY_CLASSIFICATION guid=UNRECOGNIZED; classification=AUTHORING_OR_UNKNOWN; reason=IDENTITY_UNAVAILABLE");
+                    result.Add("UNRESOLVED:" + asset.GetInstanceID()); continue;
+                }
+                string classification = CaptureDirtyClassification(asset, path, guid, localId, out string knownGuid, out string reason);
+                Debug.Log("JOURNEY_WORLD_HUD_DIRTY_CLASSIFICATION guid=" + knownGuid + "; classification=" + classification + "; reason=" + reason);
+                if (classification == "OFFICIAL_URP_SHADER_CACHE") shaderCaches++;
+                else if (classification == "DYNAMIC_FONT_ATLAS_CACHE") fontAtlasCaches++;
+                else
+                {
                     result.Add(guid + ":" + localId);
+                    if (knownGuid != "UNRECOGNIZED" && rejectionCode == null) rejectionCode = "JOURNEY_WORLD_HUD_CACHE_" + reason;
+                }
+            }
             return result;
         }
         static void CheckCaptureAssetLifecycle(HashSet<string> dependencies, HashSet<string> before, string phase)
         {
-            var dirty = DirtyPersistentCaptureAssets(dependencies);
+            var dirty = DirtyPersistentCaptureAssets(dependencies, out int shaderCaches, out int fontAtlasCaches, out string rejectionCode);
             int added = dirty.Count(id => !before.Contains(id));
             // This exact generated material had an earlier, separate render-lifecycle regression.
             // Observe its loaded state without loading, changing keywords, or saving it.
             var sample = Resources.FindObjectsOfTypeAll<Material>().FirstOrDefault(m =>
                 AssetDatabase.GetAssetPath(m) == Folder + "/Layout-FFC261.mat");
-            Debug.Log("JOURNEY_WORLD_HUD_ASSET_LIFECYCLE phase=" + phase + "; dirtyDependencyAssets=" + dirty.Count +
+            Debug.Log("JOURNEY_WORLD_HUD_ASSET_LIFECYCLE phase=" + phase + "; dirtyDependencyAssets=" + (dirty.Count + shaderCaches + fontAtlasCaches) +
+                "; protectedDirtyAssets=" + dirty.Count + "; officialShaderCaches=" + shaderCaches + "; dynamicFontAtlasCaches=" + fontAtlasCaches +
                 "; newlyDirty=" + added + "; trackedMaterialLoaded=" + (sample ? "true" : "false") +
                 "; trackedMaterialDirty=" + (sample && EditorUtility.IsDirty(sample) ? "true" : "false") +
                 "; trackedEmission=" + (sample && sample.IsKeywordEnabled("_EMISSION") ? "true" : "false") +
                 "; trackedLightmapFlags=" + (sample ? ((int)sample.globalIlluminationFlags).ToString() : "unloaded"));
             if (phase == "before" && dirty.Count != 0)
-                throw new InvalidOperationException("JOURNEY_WORLD_HUD_DIRTY_DEPENDENCY_PREEXISTING");
-            if (added != 0) throw new InvalidOperationException("JOURNEY_WORLD_HUD_DIRTY_DEPENDENCY_ADDED");
+                throw new InvalidOperationException(rejectionCode ?? "JOURNEY_WORLD_HUD_DIRTY_DEPENDENCY_PREEXISTING");
+            if (added != 0) throw new InvalidOperationException(rejectionCode ?? "JOURNEY_WORLD_HUD_DIRTY_DEPENDENCY_ADDED");
         }
         // The existing environment regression and minimal HUD entry share the same legal dismount view.
         static void PlaceWalkingCaptureCamera(JourneyMotor motor)

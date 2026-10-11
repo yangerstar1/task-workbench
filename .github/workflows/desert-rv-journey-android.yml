@@ -2,7 +2,7 @@ name: Desert RV restored Journey Android development candidate
 on:
   push:
     branches: [journey-android-c15]
-    paths: [.github/dispatch/desert-rv-journey-android-c15-restored-r2-20261011.json]
+    paths: [.github/dispatch/desert-rv-journey-android-c15-restored-r3-20261011.json]
 permissions:
   contents: read
   actions: read
@@ -19,7 +19,7 @@ jobs:
     timeout-minutes: 170
     env:
       GITHUB_REPOSITORY_VISIBILITY: ${{ github.event.repository.visibility }}
-      JOURNEY_ANDROID_RESTORATION: desert-rv-journey-android-c15-restored-r2-20261011-once
+      JOURNEY_ANDROID_RESTORATION: desert-rv-journey-android-c15-restored-r3-20261011-once
       WORLD_CAPTURE_MODE: restored
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683

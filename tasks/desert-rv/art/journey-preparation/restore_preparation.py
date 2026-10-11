@@ -18,7 +18,7 @@ PRODUCER=dict(repository='yangerstar1/task-workbench',runId=37923953772,runAttem
  generatedReceiptSha256='2b5e06b3b5dfcfb5a53afc3ff750b4eb8f460b222dc1abdca5974fc6c4702526',sourceStateSha256='c33b884bd4caaf3fb8d310cebbc0b8de62b52c61cd483cd39a846e245425205b')
 # This is the sole additional consumer: one reviewed Android request and producer.
 # The historical Linux profile remains byte-for-byte pinned below this selection.
-ANDROID_REQUEST_ID = 'desert-rv-journey-android-c15-restored-r2-20261011-once'
+ANDROID_REQUEST_ID = 'desert-rv-journey-android-c15-restored-r3-20261011-once'
 ANDROID = os.environ.get('JOURNEY_ANDROID_RESTORATION') == ANDROID_REQUEST_ID
 if ANDROID:
  POLICY='tasks/desert-rv/art/journey-preparation/android-restoration-transition.json'
@@ -63,7 +63,7 @@ _ALLOWED=(
  'tasks/desert-rv/unity/Assets/DesertRV/Tests/JourneyRestoration/JourneyRestorationTests.cs.meta')
 ALLOWED_SOURCE_CHANGES=frozenset(_ALLOWED)
 if ANDROID:
- ALLOWED_SOURCE_CHANGES=frozenset(('tasks/desert-rv/scripts/player/verify_tracer_shader.py','tasks/desert-rv/scripts/player/test_verify_tracer_shader.py','tasks/desert-rv/art/journey-preparation/android-producer-native-history.json',)+('.github/workflows/desert-rv-journey-android.yml', 'tasks/desert-rv/art/journey-preparation/restore_preparation.py', 'tasks/desert-rv/art/journey-preparation/test_restore_preparation.py', 'tasks/desert-rv/scripts/player/journey_android.py', 'tasks/desert-rv/scripts/player/test_journey_android.py', 'tasks/desert-rv/scripts/player/journey_android_container.sh', 'tasks/desert-rv/scripts/journey_mobile_hud_native.py', 'tasks/desert-rv/scripts/test_journey_mobile_hud_native.py', 'tasks/desert-rv/unity/Assets/DesertRV/Editor/JourneyCandidateRestoration.cs', 'tasks/desert-rv/unity/Assets/DesertRV/Editor/JourneySceneAuthoring.cs', 'tasks/desert-rv/unity/Assets/DesertRV/Editor/JourneyHudCapture.cs'))
+ ALLOWED_SOURCE_CHANGES=frozenset(('tasks/desert-rv/unity/Assets/DesertRV/Tests/JourneyRestoration/JourneyRestorationTests.cs','tasks/desert-rv/scripts/player/verify_tracer_shader.py','tasks/desert-rv/scripts/player/test_verify_tracer_shader.py','tasks/desert-rv/art/journey-preparation/android-producer-native-history.json',)+('.github/workflows/desert-rv-journey-android.yml', 'tasks/desert-rv/art/journey-preparation/restore_preparation.py', 'tasks/desert-rv/art/journey-preparation/test_restore_preparation.py', 'tasks/desert-rv/scripts/player/journey_android.py', 'tasks/desert-rv/scripts/player/test_journey_android.py', 'tasks/desert-rv/scripts/player/journey_android_container.sh', 'tasks/desert-rv/scripts/journey_mobile_hud_native.py', 'tasks/desert-rv/scripts/test_journey_mobile_hud_native.py', 'tasks/desert-rv/unity/Assets/DesertRV/Editor/JourneyCandidateRestoration.cs', 'tasks/desert-rv/unity/Assets/DesertRV/Editor/JourneySceneAuthoring.cs', 'tasks/desert-rv/unity/Assets/DesertRV/Editor/JourneyHudCapture.cs'))
 
 def pin(path):return dict(path=str(path.relative_to(ROOT)),sha256=sha(path))
 def write_fresh(path,value):
@@ -387,7 +387,7 @@ def finish(native):
 DIAGNOSTIC=PRIVATE/'restoration-diagnostic.json'
 HOST_STATUS=TASK/'journey-restoration-status.json'
 DIAGNOSTIC_STAGES={'INPUT','INVENTORY','SOURCE_PROOF','STRICT_BUNDLES','DEPENDENCIES','GENERATED_BYTES','SELECTION','POSES','GROUNDING','IMPORTER_IDENTITIES','SAVED_BINDINGS','WORLD_HUD_CAPTURE','FINAL_PROTECTION','PROOF','COMPLETED'}
-DIAGNOSTIC_ERRORS={'DIAGNOSTIC_ARGUMENT','RUN_ID_ARGUMENT','NONE','IMPORTER_IDENTITY','DEPENDENCY_BYTES','DIRTY_DEPENDENCY','ASSET_LIFECYCLE','VALIDATION','IO','UNAUTHORIZED','OTHER'}
+DIAGNOSTIC_ERRORS={'CACHE_PACKAGE_IDENTITY','CACHE_ASSET_BYTES','CACHE_META_BYTES','CACHE_SUBASSET_RELATION','CACHE_FONT_NOT_LOADED','CACHE_FONT_IDENTITY','CACHE_FONT_NOT_DYNAMIC','CACHE_FONT_ATLAS_LINK','DIAGNOSTIC_ARGUMENT','RUN_ID_ARGUMENT','NONE','IMPORTER_IDENTITY','DEPENDENCY_BYTES','DIRTY_DEPENDENCY','ASSET_LIFECYCLE','VALIDATION','IO','UNAUTHORIZED','OTHER'}
 ASSET_LIFECYCLE_ORDER=('RESTORATION_ENTRY','DEPENDENCIES_BEFORE','DEPENDENCIES_AFTER','POSES_BEFORE','POSES_AFTER','GROUNDING_BEFORE','GROUNDING_AFTER','IMPORTER_IDENTITIES_BEFORE','IMPORTER_IDENTITIES_AFTER','SAVED_ROOT_IDENTITIES_BEFORE','SAVED_ROOT_IDENTITIES_AFTER','SAVED_BINDINGS_BEFORE','SAVED_BINDINGS_AFTER','CAPTURE_ENTRY','CAPTURE_GATE_BEFORE','CAPTURE_GATE_AFTER','CAPTURE_REGION_1_BEFORE','CAPTURE_REGION_1_AFTER','CAPTURE_REGION_3_BEFORE','CAPTURE_REGION_3_AFTER','CAPTURE_SCENE_RESTORE_BEFORE','CAPTURE_SCENE_RESTORE_AFTER','RESTORATION_SCENE_RESTORE_BEFORE','RESTORATION_SCENE_RESTORE_AFTER','FINAL_PROTECTION_BEFORE','FINAL_PROTECTION_AFTER')
 ASSET_LIFECYCLE_STAGES=frozenset(ASSET_LIFECYCLE_ORDER)
 BUILTIN_DEPENDENCIES=frozenset(('Resources/unity_builtin_extra','Library/unity default resources'))

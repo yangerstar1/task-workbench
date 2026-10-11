@@ -254,6 +254,9 @@ namespace DesertRV.Editor
         }
         static string ErrorClass(Exception error)
         {
+            foreach (string code in new[] { "CACHE_PACKAGE_IDENTITY", "CACHE_ASSET_BYTES", "CACHE_META_BYTES", "CACHE_SUBASSET_RELATION",
+                "CACHE_FONT_NOT_LOADED", "CACHE_FONT_IDENTITY", "CACHE_FONT_NOT_DYNAMIC", "CACHE_FONT_ATLAS_LINK" })
+                if (error.Message == "JOURNEY_WORLD_HUD_" + code) return code;
             if (error.Message == "JOURNEY_WORLD_HUD_DIRTY_DEPENDENCY_PREEXISTING" || error.Message == "JOURNEY_WORLD_HUD_DIRTY_DEPENDENCY_ADDED") return "DIRTY_DEPENDENCY";
             if (error.Message == "JOURNEY_RESTORATION_ASSET_LIFECYCLE_FAILED") return "ASSET_LIFECYCLE";
             if (error.Message == "JOURNEY_RESTORATION_DIAGNOSTIC_SCHEMA_ARGUMENT") return "DIAGNOSTIC_ARGUMENT";
