@@ -23,6 +23,8 @@ namespace DesertRV
         public Collider exitVolume, safeZone, salvageSurface, powerSurface, ramGate;
         public GameObject salvageVisual;
         public BeastActor[] guards, roadBeasts;
+        // Authored by the real-region candidate binder; never inferred from a physics layer.
+        public BoxCollider[] pouncerSupportSurfaces = Array.Empty<BoxCollider>();
         public RegionWave[] waves;
         public Vector3 progressDirection = Vector3.forward;
         public double regionOffset;
@@ -67,6 +69,13 @@ namespace DesertRV
             {
                 if (wave == null || wave.enemies == null || wave.enemies.Length == 0) { reason = "空波次不能作为完成证据。"; return false; }
                 foreach (var e in wave.enemies) if (!e || !seen.Add(e)) { reason = "波次敌人引用缺失或重复。"; return false; }
+            }
+            foreach (var enemy in seen)
+            {
+                if (enemy.armored || !enemy.GetComponent<PouncerPawContactConstraint>()) continue;
+                var support = enemy.GetComponent<PouncerGroundSupport>();
+                if (!support || support.region != this || !support.ValidateBindings(out _))
+                { reason = "真实 Pouncer 缺少同地区、静态且明确的道路/地基地面绑定。"; return false; }
             }
             var supplyIds = new HashSet<string>();
             var supplySurfaces = new HashSet<Collider>();

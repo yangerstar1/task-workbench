@@ -10,6 +10,16 @@ namespace DesertRV
     [DefaultExecutionOrder(1500), DisallowMultipleComponent]
     public sealed class PouncerPawContactConstraint : MonoBehaviour
     {
+        // The standalone STRICT export keeps this file plus its original solver only.
+        // A real region supplies the optional interface; no compile dependency on its mover.
+        public struct SurfaceHit { public Collider collider; public Vector3 point, normal; }
+        public interface ISceneSupport
+        {
+            bool ValidateBindings(out string reason);
+            bool ReconcileSynchronized(out string reason);
+            bool TrySampleSupport(Vector3 point,out SurfaceHit support);
+            void RecordPawSupport(string legId,Collider surface);
+        }
         [Serializable] public sealed class Leg
         {
             public string id;
@@ -183,6 +193,52 @@ namespace DesertRV
             }
             return min;
         }
+        Vector3 WorldPoint(SolePoint point)
+        {
+            Vector3 world=Vector3.zero;
+            foreach(var weight in point.influences)world+=boneMatrices[weight.bone].MultiplyPoint3x4(weight.point)*weight.weight;
+            return world;
+        }
+        internal bool TryGetSupportFootprint(List<Vector3> points,out string reason)
+        {
+            reason=null;
+            if((!calibrated && !Calibrate(out reason)) || !CacheStillValid(out reason))return false;
+            RefreshMatrices();
+            foreach(var leg in legs)foreach(var point in leg.sole)
+            {
+                var world=WorldPoint(point);
+                if(!TwoBoneArmSolver.Finite(world)){reason="Nonfinite actual paw support footprint.";return false;}
+                points.Add(world);
+            }
+            return true;
+        }
+        bool SampleMinimum(Leg leg,out SurfaceHit ground,out float minimum,out SolePoint lowest,out string reason)
+        {
+            var support=GetComponent<ISceneSupport>();
+            if(support==null)
+            {
+                // Original standalone model STRICT fixture. Actual regions require support in ValidateStructure.
+                bool found=Ground(leg,out var originalGround,out reason);
+                ground=new SurfaceHit{collider=originalGround.collider,point=originalGround.point,normal=originalGround.normal};
+                lowest=null;minimum=found?Minimum(leg,ground.point,ground.normal,out lowest):0;
+                return found;
+            }
+            ground=default;minimum=0;lowest=null;reason=null;
+            support.RecordPawSupport(leg.id,null);
+            if(!support.ValidateBindings(out reason))return false;
+            float measuredMinimum=float.PositiveInfinity;
+            foreach(var point in leg.sole)
+            {
+                var world=WorldPoint(point);
+                if(!TwoBoneArmSolver.Finite(world) || !support.TrySampleSupport(world,out var hit))
+                {ground=default;lowest=null;reason="No eligible finite authored support under actual paw geometry.";return false;}
+                float distance=Vector3.Dot(world-hit.point,hit.normal);
+                if(distance<measuredMinimum){measuredMinimum=distance;lowest=point;ground=hit;}
+            }
+            if(lowest!=null)minimum=measuredMinimum;
+            support.RecordPawSupport(leg.id,ground.collider);
+            return lowest!=null;
+        }
         bool Ground(Leg leg,out RaycastHit ground,out string reason)
         {
             ground=default;reason=null;var scene=actor.gameObject.scene;
@@ -231,7 +287,11 @@ namespace DesertRV
             report.currentLength=current.length;report.nextLength=next.length;report.animatorSpeed=animator.speed;
             report.transitionNormalizedTime=transition?animator.GetAnimatorTransitionInfo(0).normalizedTime:0;
             if(source=="Unknown" || destination=="Unknown"){report.reason="Unknown actual Animator state.";HasFailure=true;return false;}
-            Physics.SyncTransforms();RefreshMatrices();
+            Physics.SyncTransforms();
+            var rootSupport=GetComponent<ISceneSupport>();
+            if(rootSupport!=null && !rootSupport.ReconcileSynchronized(out report.reason))
+            {report.reason="Pouncer root support rejected: "+report.reason;HasFailure=true;return false;}
+            RefreshMatrices();
             Vector3 rootPosition=actor.transform.position,rootScale=actor.transform.localScale;Quaternion rootRotation=actor.transform.rotation;
             for(int i=0;i<4;i++){upperBefore[i]=legs[i].upper.localRotation;lowerBefore[i]=legs[i].lower.localRotation;pawBefore[i]=legs[i].paw.localRotation;}
             bool all=true,anyWrite=false;
@@ -239,9 +299,8 @@ namespace DesertRV
             {
                 var row=new LegReport{id=leg.id,sourceState=source,destinationState=destination,prePawWorld=leg.paw.position,
                     postPawWorld=leg.paw.position,selectedVertices=leg.sole.Count,excludedMixedVertices=leg.excludedMixedVertices,lowestSourceVertex=-1};report.legs.Add(row);
-                if(!Ground(leg,out var ground,out row.reason)){all=false;continue;}
+                if(!SampleMinimum(leg,out var ground,out row.preMinDistance,out var lowest,out row.reason)){all=false;continue;}
                 row.groundPoint=ground.point;row.groundNormal=ground.normal;row.groundSceneHandle=ground.collider.gameObject.scene.handle;
-                row.preMinDistance=Minimum(leg,ground.point,ground.normal,out var lowest);
                 row.lowestSourceVertex=lowest==null?-1:lowest.vertex;row.lowestRendererPath=lowest==null?null:lowest.rendererPath;
                 row.postMinDistance=row.attemptedPostMinDistance=row.preMinDistance;
                 if(!TwoBoneArmSolver.Finite(row.preMinDistance)){row.reason="Nonfinite actual paw LBS geometry.";all=false;continue;}
@@ -261,9 +320,11 @@ namespace DesertRV
                 bool lowerOk=TwoBoneArmSolver.TrySwing(leg.paw.position-leg.lower.position,target-leg.lower.position,normal,Epsilon,out var lowerSwing);
                 if(lowerOk)leg.lower.rotation=lowerSwing*leg.lower.rotation;
                 leg.paw.rotation=pawRotation; // The animated digits keep their local TRS and world orientation.
-                RefreshMatrices();row.attemptedPostMinDistance=Minimum(leg,ground.point,ground.normal,out _);
+                RefreshMatrices();
+                bool postSupported=SampleMinimum(leg,out _,out row.attemptedPostMinDistance,out _,out var postReason);
+                if(!postSupported)row.reason=postReason;
                 bool immutable=leg.upper.localPosition==upperLocal && leg.lower.localPosition==lowerLocal && leg.upper.localScale==upperScale && leg.lower.localScale==lowerScale && DescendantsUnchanged(leg);
-                row.valid=lowerOk && immutable && Vector3.Distance(leg.upper.position,hip)<=LengthTolerance && Vector3.Distance(leg.paw.position,target)<=LengthTolerance &&
+                row.valid=postSupported && lowerOk && immutable && Vector3.Distance(leg.upper.position,hip)<=LengthTolerance && Vector3.Distance(leg.paw.position,target)<=LengthTolerance &&
                     Mathf.Abs(Vector3.Distance(leg.upper.position,leg.lower.position)-leg.upperLength)<=LengthTolerance && Mathf.Abs(Vector3.Distance(leg.lower.position,leg.paw.position)-leg.lowerLength)<=LengthTolerance &&
                     Quaternion.Angle(leg.paw.rotation,pawRotation)<=.01f && TwoBoneArmSolver.Finite(row.attemptedPostMinDistance) && Mathf.Abs(row.attemptedPostMinDistance-Clearance)<=LengthTolerance*2;
                 if(!row.valid){row.reason="Post-solve geometry/length/endpoint/immutable-transform invariant failed; all attempted rotations restored.";all=false;}
@@ -277,7 +338,7 @@ namespace DesertRV
                 RefreshMatrices();
                 for(int i=0;i<4;i++)
                 {var row=report.legs[i];row.corrected=false;row.valid=false;row.postPawWorld=legs[i].paw.position;
-                    if(row.lowestSourceVertex>=0)row.postMinDistance=Minimum(legs[i],row.groundPoint,row.groundNormal,out _);}
+                    if(row.lowestSourceVertex>=0)SampleMinimum(legs[i],out _,out row.postMinDistance,out _,out _);}
                 report.reason=report.reason??"Paw contact failed; transaction rolled back and failure latched.";HasFailure=true;
             }
             report.valid=all;if(all && report.legs.Exists(row=>row.corrected))lastCorrectionReport=report;

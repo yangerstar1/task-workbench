@@ -10,6 +10,8 @@ using UnityEditor.SceneManagement;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
+[assembly: System.Runtime.CompilerServices.InternalsVisibleTo("DesertRV.PouncerGroundTests")]
+
 namespace DesertRV.Tests
 {
     // Native EditMode fixture source, not a claim of native execution or imported-asset acceptance.
@@ -112,7 +114,7 @@ namespace DesertRV.Tests
             }
         }
 
-        sealed class Fixture : IDisposable
+        internal sealed class Fixture : IDisposable
         {
             public GameObject Root;
             public Component Actor, Constraint;
@@ -144,9 +146,11 @@ namespace DesertRV.Tests
             AnimationClip clip;
             bool disposed;
             int rawPoseEvaluation;
+            readonly bool isolatedPhysics;
 
-            public Fixture(bool nonuniformAncestor = false, bool withFloor = true)
+            public Fixture(bool nonuniformAncestor = false, bool withFloor = true, bool isolatedPhysics = false)
             {
+                this.isolatedPhysics = isolatedPhysics;
                 originalActive = SceneManager.GetActiveScene(); QualitySettings.skinWeights = SkinWeights.Unlimited;
                 try
                 {
@@ -246,7 +250,9 @@ namespace DesertRV.Tests
             {
                 // Preview scenes preserve the caller's unsaved active scene. Both owners still
                 // contain real colliders; actual PhysicsScene equality is observed, not assumed.
-                var scene = EditorSceneManager.NewPreviewScene();
+                var scene = isolatedPhysics
+                    ? SceneManager.CreateScene("PouncerGroundPhysics_" + Guid.NewGuid().ToString("N"), new CreateSceneParameters(LocalPhysicsMode.Physics3D))
+                    : EditorSceneManager.NewPreviewScene();
                 ownedScenes.Add(scene);
                 return scene;
             }

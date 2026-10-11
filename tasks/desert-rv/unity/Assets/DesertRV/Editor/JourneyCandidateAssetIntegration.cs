@@ -394,6 +394,34 @@ namespace DesertRV.Editor
                 go.SetActive(true); Record(go); Record(go.transform); return go.GetComponent<BeastActor>();
             }).ToArray();
         }
+        // Also used to derive new-source prepared scenes from an immutable producer input.
+        // Only region support references and per-instance Pouncer support components change.
+        public static void BindPouncerGroundSupport(RegionBinding binding)
+        {
+            Require(binding && binding.gameObject.scene.IsValid() && binding.gameObject.scene.isLoaded,
+                "Pouncer grounding requires an actual loaded region binding.");
+            var names = new[] { "Route foundation", "Road surface" };
+            binding.pouncerSupportSurfaces = names.Select(name => {
+                var matches = binding.transform.Cast<Transform>().Where(child => child.name == name).ToArray();
+                Require(matches.Length == 1, "Authored support missing or ambiguous: " + name);
+                var floor = matches[0];
+                Require(floor.GetComponents<Collider>().Length == 1, "Authored support must have exactly one collider: " + name);
+                var box = floor.GetComponent<BoxCollider>();
+                Require(box && box.enabled && !box.isTrigger && !box.attachedRigidbody, "Authored static support box required: " + name);
+                return box;
+            }).ToArray();
+            Record(binding);
+            foreach (var actor in binding.AllEnemies())
+            {
+                if (actor.armored) continue;
+                var paws = actor.GetComponent<PouncerPawContactConstraint>();
+                Require(paws, "Actual regional Pouncer requires its original paw constraint: " + actor.name);
+                var support = actor.GetComponent<PouncerGroundSupport>();
+                if (!support) support = actor.gameObject.AddComponent<PouncerGroundSupport>();
+                support.actor = actor; support.paws = paws; support.region = binding;
+                Require(support.ValidateBindings(out string reason), reason); Record(support);
+            }
+        }
         static void WireRegion(Scene scene, Scene boot, RegionPlan plan, Dictionary<string, Resolved> assets)
         {
             var binding = One<RegionBinding>(scene); var motor = One<JourneyMotor>(boot);
@@ -401,6 +429,7 @@ namespace DesertRV.Editor
             Require(All<BeastActor>(scene).Length == 0 && !binding.AllEnemies().Any(), "Refusing to replace existing regional actors.");
             binding.guards = Spawn(plan.guards, binding, assets); binding.roadBeasts = Spawn(plan.roadBeasts, binding, assets);
             binding.waves = plan.waves.Select(w => new RegionWave { enemies = Spawn(w.enemies, binding, assets) }).ToArray();
+            BindPouncerGroundSupport(binding);
             Require(binding.ValidateStructure(out string reason), reason);
             Require(!binding.Validate(out _), "Production approval gate unexpectedly opened.");
             Require(binding.regionOffset == JourneySceneAuthoring.RegionOffsets[plan.region - 1] && binding.progressDirection == Vector3.forward &&

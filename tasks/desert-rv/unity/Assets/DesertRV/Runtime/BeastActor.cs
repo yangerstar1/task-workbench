@@ -166,6 +166,9 @@ namespace DesertRV
         bool MoveSwept(Vector3 displacement, out Collider contact)
         {
             contact = null;
+            // The real-region binder owns Pouncer support; armored movement stays unchanged.
+            var support = armored ? null : GetComponent<PouncerGroundSupport>();
+            if (support) return support.TryMove(displacement, out contact, out _);
             float length = displacement.magnitude;
             if (length < .0001f) return true;
             if(!TryGetSweepCapsule(out var bottomSphere,out var topSphere,out var radius))
