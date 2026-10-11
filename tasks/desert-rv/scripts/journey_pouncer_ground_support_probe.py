@@ -24,15 +24,15 @@ from journey_keyboard_look_native import file_bytes, raw_pin, safe_path, protect
 from strict_output import verify_staged_inventory
 import generated_export as generated
 
-BASE = 'c6f78eee249b2314df8b2a808b5768e35c6a8289'
+BASE = '65299f98cadb82183c631f0418672ead3313e71f'
 PRODUCTION_BASE = '2915b8b1e5be8b800a3d71f186b5316a8f626bc8'
 BRANCH = 'journey-pouncer-ground-support-2915'
 REF = 'refs/heads/' + BRANCH
 REPOSITORY = 'yangerstar1/task-workbench'
 OWNER_NAME = 'yangerstar1'
 WORKFLOW = '.github/workflows/desert-rv-pouncer-ground-support.yml'
-REQUEST = '.github/dispatch/desert-rv-pouncer-ground-support-2915-r1-20261011.json'
-NONCE = 'desert-rv-pouncer-ground-support-2915-r1-20261011-once'
+REQUEST = '.github/dispatch/desert-rv-pouncer-ground-support-2915-r2-20261011.json'
+NONCE = 'desert-rv-pouncer-ground-support-2915-r2-20261011-once'
 PRODUCER = dict(commit=PRODUCTION_BASE, runId=38091066745,
     artifactId=11685769353, artifactName='journey-preparation-UNREVIEWED-38091066745-1',
     artifactBytes=19825311, artifactSha256='98448f817201ca54b7206ba535040a6ef5641bc2151c0da8ebe3fcb6caa60957',
@@ -86,15 +86,10 @@ MAX_NATIVE_REPORT = 24 * 1024**2
 TEST_ADDITIONS = {'Assets/DesertRV/Tests/PlayMode/JourneyR3ContinuousContactTests.cs',
     'Assets/DesertRV/Tests/PlayMode/JourneyR3ContinuousContactTests.cs.meta'}
 CHANGED_FILES = frozenset({
-    '.github/dispatch/desert-rv-pouncer-ground-support-2915-r1-20261011.json',
+    '.github/dispatch/desert-rv-pouncer-ground-support-2915-r2-20261011.json',
     '.github/workflows/desert-rv-pouncer-ground-support.yml',
     'tasks/desert-rv/SOURCE-STATE.json',
     'tasks/desert-rv/scripts/journey_pouncer_ground_support_probe.py',
-    'tasks/desert-rv/scripts/journey_pouncer_support_reports.py',
-    'tasks/desert-rv/scripts/test_journey_pouncer_ground_support_probe.py',
-    'tasks/desert-rv/scripts/test_journey_pouncer_support_reports.py',
-    'tasks/desert-rv/unity/Assets/DesertRV/Tests/CandidateArt/PouncerPawContactConstraintTests.cs',
-    'tasks/desert-rv/unity/Assets/DesertRV/Tests/EditMode/JourneyPouncerSupportBindingTests.cs',
     'tasks/desert-rv/unity/Assets/DesertRV/Tests/PouncerGround/PouncerGroundSupportTests.cs',
 })
 

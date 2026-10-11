@@ -15,7 +15,6 @@ using UnityEngine.SceneManagement;
 namespace DesertRV.Tests
 {
     // Actual Unity physics and skinned geometry tests; source authoring is not execution evidence.
-    [NonParallelizable]
     public sealed class PouncerGroundSupportTests
     {
         const BindingFlags Flags = BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
