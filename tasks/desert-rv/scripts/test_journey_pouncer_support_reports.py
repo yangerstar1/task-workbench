@@ -44,6 +44,7 @@ def focused_case(index):
     drop = index % 2 == 1
     cadence = 1 / 30 if index < 2 else .2
     row.update(name=reports.CASE_ORDER[index], frameBound=240 if index < 2 else 120,
+               deathFrames=54 if index < 2 else 9, resetFrames=2, lifecycleCompleted=True,
                frames=20, firstFrame=100, lastFrame=119, selectedSoleVertices=40,
                stalkFrames=15, windupFrames=5, walkFrames=15, animatorWindupFrames=2,
                stalkToWindupCount=1, walkToWindupCount=1, blendedWalkToWindupFrames=3,
@@ -239,7 +240,8 @@ class FocusedReportTests(unittest.TestCase):
 
     def test_partial_prefix_and_failed_frame_are_retained_without_promotion(self):
         value = focused_fixture(); value.update(status=reports.FOCUSED_INCOMPLETE, failureCode='PAW_LIMIT', cases=value['cases'][:2])
-        row = value['cases'][-1]; row.update(completed=False, maxPawCorrection=.12, stalkFrames=21)
+        row = value['cases'][-1]; row.update(completed=False, maxPawCorrection=.12, stalkFrames=21,
+                                           deathFrames=0, resetFrames=0, lifecycleCompleted=False)
         self.assertFalse(self.verify(value, complete=False))
         with self.assertRaises(ValueError): self.verify(value)
         value['cases'].append(focused_case(2))
@@ -258,7 +260,7 @@ class FocusedReportTests(unittest.TestCase):
         row = value['cases'][0]
         for name in reports.CASE_INTS:
             row[name] = 0
-        row.update(completed=False, firstFrame=100, frameBound=240)
+        row.update(completed=False, firstFrame=100, frameBound=240, deathFrames=0, resetFrames=0, lifecycleCompleted=False)
         self.assertFalse(self.verify(value, complete=False))
         row['maxRootSupportError'] = 10**500
         with self.assertRaisesRegex(ValueError, '^POUNCER_SUPPORT_REPORT_FOCUSED_CASE_NUMBERS$'):
@@ -309,6 +311,47 @@ class FocusedReportTests(unittest.TestCase):
         with self.assertRaises(ValueError): self.verify(value)
         value = focused_fixture(); value['cases'][0]['frames'] = True
         with self.assertRaises(ValueError): self.verify(value)
+
+    def test_lifecycle_failure_after_crossing_keeps_bounded_metrics_without_promotion(self):
+        for code, death, reset in (('DEATH_LIFECYCLE', 0, 0), ('DEATH_LIFECYCLE', 1, 0), ('RESET_LIFECYCLE', 54, 0),
+                                   ('RESET_LIFECYCLE', 54, 1), ('LIFECYCLE_TIMEOUT', 240, 0)):
+            value = focused_fixture()
+            value.update(status=reports.FOCUSED_INCOMPLETE, failureCode=code, cases=value['cases'][:1])
+            row = value['cases'][0]
+            row.update(deathFrames=death, resetFrames=reset, lifecycleCompleted=False,
+                       modelUnchanged=False, targetStationary=False,
+                       maxPawCorrection=.128, maxPawResidual=.02,
+                       maxCorrectedClearanceError=.05, maxSkinningAgreementError=.01)
+            value = json.loads(json.dumps(value, allow_nan=False))
+            with self.subTest(code=code, reset=reset):
+                self.assertFalse(self.verify(value, complete=False))
+                with self.assertRaises(ValueError): self.verify(value)
+                value['cases'].append(focused_case(1))
+                with self.assertRaisesRegex(ValueError, 'FOCUSED_INCOMPLETE_PREFIX$'):
+                    self.verify(value, complete=False)
+
+    def test_lifecycle_counts_flags_duration_and_success_budgets_remain_exact(self):
+        for index in (0, 2):
+            for field, replacement in (('deathFrames', True), ('resetFrames', 1.0),
+                    ('deathFrames', -1), ('resetFrames', -1), ('deathFrames', 241 if index == 0 else 121),
+                    ('resetFrames', 241 if index == 0 else 121), ('lifecycleCompleted', 1),
+                    ('deathFrames', 53 if index == 0 else 8), ('resetFrames', 1), ('lifecycleCompleted', False)):
+                value = focused_fixture(); value['cases'][index][field] = replacement
+                with self.subTest(index=index, field=field, replacement=replacement), self.assertRaises(ValueError):
+                    self.verify(value)
+        value = focused_fixture(); value.update(status=reports.FOCUSED_INCOMPLETE, cases=value['cases'][:1])
+        row = value['cases'][0]; row.update(lifecycleCompleted=False, deathFrames=1, resetFrames=1)
+        with self.assertRaisesRegex(ValueError, 'FOCUSED_DEATH_COVERAGE$'): self.verify(value, complete=False)
+        row.update(deathFrames=0, resetFrames=0, completed=False, lifecycleCompleted=True)
+        with self.assertRaisesRegex(ValueError, 'FOCUSED_LIFECYCLE_ORDER$'): self.verify(value, complete=False)
+        row.update(completed=True, lifecycleCompleted=False, maxRootStep=.076)
+        with self.assertRaisesRegex(ValueError, 'FOCUSED_PRODUCTION_BUDGET$'): self.verify(value, complete=False)
+        row.update(maxRootStep=.075, boundSupportValid=False)
+        with self.assertRaisesRegex(ValueError, 'FOCUSED_CASE_COMPLETION$'): self.verify(value, complete=False)
+        row['boundSupportValid'] = True
+        row.update(maxRootStep=.075, maxPawCorrection=math.nan)
+        with self.assertRaisesRegex(ValueError, 'FOCUSED_CASE_NUMBERS$'): self.verify(value, complete=False)
+        self.assertTrue(self.verify(json.loads(json.dumps(focused_fixture(), allow_nan=False))))
 
 
 if __name__ == '__main__':

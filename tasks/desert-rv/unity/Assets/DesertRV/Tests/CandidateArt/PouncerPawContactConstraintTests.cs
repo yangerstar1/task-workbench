@@ -389,17 +389,17 @@ namespace DesertRV.Tests
             }
             public void Reset() => Call(Constraint, "ResetContactState");
             public bool Failed => Property<bool>(Constraint, "HasFailure");
-            public void RewriteRawPose()
+            public void RewriteRawPose(string stateName = "Idle")
             {
                 Animator.speed = 1;
                 // The original fixture had complete but constant curves and repeatedly sampled
                 // exactly .25 with zero delta. Advance genuine animated channels to a raw key.
                 float targetTime = (++rawPoseEvaluation % 2 == 1) ? .25f : .75f;
                 const float frameDelta = 1f / 60f;
-                Animator.Play("Idle", 0, targetTime - frameDelta); Animator.Update(0); Animator.Update(frameDelta);
+                Animator.Play(stateName, 0, targetTime - frameDelta); Animator.Update(0); Animator.Update(frameDelta);
                 Assert.That(Animator.GetCurrentAnimatorStateInfo(0).normalizedTime,
                     Is.EqualTo(targetTime).Within(.00001f), "Animator must advance to the keyed raw pose.");
-                Assert.That(Animator.GetCurrentAnimatorStateInfo(0).shortNameHash, Is.EqualTo(UnityEngine.Animator.StringToHash("Idle")),
+                Assert.That(Animator.GetCurrentAnimatorStateInfo(0).shortNameHash, Is.EqualTo(UnityEngine.Animator.StringToHash(stateName)),
                     "A genuine Animator state must be evaluated, not a fabricated state label.");
                 Assert.That(Animator.IsInTransition(0), Is.False);
                 for (int i = 0; i < 4; i++)

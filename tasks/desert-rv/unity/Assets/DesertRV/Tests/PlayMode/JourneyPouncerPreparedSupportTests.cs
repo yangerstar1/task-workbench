@@ -56,10 +56,11 @@ namespace DesertRV.Tests
             public int stalkToWindupCount, walkToWindupCount, blendedWalkToWindupFrames, riseCount, dropCount, mixedSupportSamples;
             public int lowSupportSamples, highSupportSamples, selectedSoleVertices, correctedLegFrames, aiMovementFrames;
             public int independentSamples, independentCrossingSamples, independentTransitionSamples;
+            public int deathFrames, resetFrames;
             public Vector3 fixtureActorRoot, initialRoot, finalRoot, target;
             public float initialSupportY, finalSupportY, measuredSurfaceRise, horizontalTravel;
             public float maxRootStep, maxRootSupportError, maxRootCenterGroundDelta, maxPawCorrection, maxPawResidual, maxCorrectedClearanceError, maxSkinningAgreementError;
-            public bool completed, actorYUnchangedAtSetup, boundSupportValid, modelUnchanged, targetStationary;
+            public bool completed, actorYUnchangedAtSetup, boundSupportValid, modelUnchanged, targetStationary, lifecycleCompleted;
         }
         [Serializable] public sealed class Report
         {
@@ -81,6 +82,10 @@ namespace DesertRV.Tests
         Vector3 beforeAI, previousRoot; string beforePhase, previousAnimation; int sampledFrame = -1;
         bool recording, ownsBootstrap, ownsRegion, callbackAttached, observerFailed, sawWalk, cleanupFailed;
         float oldCapture, oldScale, oldFixed; CursorLockMode oldLock; bool oldCursor;
+        enum LifecyclePhase { None, Death, Reset }
+        LifecyclePhase lifecycle; Vector3 deathRoot, lifecycleTarget; CapsuleCollider hurtbox;
+        AnimationClip deathClip; float deathElapsed; int lifecycleLastFrame = -1, resetMovingFrames, resetWalkFrames;
+        bool deathFinished;
 
         [UnityTest, Timeout(600000)] public IEnumerator RealPreparedR3_PouncerCrossesSupportAtBothCadences()
         {
@@ -157,9 +162,11 @@ namespace DesertRV.Tests
                 }
                 recording = false;
                 Require(current.completed, "CROSSING_OR_TRANSITION_NOT_OBSERVED"); Write();
+                var life = ObserveLifecycle();
+                while (life.MoveNext()) yield return life.Current; // Keep lifecycle exceptions inside the outer first-error recorder.
                 actor.gameObject.SetActive(false); // Between-case fixture cleanup only.
             }
-            Require(report.cases.Count == 4 && report.cases.All(c => c.completed), "CASE_INVENTORY");
+            Require(report.cases.Count == 4 && report.cases.All(c => c.completed && c.lifecycleCompleted), "CASE_INVENTORY");
             report.status = "COMPLETED_FOCUSED_SUPPORT_UNREVIEWED"; Write();
         }
 
@@ -202,6 +209,60 @@ namespace DesertRV.Tests
             report.cases.Add(current); Require(valid && current.actorYUnchangedAtSetup, "FIXTURE_BINDINGS"); Write();
         }
 
+        IEnumerator ObserveLifecycle()
+        {
+            // Fixture actions happen between stages. Observation starts only on a new full
+            // BeforeAI/Animator/LateUpdate frame; no clip sampling or actor placement here.
+            hurtbox = actor.GetComponent<CapsuleCollider>();
+            var clips = controller.animationClips.Where(c => c.name == "Death").Distinct().ToArray();
+            Require(clips.Length == 1 && clips[0] && !clips[0].isLooping &&
+                Mathf.Abs(clips[0].length - 1.8f) <= RootTolerance, "DEATH_LIFECYCLE");
+            deathClip = clips[0]; deathRoot = actor.transform.position; lifecycleTarget = vehicle.position;
+            deathElapsed = 0; deathFinished = false; sampledFrame = lifecycleLastFrame = -1;
+            int health = (int)Get(actor, "Health");
+            Require(health > 0 && hurtbox && hurtbox.enabled, "DEATH_LIFECYCLE");
+            Call(actor, "TakeHit", health, actor.transform.forward, false);
+            Require((bool)Get(actor, "Dead") && (int)Get(actor, "Health") == 0 && !hurtbox.enabled &&
+                actor.transform.position.Equals(deathRoot), "DEATH_LIFECYCLE");
+            lifecycle = LifecyclePhase.Death; Write();
+            for (int frame = 0; frame < current.frameBound && !deathFinished; frame++)
+            {
+                yield return null;
+                Require(!observerFailed && report.nativeErrorCount == 0, "NATIVE_OR_OBSERVER_FAILURE");
+            }
+            Require(deathFinished, "LIFECYCLE_TIMEOUT");
+            var deathEnd = animator.GetCurrentAnimatorStateInfo(0);
+            Debug.Log("Prepared support Death complete " + current.name + ": frames=" + current.deathFrames +
+                "; normalized=" + deathEnd.normalizedTime + "; seconds=" + deathEnd.length +
+                "; inTransition=" + animator.IsInTransition(0) + "; root=" + deathRoot.ToString("F6"));
+            lifecycle = LifecyclePhase.None; sampledFrame = lifecycleLastFrame = -1;
+            // ResetActor owns the authored home. Move only the real motor's fixture target
+            // near that home, so ordinary Idle -> Stalk can wake and move after reset.
+            var home = (Vector3)Field(actor, "home");
+            lifecycleTarget = new Vector3(0, vehicle.position.y, home.z);
+            float targetDistance = new Vector2(lifecycleTarget.x - home.x, lifecycleTarget.z - home.z).magnitude;
+            Require(targetDistance > 5.2f && targetDistance < 19, "RESET_LIFECYCLE");
+            Call(motor, "PlaceForRegion", lifecycleTarget, Quaternion.identity);
+            Call(session, "ResetPositionSample", Call(region, "WorldProgress", lifecycleTarget));
+            Call(actor, "ResetActor");
+            Require(!(bool)Get(actor, "Dead") && Get(actor, "Phase").ToString() == "Idle" &&
+                (int)Get(actor, "Health") == health && hurtbox.enabled && !(bool)Get(paws, "HasFailure") &&
+                actor.transform.position.Equals(home), "RESET_LIFECYCLE");
+            Debug.Log("Prepared support lifecycle " + current.name + ": home=" + home.ToString("F6") +
+                "; reset target=" + lifecycleTarget.ToString("F6") + "; Death clip seconds=" + deathClip.length);
+            resetMovingFrames = resetWalkFrames = 0; lifecycle = LifecyclePhase.Reset; Write();
+            for (int frame = 0; frame < current.frameBound && !current.lifecycleCompleted; frame++)
+            {
+                yield return null;
+                Require(!observerFailed && report.nativeErrorCount == 0, "NATIVE_OR_OBSERVER_FAILURE");
+            }
+            Require(current.lifecycleCompleted, "LIFECYCLE_TIMEOUT");
+            Debug.Log("Prepared support Reset complete " + current.name + ": frames=" + current.resetFrames +
+                "; AI moving frames=" + resetMovingFrames + "; settled Walk frames=" + resetWalkFrames +
+                "; phase=" + Get(actor, "Phase") + "; root=" + actor.transform.position.ToString("F6"));
+            lifecycle = LifecyclePhase.None; sampledFrame = -1; Write();
+        }
+
         void BeforeAI()
         {
             sampledFrame = Time.frameCount; beforeAI = actor.transform.position; beforePhase = Get(actor, "Phase").ToString();
@@ -212,6 +273,7 @@ namespace DesertRV.Tests
         void AfterPaws()
         {
             if (sampledFrame != Time.frameCount) return; // Recording can begin after this frame's BeforeAI.
+            if (lifecycle != LifecyclePhase.None) { AfterLifecyclePaws(); return; }
             Require(current.frames < current.frameBound, "FRAME_BOUND");
             if (current.frames > 0) Require(Time.frameCount == current.lastFrame + 1, "OBSERVATION_GAP");
             var root = actor.transform.position; string phase = Get(actor, "Phase").ToString();
@@ -301,7 +363,73 @@ namespace DesertRV.Tests
             if (current.completed || current.frames % 15 == 0) Write();
         }
 
-        float MeasureActualSupport(float rootGround)
+        void AfterLifecyclePaws()
+        {
+            string code = lifecycle == LifecyclePhase.Death ? "DEATH_LIFECYCLE" : "RESET_LIFECYCLE";
+            if (lifecycleLastFrame >= 0) Require(Time.frameCount == lifecycleLastFrame + 1, code);
+            lifecycleLastFrame = Time.frameCount;
+            if (lifecycle == LifecyclePhase.Death)
+            { Require(current.deathFrames < current.frameBound, "LIFECYCLE_TIMEOUT"); current.deathFrames++; }
+            else { Require(current.resetFrames < current.frameBound, "LIFECYCLE_TIMEOUT"); current.resetFrames++; }
+            var root = actor.transform.position;
+            object pawReport = Field(paws, "lastReport");
+            Require(pawReport != null && (int)Field(pawReport, "frame") == Time.frameCount, "PAW_REPORT_FRESH");
+            Require(animator.enabled && animator.speed == 1 && animator.runtimeAnimatorController == controller &&
+                !animator.applyRootMotion, "ANIMATOR_CHANGED");
+            current.modelUnchanged &= skins.All(s => s.renderer.sharedMesh == s.source && s.renderer.bones.SequenceEqual(s.bones));
+            current.targetStationary &= Vector3.Distance(vehicle.position, lifecycleTarget) < RootTolerance;
+            Require(current.modelUnchanged && current.targetStationary, "FIXTURE_MUTATED");
+            var legs = ((IEnumerable)Field(pawReport, "legs")).Cast<object>().ToArray();
+            Require(legs.Length == 4, "LEG_REPORT_INVENTORY");
+            foreach (var leg in legs)
+            {
+                float correction = (float)Field(leg, "correctionMeters"), distance = (float)Field(leg, "postMinDistance");
+                Require(Finite(correction) && Finite(distance), "NONFINITE_SAMPLE");
+                current.maxPawCorrection = Mathf.Max(current.maxPawCorrection, correction);
+                current.maxPawResidual = Mathf.Max(current.maxPawResidual, Mathf.Max(0, -distance));
+                Require(correction <= PawMaximumCorrection && distance >= -PawFloorTolerance, "PAW_LIMIT");
+                Require((bool)Field(leg, "valid"), "LEG_INVALID");
+                if ((bool)Field(leg, "corrected"))
+                {
+                    float error = Mathf.Abs(distance - (float)Field(leg, "targetClearance"));
+                    current.maxCorrectedClearanceError = Mathf.Max(current.maxCorrectedClearanceError, error);
+                    Require(error <= .0002f, "CORRECTED_CLEARANCE");
+                }
+            }
+            Require((bool)Field(pawReport, "valid") && !(bool)Get(paws, "HasFailure"), "PAW_REPORT_FAILED");
+            float expected = MeasureActualSupport(SupportAt(root, out _), false);
+            var info = animator.GetCurrentAnimatorStateInfo(0);
+            if (lifecycle == LifecyclePhase.Death)
+            {
+                Require((bool)Get(actor, "Dead") && beforePhase == "Dead" && (int)Get(actor, "Health") == 0 &&
+                    !hurtbox.enabled && root.Equals(deathRoot) && beforeAI.Equals(deathRoot), code);
+                deathElapsed += Time.deltaTime;
+                bool deathState = info.shortNameHash == Animator.StringToHash("Death");
+                if (!animator.IsInTransition(0))
+                {
+                    Require(deathState && !info.loop && Mathf.Abs(info.length - deathClip.length) <= RootTolerance, code);
+                    Require(legs.All(l => (string)Field(l, "sourceState") == "Death" &&
+                        (string)Field(l, "destinationState") == "Death"), code);
+                }
+                deathFinished = !animator.IsInTransition(0) && deathState && info.normalizedTime >= 1 &&
+                    deathElapsed + .00001f >= deathClip.length;
+            }
+            else
+            {
+                Require(!(bool)Get(actor, "Dead") && (int)Get(actor, "Health") > 0 && hurtbox.enabled, code);
+                // The original crossing root/counter evidence stays frozen after completion.
+                Require(Mathf.Abs(root.y - expected) <= RootTolerance, "ROOT_NOT_ON_ACTUAL_SUPPORT");
+                float distance = new Vector2(root.x - beforeAI.x, root.z - beforeAI.z).magnitude;
+                if (distance > .00001f)
+                { Require(beforePhase == "Stalk", code); resetMovingFrames++; }
+                if (Get(actor, "Phase").ToString() == "Stalk" && !animator.IsInTransition(0) &&
+                    info.shortNameHash == Animator.StringToHash("Walk")) resetWalkFrames++;
+                current.lifecycleCompleted = current.resetFrames >= 2 && resetMovingFrames >= 2 && resetWalkFrames >= 2;
+            }
+            Write();
+        }
+
+        float MeasureActualSupport(float rootGround, bool recordCrossingSamples = true)
         {
             float expected = rootGround; bool low = false, high = false;
             foreach (var skin in skins)
@@ -318,9 +446,12 @@ namespace DesertRV.Tests
                     Require(residual <= PawFloorTolerance, "INDEPENDENT_SOLE_CLEARANCE");
                 }
             }
-            if (low && high) current.mixedSupportSamples++;
-            if (Mathf.Abs(expected - foundation.bounds.max.y) < RootTolerance) current.lowSupportSamples++;
-            if (Mathf.Abs(expected - road.bounds.max.y) < RootTolerance) current.highSupportSamples++;
+            if (recordCrossingSamples)
+            {
+                if (low && high) current.mixedSupportSamples++;
+                if (Mathf.Abs(expected - foundation.bounds.max.y) < RootTolerance) current.lowSupportSamples++;
+                if (Mathf.Abs(expected - road.bounds.max.y) < RootTolerance) current.highSupportSamples++;
+            }
             return expected;
         }
 
@@ -370,7 +501,7 @@ namespace DesertRV.Tests
         }
         void ObserveSafely(Action action)
         {
-            if (!recording || observerFailed) return;
+            if ((!recording && lifecycle == LifecyclePhase.None) || observerFailed) return;
             try { action(); }
             catch { observerFailed = true; Fail("OBSERVER_EXCEPTION"); Write(); }
         }
@@ -430,7 +561,7 @@ namespace DesertRV.Tests
         }
         [UnityTearDown] public IEnumerator Cleanup()
         {
-            recording = false;
+            recording = false; lifecycle = LifecyclePhase.None;
             try
             {
                 CleanupAction(() => { if (actor) actor.gameObject.SetActive(false); });

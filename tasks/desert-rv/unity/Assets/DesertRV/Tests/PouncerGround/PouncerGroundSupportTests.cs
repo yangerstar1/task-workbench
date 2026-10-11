@@ -427,10 +427,34 @@ namespace DesertRV.Tests
                 Call(w.F.Actor, "TakeHit", 1000, Vector3.forward, false);
                 Assert.That(Get<bool>(w.F.Actor, "Dead"), Is.True); Assert.That(w.Capsule.enabled, Is.False);
                 var before = w.F.Root.transform.position;
-                w.F.Animator.Play("Death", 0, 0); w.F.Animator.Update(0); w.CheckPaws();
+                // This is a synthetic lifecycle control: its raw keys are .25/.75;
+                // time zero is a deliberately displaced pose, not the imported Death clip.
+                w.F.RewriteRawPose("Death"); w.CheckPaws();
                 Assert.That(w.F.Root.transform.position, Is.EqualTo(before)); Assert.That(w.Capsule.enabled, Is.False);
+                // Preserve the observed 128 mm displaced-key rejection as a negative control.
+                w.F.Animator.Play("Death", 0, 0); w.F.Animator.Update(0);
+                Assert.That(w.F.Animator.IsInTransition(0), Is.False);
+                Assert.That(w.F.Animator.GetCurrentAnimatorStateInfo(0).shortNameHash, Is.EqualTo(Animator.StringToHash("Death")));
+                Assert.That(w.F.Animator.GetCurrentAnimatorStateInfo(0).normalizedTime, Is.EqualTo(0).Within(.00001f));
+                var bones = w.F.Upper.Concat(w.F.Lower).Concat(w.F.Foot).ToArray();
+                var rotations = bones.Select(bone => bone.localRotation).ToArray();
+                Assert.That(w.Apply(out var rejected), Is.False); Assert.That(w.F.Failed, Is.True);
+                var rows = (IList)rejected.GetType().GetField("legs").GetValue(rejected);
+                Assert.That(rows.Count, Is.EqualTo(4));
+                foreach (var row in rows)
+                {
+                    var type = row.GetType();
+                    Assert.That((float)type.GetField("correctionMeters").GetValue(row), Is.GreaterThan(.100f));
+                    Assert.That((string)type.GetField("reason").GetValue(row), Is.EqualTo("Correction exceeds bounded range; no clamp."));
+                    Assert.That((bool)type.GetField("corrected").GetValue(row), Is.False);
+                    Assert.That((float)type.GetField("postMinDistance").GetValue(row),
+                        Is.EqualTo((float)type.GetField("preMinDistance").GetValue(row)).Within(.000001f));
+                }
+                for (int i = 0; i < bones.Length; i++) Assert.That(bones[i].localRotation, Is.EqualTo(rotations[i]));
+                Assert.That(w.F.Root.transform.position, Is.EqualTo(before)); Assert.That(w.Capsule.enabled, Is.False);
+                Assert.That(w.Apply(out _), Is.False, "The rejected pose stays latched until the real actor reset.");
                 Call(w.F.Actor, "ResetActor"); Assert.That(w.Capsule.enabled, Is.True); Assert.That(w.F.Failed, Is.False);
-                w.F.Animator.Play("Idle", 0, 0); w.F.Animator.Update(0); w.CheckPaws();
+                w.F.RewriteRawPose(); w.CheckPaws();
             });
         }
     }

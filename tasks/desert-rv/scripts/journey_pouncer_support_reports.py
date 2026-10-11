@@ -40,11 +40,13 @@ FOCUSED_FLAGS = set('inputVerified replayDetached scenesUnloaded originalScenesP
 FOCUSED_KEYS = FOCUSED_FLAGS | set('schema status sourceCommit producerCommit producerGeneratedReceiptSha256 derivedReceiptSha256 inputSha256 unityVersion failureCode nativeErrorCount sourcePinCount scenePinCount approved cases'.split())
 FOCUSED_CODES = set('''ACTIVE_SCENE ANIMATOR_CHANGED CAPTURE_CADENCE CASE_INVENTORY CLEANUP_EXCEPTION CLEANUP_FAILED CLEANUP_OR_NATIVE_ERROR CONSUMER_BYTES_DIFFER CORRECTED_CLEARANCE CROSSING_OR_TRANSITION_NOT_OBSERVED DIRECTOR_OWNER FIRST_WAVE_INVENTORY FIXTURE_ADVANCE FIXTURE_BINDINGS FIXTURE_COLLECT FIXTURE_INSTALL FIXTURE_MUTATED FOREIGN_COLLIDER FOREIGN_DIRECTOR FRAME_BOUND INDEPENDENT_SOLE_CLEARANCE INITIAL_SUPPORT_WRONG INPUT_HASH INPUT_MISSING INPUT_PROVENANCE INPUT_SCHEMA LEG_INVALID LEG_REPORT_INVENTORY MOVEMENT_OUTSIDE_PRODUCTION_AI_PHASE NATIVE_OR_OBSERVER_FAILURE NONFINITE_SAMPLE NONWALKABLE_SUPPORT NOT_PLAYMODE OBSERVATION_GAP OBSERVER_EXCEPTION PAW_BINDINGS PAW_LIMIT PAW_REPORT_FAILED PAW_REPORT_FRESH PLAYING_REQUIRED POUNCER_REQUIRED PREPARED_ROAD_EDGE PREPARED_SUPPORT_HEIGHTS PRODUCTION_BIND_R3 READABLE_NATIVE_SKIN REGION_ID REPORT_SIZE_BOUND REQUIRED_SOURCE_PIN ROOT_NOT_ON_ACTUAL_SUPPORT SAVED_MODEL_BINDING SAVED_SUPPORT_BINDING SAVED_SUPPORT_INVENTORY SCENE_PIN_INVENTORY SKIN_INVENTORY SOLE_INVENTORY_EMPTY SOURCE_ALREADY_LOADED SOURCE_PIN_HASH SOURCE_PIN_INVENTORY START_JOURNEY STATIONARY_INPUT_REQUIRED SUPPORT_MISSING TEST_EXCEPTION UNCHANGED_PAW_BUDGET UNITY_ERROR WEIGHT_STREAM_INVENTORY'''.split())
 CASE_ORDER = ('rise-30hz', 'drop-30hz', 'rise-5hz', 'drop-5hz')
+FOCUSED_CODES |= {'DEATH_LIFECYCLE', 'RESET_LIFECYCLE', 'LIFECYCLE_TIMEOUT'}
 CASE_FLAGS = set('completed actorYUnchangedAtSetup boundSupportValid modelUnchanged targetStationary'.split())
+LIFECYCLE_INTS = {'deathFrames', 'resetFrames'}
 CASE_INTS = set('frameBound frames firstFrame lastFrame stalkFrames windupFrames walkFrames animatorWindupFrames stalkToWindupCount walkToWindupCount blendedWalkToWindupFrames riseCount dropCount mixedSupportSamples lowSupportSamples highSupportSamples selectedSoleVertices correctedLegFrames aiMovementFrames independentSamples independentCrossingSamples independentTransitionSamples'.split())
 CASE_FLOATS = set('captureDelta aiDelta actualDeltaMin actualDeltaMax initialSupportY finalSupportY measuredSurfaceRise horizontalTravel maxRootStep maxRootSupportError maxRootCenterGroundDelta maxPawCorrection maxPawResidual maxCorrectedClearanceError maxSkinningAgreementError'.split())
 CASE_VECTORS = {'fixtureActorRoot', 'initialRoot', 'finalRoot', 'target'}
-CASE_KEYS = CASE_FLAGS | CASE_INTS | CASE_FLOATS | CASE_VECTORS | {'name'}
+CASE_KEYS = CASE_FLAGS | CASE_INTS | CASE_FLOATS | CASE_VECTORS | LIFECYCLE_INTS | {'name', 'lifecycleCompleted'}
 
 
 def require(ok, code):
@@ -170,6 +172,16 @@ def focused_case(row, index):
     cadence, bound = ((1 / 30, 240) if index < 2 else (.2, 120))
     require(near(row['captureDelta'], cadence) and near(row['aiDelta'], min(cadence, .1)) and row['frameBound'] == bound and
             0 <= row['frames'] <= bound, 'FOCUSED_CADENCE_BOUND')
+    # These observe later ordinary frames and do not alter crossing contiguity or counters.
+    require(type(row['lifecycleCompleted']) is bool and all(integer(row[n], 0, bound) for n in LIFECYCLE_INTS),
+            'FOCUSED_LIFECYCLE_TYPES_BOUND')
+    require(row['completed'] or not row['lifecycleCompleted'] and row['deathFrames'] == row['resetFrames'] == 0,
+            'FOCUSED_LIFECYCLE_ORDER')
+    if row['resetFrames'] or row['lifecycleCompleted']:
+        # The pinned real Death clip is 1.8s; tolerance covers float time accumulation only.
+        require(row['deathFrames'] * cadence >= 1.8 - 1e-5, 'FOCUSED_DEATH_COVERAGE')
+    if row['lifecycleCompleted']:
+        require(row['resetFrames'] >= 2, 'FOCUSED_RESET_COVERAGE')
     # Failure may happen partway through a frame, after counters advanced but before
     # frames/lastFrame were committed. Only the final incomplete case may have it.
     observed = row['frames'] + (not row['completed'])
@@ -189,7 +201,11 @@ def focused_case(row, index):
         return
     drop = index % 2 == 1
     start, finish = ((.035, -.04) if drop else (-.04, .035))
-    require(all(row[n] for n in CASE_FLAGS) and row['frames'] > 0 and row['selectedSoleVertices'] >= 16, 'FOCUSED_CASE_COMPLETION')
+    # Model/target flags also observe lifecycle frames; preserve their actual failed
+    # values in the final incomplete case without discarding its crossing evidence.
+    require(all(row[n] for n in CASE_FLAGS
+                if row['lifecycleCompleted'] or n not in {'modelUnchanged', 'targetStationary'}) and
+            row['frames'] > 0 and row['selectedSoleVertices'] >= 16, 'FOCUSED_CASE_COMPLETION')
     require(near(row['actualDeltaMin'], cadence, 1e-5) and near(row['actualDeltaMax'], cadence, 1e-5) and
             row['actualDeltaMin'] <= row['actualDeltaMax'], 'FOCUSED_ACTUAL_CADENCE')
     require(near(row['initialSupportY'], start, .0001) and near(row['finalSupportY'], finish, .0001) and
@@ -207,7 +223,11 @@ def focused_case(row, index):
     # 1e-9 only covers float-to-JSON rounding; production budgets remain unchanged.
     limits = {'maxRootStep': .0751, 'maxRootSupportError': .0001, 'maxRootCenterGroundDelta': .0751,
               'maxPawCorrection': .1, 'maxPawResidual': .004, 'maxCorrectedClearanceError': .0002, 'maxSkinningAgreementError': .00025}
-    require(all(row[name] <= limit + 1e-9 for name, limit in limits.items()), 'FOCUSED_PRODUCTION_BUDGET')
+    # A failed lifecycle may record the actual offending paw metric. Crossing/root
+    # checks remain required; completed lifecycle evidence retains every original budget.
+    lifecycle_metrics = {'maxPawCorrection', 'maxPawResidual', 'maxCorrectedClearanceError', 'maxSkinningAgreementError'}
+    require(all(row[name] <= limit + 1e-9 for name, limit in limits.items()
+                if row['lifecycleCompleted'] or name not in lifecycle_metrics), 'FOCUSED_PRODUCTION_BUDGET')
 
 
 def verify_focused_report(value, expectation, input_sha, complete=False):
@@ -234,8 +254,8 @@ def verify_focused_report(value, expectation, input_sha, complete=False):
         require(value['sourcePinCount'] == value['scenePinCount'] == 0 and not value['cases'], 'FOCUSED_UNVERIFIED_CASES')
     for index, row in enumerate(value['cases']):
         focused_case(row, index)
-        require(index == len(value['cases']) - 1 or row['completed'], 'FOCUSED_INCOMPLETE_PREFIX')
+        require(index == len(value['cases']) - 1 or row['completed'] and row['lifecycleCompleted'], 'FOCUSED_INCOMPLETE_PREFIX')
     if done:
-        require(len(value['cases']) == 4 and all(c['completed'] for c in value['cases']) and all(value[n] for n in FOCUSED_FLAGS) and
+        require(len(value['cases']) == 4 and all(c['completed'] and c['lifecycleCompleted'] for c in value['cases']) and all(value[n] for n in FOCUSED_FLAGS) and
                 value['nativeErrorCount'] == 0 and value['failureCode'] == '', 'FOCUSED_COMPLETION')
     return done
