@@ -57,7 +57,7 @@
     },
     {
       "path": ".github/workflows/desert-rv-journey-android.yml",
-      "sha256": "0edcf8f9797d44365724f8b1d9c7a969e83a60d557d7e472aef97b67d1ffe080",
+      "sha256": "963979866e1f137142deb66ac32d14ae025d819a4e90d625af29bd568cf0f239",
       "size": 38603
     },
     {
@@ -577,7 +577,7 @@
     },
     {
       "path": "tasks/desert-rv/scripts/player/journey_android.py",
-      "sha256": "47737a6b5c279d9f1b712bf17ae75f258f252cc2387fff811200d4f837cad74a",
+      "sha256": "f24299fcab2c20e4dcf15d4df0cfac2da434017c43f1c077868517ba46e65929",
       "size": 28630
     },
     {
@@ -4477,8 +4477,8 @@
     },
     {
       "path": "tasks/desert-rv/unity/Assets/DesertRV/Editor/JourneySceneAuthoring.SurfaceArt.cs",
-      "sha256": "47c01e4ce42dc5805f93a54fd7a00494d420d748af0d911b97f4792a248aabba",
-      "size": 15037
+      "sha256": "a7d6822b8f22902d7d6246c2d21e348f4be2cd9d47f1c66ccd41862d429cc801",
+      "size": 20199
     },
     {
       "path": "tasks/desert-rv/unity/Assets/DesertRV/Editor/JourneySceneAuthoring.SurfaceArt.cs.meta",
@@ -5702,8 +5702,8 @@
     },
     {
       "path": "tasks/desert-rv/unity/Assets/DesertRV/Tests/JourneyPreparation/JourneyPreparationTests.cs",
-      "sha256": "d158e1ae717bed75013713b16dbd861d481e2128e3fb596190f64fdec43f6721",
-      "size": 29397
+      "sha256": "348feb4499704b12da5dc56d3f841c3041c1ebafba512cdddc1a57f1f85b5d9d",
+      "size": 35307
     },
     {
       "path": "tasks/desert-rv/unity/Assets/DesertRV/Tests/JourneyPreparation/JourneyPreparationTests.cs.meta",

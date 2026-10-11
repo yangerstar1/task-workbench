@@ -10,6 +10,71 @@ namespace DesertRV.Tests
 {
     public sealed class JourneyPreparationTests
     {
+        static void VerifySurfaceReloadLifecycle()
+        {
+            const string folder = "Assets/__JourneySurfaceReloadFixture";
+            string meshPath = folder + "/Mesh.asset", materialPath = folder + "/Material.mat";
+            Assert.IsFalse(Directory.Exists(folder) || File.Exists(folder + ".meta"), "Owned surface fixture destination must be absent.");
+            var scenes = Enumerable.Range(0, SceneManager.sceneCount).Select(SceneManager.GetSceneAt).ToArray();
+            var active = SceneManager.GetActiveScene(); var dirty = scenes.Select(scene => scene.isDirty).ToArray();
+            var roots = scenes.Where(scene => scene.isLoaded).SelectMany(scene => scene.GetRootGameObjects()).Select(go => go.GetInstanceID()).ToArray();
+            var vertices = new[] { Vector3.zero, Vector3.right * 2, Vector3.forward * 3 };
+            var uv = new[] { Vector2.zero, Vector2.right, new Vector2(0, 1.5f) };
+            var color = Color.green;
+            Mesh mesh = null; Material material = null;
+            var failures = new System.Collections.Generic.List<Exception>();
+            void Cleanup(Action action) { try { action(); } catch (Exception failure) { failures.Add(failure); } }
+            try
+            {
+                Assert.IsNotEmpty(UnityEditor.AssetDatabase.CreateFolder("Assets", "__JourneySurfaceReloadFixture"));
+                mesh = new Mesh { vertices = vertices, uv = uv, triangles = new[] { 0, 1, 2 } }; mesh.RecalculateBounds();
+                // The fixture needs saved native material data, not a URP upgrader or rendering.
+                var shader = Shader.Find("Unlit/Color"); Assert.IsTrue(shader);
+                material = new Material(shader); material.SetColor("_Color", color);
+                UnityEditor.AssetDatabase.CreateAsset(mesh, meshPath); UnityEditor.AssetDatabase.SaveAssetIfDirty(mesh);
+                UnityEditor.AssetDatabase.CreateAsset(material, materialPath); UnityEditor.AssetDatabase.SaveAssetIfDirty(material);
+                var saved = new[] { meshPath, materialPath }.SelectMany(path => new[] { path, path + ".meta" }).ToDictionary(path => path, File.ReadAllBytes);
+                var authoring = Type.GetType("DesertRV.Editor.JourneySceneAuthoring, Assembly-CSharp-Editor", true);
+                var unload = authoring.GetMethod("UnloadSurfaceMainAsset", BindingFlags.Static | BindingFlags.NonPublic);
+                // Keep no old wrapper alive in the fixture, and exercise the production helper.
+                mesh = null; material = null;
+                unload.Invoke(null, new object[] { meshPath, typeof(Mesh) });
+                unload.Invoke(null, new object[] { materialPath, typeof(Material) });
+                Assert.IsFalse(UnityEditor.AssetDatabase.IsMainAssetAtPathLoaded(meshPath));
+                Assert.IsFalse(UnityEditor.AssetDatabase.IsMainAssetAtPathLoaded(materialPath));
+                mesh = UnityEditor.AssetDatabase.LoadAssetAtPath<Mesh>(meshPath);
+                material = UnityEditor.AssetDatabase.LoadAssetAtPath<Material>(materialPath);
+                Assert.IsTrue(UnityEditor.AssetDatabase.IsMainAssetAtPathLoaded(meshPath));
+                Assert.IsTrue(UnityEditor.AssetDatabase.IsMainAssetAtPathLoaded(materialPath));
+                CollectionAssert.AreEqual(vertices, mesh.vertices); CollectionAssert.AreEqual(uv, mesh.uv);
+                CollectionAssert.AreEqual(new[] { 0, 1, 2 }, mesh.triangles);
+                Assert.AreEqual(new Bounds(new Vector3(1, 0, 1.5f), new Vector3(2, 0, 3)), mesh.bounds);
+                Assert.AreEqual(shader, material.shader); Assert.AreEqual(color, material.GetColor("_Color"));
+                Assert.IsTrue(UnityEditor.EditorUtility.IsPersistent(mesh) && UnityEditor.EditorUtility.IsPersistent(material));
+                Assert.IsFalse(UnityEditor.EditorUtility.IsDirty(mesh) || UnityEditor.EditorUtility.IsDirty(material));
+                foreach (var file in saved) CollectionAssert.AreEqual(file.Value, File.ReadAllBytes(file.Key));
+            }
+            catch (Exception failure) { failures.Add(failure); }
+            finally
+            {
+                Cleanup(() => { if (mesh && !UnityEditor.EditorUtility.IsPersistent(mesh)) UnityEngine.Object.DestroyImmediate(mesh); });
+                Cleanup(() => { if (material && !UnityEditor.EditorUtility.IsPersistent(material)) UnityEngine.Object.DestroyImmediate(material); });
+                Cleanup(() => {
+                    if (UnityEditor.AssetDatabase.IsValidFolder(folder)) Assert.IsTrue(UnityEditor.AssetDatabase.DeleteAsset(folder), "Owned surface fixture cleanup failed.");
+                    Assert.IsFalse(Directory.Exists(folder) || File.Exists(folder + ".meta"));
+                });
+                Cleanup(() => {
+                    var after = Enumerable.Range(0, SceneManager.sceneCount).Select(SceneManager.GetSceneAt).ToArray();
+                    CollectionAssert.AreEqual(scenes.Select(scene => scene.handle), after.Select(scene => scene.handle));
+                    CollectionAssert.AreEqual(dirty, after.Select(scene => scene.isDirty));
+                    CollectionAssert.AreEqual(roots, after.Where(scene => scene.isLoaded).SelectMany(scene => scene.GetRootGameObjects()).Select(go => go.GetInstanceID()));
+                    Assert.AreEqual(active, SceneManager.GetActiveScene());
+                });
+            }
+            if (failures.Count == 1) System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(failures[0]).Throw();
+            if (failures.Count > 1) throw new AggregateException("Surface reload fixture/cleanup failed.", failures);
+            Debug.Log("JOURNEY_SURFACE_RELOAD_REGRESSION: mesh/material native loaded-unloaded-loaded, saved data and bytes, owned cleanup and unchanged scenes verified.");
+        }
         static void VerifyFxPreviewLifecycle(bool fail)
         {
             var editor = Type.GetType("DesertRV.Editor.JourneyCandidateAssetIntegration, Assembly-CSharp-Editor", true);
@@ -262,6 +327,7 @@ namespace DesertRV.Tests
                     seconds.ToString("F3", System.Globalization.CultureInfo.InvariantCulture));
                 previousSeconds = seconds;
             }
+            VerifySurfaceReloadLifecycle(); MarkPhase("surface-native-reload-regressions");
             // Actual native success and injected-failure cleanup, inside the existing single-case gate.
             VerifyFxPreviewLifecycle(false); VerifyFxPreviewLifecycle(true); MarkPhase("fx-preview-lifecycle-regressions");
             VerifyPoseJsonRoundtrip(); MarkPhase("pose-json-regressions");

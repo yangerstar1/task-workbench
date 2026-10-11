@@ -33,13 +33,13 @@ def load_build_modules():
     from capture_game_window import atomic
     from prepare_safe_diagnostic_export import safe,sha,read_json
 
-BASE = '10a021dcdc3861b8bfc47d54f26b7fe46d0b52d3'
+BASE = '767b37db844cbe27b0940ee3bc9677b1fc8291f7'
 BRANCH = 'journey-android-c15'
 REF = 'refs/heads/' + BRANCH
 REPO = 'yangerstar1/task-workbench'
 WORKFLOW = '.github/workflows/desert-rv-journey-android.yml'
-REQUEST = '.github/dispatch/desert-rv-journey-android-c15-r1-20261011.json'
-REQUEST_ID = 'desert-rv-journey-android-c15-r1-20261011-once'
+REQUEST = '.github/dispatch/desert-rv-journey-android-c15-r2-20261011.json'
+REQUEST_ID = 'desert-rv-journey-android-c15-r2-20261011-once'
 SOURCE = 'tasks/desert-rv/SOURCE-STATE.json'
 SELECTION = 'tasks/desert-rv/art/journey-preparation/three-strict-candidates.json'
 IMAGE = 'unityci/editor@sha256:1e98c949ff728e6ff627b5c55ef65975125a6dc47cf27060601b79a141cc8692'

@@ -172,31 +172,68 @@ namespace DesertRV.Editor
                 "Original two physical supports must remain enabled boxes.");
         }
 
+        static Object LoadCleanSurfaceMainAsset(string path, Type expectedType, string stage)
+        {
+            SurfaceRequire(expectedType == typeof(Mesh) || expectedType == typeof(Material), "Unexpected surface asset type.");
+            SurfaceRequire(File.Exists(path) && File.Exists(path + ".meta"), "Saved surface asset or metadata missing: " + path);
+            var asset = AssetDatabase.LoadMainAssetAtPath(path);
+            bool persistent = asset && EditorUtility.IsPersistent(asset), dirty = asset && EditorUtility.IsDirty(asset);
+            bool loaded = AssetDatabase.IsMainAssetAtPathLoaded(path);
+            int hideFlags = asset ? (int)asset.hideFlags : -1;
+            string type = asset && asset.GetType() == expectedType ? expectedType.Name : "unexpected-or-missing";
+            string hashes = "; sha256=" + HashFile(path) + "; metaSha256=" + HashFile(path + ".meta");
+            Debug.Log("JOURNEY_SURFACE_RELOAD_ASSET stage=" + stage + "; path=" + path + "; type=" + type +
+                "; persistent=" + persistent + "; dirty=" + dirty + "; hideFlags=" + hideFlags + "; loaded=" + loaded + hashes);
+            SurfaceRequire(asset && asset.GetType() == expectedType && persistent && !dirty && loaded &&
+                AssetDatabase.IsMainAsset(asset) && AssetDatabase.GetAssetPath(asset) == path,
+                "Exact clean persistent main surface asset required: " + path);
+            return asset;
+        }
+
+        static void UnloadSurfaceMainAsset(string path, Type expectedType)
+        {
+            var asset = LoadCleanSurfaceMainAsset(path, expectedType, "before-unload");
+            int hideFlags = (int)asset.hideFlags;
+            Resources.UnloadAsset(asset);
+            asset = null;
+            // Unity 6000.3 Object.bool may still report a Mesh/Material alive through its
+            // PersistentManager instance ID. Test native residency without the old wrapper.
+            // See AssetDatabase.IsMainAssetAtPathLoaded's official material unload example.
+            bool loaded = AssetDatabase.IsMainAssetAtPathLoaded(path);
+            Debug.Log("JOURNEY_SURFACE_RELOAD_ASSET stage=after-unload; path=" + path + "; type=" + expectedType.Name +
+                "; hideFlags=" + hideFlags + "; loaded=" + loaded + "; sha256=" + HashFile(path) + "; metaSha256=" + HashFile(path + ".meta"));
+            SurfaceRequire(!loaded, "Native main surface asset remains loaded: " + path);
+        }
+
         // Called by the existing native preparation case, after the real saved integration.
         // Reloads every real region; it does not certify rendering, gameplay or Android.
         public static void ValidateSavedPhysicalSurfaceArt()
         {
             var setup = EditorSceneManager.GetSceneManagerSetup();
             SurfaceRequire(!setup.Any(s => s.isLoaded && SceneManager.GetSceneByPath(s.path).isDirty), "Save/discard scene edits before validation.");
+            var paths = Enumerable.Range(1, 3).SelectMany(region => SurfaceArtRoles().Select(role => SurfaceMeshPath(region, role)))
+                .Concat(new[] { SurfaceMaterialPath(true), SurfaceMaterialPath(false) }).ToArray();
+            SurfaceRequire(paths.Length == 122 && paths.Distinct().Count() == 122, "Exact 122 surface main asset paths required.");
+            var files = paths.Concat(RegionPaths).SelectMany(path => new[] { path, path + ".meta" }).ToArray();
+            foreach (string path in files) SurfaceRequire(File.Exists(path), "Saved surface verification file missing: " + path);
+            var hashes = files.ToDictionary(path => path, HashFile);
+            // Preserve the original clean-asset precondition before closing any scenes.
+            // Discard each wrapper here; reacquire it only after scene references are gone.
+            foreach (string path in paths) LoadCleanSurfaceMainAsset(path,
+                path.EndsWith(".mat", StringComparison.Ordinal) ? typeof(Material) : typeof(Mesh), "preflight");
+            var failures = new List<Exception>();
             try
             {
-                // Scene reopen alone may keep cached native Mesh/Material objects alive.
-                // Unload the exact persistent assets after removing scene references, so
-                // the next scene load must consume the saved files that will be exported.
-                var cached = Enumerable.Range(1, 3).SelectMany(region => SurfaceArtRoles().Select(role =>
-                    (Object)AssetDatabase.LoadAssetAtPath<Mesh>(SurfaceMeshPath(region, role))))
-                    .Concat(new[] { (Object)AssetDatabase.LoadAssetAtPath<Material>(SurfaceMaterialPath(true)),
-                        AssetDatabase.LoadAssetAtPath<Material>(SurfaceMaterialPath(false)) }).ToArray();
-                SurfaceRequire(cached.Length == 122 && cached.All(asset => asset && EditorUtility.IsPersistent(asset) && !EditorUtility.IsDirty(asset)),
-                    "Exact clean persistent surface assets required before reload.");
+                // Remove scene references before acquiring wrappers. Retain no Mesh/Material
+                // wrapper across unload, and do not save/reimport while proving disk identity.
                 EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
-                foreach (var asset in cached)
-                {
-                    if (asset) Resources.UnloadAsset(asset);
-                    SurfaceRequire(!asset, "Native surface asset did not unload.");
-                }
+                Debug.Log("JOURNEY_SURFACE_RELOAD_PHASE stage=scenes-closed; assets=122");
+                foreach (string path in paths) UnloadSurfaceMainAsset(path, path.EndsWith(".mat", StringComparison.Ordinal) ? typeof(Material) : typeof(Mesh));
+                foreach (string path in paths) SurfaceRequire(!AssetDatabase.IsMainAssetAtPathLoaded(path), "Surface main asset reloaded before scene open: " + path);
+                Debug.Log("JOURNEY_SURFACE_RELOAD_PHASE stage=all-unloaded; assets=122");
                 foreach (string path in RegionPaths)
                 {
+                    Debug.Log("JOURNEY_SURFACE_RELOAD_PHASE stage=scene-open; path=" + path);
                     var scene = EditorSceneManager.OpenScene(path, OpenSceneMode.Single);
                     var binding = Components<RegionBinding>(scene).Single();
                     ValidatePhysicalSurfaceArt(binding);
@@ -204,9 +241,34 @@ namespace DesertRV.Editor
                         binding.pouncerSupportSurfaces.Contains(binding.transform.Find("Route foundation").GetComponent<BoxCollider>()) &&
                         binding.pouncerSupportSurfaces.Contains(binding.transform.Find("Road surface").GetComponent<BoxCollider>()),
                         "Saved Pouncer support bindings changed.");
+                    foreach (string assetPath in SurfaceArtRoles().Select(role => SurfaceMeshPath(binding.region, role))
+                        .Concat(new[] { SurfaceMaterialPath(true), SurfaceMaterialPath(false) }))
+                    {
+                        SurfaceRequire(AssetDatabase.IsMainAssetAtPathLoaded(assetPath), "Scene did not reload its surface main asset: " + assetPath);
+                        var asset = AssetDatabase.LoadMainAssetAtPath(assetPath);
+                        SurfaceRequire(asset && EditorUtility.IsPersistent(asset) && !EditorUtility.IsDirty(asset), "Reloaded surface asset is not clean/persistent: " + assetPath);
+                    }
+                    SurfaceRequire(!scene.isDirty, "Saved surface verification dirtied its scene: " + path);
+                    Debug.Log("JOURNEY_SURFACE_RELOAD_PHASE stage=scene-verified; path=" + path);
                 }
             }
-            finally { RestoreSceneSetup(setup); }
+            catch (Exception failure) { failures.Add(failure); }
+            finally
+            {
+                // Preserve the first failed assertion even if restoration or the final byte
+                // check also fails, as in the existing read-only integration transaction.
+                try { RestoreSceneSetup(setup); }
+                catch (Exception failure) { failures.Add(failure); }
+                try
+                {
+                    foreach (var file in hashes) SurfaceRequire(File.Exists(file.Key) && HashFile(file.Key) == file.Value,
+                        "Surface asset, scene or metadata bytes changed during reload/restoration: " + file.Key);
+                    Debug.Log("JOURNEY_SURFACE_RELOAD_PHASE stage=disk-hashes-preserved; files=" + hashes.Count);
+                }
+                catch (Exception failure) { failures.Add(failure); }
+            }
+            if (failures.Count == 1) System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(failures[0]).Throw();
+            if (failures.Count > 1) throw new AggregateException("Surface reload verification/restoration failed.", failures);
             Debug.Log("JOURNEY_SURFACE_ART_SAVED_BINDINGS: 120 actual render meshes, two materials, metre UVs and original two-box supports verified; visual acceptance pending.");
         }
     }
