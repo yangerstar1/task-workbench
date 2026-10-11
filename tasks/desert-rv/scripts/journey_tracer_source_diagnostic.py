@@ -77,15 +77,34 @@ def attempt(action):
         return dict(status='FAIL', errorClass=error_class(error))
 
 
+def admission(env):
+    # Only the existing exact Android ref selects Android admission. Every other
+    # context retains the unchanged, closed Linux dispatcher and its rejections.
+    if env.get('GITHUB_REF') == 'refs/heads/journey-android-c15':
+        sys.path.insert(0, str(TASK / 'scripts/player'))
+        import journey_android
+        return journey_android
+    import journey_tracer_dispatch
+    return journey_tracer_dispatch
+
+
+def verify_admission(env):
+    dispatch = admission(env)
+    if env.get('GITHUB_REF') == 'refs/heads/journey-android-c15':
+        return dispatch.dispatch(env)
+    return dispatch.verify(ROOT, env)
+
+
 def pinned_baseline(env):
     """Authenticate HEAD's original request, without trusting native-modified files.
 
     This function only permits diagnostic reads. The unchanged admission helper is
     still checked independently and remains required by the original native gate.
     """
-    import journey_tracer_dispatch as dispatch
+    dispatch = admission(env)
+    import journey_tracer_dispatch as git_helpers
     import verify_evidence as original
-    git = lambda *args: dispatch.git(ROOT, *args)
+    git = lambda *args: git_helpers.git(ROOT, *args)
     head = git('rev-parse', 'HEAD').decode().strip()
     parents = [line.split(' ', 1)[1] for line in git('cat-file', '-p', 'HEAD').decode().split('\n\n', 1)[0].splitlines() if line.startswith('parent ')]
     git('cat-file', '-e', dispatch.BASE + '^{commit}')
@@ -94,7 +113,7 @@ def pinned_baseline(env):
     selection = git('show', 'HEAD:' + dispatch.SELECTION)
     present = subprocess.run(['git', 'cat-file', '-e', dispatch.BASE + ':' + dispatch.REQUEST], cwd=ROOT, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode == 0
     changed = git('diff-tree', '--no-commit-id', '--name-only', '-r', 'HEAD').decode().splitlines()
-    event = json_bytes(dispatch.safe_bytes(Path(env.get('GITHUB_EVENT_PATH', '')), 4 * 1024**2))
+    event = json_bytes(git_helpers.safe_bytes(Path(env.get('GITHUB_EVENT_PATH', '')), 4 * 1024**2))
     dispatch.validate(env, event, head, parents, request, request, present, changed, sha(raw), sha(selection))
     source = json_bytes(raw)
     require(source.get('schema') == 'desert-rv-source-state/v1' and source.get('coverageRoots') == list(original.SOURCE_ROOTS) and source.get('coverageFiles') == list(original.SOURCE_FILES))
@@ -331,11 +350,10 @@ def collect_changes(source, expected):
 
 def check_original_gates(env, source):
     sys.path[:0] = [str(TASK / 'art/journey-preparation'), str(TASK / 'scripts/rendered')]
-    import journey_tracer_dispatch as dispatch
     import pipeline
     import prepared_source
     results = {key: dict(status='FAIL', errorClass='OtherError') for key in CHECKS}
-    results['dispatchIdentity'] = attempt(lambda: dispatch.verify(ROOT, env))
+    results['dispatchIdentity'] = attempt(lambda: verify_admission(env))
     state = None
     try:
         state = pipeline.state()

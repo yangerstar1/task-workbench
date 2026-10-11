@@ -288,7 +288,7 @@ def blank(env):
     identity = isolated.owner_identity(env)
     return dict(schema=1, resultScope='ACTUAL_RV_ENTRY_PHYSICS_DIAGNOSTIC',
                 purpose='NATIVE_DIAGNOSTIC_ONLY', **identity,
-                requestId=dispatch.REQUEST_ID, requestSha256='', sourceStateSha256='',
+                requestId=source.admission(env).REQUEST_ID, requestSha256='', sourceStateSha256='',
                 isolatedProjectPath=isolated.COPY_REL, expectedNativeCases=1,
                 nativeCases=0, nativeOutcome='unknown', nativeResults=[], nativeXmlSha256='',
                 fixtureSourceSha256='', physicsReportSha256='', physics=None,
@@ -297,9 +297,11 @@ def blank(env):
                 checks={name: 'NOT_CHECKED' for name in ('identity', 'nativeXml', 'physics', 'originalSource', 'isolation')})
 
 
-def validate_report(value):
+def validate_report(value, env=None):
     try:
-        expected = blank(dict(GITHUB_SHA=value['sourceCommit'], GITHUB_RUN_ID=value['runId'], GITHUB_RUN_ATTEMPT=value['runAttempt']))
+        context = {} if env is None else dict(env)
+        context.update(GITHUB_SHA=value['sourceCommit'], GITHUB_RUN_ID=value['runId'], GITHUB_RUN_ATTEMPT=value['runAttempt'])
+        expected = blank(context)
         require(type(value) is dict and set(value) == set(expected))
         for key in ('schema', 'resultScope', 'purpose', 'requestId', 'isolatedProjectPath', 'expectedNativeCases'):
             require(type(value[key]) is type(expected[key]) and value[key] == expected[key])
@@ -331,6 +333,7 @@ def validate_report(value):
 
 
 def run(env):
+    dispatch = source.admission(env)
     report = blank(env)
     report['nativeOutcome'] = env.get('NATIVE_OUTCOME') if env.get('NATIVE_OUTCOME') in OUTCOMES else 'unknown'
     def check(name, action):
@@ -341,7 +344,7 @@ def run(env):
             # No raw logs, exception text, XML messages, or caller paths are public.
             report['checks'][name] = 'FAIL'
     def identity():
-        request = dispatch.verify(ROOT, env)
+        request = source.verify_admission(env)
         report.update(requestSha256=pin(isolated.file_bytes(ROOT / dispatch.REQUEST, 2048)),
                       sourceStateSha256=request['sourceStateSha256'],
                       fixtureSourceSha256=pin(isolated.file_bytes(ROOT / TEST_SOURCE, 1024**2)))
@@ -374,7 +377,7 @@ def run(env):
         check(name, action)
     report['diagnosticComplete'] = diagnostic_complete(report)
     report['status'] = 'DIAGNOSTIC_COMPLETE' if report['diagnosticComplete'] else 'INCOMPLETE'
-    require(validate_report(report))
+    require(validate_report(report, env))
     isolated.safe_path(REPORT)
     raw = (json.dumps(report, separators=(',', ':')) + '\n').encode()
     require(len(raw) <= MAX_REPORT and not REPORT.exists())

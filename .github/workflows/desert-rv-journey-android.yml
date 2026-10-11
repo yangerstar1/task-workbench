@@ -2,7 +2,7 @@ name: Desert RV fresh Journey Android development candidate
 on:
   push:
     branches: [journey-android-c15]
-    paths: [.github/dispatch/desert-rv-journey-android-c15-20261011.json]
+    paths: [.github/dispatch/desert-rv-journey-android-c15-r1-20261011.json]
 permissions:
   contents: read
   actions: read
@@ -95,6 +95,7 @@ jobs:
           SELECTION_SHA: ${{ steps.dispatch_identity.outputs.selection_sha256 }}
         run: |
           /usr/bin/python3 tasks/desert-rv/scripts/player/test_journey_android.py
+          /usr/bin/python3 tasks/desert-rv/scripts/test_journey_android_admission.py
           /usr/bin/python3 tasks/desert-rv/scripts/test_journey_tracer_source_diagnostic.py DiagnosticTests
           /usr/bin/python3 tasks/desert-rv/scripts/test_journey_tracer_native.py
           /usr/bin/python3 tasks/desert-rv/scripts/test_journey_keyboard_look_native.py

@@ -146,7 +146,7 @@ class AndroidDispatchTests(unittest.TestCase):
         self.command('add','.');self.command('commit','--quiet','-m','base');self.base=self.command('rev-parse','HEAD').strip()
         p=patch.object(a,'BASE',self.base);p.start();self.addCleanup(p.stop)
         request=self.root/a.REQUEST;request.parent.mkdir(parents=True)
-        request.write_text(json.dumps(dict(schema=1,requestId='desert-rv-journey-android-c15-20261011-once',baseCommit=self.base,sourceStateSha256=a.sha(self.task/'SOURCE-STATE.json'),selection=a.SELECTION,selectionSha256=a.sha(selection),image=a.IMAGE)))
+        request.write_text(json.dumps(dict(schema=1,requestId=a.REQUEST_ID,baseCommit=self.base,sourceStateSha256=a.sha(self.task/'SOURCE-STATE.json'),selection=a.SELECTION,selectionSha256=a.sha(selection),image=a.IMAGE)))
         self.command('add','.');self.command('commit','--quiet','-m','candidate');self.head=self.command('rev-parse','HEAD').strip()
         self.event=dict(before=self.base,after=self.head,ref=a.REF,created=False,deleted=False,forced=False,sender=dict(login='yangerstar1'),head_commit=dict(id=self.head),repository=dict(full_name=a.REPO,private=False,fork=False,default_branch='main',owner=dict(login='yangerstar1')))
         self.event_path=self.root/'event.json';self.write_event()

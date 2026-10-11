@@ -57,8 +57,8 @@
     },
     {
       "path": ".github/workflows/desert-rv-journey-android.yml",
-      "sha256": "088d18ae79d5399da1cf2db01a9c12f835a9b9c21534ffa4fdb39f8f520a5e1a",
-      "size": 38515
+      "sha256": "0edcf8f9797d44365724f8b1d9c7a969e83a60d557d7e472aef97b67d1ffe080",
+      "size": 38603
     },
     {
       "path": ".github/workflows/desert-rv-journey-prepare.yml",
@@ -497,8 +497,8 @@
     },
     {
       "path": "tasks/desert-rv/scripts/journey_cabin_entry_native.py",
-      "sha256": "8cbeb9876db5a7b0e7809af613bb6db69c5862d55a1b292839b82a04c7af0a38",
-      "size": 27709
+      "sha256": "72d0c4f0e15185c1d98d3dddc702029fe97ea10ba1eba77ea12bc3e61c040dca",
+      "size": 27853
     },
     {
       "path": "tasks/desert-rv/scripts/journey_combat_feedback_native.py",
@@ -557,8 +557,8 @@
     },
     {
       "path": "tasks/desert-rv/scripts/journey_tracer_source_diagnostic.py",
-      "sha256": "65456a66b497a6db9b2cf900d2d0c992352049fa1f2ffdd31ceab1a642478cbc",
-      "size": 31110
+      "sha256": "57a379c342d95a0f9f16a4c30ff8ce6ddd9f560d263e30b54cd907fe67443ac6",
+      "size": 31737
     },
     {
       "path": "tasks/desert-rv/scripts/player/JourneyAndroid.Dockerfile",
@@ -577,8 +577,8 @@
     },
     {
       "path": "tasks/desert-rv/scripts/player/journey_android.py",
-      "sha256": "10153f4e29adbeab9a8e2cb82910c659288b094dc9084d7ae411561468392228",
-      "size": 27648
+      "sha256": "47737a6b5c279d9f1b712bf17ae75f258f252cc2387fff811200d4f837cad74a",
+      "size": 28630
     },
     {
       "path": "tasks/desert-rv/scripts/player/journey_android_container.sh",
@@ -612,8 +612,8 @@
     },
     {
       "path": "tasks/desert-rv/scripts/player/test_journey_android.py",
-      "sha256": "355da29f79704bff97462daf59e346b4b1d78637d43c3f30aed5dedf8f38b0b6",
-      "size": 18380
+      "sha256": "53e7c663ad4d96ec903aae035dcf20a8f6b0896b547349185bcbe8e7bbd13b94",
+      "size": 18347
     },
     {
       "path": "tasks/desert-rv/scripts/player/test_journey_linux_export.py",
@@ -769,6 +769,11 @@
       "path": "tasks/desert-rv/scripts/test_environment_image_precheck.py",
       "sha256": "0850700d7f9c57de4cd6c05f6b811d0fe4d0663141bd7e6153c8e51e83e0b323",
       "size": 84039
+    },
+    {
+      "path": "tasks/desert-rv/scripts/test_journey_android_admission.py",
+      "sha256": "03e33453fdb6c7e4b281ccd3ef6149b9a3ba87701e06504c8f720e235c47a08f",
+      "size": 13009
     },
     {
       "path": "tasks/desert-rv/scripts/test_journey_cabin_entry_native.py",

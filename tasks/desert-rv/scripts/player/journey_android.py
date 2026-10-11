@@ -33,12 +33,14 @@ def load_build_modules():
     from capture_game_window import atomic
     from prepare_safe_diagnostic_export import safe,sha,read_json
 
-BASE = 'c15c3ecbde24156d4e4116b129802a9cbd1df926'
+BASE = '10a021dcdc3861b8bfc47d54f26b7fe46d0b52d3'
 BRANCH = 'journey-android-c15'
 REF = 'refs/heads/' + BRANCH
 REPO = 'yangerstar1/task-workbench'
 WORKFLOW = '.github/workflows/desert-rv-journey-android.yml'
-REQUEST = '.github/dispatch/desert-rv-journey-android-c15-20261011.json'
+REQUEST = '.github/dispatch/desert-rv-journey-android-c15-r1-20261011.json'
+REQUEST_ID = 'desert-rv-journey-android-c15-r1-20261011-once'
+SOURCE = 'tasks/desert-rv/SOURCE-STATE.json'
 SELECTION = 'tasks/desert-rv/art/journey-preparation/three-strict-candidates.json'
 IMAGE = 'unityci/editor@sha256:1e98c949ff728e6ff627b5c55ef65975125a6dc47cf27060601b79a141cc8692'
 STATE = PROJECT/'JourneyEvidence/JourneyPreparation'
@@ -134,8 +136,9 @@ def sealed(path, limit=4*1024**2):
 def git(*args):
     return subprocess.check_output(['git', *args], cwd=ROOT, stderr=subprocess.DEVNULL)
 
-def dispatch(env=None):
-    env = os.environ if env is None else env
+def validate(env, event, head, parents, request_raw, tracked_raw, request_in_parent,
+             changed_paths, source_sha, selection_sha):
+    """Exact Android admission, also usable with HEAD bytes for read-only diagnostics."""
     require(env.get('GITHUB_ACTIONS') == 'true' and env.get('RUNNER_ENVIRONMENT') == 'github-hosted' and
             env.get('RUNNER_OS') == 'Linux' and env.get('GITHUB_REPOSITORY') == REPO and
             env.get('GITHUB_REPOSITORY_VISIBILITY') == 'public', 'ANDROID_PUBLIC_HOSTED')
@@ -143,24 +146,37 @@ def dispatch(env=None):
             env.get('GITHUB_EVENT_NAME') == 'push' and env.get('GITHUB_REF') == REF and
             env.get('GITHUB_WORKFLOW_REF') == REPO+'/'+WORKFLOW+'@'+REF and
             env.get('GITHUB_RUN_ATTEMPT') == '1' and re.fullmatch('[1-9][0-9]*', env.get('GITHUB_RUN_ID','')), 'ANDROID_OWNER_PUSH')
-    head = git('rev-parse','HEAD').decode().strip()
     require(re.fullmatch('[a-f0-9]{40}',head) and env.get('GITHUB_SHA') == head and head != BASE, 'ANDROID_HEAD')
-    parents = [line.split(' ',1)[1] for line in git('cat-file','-p','HEAD').decode().split('\n\n',1)[0].splitlines() if line.startswith('parent ')]
     require(parents == [BASE], 'ANDROID_PARENT')
-    event = sealed(Path(env['GITHUB_EVENT_PATH']))
-    require(event.get('before') == BASE and event.get('after') == head and event.get('ref') == REF and
+    require(type(event) is dict and event.get('before') == BASE and event.get('after') == head and event.get('ref') == REF and
             all(event.get(k) is False for k in ('created','deleted','forced')) and
             event.get('sender',{}).get('login') == 'yangerstar1' and event.get('head_commit',{}).get('id') == head, 'ANDROID_EVENT')
     repo = event.get('repository',{})
-    require(repo.get('full_name') == REPO and repo.get('private') is False and repo.get('fork') is False and
+    require(type(repo) is dict and repo.get('full_name') == REPO and repo.get('private') is False and repo.get('fork') is False and
             repo.get('default_branch') == 'main' and repo.get('owner',{}).get('login') == 'yangerstar1', 'ANDROID_REPOSITORY')
-    request = sealed(ROOT/REQUEST, 4096)
-    require(request == dict(schema=1, requestId='desert-rv-journey-android-c15-20261011-once', baseCommit=BASE,
-            sourceStateSha256=sha(TASK/'SOURCE-STATE.json'), selection=SELECTION, selectionSha256=sha(ROOT/SELECTION), image=IMAGE), 'ANDROID_REQUEST')
-    for name in (REQUEST, SELECTION, 'tasks/desert-rv/SOURCE-STATE.json'):
+    require(type(request_raw) is bytes and 0 < len(request_raw) <= 4096, 'ANDROID_REQUEST')
+    request = json.loads(request_raw, object_pairs_hook=unique, parse_constant=lambda _: require(False, 'JSON_CONSTANT'))
+    require(type(request) is dict and type(request.get('schema')) is int and
+            request == dict(schema=1, requestId=REQUEST_ID, baseCommit=BASE,
+            sourceStateSha256=source_sha, selection=SELECTION, selectionSha256=selection_sha, image=IMAGE), 'ANDROID_REQUEST')
+    require(request_raw == tracked_raw, 'ANDROID_TRACKED_INPUT')
+    require(request_in_parent is False and REQUEST in changed_paths, 'ANDROID_FRESH_REQUEST')
+    return request
+
+def dispatch(env=None):
+    env = os.environ if env is None else env
+    head = git('rev-parse','HEAD').decode().strip()
+    parents = [line.split(' ',1)[1] for line in git('cat-file','-p','HEAD').decode().split('\n\n',1)[0].splitlines() if line.startswith('parent ')]
+    git('cat-file','-e',BASE+'^{commit}')
+    request_path = safe(ROOT/REQUEST)
+    require(0 < request_path.stat().st_size <= 4096, 'ANDROID_REQUEST')
+    request_raw = request_path.read_bytes()
+    request = validate(env, sealed(Path(env['GITHUB_EVENT_PATH'])), head, parents, request_raw,
+        git('show','HEAD:'+REQUEST), subprocess.run(['git','cat-file','-e',BASE+':'+REQUEST],cwd=ROOT,
+        stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL).returncode == 0,
+        git('diff-tree','--no-commit-id','--name-only','-r','HEAD').decode().splitlines(), sha(ROOT/SOURCE), sha(ROOT/SELECTION))
+    for name in (SOURCE, SELECTION):
         require(safe(ROOT/name).read_bytes() == git('show','HEAD:'+name), 'ANDROID_TRACKED_INPUT')
-    absent = subprocess.run(['git','cat-file','-e',BASE+':'+REQUEST],cwd=ROOT,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
-    require(absent.returncode != 0 and REQUEST in git('diff-tree','--no-commit-id','--name-only','-r','HEAD').decode().splitlines(), 'ANDROID_FRESH_REQUEST')
     return request
 
 def output(**values):
