@@ -112,7 +112,7 @@ def _closed_schema(value, kind, field, location):
         elif key == 'unityVersion': require(value=='6000.3.19f1','VERSION_TEXT')
         elif key == 'failureCode': require(value=='' or re.fullmatch(r'OBSERVER_(NullReferenceException|MissingMethodException|MissingFieldException|TypeLoadException|TargetInvocationException|AssertionException|ArgumentException|InvalidOperationException|IndexOutOfRangeException|KeyNotFoundException)',value) is not None,'FAILURE_TEXT')
         elif key == 'mismatches': require(False,'MISMATCH_TEXT')
-        elif field == 'ColliderIdentity.scene': require(value in ('','Assets/DesertRV/Scenes/Journey/JourneyBootstrap.unity','Assets/DesertRV/Scenes/Journey/NightBeacon.unity'),'SCENE_TEXT')
+        elif field == 'ColliderIdentity.scene': require(value in ('','DontDestroyOnLoad','Assets/DesertRV/Scenes/Journey/JourneyBootstrap.unity','Assets/DesertRV/Scenes/Journey/NightBeacon.unity'),'SCENE_TEXT')
         elif field == 'ColliderIdentity.path': require(0<len(value)<=2048 and len(value.split('/'))<=32 and all(part in COLLIDER_NODE_NAMES for part in value.split('/')),'COLLIDER_PATH')
         elif field == 'ColliderIdentity.type': require(value in {'BoxCollider','MeshCollider','CapsuleCollider','SphereCollider','CharacterController'},'COLLIDER_TYPE')
         elif field == 'ColliderIdentity.role': require(value in {'retained-rv','walker','beast','world'},'ROLE_TEXT')
@@ -127,6 +127,83 @@ def _closed_schema(value, kind, field, location):
         elif field == 'Sequence.name': require(value in {p[0] for p in PLANS},'SEQUENCE_TEXT')
         elif key in {'name','step'}: require(value in {row[0] for p in PLANS for row in p[4]},'STEP_TEXT')
         else: require(False,'UNEXPECTED_STRING_FIELD')
+
+MAX_REDACTED_BYTES = 24 * 1024 * 1024
+MAX_OMISSIONS = 128
+
+
+def redact_native_report(raw, rejection_code, native_failure):
+    """Safety-only projection of rejected native bytes; never a validated trace."""
+    require(type(raw) is bytes and len(raw) <= MAX_REDACTED_BYTES, 'REDACTED_RAW_BOUND')
+    require(type(native_failure) is bool and type(rejection_code) is str and
+            re.fullmatch(r'(?:R3_CONTINUOUS|R3_NATURAL_CONTACT)_[A-Z0-9_]{1,96}', rejection_code), 'REDACTED_CONTEXT')
+    omissions = []; count = 0
+    # Reserve wrapper/omission overhead; every data child starts as a charged null.
+    budget = MAX_REDACTED_BYTES - 256 * 1024 - 4
+    def encode(value): return json.dumps(value, sort_keys=True, separators=(',', ':'), allow_nan=True).encode()
+    def omit(value, location, code, missing=False):
+        nonlocal count
+        count += 1
+        if len(omissions) < MAX_OMISSIONS:
+            packed = encode(value)
+            kind = 'missing' if missing else {type(None):'null', bool:'boolean', int:'number', float:'number', str:'string', list:'array', dict:'object'}[type(value)]
+            omissions.append(dict(location=location, code=code, type=kind, jsonBytes=len(packed),
+                length=len(value) if type(value) in (str,list,dict) else 0, sha256=hashlib.sha256(packed).hexdigest()))
+        return None
+    def charge(extra):
+        nonlocal budget
+        if extra > budget: return False
+        budget -= extra; return True
+    def project(value, kind, field, location, depth=0):
+        if depth > 24: return omit(value,location,'R3_CONTINUOUS_DEPTH')
+        if kind.endswith('[]'):
+            if value is None: return None
+            if type(value) is not list: return omit(value,location,'R3_CONTINUOUS_CLOSED_ARRAY')
+            if len(value)>4096: return omit(value,location,'R3_CONTINUOUS_ARRAY_BOUND')
+            if not charge(2 + max(0,len(value)-1) + 4*len(value) - 4):
+                return omit(value,location,'R3_CONTINUOUS_REDACTED_JSON_BUDGET')
+            return [project(v,kind[:-2],field,location+'['+str(i)+']',depth+1) for i,v in enumerate(value)]
+        if kind in SCHEMA or kind == 'v':
+            if value is None and kind in SCHEMA: return None
+            fields = SCHEMA[kind] if kind in SCHEMA else dict(x='n',y='n',z='n')
+            code = 'R3_CONTINUOUS_CLOSED_KEYS_'+kind.upper() if kind in SCHEMA else 'R3_CONTINUOUS_VECTOR'
+            if type(value) is not dict: return omit(value,location,code)
+            overhead = 2 + max(0,len(fields)-1) + sum(len(encode(k))+1+4 for k in fields) - 4
+            if not charge(overhead): return omit(value,location,'R3_CONTINUOUS_REDACTED_JSON_BUDGET')
+            for key in value:
+                if key not in fields: omit(value[key],location+'.<unknown>',code)
+            return {key:project(value[key],sub,kind+'.'+key,location+'.'+key,depth+1) if key in value else
+                    omit(None,location+'.'+key,code,missing=True) for key,sub in fields.items()}
+        try:
+            finite_tree(value)
+            closed_schema(value,kind,field)
+        except (ValueError,OverflowError) as error:
+            code = str(error) if type(error) is ValueError else 'R3_CONTINUOUS_NONFINITE'
+            return omit(value,location,code)
+        packed = encode(value)
+        if not charge(len(packed)-4): return omit(value,location,'R3_CONTINUOUS_REDACTED_JSON_BUDGET')
+        return value
+    def unique(pairs):
+        value = {}
+        for key,item in pairs:
+            require(key not in value,'REDACTED_DUPLICATE_JSON'); value[key]=item
+        return value
+    try:
+        # JSON nonfinite constants can only become hashed omissions in this path.
+        native = json.loads(raw,object_pairs_hook=unique)
+    except (ValueError,UnicodeError,RecursionError):
+        data = None; count=1
+        omissions.append(dict(location='$',code='R3_CONTINUOUS_REDACTED_JSON_PARSE',type='invalid-json',
+            jsonBytes=len(raw),length=0,sha256=hashlib.sha256(raw).hexdigest()))
+    else: data=project(native,'Report','','$')
+    value=dict(schema=1,mode='FAILED_REDACTED',semanticsValidated=False,diagnosticComplete=False,
+        gameplayAccepted=False,nativeFailure=native_failure,rawReportExported=False,
+        sourceRaw=dict(sha256=hashlib.sha256(raw).hexdigest(),bytes=len(raw)),strictValidationCode=rejection_code,
+        omissionCount=count,omissionsDropped=count-len(omissions),omissions=omissions,data=data)
+    result=json.dumps(value,sort_keys=True,separators=(',',':'),allow_nan=False).encode()+b'\n'
+    require(len(result)<=MAX_REDACTED_BYTES,'REDACTED_OUTPUT_BOUND')
+    return result
+
 
 def verify_native_report(native, expectation, input_sha, pins):
     finite_tree(native)

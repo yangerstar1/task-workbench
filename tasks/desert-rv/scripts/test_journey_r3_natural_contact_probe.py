@@ -361,7 +361,7 @@ class OwnedCopyAndExport(unittest.TestCase):
         self.assertFalse(result['approved']);self.assertEqual(result['nativeOutcome'],'failure')
         self.assertNotIn(str(self.root),probe.REPORT.read_text())
         self.assertEqual({p.name for p in probe.EXPORT.iterdir()},{'report.json','consumer-SOURCE-STATE.json','consumer-input.json','source'})
-    def prepare_partial_report(self):
+    def prepare_partial_report(self, completed=False):
         from test_journey_r3_continuous_contact_report import fixture
         import journey_r3_continuous_contact_report as reports
         native,expected,_,_=fixture()
@@ -376,10 +376,11 @@ class OwnedCopyAndExport(unittest.TestCase):
         pins={name:row['sha256'] for name,row in owner['union'].items()}
         pins[probe.INPUT_REL]=owner['inputSha256']
         pins[probe.INPUT_REL.replace('.json','.sha256')]=probe.sha(probe.file_bytes((self.copy/probe.INPUT_REL).with_suffix('.sha256')))
-        native.update(status='fixture-incomplete',consumerCommit=self.env['GITHUB_SHA'])
+        native.update(status='completed' if completed else 'fixture-incomplete',consumerCommit=self.env['GITHUB_SHA'])
         native['dependencyCheck']['inputSha256']=owner['inputSha256']
         for row in native['sourceFiles']:row['sha256']=pins[row['path']]
-        native['sequences']=native['sequences'][:1];native['sequences'][0]['completed']=False;native['sequences'][0]['frames']=native['sequences'][0]['frames'][:5]
+        if not completed:
+            native['sequences']=native['sequences'][:1];native['sequences'][0]['completed']=False;native['sequences'][0]['frames']=native['sequences'][0]['frames'][:5]
         probe.ARTIFACTS.mkdir();(probe.ARTIFACTS/'result.xml').write_text(f'<test-run result="Failed" total="1" passed="0" failed="1" skipped="0" inconclusive="0"><test-case fullname="{probe.TEST}" result="Failed"><failure><message>POUNCER_PAW_CONTACT_FAILED</message><stack-trace>DesertRV.PouncerPawContactConstraint:LateUpdate () (at Assets/DesertRV/Runtime/PouncerPawContactConstraint.cs:71)</stack-trace></failure></test-case></test-run>')
         return native
 
@@ -393,6 +394,91 @@ class OwnedCopyAndExport(unittest.TestCase):
         self.assertFalse(result['nativeSummary']['diagnosticComplete']);self.assertEqual(result['nativeSummary']['observedFrames'],5)
         self.assertEqual((probe.EXPORT/'native-r3-continuous-contact.json').read_bytes(),raw)
         self.assertIn('diagnostic_complete=false',(self.root/'output').read_text())
+
+    def test_complete_strict_report_uses_raw_route_and_native_failed_xml_still_fails(self):
+        native=self.prepare_partial_report(completed=True);raw=json.dumps(native).encode();(self.copy/probe.RAW_REL).write_bytes(raw)
+        with mock.patch.object(probe,'dispatch'),mock.patch.object(probe.source,'verify_source_state'),mock.patch.object(probe,'git',return_value=b''):
+            self.assertEqual(probe.finish(),2)
+        result=probe.read(probe.REPORT)
+        self.assertEqual((probe.EXPORT/result['nativeReport']['path']).read_bytes(),raw)
+        self.assertTrue(result['nativeSummary']['diagnosticComplete']);self.assertEqual(result['nativeSummary']['observedFrames'],1212)
+        self.assertIsNone(result['nativeRedactedReport']);self.assertIsNone(result['nativeReportRejection'])
+        self.assertEqual(result['xml']['result'],'Failed');self.assertEqual(result['nativeOutcome'],'failure')
+        self.assertIn('diagnostic_complete=false',(self.root/'output').read_text())
+    def test_complete_strict_report_and_passed_native_remain_on_original_success_route(self):
+        native=self.prepare_partial_report(completed=True);raw=json.dumps(native).encode();(self.copy/probe.RAW_REL).write_bytes(raw)
+        producer_source=b'public host producer source';producer_receipt=b'public host producer receipt'
+        (probe.PRIVATE/'prepared-input/generated').mkdir(parents=True)
+        (probe.PRIVATE/'producer-SOURCE-STATE.json').write_bytes(producer_source)
+        (probe.PRIVATE/'prepared-input/generated/receipt.json').write_bytes(producer_receipt)
+        producer=dict(probe.PRODUCER,sourceStateSha256=probe.sha(producer_source),generatedReceiptSha256=probe.sha(producer_receipt))
+        (probe.ARTIFACTS/'result.xml').write_text(f'<test-run result="Passed" total="1" passed="1" failed="0" skipped="0" inconclusive="0"><test-case fullname="{probe.TEST}" result="Passed"/></test-run>')
+        with mock.patch.object(probe,'dispatch'),mock.patch.object(probe.source,'verify_source_state'),mock.patch.object(probe,'git',return_value=b''),mock.patch.object(probe,'PRODUCER',producer),mock.patch.dict(os.environ,NATIVE_OUTCOME='success'):
+            self.assertEqual(probe.finish(),0)
+        result=probe.read(probe.REPORT)
+        self.assertEqual(result['status'],'DIAGNOSTIC_COMPLETED_NOT_GAMEPLAY_ACCEPTANCE');self.assertEqual(result['checks'],[])
+        self.assertEqual((probe.EXPORT/result['nativeReport']['path']).read_bytes(),raw)
+        self.assertEqual(result['nativeSummary']['observedFrames'],1212);self.assertTrue(result['nativeSummary']['diagnosticComplete'])
+        self.assertIsNone(result['nativeRedactedReport']);self.assertIsNone(result['nativeReportRejection'])
+        self.assertFalse(result['approved']);self.assertFalse(result['gameplayReviewed'])
+        self.assertIn('diagnostic_complete=true',(self.root/'output').read_text())
+
+    def test_oversize_native_file_keeps_failure_evidence_without_reading_or_exporting_raw(self):
+        self.prepare_partial_report();(self.copy/probe.RAW_REL).write_bytes(b' '*(probe.MAX_NATIVE_REPORT+1))
+        with mock.patch.object(probe,'dispatch'),mock.patch.object(probe.source,'verify_source_state'),mock.patch.object(probe,'git',return_value=b''):
+            self.assertEqual(probe.finish(),2)
+        result=probe.read(probe.REPORT)
+        self.assertIsNone(result['nativeReport']);self.assertIsNone(result['nativeRedactedReport'])
+        self.assertEqual(result['xml']['result'],'Failed');self.assertEqual(result['nativeOutcome'],'failure')
+        self.assertIn('BOUNDED_ORIGINAL_NATIVE_REPORT_UNAVAILABLE',result['checks'])
+        self.assertFalse(any(p.name.startswith('native-r3-') for p in probe.EXPORT.iterdir()))
+    def test_oversize_subtree_projects_safe_neighbor_frames_without_raw_export(self):
+        native=self.prepare_partial_report();native['colliders']=[{}]*4097;raw=json.dumps(native).encode();(self.copy/probe.RAW_REL).write_bytes(raw)
+        with mock.patch.object(probe,'dispatch'),mock.patch.object(probe.source,'verify_source_state'),mock.patch.object(probe,'git',return_value=b''):
+            self.assertEqual(probe.finish(),2)
+        result=probe.read(probe.REPORT);data=probe.read(probe.EXPORT/result['nativeRedactedReport']['path'])
+        self.assertEqual(result['nativeReportRejection']['code'],'R3_CONTINUOUS_ARRAY_BOUND');self.assertIsNone(result['nativeReport'])
+        self.assertIsNone(data['data']['colliders']);self.assertEqual(len(data['data']['sequences'][0]['frames']),5)
+        self.assertEqual(data['omissions'][0]['length'],4097);self.assertTrue(data['nativeFailure'])
+
+    def test_rejected_native_exports_one_pinned_safe_projection_and_keeps_native_failure(self):
+        native=self.prepare_partial_report();native['colliders']=[dict(id=1,instanceId=-1,scene='unknown-private-scene',path='/private/account',type='MeshCollider',role='world',trigger=False,min=dict(x=0,y=0,z=0),max=dict(x=1,y=1,z=1))]
+        raw=json.dumps(native).encode();(self.copy/probe.RAW_REL).write_bytes(raw)
+        with mock.patch.object(probe,'dispatch'),mock.patch.object(probe.source,'verify_source_state'),mock.patch.object(probe,'git',return_value=b''):
+            self.assertEqual(probe.finish(),2)
+        result=probe.read(probe.REPORT);row=result['nativeRedactedReport']
+        self.assertEqual(set(row),{'path','mode','bytes','sha256'});self.assertEqual(row['mode'],'FAILED_REDACTED')
+        packed=(probe.EXPORT/row['path']).read_bytes();self.assertEqual(probe.raw_pin(packed),{k:row[k] for k in ('bytes','sha256')})
+        data=probe.parse(packed);self.assertTrue(data['nativeFailure']);self.assertFalse(data['semanticsValidated']);self.assertFalse(data['diagnosticComplete'])
+        self.assertEqual(data['sourceRaw'],probe.raw_pin(raw));self.assertEqual(len(data['data']['sequences'][0]['frames']),5)
+        self.assertEqual(result['status'],'FAILED_REDACTED_DIAGNOSTIC_NOT_GAMEPLAY_ACCEPTANCE')
+        self.assertIsNone(result['nativeReport']);self.assertIsNone(result['nativeSummary'])
+        self.assertEqual(result['xml']['result'],'Failed');self.assertEqual(result['nativeOutcome'],'failure')
+        expected={'report.json',row['path']} | {p['path'] for p in result['sourceSnapshots']}
+        self.assertEqual({p.relative_to(probe.EXPORT).as_posix() for p in probe.EXPORT.rglob('*') if p.is_file()},expected)
+        for p in probe.EXPORT.rglob('*.json'):
+            for secret in ('unknown-private-scene','/private/account'):self.assertNotIn(secret,p.read_text())
+        self.assertIn('diagnostic_complete=false',(self.root/'output').read_text())
+    def test_nonfinite_native_json_gets_failed_safe_projection(self):
+        native=self.prepare_partial_report();native['sequences'][0]['frames'][1]['dt']=float('nan')
+        raw=json.dumps(native).encode();(self.copy/probe.RAW_REL).write_bytes(raw)
+        with mock.patch.object(probe,'dispatch'),mock.patch.object(probe.source,'verify_source_state'),mock.patch.object(probe,'git',return_value=b''):
+            self.assertEqual(probe.finish(),2)
+        result=probe.read(probe.REPORT);data=probe.read(probe.EXPORT/result['nativeRedactedReport']['path'])
+        self.assertEqual(result['nativeReportRejection']['code'],'R3_NATURAL_CONTACT_NONFINITE_JSON')
+        self.assertIsNone(data['data']['sequences'][0]['frames'][1]['dt']);self.assertEqual(data['omissionCount'],1)
+        self.assertTrue(data['nativeFailure']);self.assertIsNone(result['nativeReport'])
+
+    def test_truncated_native_json_still_exports_bounded_failed_metadata(self):
+        self.prepare_partial_report();raw=b'{"sequences":[{"private-key":"private-body",'
+        (self.copy/probe.RAW_REL).write_bytes(raw)
+        with mock.patch.object(probe,'dispatch'),mock.patch.object(probe.source,'verify_source_state'),mock.patch.object(probe,'git',return_value=b''):
+            self.assertEqual(probe.finish(),2)
+        result=probe.read(probe.REPORT);data=probe.read(probe.EXPORT/result['nativeRedactedReport']['path'])
+        self.assertIsNone(data['data']);self.assertEqual(data['sourceRaw'],probe.raw_pin(raw));self.assertTrue(data['nativeFailure'])
+        self.assertEqual(data['omissions'][0]['code'],'R3_CONTINUOUS_REDACTED_JSON_PARSE')
+        self.assertEqual(result['xml']['result'],'Failed');self.assertIsNone(result['nativeReport'])
+        self.assertNotIn('private-key',json.dumps(data));self.assertNotIn('private-body',json.dumps(data))
 
     def test_unsafe_partial_is_not_exported_and_rejection_context_is_bounded(self):
         native=self.prepare_partial_report();native['sequences'][0]['frames'][2]['motor']['privateExtra']='/private/account/secret'

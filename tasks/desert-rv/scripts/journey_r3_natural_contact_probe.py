@@ -24,15 +24,15 @@ from journey_keyboard_look_native import file_bytes, raw_pin, safe_path, protect
 from strict_output import verify_staged_inventory
 import generated_export as generated
 
-BASE = '162d610e9bfd1fbdc7a149fccd5138148d7a92cb'
+BASE = '2f17ae5f35560bb9aa45d5c3a5946de76a5a415e'
 PRODUCTION_BASE = '9dd81678b649ac7a13eb7e47354afeaf62acf323'
 BRANCH = 'journey-r3-natural-contact-probe-9dd'
 REF = 'refs/heads/' + BRANCH
 REPOSITORY = 'yangerstar1/task-workbench'
 OWNER_NAME = 'yangerstar1'
 WORKFLOW = '.github/workflows/desert-rv-r3-natural-contact.yml'
-REQUEST = '.github/dispatch/desert-rv-r3-natural-contact-9dd-r1-20261010.json'
-NONCE = 'desert-rv-r3-natural-contact-9dd-r1-20261010-once'
+REQUEST = '.github/dispatch/desert-rv-r3-natural-contact-9dd-r2-20261011.json'
+NONCE = 'desert-rv-r3-natural-contact-9dd-r2-20261011-once'
 PRODUCER = dict(commit=PRODUCTION_BASE, runId=38070456519,
     artifactId=11677987684, artifactName='journey-preparation-UNREVIEWED-38070456519-1',
     artifactBytes=19823499, artifactSha256='4050e0b700fcfe6f1cdaafebdc06ff4ab6c8bc7561a3fdd801c61e9b3294c15b',
@@ -467,7 +467,7 @@ def finish():
         approved=False, gameplayReviewed=False, scopeReusable=False,
         nativeOutcome=os.environ.get('NATIVE_OUTCOME','unknown'), sourceUnchanged=False,
         isolatedInputsVerified=False, inputUnchanged=False, xml=None, nativeReport=None,
-        nativeSummary=None, nativeReportRejection=None, settings=None, changes=[], sourceSnapshots=[], checks=[])
+        nativeSummary=None, nativeReportRejection=None, nativeRedactedReport=None, settings=None, changes=[], sourceSnapshots=[], checks=[])
     require(value['nativeOutcome'] in {'success','failure','cancelled','skipped','unknown'}, 'OUTCOME')
     safe_path(EXPORT); require(not EXPORT.exists(), 'EXPORT_EXISTS')
     EXPORT.mkdir(mode=0o700)
@@ -501,6 +501,7 @@ def finish():
     except Exception as error:
         value['checks'].extend(('EXACT_ONE_CASE_XML_UNAVAILABLE', failure_code(error)))
     if owner is not None and value['inputUnchanged']:
+        raw = None
         try:
             from journey_r3_continuous_contact_report import verify_native_report
             raw = file_bytes(COPY / RAW_REL, MAX_NATIVE_REPORT)
@@ -522,6 +523,16 @@ def finish():
                     type(digest) is str and re.fullmatch('[a-f0-9]{64}', digest)):
                 value['nativeReportRejection'].update(location=location, valueSha256=digest)
             value['checks'].extend(('BOUNDED_ORIGINAL_NATIVE_REPORT_UNAVAILABLE', code))
+            if raw is not None and value['nativeReport'] is None:
+                try:
+                    from journey_r3_continuous_contact_report import redact_native_report
+                    redacted = redact_native_report(raw, code, value['nativeOutcome']=='failure' or
+                        value['xml'] is not None and value['xml']['result']=='Failed')
+                    name = 'native-r3-continuous-contact-redacted.json'
+                    with (EXPORT / name).open('xb') as stream: stream.write(redacted)
+                    value['nativeRedactedReport'] = dict(path=name,mode='FAILED_REDACTED',**raw_pin(redacted))
+                except Exception as projection_error:
+                    value['checks'].extend(('BOUNDED_REDACTED_NATIVE_REPORT_UNAVAILABLE',failure_code(projection_error)))
     snapshots = [
         ('producer-SOURCE-STATE.json', PRIVATE / 'producer-SOURCE-STATE.json', PRODUCER['sourceStateSha256']),
         ('producer-generated-receipt.json', PRIVATE / 'prepared-input/generated/receipt.json', PRODUCER['generatedReceiptSha256']),
@@ -546,6 +557,8 @@ def finish():
         value['xml'] is not None and value['xml']['result'] == 'Passed' and value['nativeOutcome'] == 'success' and
         value['nativeSummary'] is not None and value['nativeSummary']['diagnosticComplete'] and not value['checks'])
     if complete: value['status'] = 'DIAGNOSTIC_COMPLETED_NOT_GAMEPLAY_ACCEPTANCE'
+    elif value['nativeRedactedReport'] is not None:
+        value['status'] = 'FAILED_REDACTED_DIAGNOSTIC_NOT_GAMEPLAY_ACCEPTANCE'
     elif value['nativeReport'] is not None:
         value['status'] = 'FAILED_OR_PARTIAL_DIAGNOSTIC_NOT_GAMEPLAY_ACCEPTANCE'
     write_new(REPORT, value)

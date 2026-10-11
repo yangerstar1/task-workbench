@@ -113,6 +113,27 @@ class PartialBoundaries(unittest.TestCase):
         self.assertEqual(result['status'],'FAILED_PARTIAL_OBSERVATION_NOT_ACCEPTANCE')
         self.assertEqual(result['observedFrames'],491);self.assertEqual(result['expectedFrames'],1212)
         self.assertEqual([s['completed'] for s in result['sequences']],[True,False])
+    def test_actual_persistent_scene_rejection_hash_now_accepts_safe_partial(self):
+        # Observed value hash from native run 38097078202; remaining DTO is synthetic.
+        scene='DontDestroyOnLoad'
+        self.assertEqual(hashlib.sha256(json.dumps(scene,separators=(',',':')).encode()).hexdigest(),
+                         '6454b79f26bc846f408ac63de1cb0ecfe9a18e0f5a316c7b074d3afd80e7a307')
+        self.value['colliders']=[complete(dict(id=1,instanceId=-100,path='JourneyBootstrap',
+            type='MeshCollider',role='retained-rv',scene=scene),'ColliderIdentity')]
+        result=self.verify()
+        self.assertEqual(result['status'],'FAILED_PARTIAL_OBSERVATION_NOT_ACCEPTANCE')
+        self.assertFalse(result['diagnosticComplete']);self.assertFalse(result['gameplayAccepted'])
+        self.assertEqual(result['observedFrames'],491)
+    def test_unknown_runtime_scene_still_rejected_with_precise_location(self):
+        for scene in ('DontDestroyOnLoad/private','DontDestroyOnLoad(Clone)','/home/runner/secret','OtherRuntimeScene'):
+            with self.subTest(scene=scene):
+                self.value['colliders']=[complete(dict(id=1,instanceId=-100,path='JourneyBootstrap',
+                    type='MeshCollider',role='retained-rv',scene=scene),'ColliderIdentity')]
+                with self.assertRaises(ValueError) as caught:self.verify()
+                self.assertEqual(str(caught.exception),'R3_CONTINUOUS_SCENE_TEXT')
+                self.assertEqual(caught.exception.report_location,'$.colliders[0].scene')
+                self.assertEqual(caught.exception.value_sha256,
+                    hashlib.sha256(json.dumps(scene,separators=(',',':')).encode()).hexdigest())
     def test_empty_recorded_prefix_is_explicitly_partial(self):
         self.value['sequences']=[]
         result=self.verify();self.assertEqual(result['observedFrames'],0);self.assertFalse(result['diagnosticComplete'])
@@ -159,6 +180,113 @@ class PartialBoundaries(unittest.TestCase):
     def test_complete_claim_cannot_use_partial_relaxations(self):
         self.value['status']='completed'
         with self.assertRaises(ValueError):self.verify()
+
+
+class RedactedBoundaries(unittest.TestCase):
+    def setUp(self):
+        self.value,_,_,_=fixture()
+        self.value['status']='fixture-incomplete';self.value['sequences']=self.value['sequences'][:1]
+        self.value['sequences'][0]['completed']=False;self.value['sequences'][0]['frames']=self.value['sequences'][0]['frames'][:2]
+    def project(self,value=None,raw=None):
+        raw=raw if raw is not None else json.dumps(self.value if value is None else value).encode()
+        packed=redact_native_report(raw,'R3_CONTINUOUS_SCENE_TEXT',True)
+        self.assertLessEqual(len(packed),MAX_REDACTED_BYTES)
+        result=json.loads(packed)
+        self.assertEqual(set(result),{'schema','mode','semanticsValidated','diagnosticComplete','gameplayAccepted','nativeFailure','rawReportExported','sourceRaw','strictValidationCode','omissionCount','omissionsDropped','omissions','data'})
+        self.assertEqual(result['mode'],'FAILED_REDACTED');self.assertTrue(result['nativeFailure'])
+        for key in ('semanticsValidated','diagnosticComplete','gameplayAccepted','rawReportExported'):self.assertFalse(result[key])
+        self.assertEqual(result['sourceRaw'],dict(bytes=len(raw),sha256=hashlib.sha256(raw).hexdigest()))
+        self.assertEqual(result['omissionCount'],len(result['omissions'])+result['omissionsDropped'])
+        for row in result['omissions']:
+            self.assertEqual(set(row),{'location','code','type','jsonBytes','length','sha256'})
+            self.assertRegex(row['location'],r'^\$(?:\.[A-Za-z][A-Za-z0-9_]*|\.[<]unknown[>]|\[[0-9]{1,4}\]){0,32}$')
+            self.assertRegex(row['code'],r'^R3_CONTINUOUS_[A-Z0-9_]+$');self.assertRegex(row['sha256'],r'^[a-f0-9]{64}$')
+        return result
+    def test_complete_and_partial_remain_semantically_unvalidated(self):
+        for status in ('completed','fixture-incomplete'):
+            self.value['status']=status
+            result=self.project();self.assertEqual(result['omissionCount'],0)
+            self.assertEqual(result['data'],self.value)
+    def test_unknown_scene_and_private_path_keep_numeric_contact_frames(self):
+        self.value['colliders']=[complete(dict(id=1,instanceId=-8,path='/home/account/secret',scene='private-scene',type='MeshCollider',role='world'),'ColliderIdentity')]
+        result=self.project();text=json.dumps(result)
+        self.assertNotIn('/home/account/secret',text);self.assertNotIn('private-scene',text)
+        self.assertEqual(result['data']['colliders'][0]['id'],1)
+        self.assertIsNone(result['data']['colliders'][0]['scene']);self.assertIsNone(result['data']['colliders'][0]['path'])
+        self.assertEqual(result['data']['sequences'],self.value['sequences'])
+        self.assertEqual({r['code'] for r in result['omissions']},{'R3_CONTINUOUS_SCENE_TEXT','R3_CONTINUOUS_COLLIDER_PATH'})
+    def test_unknown_keys_never_appear_even_when_their_values_are_safe(self):
+        self.value['sequences'][0]['frames'][0]['private-account-name']=7
+        result=self.project();self.assertNotIn('private-account-name',json.dumps(result))
+        self.assertEqual(result['omissions'][0]['location'],'$.sequences[0].frames[0].<unknown>')
+        self.assertEqual(result['data']['sequences'][0]['frames'][1],self.value['sequences'][0]['frames'][1])
+    def test_nan_wrong_type_and_vector_unknown_preserve_siblings_and_indexes(self):
+        frame=self.value['sequences'][0]['frames'][0]
+        frame['dt']=float('nan');frame['control']=['secret'];frame['beforeAI']['privateKey']='privateBody'
+        frame['beforeAI']['x']='secret';frame['beforeAI']['y']=3
+        result=self.project();copy=result['data']['sequences'][0]['frames'][0]
+        self.assertIsNone(copy['dt']);self.assertIsNone(copy['control']);self.assertIsNone(copy['beforeAI']['x'])
+        self.assertEqual(copy['beforeAI']['y'],3);self.assertEqual(len(result['data']['sequences'][0]['frames']),2)
+        for secret in ('NaN','secret','privateKey','privateBody'):self.assertNotIn(secret,json.dumps(result))
+        self.assertEqual(result['omissionCount'],4)
+    def test_deep_mistyped_leaf_is_omitted_without_losing_neighbor_frames(self):
+        deep='privateBody'
+        for _ in range(27):deep=[deep]
+        self.value['sequences'][0]['frames'][0]['step']=deep
+        result=self.project();self.assertEqual(result['omissions'][0]['code'],'R3_CONTINUOUS_DEPTH')
+        self.assertIsNone(result['data']['sequences'][0]['frames'][0]['step'])
+        self.assertEqual(result['data']['sequences'][0]['frames'][1],self.value['sequences'][0]['frames'][1])
+        self.assertNotIn('privateBody',json.dumps(result))
+    def test_oversize_array_and_string_are_hashed_as_whole_subtrees(self):
+        self.value['colliders']=[{}]*4097;self.value['scope']='private'*1000
+        result=self.project();self.assertIsNone(result['data']['colliders']);self.assertIsNone(result['data']['scope'])
+        self.assertEqual({r['code'] for r in result['omissions']},{'R3_CONTINUOUS_ARRAY_BOUND','R3_CONTINUOUS_STRING_BOUND'})
+        self.assertEqual(result['data']['sequences'],self.value['sequences'])
+    def test_omissions_are_bounded_and_dropped_count_is_explicit(self):
+        self.value.update({'private-field-'+str(i):'secret-'+str(i) for i in range(200)})
+        result=self.project();self.assertEqual(len(result['omissions']),128);self.assertEqual(result['omissionCount'],200)
+        self.assertEqual(result['omissionsDropped'],72);self.assertEqual(result['data']['sequences'],self.value['sequences'])
+        self.assertNotIn('private-field',json.dumps(result));self.assertNotIn('secret-',json.dumps(result))
+    def test_missing_required_field_is_recorded_without_fabrication(self):
+        del self.value['sequences'][0]['frames'][0]['motor']
+        result=self.project();row=result['omissions'][0]
+        self.assertEqual(row['type'],'missing');self.assertTrue(row['location'].endswith('.motor'))
+        self.assertIsNone(result['data']['sequences'][0]['frames'][0]['motor'])
+    def test_truncated_duplicate_or_deep_json_keeps_only_safe_raw_fingerprint(self):
+        for raw in (b'{"private-field":"secret",',b'{"schemaVersion":1,"schemaVersion":2}',b'['*1500+b'0'+b']'*1500):
+            result=self.project(raw=raw)
+            self.assertIsNone(result['data']);self.assertIn(result['omissions'][0]['code'],{'R3_CONTINUOUS_REDACTED_JSON_PARSE','R3_CONTINUOUS_CLOSED_KEYS_REPORT'})
+            self.assertNotIn('private-field',json.dumps(result));self.assertNotIn('secret',json.dumps(result))
+    def test_output_budget_omits_subtrees_and_raw_limit_is_enforced(self):
+        from unittest import mock
+        import journey_r3_continuous_contact_report as module
+        self.value['colliders']=[complete(dict(id=i,instanceId=i,path='JourneyBootstrap',scene='',type='MeshCollider',role='world'),'ColliderIdentity') for i in range(1000)]
+        raw=json.dumps(self.value,separators=(',',':')).encode()
+        with mock.patch.object(module,'MAX_REDACTED_BYTES',300*1024):
+            result=self.project(raw=raw)
+            self.assertIn('R3_CONTINUOUS_REDACTED_JSON_BUDGET',{r['code'] for r in result['omissions']})
+            self.assertLessEqual(len(json.dumps(result,separators=(',',':')).encode()),300*1024)
+            with self.assertRaisesRegex(ValueError,'REDACTED_RAW_BOUND'):redact_native_report(b' '* (300*1024+1),'R3_CONTINUOUS_SCHEMA',True)
+    def test_every_fixed_string_source_is_accepted_by_its_existing_field_gate(self):
+        for field,value in EXACT_TEXT.items():
+            closed_schema(value,'s',('Sequence.' if field=='fixture' else 'Report.')+field)
+        for scene in ('','DontDestroyOnLoad','Assets/DesertRV/Scenes/Journey/JourneyBootstrap.unity','Assets/DesertRV/Scenes/Journey/NightBeacon.unity'):
+            closed_schema(scene,'s','ColliderIdentity.scene')
+        for name in COLLIDER_NODE_NAMES:closed_schema(name,'s','ColliderIdentity.path')
+        values={'ColliderIdentity.type':['BoxCollider','MeshCollider','CapsuleCollider','SphereCollider','CharacterController'],
+            'ColliderIdentity.role':['retained-rv','walker','beast','world'],'Beast.phase':['Idle','Stalk','Windup','Attack','Recover','Hit','Dead'],
+            'AIQuery.route':['','no-move-in-this-phase','home-forward-then-tangent-if-blocked','windup-eligible-no-move','stalk-forward-then-tangent-if-blocked','attack-forward'],
+            'Frame.status':['Menu','Loading','Playing','Paused','Failed','Completed'],'Frame.control':['Driving','OnFoot'],
+            'Sequence.upgrades':['Ram, Arc'],'Report.status':['completed','fixture-incomplete'],
+            'ArcObservation.sourceQuery':['clear','missing-binding','nonconvex-triangles','nonconvex-aabb-distance-lower-bound','native-supported-closest-point','unsupported-solid-collider','nonconvex-triangles-invalid-geometry'],
+            'ArcObservation.sourceSquareDistanceRaw':['NaN','Infinity','-Infinity','0','-0','1.3E-05'],
+            'Report.failureCode':['']+['OBSERVER_'+name for name in ('NullReferenceException','MissingMethodException','MissingFieldException','TypeLoadException','TargetInvocationException','AssertionException','ArgumentException','InvalidOperationException','IndexOutOfRangeException','KeyNotFoundException')],
+            'Report.unityVersion':['6000.3.19f1'],'Report.producerRunId':['38070456519'],
+            'Report.producerCommit':[PRODUCER],'Report.consumerCommit':['b'*40],'Pin.sha256':['a'*64],
+            'Pin.path':[INPUT,INPUT.replace('.json','.sha256')]+[x for path in SOURCE_PATHS for x in (path,path+'.meta')],
+            'DependencyCheck.inputSha256':['a'*64],'Sequence.name':[p[0] for p in PLANS],'Step.name':[row[0] for p in PLANS for row in p[4]]}
+        for field,choices in values.items():
+            for value in choices:closed_schema(value,'s',field)
 
 
 if __name__=='__main__': unittest.main()
