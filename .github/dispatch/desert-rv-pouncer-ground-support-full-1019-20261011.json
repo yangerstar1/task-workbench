@@ -1,0 +1,23 @@
+{
+  "schema": 1,
+  "requestId": "desert-rv-pouncer-ground-support-full-1019-20261011-once",
+  "baseCommit": "1019ff71443f2dbc25a0f1b5027d5b245f295b29",
+  "sourceStateSha256": "2f84c4dfe7108b96226623e75e4a3005477a4a3f3e5b9766d27e04ec23c1bf10",
+  "selection": "tasks/desert-rv/art/journey-preparation/three-strict-candidates.json",
+  "selectionSha256": "e46d71b118dbf614cb183928528992037a4f8e4d408bf5359484716106457b05",
+  "shortEvidence": {
+    "commit": "1019ff71443f2dbc25a0f1b5027d5b245f295b29",
+    "runId": 38111105749,
+    "runAttempt": 1,
+    "jobId": 114386673921,
+    "branch": "journey-pouncer-ground-support-2915",
+    "workflow": ".github/workflows/desert-rv-pouncer-ground-support.yml",
+    "artifactId": 11692021847,
+    "artifactName": "journey-pouncer-ground-support-UNREVIEWED-38111105749-1",
+    "artifactBytes": 950762,
+    "artifactSha256": "4110ccbb37a48a83c90f9f705d3bf3b3ee19491cae6f0cce130228daa6143d91",
+    "reportSha256": "eb7aa27c6d1243132bf597c5cc5e3a0d1741a5072189083745f1e8dec1e4c60d",
+    "sourceStateSha256": "c6224e96b67c11625c7dd58b9bc504714d922775fc9abd190fdb6445e715945e",
+    "unityMapSha256": "3bdbb794c4b6cf54e0b4ee453a7e407673e824d4dc9fcbd76e96802d16029990"
+  }
+}

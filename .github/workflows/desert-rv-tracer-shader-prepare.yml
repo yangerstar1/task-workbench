@@ -1,8 +1,8 @@
-name: Desert RV combat feedback fresh producer and Linux candidate
+name: Desert RV Pouncer ground support fresh producer and Linux candidate
 on:
   push:
-    branches: [wip/combat-feedback-20261010]
-    paths: [.github/dispatch/desert-rv-combat-feedback-full-20261010.json]
+    branches: [journey-pouncer-ground-support-full-1019]
+    paths: [.github/dispatch/desert-rv-pouncer-ground-support-full-1019-20261011.json]
 permissions:
   contents: read
   actions: read
@@ -13,7 +13,7 @@ jobs:
   prepare:
     if: >-
       github.repository == 'yangerstar1/task-workbench' &&
-      github.event_name == 'push' && github.ref == 'refs/heads/wip/combat-feedback-20261010' &&
+      github.event_name == 'push' && github.ref == 'refs/heads/journey-pouncer-ground-support-full-1019' &&
       github.actor == 'yangerstar1' && github.triggering_actor == 'yangerstar1'
     runs-on: ubuntu-24.04
     timeout-minutes: 230
@@ -25,11 +25,13 @@ jobs:
           persist-credentials: false
           lfs: false
           fetch-depth: 2
-      - name: Verify the single-use tracer producer push
+      - name: Verify one-use fresh push and admit exact prior 14 plus 2 native evidence
         id: dispatch_identity
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           /usr/bin/python3 tasks/desert-rv/scripts/test_journey_tracer_dispatch.py
-          /usr/bin/python3 tasks/desert-rv/scripts/journey_tracer_dispatch.py
+          /usr/bin/python3 tasks/desert-rv/scripts/journey_tracer_dispatch.py --admit
       - name: Verify current source before fixed-image readiness
         run: /usr/bin/python3 tasks/desert-rv/scripts/verify_evidence.py guard
       - name: Verify fixed-image readiness with at most one bounded fallback pull

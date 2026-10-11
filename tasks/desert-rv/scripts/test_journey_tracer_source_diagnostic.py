@@ -152,17 +152,32 @@ class RealWorkflowFixtureTests(unittest.TestCase):
                 result=subprocess.run(args,cwd=root,env=env,stdout=subprocess.PIPE,stderr=subprocess.STDOUT)
                 self.assertEqual(result.returncode,expected,result.stdout.decode()[-4000:]);return result.stdout.decode().strip()
             run(['git','init']);run(['git','config','user.name','Host fixture']);run(['git','config','user.email','fixture@example.invalid'])
-            (root/'host-base').write_text('host fixture');run(['git','add','.']);run(['git','commit','-m','Host fixture parent']);parent=run(['git','rev-parse','HEAD'])
+            # New consumer Git/run identity is synthetic; prior short evidence stays genuine and is never downloaded here.
+            prior=Path(os.environ.get('JOURNEY_SHORT_TEST_FIXTURE', str(SOURCE_ROOT/dispatch.ADMISSION)))
+            self.assertTrue((prior/'original.zip').is_file(), 'This fixture requires the already admitted exact short package')
             for name in source.source_inventory():
                 path=root/name;path.parent.mkdir(parents=True,exist_ok=True);shutil.copyfile(SOURCE_ROOT/name,path)
             public='tasks/desert-rv/PUBLIC-EXPORT.json';shutil.copyfile(SOURCE_ROOT/public,root/public)
-            helper=root/'tasks/desert-rv/scripts/journey_tracer_dispatch.py';helper.write_text(helper.read_text().replace(dispatch.BASE,parent))
-            run(['/usr/bin/python3','tasks/desert-rv/scripts/update_source_state.py'])
+            shutil.copyfile(SOURCE_ROOT/dispatch.SOURCE, root/dispatch.SOURCE)
+            run(['git','add','.']);run(['git','commit','-m','Host fixture parent']);parent=run(['git','rev-parse','HEAD'])
+            helper=root/'tasks/desert-rv/scripts/journey_tracer_dispatch.py'
+            helper.write_text(helper.read_text().replace("BASE = '"+dispatch.BASE+"'", "BASE = '"+parent+"'"))
+            for name in dispatch.CHANGED_FILES - {dispatch.REQUEST,dispatch.SOURCE,'tasks/desert-rv/scripts/journey_tracer_dispatch.py'}:
+                p=root/name;p.write_bytes(p.read_bytes()+b'\n')
+            run(['/usr/bin/python3','tasks/desert-rv/scripts/update_source_state.py'],dict(os.environ,PYTHONDONTWRITEBYTECODE='1'))
             sha=lambda path:hashlib.sha256(path.read_bytes()).hexdigest()
-            request=dict(schema=1,requestId=dispatch.REQUEST_ID,baseCommit=parent,sourceStateSha256=sha(root/dispatch.SOURCE),selection=dispatch.SELECTION,selectionSha256=sha(root/dispatch.SELECTION))
-            path=root/dispatch.REQUEST;path.parent.mkdir(parents=True,exist_ok=True);path.write_text(json.dumps(request));run(['git','add','.']);run(['git','commit','-m','Host source'])
+            request=dict(schema=1,requestId=dispatch.REQUEST_ID,baseCommit=parent,sourceStateSha256=sha(root/dispatch.SOURCE),selection=dispatch.SELECTION,selectionSha256=sha(root/dispatch.SELECTION),shortEvidence=dispatch.SHORT)
+            path=root/dispatch.REQUEST;path.parent.mkdir(parents=True,exist_ok=True);path.write_text(json.dumps(request));run(['git','add',*sorted(dispatch.CHANGED_FILES)]);run(['git','commit','-m','Host source'])
             head=run(['git','rev-parse','HEAD']);event=root/'event.json';event.write_text(json.dumps(dict(before=parent,after=head,ref=dispatch.REF,created=False,deleted=False,forced=False,repository=dict(full_name=dispatch.REPOSITORY,private=False,fork=False,default_branch='main',owner=dict(login=dispatch.OWNER)),sender=dict(login=dispatch.OWNER),head_commit=dict(id=head))))
             env=dict(os.environ,PYTHONDONTWRITEBYTECODE='1',GITHUB_ACTIONS='true',RUNNER_ENVIRONMENT='github-hosted',RUNNER_OS='Linux',GITHUB_REPOSITORY=dispatch.REPOSITORY,GITHUB_REPOSITORY_VISIBILITY='public',GITHUB_ACTOR=dispatch.OWNER,GITHUB_TRIGGERING_ACTOR=dispatch.OWNER,GITHUB_REF=dispatch.REF,GITHUB_SHA=head,GITHUB_RUN_ID='9876',GITHUB_RUN_ATTEMPT='1',GITHUB_EVENT_NAME='push',GITHUB_WORKFLOW_REF=dispatch.REPOSITORY+'/'+dispatch.WORKFLOW+'@'+dispatch.REF,GITHUB_EVENT_PATH=str(event),GITHUB_OUTPUT=str(root/'output'),NATIVE_OUTCOME='failure')
+            # Retarget only the local fixture seal; revalidate the ORIGINAL real 14+2 package under its original identities.
+            evidence={n:dispatch.safe_bytes(prior/n,dispatch.SHORT['artifactBytes'] if n=='original.zip' else 8*1024**2)
+                for n in dispatch.ADMISSION_FILES-{'seal.json'}}
+            dispatch.validate_short_api(*(dispatch.parse(evidence[n+'.json']) for n in ('run','artifact','jobs')))
+            dispatch.verify_short_bundle(evidence['original.zip'],json.loads((root/dispatch.SOURCE).read_bytes()))
+            sealed=root/dispatch.ADMISSION;sealed.mkdir()
+            for name,raw in evidence.items():(sealed/name).write_bytes(raw)
+            (sealed/'seal.json').write_text(json.dumps(dispatch.seal_value(env,request,evidence)))
             run(['/usr/bin/python3','tasks/desert-rv/scripts/verify_evidence.py','guard'],env)
             run(['/usr/bin/python3','tasks/desert-rv/scripts/backup/restore_unity_font.py'],env)
             run(['/usr/bin/python3','tasks/desert-rv/art/journey-preparation/pipeline.py','init','--selection',dispatch.SELECTION,'--sha256',request['selectionSha256']],env)
