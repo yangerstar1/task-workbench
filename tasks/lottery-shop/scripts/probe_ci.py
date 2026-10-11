@@ -35,6 +35,15 @@ EXPECTED_CASES = {"Lottery.Probe.Tests.ProbeTests." + name for name in (
     "ChineseFontContainsRequiredGlyphs", "InputBackendAndLifecycle", "SceneReferencesFontAndUrpMaterial")}
 PACKAGES = {"com.unity.render-pipelines.universal": "17.3.0",
             "com.unity.inputsystem": "1.20.1", "com.unity.test-framework": "1.6.0"}
+# Exact URP 17.3 initialization outputs, not a general Assets/*.asset exemption.
+# Unity-Technologies/Graphics@2d2e78cc9d6254bc6e7c9c5552cea053508e86cb
+# Runtime/UniversalRenderPipelineGlobalSettings.cs defines both asset paths.
+URP_GENERATED_GLOBAL_ASSETS = {
+    "Assets/UniversalRenderPipelineGlobalSettings.asset",
+    "Assets/UniversalRenderPipelineGlobalSettings.asset.meta",
+    "Assets/DefaultVolumeProfile.asset",
+    "Assets/DefaultVolumeProfile.asset.meta",
+}
 
 
 def require(condition, message):
@@ -170,12 +179,20 @@ def require_safe_xml(raw):
     This intentionally fails closed on credential-like content; it is not a
     general data-loss-prevention guarantee. No report is exported on rejection.
     """
+    require(len(raw) <= 10 * 1024 * 1024, "Test XML exceeds size limit")
+    require(b"<!DOCTYPE" not in raw and b"<!ENTITY" not in raw, "DTD/entity test XML is rejected")
     text = raw.decode("utf-8-sig")
+    report = ET.fromstring(raw)
     patterns = (r"(?i)\b(?:password|passwd|unity_license|unity_email|unity_password|access[_-]?token|api[_-]?key|client[_-]?secret|authorization|bearer)\b",
                 r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}",
                 r"-----BEGIN [A-Z ]*PRIVATE KEY-----", r"\bgh[pousr]_[A-Za-z0-9]{20,}\b",
                 r"\bAKIA[0-9A-Z]{16}\b", r"\beyJ[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\b")
-    require(not any(re.search(pattern, text) for pattern in patterns),
+    values = [text]
+    for node in report.iter():
+        values.extend(node.attrib.keys())
+        values.extend(node.attrib.values())
+        values.extend(value for value in (node.text, node.tail) if value is not None)
+    require(not any(re.search(pattern, value) for pattern in patterns for value in values),
             "Raw NUnit XML export refused: potential credential or private identifier content")
 
 
@@ -205,6 +222,9 @@ def inspect_tests(directory):
     assemblies = [node for node in report.iter("test-suite") if node.get("type") == "Assembly"]
     require(len(assemblies) == 1 and assemblies[0].get("name") == "Lottery.Probe.Tests.dll"
             and assemblies[0].get("result") == "Passed", "Unexpected or missing test assembly")
+    assembly_cases = list(assemblies[0].iter("test-case"))
+    require(len(assembly_cases) == 6 and set(assembly_cases) == set(cases),
+            "Every test case must belong to the unique expected Assembly")
     require(all(node.get("result") == "Passed" for node in report.iter("test-suite")), "A test suite did not pass")
     return path, report, {"passed": 6, "failed": 0, "skipped": 0, "inconclusive": 0,
                           "cases": sorted(names), "rawXmlSha256": digest(path),
@@ -234,10 +254,13 @@ def snapshot_files(root):
             if path.is_file():
                 require(path.stat().st_size <= 32 * 1024 * 1024, "Unexpectedly large Unity source asset")
                 files[path.relative_to(project).as_posix()] = digest(path)
+                require(len(files) <= 1024, "Unexpectedly many Unity source files")
     return files
 
 
 def mutation_kind(path):
+    if path in URP_GENERATED_GLOBAL_ASSETS:
+        return "URP_GENERATED_GLOBAL_SETTING"
     if (path.startswith("Assets/GeneratedProbe/") or path == "Assets/GeneratedProbe.meta") and Path(path).suffix in {".asset", ".meta", ".mat", ".unity"}:
         return "GENERATED_PROBE_ASSET"
     if path.startswith("ProjectSettings/") and "/" not in path[len("ProjectSettings/"):] and Path(path).suffix in {".asset", ".txt"} and path != "ProjectSettings/ProjectVersion.txt":
@@ -251,43 +274,101 @@ def mutation_kind(path):
     return "UNEXPECTED_SOURCE_CHANGE"
 
 
-def inspect_mutations(before, after):
-    changes = [{"path": path, "beforeSha256": before.get(path), "afterSha256": after.get(path),
+def collect_mutations(before, after):
+    return [{"path": path, "beforeSha256": before.get(path), "afterSha256": after.get(path),
                 "kind": mutation_kind(path)} for path in sorted(before.keys() | after.keys())
                if before.get(path) != after.get(path)]
+
+
+def inspect_mutations(before, after):
+    changes = collect_mutations(before, after)
     require(all(item["kind"] != "UNEXPECTED_SOURCE_CHANGE" and item["afterSha256"] is not None
                 for item in changes), "Unexpected source mutation or deletion during Unity execution")
     return changes
 
 
+def diagnostic_changes(changes):
+    """Bounded path/class/hash metadata only; never copy source or error text."""
+    require(len(changes) <= 1024, "Too many source changes for diagnostic receipt")
+    result = []
+    for item in changes:
+        path = item["path"]
+        require(isinstance(path, str) and len(path) <= 240
+                and re.fullmatch(r"(?:Assets|Packages|ProjectSettings)/[A-Za-z0-9_. /-]+", path)
+                and all(part not in {"", ".", ".."} for part in path.split("/")),
+                "Noncanonical source path cannot be exported")
+        for key in ("beforeSha256", "afterSha256"):
+            value = item[key]
+            require(value is None or (isinstance(value, str) and re.fullmatch(r"[0-9a-f]{64}", value)),
+                    "Malformed source hash cannot be exported")
+        result.append({"path": path, "kind": mutation_kind(path),
+                       "beforeSha256": item["beforeSha256"], "afterSha256": item["afterSha256"]})
+    return result
+
+
 def audit(root, identity):
     task = root / TASK
-    before = json.loads(bounded_read(task / "evidence/pre-unity-source.json", 1024 * 1024))
-    after = snapshot_files(root)
-    changes = inspect_mutations(before, after)
-    receipt = dict(identity, status="SOURCE_MUTATIONS_EXPLICITLY_ACCOUNTED_NOT_CLEAN_SOURCE",
-                   changes=changes, generatedArtifactsRebuiltInEachJob=True)
-    write_json(task / "evidence/source-mutations.json", receipt)
-    # Save the exact generated artifacts and settings with bounded total size.
-    selected = sorted(path for path in after if mutation_kind(path) in
-                      {"GENERATED_PROBE_ASSET", "UNITY_PROJECT_SETTING", "FONT_IMPORT_METADATA", "RESOLVED_PACKAGE_LOCK"})
-    total = 0
-    manifest = []
-    with zipfile.ZipFile(task / "evidence/generated-assets.zip", "w", zipfile.ZIP_DEFLATED) as archive:
-        for name in selected:
-            path = task / "unity" / name
-            size = path.stat().st_size
-            total += size
-            require(size <= 8 * 1024 * 1024 and total <= 32 * 1024 * 1024, "Generated evidence too large")
-            archive.write(path, name)
-            manifest.append({"path": name, "sha256": after[name], "bytes": size, "kind": mutation_kind(name)})
-    write_json(task / "evidence/generated-manifest.json", {"files": manifest, "sourceCommit": identity["sourceCommit"]})
-    lock = task / "unity/Packages/packages-lock.json"
-    require(lock.is_file(), "Unity did not produce its resolved package lock")
-    lock_data = json.loads(bounded_read(lock, 1024 * 1024))
-    for name, version in PACKAGES.items():
-        require(lock_data.get("dependencies", {}).get(name, {}).get("version") == version, "Resolved lock mismatch: " + name)
-    shutil.copyfile(lock, task / "evidence/packages-lock.json")
+    changes = []
+    stage = "READ_SOURCE_BASELINE"
+    try:
+        before = json.loads(bounded_read(task / "evidence/pre-unity-source.json", 1024 * 1024))
+        require(isinstance(before, dict) and len(before) <= 1024, "Malformed source baseline")
+        require(all(isinstance(key, str) and isinstance(value, str) and re.fullmatch(r"[0-9a-f]{64}", value)
+                    for key, value in before.items()), "Malformed source baseline hash map")
+        stage = "SNAPSHOT_SOURCE"
+        after = snapshot_files(root)
+        stage = "VALIDATE_SOURCE_MUTATIONS"
+        changes = collect_mutations(before, after)
+        safe_changes = diagnostic_changes(changes)
+        inspect_mutations(before, after)
+        # Validate the resolved lock before exposing any generated archive.
+        stage = "VALIDATE_RESOLVED_LOCK"
+        lock = task / "unity/Packages/packages-lock.json"
+        require(lock.is_file(), "Unity did not produce its resolved package lock")
+        lock_data = json.loads(bounded_read(lock, 1024 * 1024))
+        for name, version in PACKAGES.items():
+            require(lock_data.get("dependencies", {}).get(name, {}).get("version") == version,
+                    "Resolved lock mismatch: " + name)
+        stage = "ARCHIVE_GENERATED_EVIDENCE"
+        selected = sorted(path for path in after if mutation_kind(path) in
+                          {"GENERATED_PROBE_ASSET", "URP_GENERATED_GLOBAL_SETTING", "UNITY_PROJECT_SETTING",
+                           "FONT_IMPORT_METADATA", "RESOLVED_PACKAGE_LOCK"})
+        total = 0
+        manifest = []
+        archive_temp = task / "evidence/generated-assets.zip.tmp"
+        with zipfile.ZipFile(archive_temp, "w", zipfile.ZIP_DEFLATED) as archive:
+            for name in selected:
+                path = task / "unity" / name
+                size = path.stat().st_size
+                total += size
+                require(size <= 8 * 1024 * 1024 and total <= 32 * 1024 * 1024, "Generated evidence too large")
+                archive.write(path, name)
+                manifest.append({"path": name, "sha256": after[name], "bytes": size, "kind": mutation_kind(name)})
+        archive_temp.replace(task / "evidence/generated-assets.zip")
+        write_json(task / "evidence/generated-manifest.json", {"files": manifest, "sourceCommit": identity["sourceCommit"]})
+        shutil.copyfile(lock, task / "evidence/packages-lock.json")
+        write_json(task / "evidence/source-mutations.json", dict(identity, status="PASS",
+                   scopeOfPass="SOURCE_MUTATIONS_EXPLICITLY_ACCOUNTED_NOT_CLEAN_SOURCE",
+                   changes=safe_changes, generatedArtifactsRebuiltInEachJob=True))
+    except (ValueError, OSError, KeyError, TypeError) as error:
+        try:
+            safe_changes = diagnostic_changes(changes)
+            metadata_status = "CANONICAL_PATH_KIND_HASH_ONLY"
+        except (ValueError, KeyError, TypeError):
+            safe_changes = []
+            metadata_status = "REJECTED_NONCANONICAL_METADATA"
+        write_json(task / "evidence/source-mutations.json", dict(identity, status="FAIL",
+                   failedStage=stage, metadataStatus=metadata_status, changes=safe_changes))
+        raise ValueError("Source audit failed; bounded diagnostic receipt saved") from error
+
+
+def diagnostic_receipt(identity, unity_outcome, verify_outcome, audit_outcome):
+    allowed = {"success", "failure", "cancelled", "skipped", "unknown"}
+    require(all(value in allowed for value in (unity_outcome, verify_outcome, audit_outcome)),
+            "Unexpected workflow outcome cannot be exported")
+    return dict(identity, status="DIAGNOSTIC_ONLY_NOT_APK_CANDIDATE",
+                unityStep=unity_outcome, apkVerificationStep=verify_outcome, sourceAuditStep=audit_outcome,
+                deviceQa="NOT_RUN", renderedFrameQa="NOT_RUN", evidencePersistence="EVIDENCE_PERSISTENCE_PENDING")
 
 
 def inspect_apk(apk, native_receipt, packages_path, identity):
@@ -338,8 +419,11 @@ def inspect_apk(apk, native_receipt, packages_path, identity):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("command", choices=("guard", "restore-font", "snapshot", "audit", "tests", "apk"))
+    parser.add_argument("command", choices=("guard", "restore-font", "snapshot", "audit", "tests", "apk", "diagnostics"))
     parser.add_argument("--root", type=Path, default=Path(__file__).resolve().parents[3])
+    parser.add_argument("--unity-outcome", default="unknown")
+    parser.add_argument("--verify-outcome", default="unknown")
+    parser.add_argument("--audit-outcome", default="unknown")
     args = parser.parse_args()
     root = args.root.resolve()
     task = root / TASK
@@ -353,6 +437,9 @@ def main():
         identity = guard(root)
         if args.command == "audit":
             audit(root, identity)
+        elif args.command == "diagnostics":
+            write_json(evidence / "diagnostic-receipt.json", diagnostic_receipt(identity, args.unity_outcome,
+                       args.verify_outcome, args.audit_outcome))
         elif args.command == "tests":
             report = export_raw_test_report(task / "artifacts/tests", evidence)
             save_safe_test_xml(report, evidence / "test-results.xml")

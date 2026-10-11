@@ -186,7 +186,40 @@ class NUnitSyntheticTests(unittest.TestCase):
         for value in ("UNITY_PASSWORD=synthetic", "synthetic@example.invalid", "Bearer synthetic",
                       "ghp_" + "z" * 30):
             with self.subTest(value=value), self.assertRaises(ValueError):
-                ci.require_safe_xml(value.encode())
+                ci.require_safe_xml(("<test-run><output>" + value + "</output></test-run>").encode())
+
+    def test_reject_three_encoded_credential_shapes_in_text_attributes_and_tails(self):
+        for value in ("synthetic&#64;example.invalid", "pass&#119;ord=synthetic", "ghp&#95;" + "z" * 30):
+            for xml in ("<test-run><output>" + value + "</output></test-run>",
+                        '<test-run><property value="' + value + '"/></test-run>',
+                        "<test-run><output/>" + value + "</test-run>"):
+                with self.subTest(xml=xml), self.assertRaises(ValueError):
+                    ci.require_safe_xml(xml.encode())
+
+    def test_rejected_encoded_xml_is_not_exported(self):
+        self.verify()
+        raw = self.path.read_bytes().replace(b"</test-run>", b"<output>pass&#119;ord=synthetic</output></test-run>")
+        self.path.write_bytes(raw)
+        out = self.directory / "evidence"
+        out.mkdir()
+        with self.assertRaises(ValueError):
+            ci.export_raw_test_report(self.directory, out)
+        self.assertFalse((out / "raw-test-results.xml").exists())
+        self.assertFalse((out / "raw-test-report-receipt.json").exists())
+
+    def test_reject_all_cases_outside_expected_assembly(self):
+        for case in list(self.suite):
+            self.suite.remove(case)
+            self.report.append(case)
+        with self.assertRaises(ValueError):
+            self.verify()
+
+    def test_reject_one_case_outside_expected_assembly(self):
+        case = self.suite[0]
+        self.suite.remove(case)
+        self.report.append(case)
+        with self.assertRaises(ValueError):
+            self.verify()
 
 
 class ApkSyntheticTests(unittest.TestCase):
@@ -318,6 +351,83 @@ class FontSyntheticTests(unittest.TestCase):
 
 
 class SourceMutationSyntheticTests(unittest.TestCase):
+    def test_failed_audit_records_path_classification_and_hash_without_source_contents(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            task = root / ci.TASK
+            source = task / "unity/Assets/Unexpected.asset"
+            source.parent.mkdir(parents=True)
+            source.write_text("SYNTHETIC-CONTENT-MUST-NOT-ENTER-DIAGNOSTIC")
+            ci.write_json(task / "evidence/pre-unity-source.json", {})
+            with self.assertRaises(ValueError):
+                ci.audit(root, {"sourceCommit": "a" * 40})
+            receipt_path = task / "evidence/source-mutations.json"
+            receipt = json.loads(receipt_path.read_text())
+            self.assertEqual(receipt["status"], "FAIL")
+            self.assertEqual(receipt["failedStage"], "VALIDATE_SOURCE_MUTATIONS")
+            self.assertEqual(receipt["changes"], [{"path": "Assets/Unexpected.asset", "kind": "UNEXPECTED_SOURCE_CHANGE",
+                            "beforeSha256": None, "afterSha256": ci.digest(source)}])
+            self.assertNotIn("SYNTHETIC-CONTENT-MUST-NOT-ENTER-DIAGNOSTIC", receipt_path.read_text())
+            self.assertFalse((task / "evidence/generated-assets.zip").exists())
+
+    def test_failed_lock_audit_also_records_failure(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            task = root / ci.TASK
+            ci.write_json(task / "evidence/pre-unity-source.json", {})
+            with self.assertRaises(ValueError):
+                ci.audit(root, {"sourceCommit": "a" * 40})
+            receipt = json.loads((task / "evidence/source-mutations.json").read_text())
+            self.assertEqual(receipt["status"], "FAIL")
+            self.assertEqual(receipt["failedStage"], "VALIDATE_RESOLVED_LOCK")
+
+    def test_diagnostic_metadata_rejects_noncanonical_paths_and_nonhash_payload(self):
+        for path in ("/absolute/file", "Assets/../outside", "Assets//double", "Assets/new\nline.asset", "Assets/x@private.invalid"):
+            with self.subTest(path=path), self.assertRaises(ValueError):
+                ci.diagnostic_changes([{"path": path, "kind": "ignored", "beforeSha256": None, "afterSha256": "a" * 64}])
+        with self.assertRaises(ValueError):
+            ci.diagnostic_changes([{"path": "Assets/Ok.asset", "beforeSha256": None, "afterSha256": "arbitrary-content"}])
+
+    def test_fixed_diagnostic_receipt_does_not_claim_candidate_or_persistence(self):
+        receipt = ci.diagnostic_receipt({"sourceCommit": "a" * 40}, "failure", "skipped", "failure")
+        self.assertEqual(receipt["status"], "DIAGNOSTIC_ONLY_NOT_APK_CANDIDATE")
+        self.assertEqual(receipt["evidencePersistence"], "EVIDENCE_PERSISTENCE_PENDING")
+        with self.assertRaises(ValueError):
+            ci.diagnostic_receipt({}, "arbitrary log contents", "success", "success")
+
+    def test_accept_exact_four_urp_initialization_outputs(self):
+        changes = ci.inspect_mutations({}, {name: "synthetic-sha" for name in ci.URP_GENERATED_GLOBAL_ASSETS})
+        self.assertEqual(len(changes), 4)
+        self.assertEqual({item["kind"] for item in changes}, {"URP_GENERATED_GLOBAL_SETTING"})
+
+    def test_reject_adjacent_unknown_urp_assets(self):
+        for name in ("Assets/Unknown.asset", "Assets/Unknown.asset.meta",
+                     "Assets/DefaultVolumeProfileExtra.asset", "Assets/DefaultVolumeProfileExtra.asset.meta",
+                     "Assets/UniversalRenderPipelineGlobalSettings2.asset",
+                     "Assets/UniversalRenderPipelineGlobalSettings2.asset.meta",
+                     "Assets/Subfolder/DefaultVolumeProfile.asset"):
+            with self.subTest(name=name), self.assertRaises(ValueError):
+                ci.inspect_mutations({}, {name: "synthetic-sha"})
+
+    def test_archive_retains_all_four_urp_assets_with_separate_classification(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            task = root / ci.TASK
+            for name in ci.URP_GENERATED_GLOBAL_ASSETS:
+                path = task / "unity" / name
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text("SYNTHETIC UNIT FIXTURE, NOT A UNITY ASSET\n")
+            ci.write_json(task / "unity/Packages/packages-lock.json", {
+                "dependencies": {name: {"version": version} for name, version in ci.PACKAGES.items()}})
+            ci.write_json(task / "evidence/pre-unity-source.json", {})
+            ci.audit(root, {"sourceCommit": "a" * 40})
+            with zipfile.ZipFile(task / "evidence/generated-assets.zip") as archive:
+                self.assertTrue(ci.URP_GENERATED_GLOBAL_ASSETS <= set(archive.namelist()))
+            manifest = json.loads((task / "evidence/generated-manifest.json").read_text())
+            selected = [item for item in manifest["files"] if item["path"] in ci.URP_GENERATED_GLOBAL_ASSETS]
+            self.assertEqual(len(selected), 4)
+            self.assertTrue(all(item["kind"] == "URP_GENERATED_GLOBAL_SETTING" for item in selected))
+
     def test_accept_named_generated_assets(self):
         result = ci.inspect_mutations({}, {"Assets/GeneratedProbe/Probe.unity": "a"})
         self.assertEqual(result[0]["kind"], "GENERATED_PROBE_ASSET")

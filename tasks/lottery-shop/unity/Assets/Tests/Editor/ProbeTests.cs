@@ -46,6 +46,11 @@ namespace Lottery.Probe.Tests
             try { Assert.That(EnhancedTouchSupport.enabled, Is.True); }
             finally { EnhancedTouchSupport.Disable(); }
             Assert.That(EnhancedTouchSupport.enabled, Is.EqualTo(before));
+            var safe = new Rect(0, 0, 1000, 600);
+            Assert.That(ProbeRuntime.HitsLicenseButton(new Vector2(900, 40), safe, 600), Is.True);
+            Assert.That(ProbeRuntime.HitsLicenseButton(new Vector2(20, 40), safe, 600), Is.False);
+            Assert.That(ProbeRuntime.HitsLicenseButton(new Vector2(900, 100), safe, 600), Is.False);
+            Assert.That(ProbeRuntime.HitsLicenseButton(new Vector2(800, 70), new Rect(40, 30, 900, 520), 600), Is.True);
 #else
             Assert.Fail("Input System backend was not enabled before compilation");
 #endif

@@ -176,3 +176,23 @@ jobs:
             tasks/lottery-shop/evidence/packages-lock.json
           if-no-files-found: ignore
           retention-days: 7
+      - name: Create bounded non-candidate failure diagnosis
+        id: diagnostics
+        if: ${{ always() && steps.guard.outcome == 'success' && (steps.verify.outcome != 'success' || steps.audit.outcome != 'success') }}
+        run: >-
+          python3 tasks/lottery-shop/scripts/probe_ci.py diagnostics
+          --unity-outcome '${{ steps.unity.outcome }}'
+          --verify-outcome '${{ steps.verify.outcome }}'
+          --audit-outcome '${{ steps.audit.outcome }}'
+      - name: Upload only fixed small failure diagnostics
+        if: ${{ always() && steps.diagnostics.outcome == 'success' }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: lottery-g0-android-diagnostics-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            tasks/lottery-shop/evidence/diagnostic-receipt.json
+            tasks/lottery-shop/evidence/guard-receipt.json
+            tasks/lottery-shop/evidence/font-receipt.json
+            tasks/lottery-shop/evidence/source-mutations.json
+          if-no-files-found: error
+          retention-days: 7
