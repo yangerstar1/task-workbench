@@ -56,6 +56,9 @@ namespace Lottery.Probe.Tests
             var roots = scene.GetRootGameObjects();
             var runtime = roots.SelectMany(r => r.GetComponentsInChildren<Lottery.Probe.ProbeRuntime>()).Single();
             Assert.That(runtime.chineseFont, Is.Not.Null);
+            var license = Resources.Load<TextAsset>("ProbeFontLicense");
+            Assert.That(license, Is.Not.Null);
+            Assert.That(license.text, Does.Contain("SIL OPEN FONT LICENSE"));
             var material = roots.SelectMany(r => r.GetComponentsInChildren<Renderer>()).Single().sharedMaterial;
             Assert.That(material, Is.Not.Null); Assert.That(material.shader, Is.Not.Null);
             Assert.That(material.shader.name, Is.EqualTo("Universal Render Pipeline/Lit"));

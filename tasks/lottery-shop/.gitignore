@@ -7,6 +7,8 @@ unity/Assets/GeneratedProbe/
 unity/Assets/GeneratedProbe.meta
 unity/Assets/Resources/ProbeChinese.otf
 unity/Assets/Resources/ProbeChinese.otf.meta
+unity/Assets/Resources/ProbeFontLicense.txt
+unity/Assets/Resources/ProbeFontLicense.txt.meta
 build/
 artifacts/
 *.csproj

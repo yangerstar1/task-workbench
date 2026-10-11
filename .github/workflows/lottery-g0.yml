@@ -1,0 +1,178 @@
+name: Lottery G0 isolated Unity probe
+
+on:
+  push:
+    branches: [lottery-shop-g0-20261011]
+    paths: [tasks/lottery-shop/ci/g0-request.json]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: unity-personal-proof
+  cancel-in-progress: false
+
+jobs:
+  tests:
+    name: Six exact EditMode checks
+    if: >-
+      github.event_name == 'push' &&
+      github.repository == 'yangerstar1/task-workbench' &&
+      github.repository_owner == 'yangerstar1' &&
+      github.actor == 'yangerstar1' && github.triggering_actor == 'yangerstar1' &&
+      github.ref == 'refs/heads/lottery-shop-g0-20261011' &&
+      github.event.repository.private == false && github.event.repository.fork == false &&
+      github.event.deleted == false
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    outputs:
+      test_count: ${{ steps.verify.outputs.test_count }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+          lfs: false
+          fetch-depth: 0
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /tasks/lottery-shop/
+            /.github/workflows/lottery-g0.yml
+      - name: Verify exact request and trusted disposable context
+        id: guard
+        run: python3 tasks/lottery-shop/scripts/probe_ci.py guard
+      - name: Test CI validators using synthetic fixtures only
+        run: python3 -m unittest discover -s tasks/lottery-shop/scripts -p 'test_*.py' -v
+      - name: Prepare disposable runner without credentials
+        run: bash tasks/lottery-shop/scripts/prepare_runner.sh
+      - name: Restore checksummed licensed font and record source baseline
+        run: |
+          python3 tasks/lottery-shop/scripts/probe_ci.py restore-font
+          python3 tasks/lottery-shop/scripts/probe_ci.py snapshot
+      - name: Execute native Unity EditMode tests
+        id: unity
+        uses: game-ci/unity-test-runner@0ff419b913a3630032cbe0de48a0099b5a9f0ed9 # v4.3.1
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+        with:
+          unityVersion: 6000.3.19f1
+          projectPath: tasks/lottery-shop/unity
+          testMode: editmode
+          artifactsPath: tasks/lottery-shop/artifacts/tests
+          customParameters: -assemblyNames Lottery.Probe.Tests -job-worker-count 2
+          dockerCpuLimit: 2
+          dockerMemoryLimit: 12g
+      - name: Require exact six PASS with no skipped tests
+        if: ${{ always() && steps.guard.outcome == 'success' && steps.unity.outcome != 'skipped' }}
+        id: verify
+        run: python3 tasks/lottery-shop/scripts/probe_ci.py tests
+      - name: Account for generated assets and settings mutations
+        id: audit
+        if: ${{ always() && steps.guard.outcome == 'success' && steps.unity.outcome != 'skipped' }}
+        run: python3 tasks/lottery-shop/scripts/probe_ci.py audit
+      - name: Upload only explicitly bounded test evidence
+        if: ${{ always() && steps.guard.outcome == 'success' }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: lottery-g0-tests-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            tasks/lottery-shop/evidence/guard-receipt.json
+            tasks/lottery-shop/evidence/font-receipt.json
+            tasks/lottery-shop/evidence/raw-test-results.xml
+            tasks/lottery-shop/evidence/raw-test-report-receipt.json
+            tasks/lottery-shop/evidence/test-results.xml
+            tasks/lottery-shop/evidence/test-receipt.json
+            tasks/lottery-shop/evidence/source-mutations.json
+            tasks/lottery-shop/evidence/generated-manifest.json
+            tasks/lottery-shop/evidence/generated-assets.zip
+            tasks/lottery-shop/evidence/packages-lock.json
+          if-no-files-found: ignore
+          retention-days: 7
+
+  android:
+    name: Independently build ARM64 IL2CPP probe
+    needs: tests
+    if: >-
+      needs.tests.result == 'success' && needs.tests.outputs.test_count == '6' &&
+      github.event_name == 'push' && github.repository == 'yangerstar1/task-workbench' &&
+      github.repository_owner == 'yangerstar1' &&
+      github.actor == 'yangerstar1' && github.triggering_actor == 'yangerstar1' &&
+      github.ref == 'refs/heads/lottery-shop-g0-20261011' &&
+      github.event.repository.private == false && github.event.repository.fork == false &&
+      github.event.deleted == false
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+          lfs: false
+          fetch-depth: 0
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /tasks/lottery-shop/
+            /.github/workflows/lottery-g0.yml
+      - name: Verify exact request and trusted disposable context
+        id: guard
+        run: python3 tasks/lottery-shop/scripts/probe_ci.py guard
+      - name: Prepare disposable runner without credentials
+        run: bash tasks/lottery-shop/scripts/prepare_runner.sh
+      - name: Restore checksummed licensed font and record source baseline
+        run: |
+          python3 tasks/lottery-shop/scripts/probe_ci.py restore-font
+          python3 tasks/lottery-shop/scripts/probe_ci.py snapshot
+      - name: Build development-only probe with Unity
+        id: unity
+        uses: game-ci/unity-builder@d829bfc901f2347c8fe18898f06712b66916ef42 # v5.0.0
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+        with:
+          unityVersion: 6000.3.19f1
+          projectPath: tasks/lottery-shop/unity
+          targetPlatform: Android
+          buildMethod: Lottery.Probe.Editor.ProbeBuild.BuildAndroid
+          buildName: LotteryG0
+          buildsPath: tasks/lottery-shop/build
+          androidTargetSdkVersion: 35
+          androidExportType: androidPackage
+          versioning: Custom
+          version: 0.0.1
+          androidVersionCode: 1
+          dockerCpuLimit: 2
+          dockerMemoryLimit: 12g
+          # Restored font/license and generated settings are expected mutations.
+          # The explicit baseline audit below rejects every other source change.
+          allowDirtyBuild: true
+          customParameters: >-
+            -job-worker-count 2
+            -probeCommit ${{ github.sha }}
+            -probeRunId ${{ github.run_id }}
+      - name: Verify APK hash, ARM64 IL2CPP and native receipt
+        id: verify
+        if: ${{ always() && steps.guard.outcome == 'success' && steps.unity.outcome == 'success' }}
+        run: python3 tasks/lottery-shop/scripts/probe_ci.py apk
+      - name: Account for generated assets and settings mutations
+        id: audit
+        if: ${{ always() && steps.guard.outcome == 'success' && steps.unity.outcome != 'skipped' }}
+        run: python3 tasks/lottery-shop/scripts/probe_ci.py audit
+      - name: Upload only verified APK and bounded evidence
+        if: ${{ always() && steps.guard.outcome == 'success' && steps.verify.outcome == 'success' && steps.audit.outcome == 'success' }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: lottery-g0-android-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            tasks/lottery-shop/build/Android/LotteryG0.apk
+            tasks/lottery-shop/build/Android/build-receipt.json
+            tasks/lottery-shop/build/Android/resolved-packages.txt
+            tasks/lottery-shop/evidence/guard-receipt.json
+            tasks/lottery-shop/evidence/font-receipt.json
+            tasks/lottery-shop/evidence/apk-receipt.json
+            tasks/lottery-shop/evidence/source-mutations.json
+            tasks/lottery-shop/evidence/generated-manifest.json
+            tasks/lottery-shop/evidence/generated-assets.zip
+            tasks/lottery-shop/evidence/packages-lock.json
+          if-no-files-found: ignore
+          retention-days: 7

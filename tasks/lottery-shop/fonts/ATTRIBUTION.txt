@@ -1,0 +1,17 @@
+Noto Sans CJK SC Regular
+Copyright: © 2014–2021 Adobe (http://www.adobe.com/).
+Noto is a trademark of Google Inc.
+License: SIL Open Font License 1.1. The complete license is in OFL.txt.
+No font glyphs, internal names, or font bytes were modified.
+Compression is only a lossless transport wrapper.
+
+Repository source: yangerstar1/task-workbench
+Source commit: 22525198f7865d055af937f5e828243023d6ad31
+Source Git blob: 29d312974af6f258e2c4d67195188bb3b72f83d3
+Compressed SHA-256: e8affaf0b8f8e8fccecf5476bf05999c891f94ef66ef9b55474fda32ce1ec786
+Restored SHA-256: a6a530f3e7e7a2c299470c42efff2e109fcc0a5be92686b96d5e84a05f3ecb2b
+Restored bytes: 16437340
+
+The CI restoration script copies this attribution and the complete OFL into
+Assets/Resources/ProbeFontLicense.txt so the notice is included in the app.
+This font retains its own license, independently of the original probe code.

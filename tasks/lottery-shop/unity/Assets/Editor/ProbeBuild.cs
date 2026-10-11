@@ -29,8 +29,15 @@ namespace Lottery.Probe.Editor
             pipeline.msaaSampleCount = 1;
             pipeline.supportsHDR = false;
             pipeline.renderScale = 1;
+            pipeline.supportsCameraDepthTexture = false;
+            pipeline.supportsCameraOpaqueTexture = false;
+            pipeline.supportsMainLightShadows = false;
+            renderer.depthPrimingMode = DepthPrimingMode.Disabled;
+            EditorUtility.SetDirty(renderer);
             GraphicsSettings.defaultRenderPipeline = pipeline;
+            int originalQuality = QualitySettings.GetQualityLevel();
             for (int i = 0; i < QualitySettings.names.Length; i++) { QualitySettings.SetQualityLevel(i); QualitySettings.renderPipeline = pipeline; }
+            QualitySettings.SetQualityLevel(originalQuality);
             EditorUtility.SetDirty(pipeline);
             var scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
             var camera = new GameObject("Probe Camera").AddComponent<Camera>();
@@ -70,6 +77,8 @@ namespace Lottery.Probe.Editor
             PlayerSettings.Android.minSdkVersion = AndroidSdkVersions.AndroidApiLevel26;
             PlayerSettings.Android.targetSdkVersion = AndroidSdkVersions.AndroidApiLevel35;
             PlayerSettings.Android.useCustomKeystore = false;
+            PlayerSettings.SetUseDefaultGraphicsAPIs(BuildTarget.Android, false);
+            PlayerSettings.SetGraphicsAPIs(BuildTarget.Android, new[] { GraphicsDeviceType.OpenGLES3 });
             PlayerSettings.defaultInterfaceOrientation = UIOrientation.LandscapeLeft;
             EditorUserBuildSettings.buildAppBundle = false;
             var output = Path.GetFullPath(Path.Combine(Application.dataPath, "../../build/Android")); Directory.CreateDirectory(output);
