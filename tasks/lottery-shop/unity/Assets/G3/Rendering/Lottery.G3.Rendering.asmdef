@@ -1,0 +1,9 @@
+{
+  "name": "Lottery.G3.Rendering",
+  "rootNamespace": "Lottery.G3.Rendering",
+  "references": [
+    "Lottery.G3.Core",
+    "Lottery.G2.Core"
+  ],
+  "autoReferenced": true
+}

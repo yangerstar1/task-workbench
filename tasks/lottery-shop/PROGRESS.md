@@ -31,3 +31,7 @@ G3 has not been compiled, built, device-tested or accepted yet. Its legal diagno
 - Run 38248877036: 45/8/24 plus Android passed; independent review still found viewport distortion, missing ad-waiting SIGKILL and binary versionCode mismatch. It was not promoted as overall G2.
 - Run 38254407558: 45 Edit and 25 SIGKILL passed; Play 6/8 failed because the new fixture raycast before the ticket existed. Android skipped. The assertions were retained and moved after actual purchase, with added pre-purchase negative checks.
 - Run 38256015857: corrected native run and APK, independent review and durable closeout completed. Earlier candidates/evidence remain immutable.
+
+## G3 WIP checkpoint 001
+
+Saved at 2026-10-12 14:45 UTC. Partial uncompiled source only, no CI request or playable-G3 claim. Core/persistence/FakeAd structures and their draft tests, the verification scaffold, approved art and partial presentation are checkpointed. The scene view, input/bootstrap wiring, final exact test identities, native compilation and real execution are unfinished. Existing G2 source and evidence remain unchanged. Local helper results (108 baseline plus 17 G3 synthetic checks) are not C# or Unity results.

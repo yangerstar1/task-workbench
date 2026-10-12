@@ -1,0 +1,400 @@
+name: Lottery G3 bounded one-day whitebox
+on:
+  push:
+    branches: [lottery-shop-g0-20261011]
+    paths: [tasks/lottery-shop/ci/g3-request.json]
+permissions:
+  contents: read
+concurrency:
+  group: unity-personal-proof
+  cancel-in-progress: false
+jobs:
+  tests:
+    name: Existing regressions then exact G3 native cases
+    if: >-
+      github.event_name == 'push' && github.repository == 'yangerstar1/task-workbench' &&
+      github.repository_owner == 'yangerstar1' && github.actor == 'yangerstar1' &&
+      github.triggering_actor == 'yangerstar1' && github.ref == 'refs/heads/lottery-shop-g0-20261011' &&
+      github.event.repository.private == false && github.event.repository.fork == false && github.event.deleted == false
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    outputs:
+      edit_passed: ${{ steps.editverify.outputs.edit_passed }}
+      play_passed: ${{ steps.playverify.outputs.play_passed }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+          lfs: false
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /tasks/lottery-shop/
+            /.github/workflows/lottery-g3.yml
+            /.github/workflows/lottery-g2.yml
+            /.github/workflows/lottery-g0.yml
+      - name: Validate source-frozen fresh preflight and unique request
+        id: guard
+        run: python3 tasks/lottery-shop/scripts/g3_ci.py guard
+      - name: Python validator self-tests are synthetic only
+        run: |
+          PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tasks/lottery-shop/scripts -p 'test_*.py' -v
+          PYTHONDONTWRITEBYTECODE=1 python3 tasks/lottery-shop/scripts/g3_test_ci.py -v
+      - name: Preserve existing 25 real G2 process kills
+        run: python3 tasks/lottery-shop/scripts/g3_process.py regression
+      - name: Six G3 transaction families times six real process kills
+        run: python3 tasks/lottery-shop/scripts/g3_process.py new
+      - name: Prepare guarded disposable runner after both process suites
+        run: bash tasks/lottery-shop/scripts/g3_prepare_runner.sh
+      - name: Restore original licensed font
+        run: python3 tasks/lottery-shop/scripts/g3_ci.py restore-font
+      - name: Snapshot all source and empty unsafe-setting baseline (regression-edit)
+        run: python3 tasks/lottery-shop/scripts/g3_ci.py snapshot --stage regression-edit
+      - name: Native regression-edit
+        id: regressionedit
+        uses: game-ci/unity-test-runner@0ff419b913a3630032cbe0de48a0099b5a9f0ed9
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+        with:
+          unityVersion: 6000.3.19f1
+          projectPath: tasks/lottery-shop/unity
+          testMode: editmode
+          artifactsPath: tasks/lottery-shop/artifacts/g2-edit
+          customParameters: >-
+            -assemblyNames Lottery.Probe.Tests;Lottery.G2.EditMode.Tests
+            -job-worker-count 2 -probeCommit ${{ github.sha }} -probeRunId ${{ github.run_id }}
+          dockerCpuLimit: 2
+          dockerMemoryLimit: 12g
+      - name: Verify exact regression-edit original XML and assembly ownership
+        id: regressioneditverify
+        if: ${{ always() && steps.guard.outcome == 'success' && steps.regressionedit.outcome != 'skipped' }}
+        run: python3 tasks/lottery-shop/scripts/g3_ci.py tests --stage regression-edit
+      - name: Normalize only authorized PS4 field and audit every source (regression-edit)
+        id: regressioneditaudit
+        if: ${{ always() && steps.guard.outcome == 'success' && steps.regressionedit.outcome != 'skipped' }}
+        run: python3 tasks/lottery-shop/scripts/g3_ci.py audit --stage regression-edit
+      - name: Preserve bounded regression-edit evidence
+        if: ${{ always() && steps.guard.outcome == 'success' && steps.regressionedit.outcome != 'skipped' }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: lottery-g3-regression-edit-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            tasks/lottery-shop/evidence/g3/regression-edit/guard-receipt.json
+            tasks/lottery-shop/evidence/g3/regression-edit/font-receipt.json
+            tasks/lottery-shop/evidence/g3/regression-edit/raw-test-results.xml
+            tasks/lottery-shop/evidence/g3/regression-edit/raw-test-report-receipt.json
+            tasks/lottery-shop/evidence/g3/regression-edit/test-results.xml
+            tasks/lottery-shop/evidence/g3/regression-edit/test-receipt.json
+            tasks/lottery-shop/evidence/g3/regression-edit/source-mutations.json
+            tasks/lottery-shop/evidence/g3/regression-edit/settings-normalization.json
+            tasks/lottery-shop/evidence/g3/regression-edit/manifest-before.json
+            tasks/lottery-shop/evidence/g3/regression-edit/manifest-after.json
+            tasks/lottery-shop/evidence/g3/regression-edit/manifest-diagnostic.json
+            tasks/lottery-shop/evidence/g3/regression-edit/generated-manifest.json
+            tasks/lottery-shop/evidence/g3/regression-edit/generated-assets.zip
+            tasks/lottery-shop/evidence/g3/regression-edit/packages-lock.json
+            tasks/lottery-shop/evidence/g3/regression-edit/audit-failure.json
+          if-no-files-found: error
+          retention-days: 7
+      - name: Snapshot all source and empty unsafe-setting baseline (regression-play)
+        run: python3 tasks/lottery-shop/scripts/g3_ci.py snapshot --stage regression-play
+      - name: Native regression-play
+        id: regressionplay
+        uses: game-ci/unity-test-runner@0ff419b913a3630032cbe0de48a0099b5a9f0ed9
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+        with:
+          unityVersion: 6000.3.19f1
+          projectPath: tasks/lottery-shop/unity
+          testMode: playmode
+          artifactsPath: tasks/lottery-shop/artifacts/g2-play
+          customParameters: >-
+            -assemblyNames Lottery.G2.PlayMode.Tests -force-glcore -screen-width 1280 -screen-height 720
+            -job-worker-count 2 -probeCommit ${{ github.sha }} -probeRunId ${{ github.run_id }}
+          dockerCpuLimit: 2
+          dockerMemoryLimit: 12g
+      - name: Verify exact regression-play original XML and assembly ownership
+        id: regressionplayverify
+        if: ${{ always() && steps.guard.outcome == 'success' && steps.regressionplay.outcome != 'skipped' }}
+        run: python3 tasks/lottery-shop/scripts/g3_ci.py tests --stage regression-play
+      - name: Verify original URP frames (regression-play)
+        id: regressionplaycaptures
+        if: ${{ always() && steps.regressionplayverify.outcome == 'success' }}
+        run: python3 tasks/lottery-shop/scripts/g3_ci.py captures --stage regression-play
+      - name: Normalize only authorized PS4 field and audit every source (regression-play)
+        id: regressionplayaudit
+        if: ${{ always() && steps.guard.outcome == 'success' && steps.regressionplay.outcome != 'skipped' }}
+        run: python3 tasks/lottery-shop/scripts/g3_ci.py audit --stage regression-play
+      - name: Preserve bounded regression-play evidence
+        if: ${{ always() && steps.guard.outcome == 'success' && steps.regressionplay.outcome != 'skipped' }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: lottery-g3-regression-play-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            tasks/lottery-shop/evidence/g3/regression-play/guard-receipt.json
+            tasks/lottery-shop/evidence/g3/regression-play/font-receipt.json
+            tasks/lottery-shop/evidence/g3/regression-play/raw-test-results.xml
+            tasks/lottery-shop/evidence/g3/regression-play/raw-test-report-receipt.json
+            tasks/lottery-shop/evidence/g3/regression-play/test-results.xml
+            tasks/lottery-shop/evidence/g3/regression-play/test-receipt.json
+            tasks/lottery-shop/evidence/g3/regression-play/source-mutations.json
+            tasks/lottery-shop/evidence/g3/regression-play/settings-normalization.json
+            tasks/lottery-shop/evidence/g3/regression-play/manifest-before.json
+            tasks/lottery-shop/evidence/g3/regression-play/manifest-after.json
+            tasks/lottery-shop/evidence/g3/regression-play/manifest-diagnostic.json
+            tasks/lottery-shop/evidence/g3/regression-play/generated-manifest.json
+            tasks/lottery-shop/evidence/g3/regression-play/generated-assets.zip
+            tasks/lottery-shop/evidence/g3/regression-play/packages-lock.json
+            tasks/lottery-shop/evidence/g3/regression-play/audit-failure.json
+            tasks/lottery-shop/evidence/g3/regression-play/initial.png
+            tasks/lottery-shop/evidence/g3/regression-play/half.png
+            tasks/lottery-shop/evidence/g3/regression-play/revealed.png
+            tasks/lottery-shop/evidence/g3/regression-play/settled.png
+            tasks/lottery-shop/evidence/g3/regression-play/render-receipt.json
+          if-no-files-found: error
+          retention-days: 7
+      - name: Snapshot all source and empty unsafe-setting baseline (edit)
+        run: python3 tasks/lottery-shop/scripts/g3_ci.py snapshot --stage edit
+      - name: Native edit
+        id: edit
+        uses: game-ci/unity-test-runner@0ff419b913a3630032cbe0de48a0099b5a9f0ed9
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+        with:
+          unityVersion: 6000.3.19f1
+          projectPath: tasks/lottery-shop/unity
+          testMode: editmode
+          artifactsPath: tasks/lottery-shop/artifacts/g3-edit
+          customParameters: >-
+            -assemblyNames Lottery.G3.EditMode.Tests
+            -job-worker-count 2 -probeCommit ${{ github.sha }} -probeRunId ${{ github.run_id }}
+          dockerCpuLimit: 2
+          dockerMemoryLimit: 12g
+      - name: Verify exact edit original XML and assembly ownership
+        id: editverify
+        if: ${{ always() && steps.guard.outcome == 'success' && steps.edit.outcome != 'skipped' }}
+        run: python3 tasks/lottery-shop/scripts/g3_ci.py tests --stage edit
+      - name: Normalize only authorized PS4 field and audit every source (edit)
+        id: editaudit
+        if: ${{ always() && steps.guard.outcome == 'success' && steps.edit.outcome != 'skipped' }}
+        run: python3 tasks/lottery-shop/scripts/g3_ci.py audit --stage edit
+      - name: Preserve bounded edit evidence
+        if: ${{ always() && steps.guard.outcome == 'success' && steps.edit.outcome != 'skipped' }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: lottery-g3-edit-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            tasks/lottery-shop/evidence/g3/edit/guard-receipt.json
+            tasks/lottery-shop/evidence/g3/edit/font-receipt.json
+            tasks/lottery-shop/evidence/g3/edit/raw-test-results.xml
+            tasks/lottery-shop/evidence/g3/edit/raw-test-report-receipt.json
+            tasks/lottery-shop/evidence/g3/edit/test-results.xml
+            tasks/lottery-shop/evidence/g3/edit/test-receipt.json
+            tasks/lottery-shop/evidence/g3/edit/source-mutations.json
+            tasks/lottery-shop/evidence/g3/edit/settings-normalization.json
+            tasks/lottery-shop/evidence/g3/edit/manifest-before.json
+            tasks/lottery-shop/evidence/g3/edit/manifest-after.json
+            tasks/lottery-shop/evidence/g3/edit/manifest-diagnostic.json
+            tasks/lottery-shop/evidence/g3/edit/generated-manifest.json
+            tasks/lottery-shop/evidence/g3/edit/generated-assets.zip
+            tasks/lottery-shop/evidence/g3/edit/packages-lock.json
+            tasks/lottery-shop/evidence/g3/edit/audit-failure.json
+          if-no-files-found: error
+          retention-days: 7
+      - name: Snapshot all source and empty unsafe-setting baseline (play)
+        run: python3 tasks/lottery-shop/scripts/g3_ci.py snapshot --stage play
+      - name: Native play
+        id: play
+        uses: game-ci/unity-test-runner@0ff419b913a3630032cbe0de48a0099b5a9f0ed9
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+        with:
+          unityVersion: 6000.3.19f1
+          projectPath: tasks/lottery-shop/unity
+          testMode: playmode
+          artifactsPath: tasks/lottery-shop/artifacts/g3-play
+          customParameters: >-
+            -assemblyNames Lottery.G3.PlayMode.Tests -force-glcore -screen-width 1280 -screen-height 720
+            -job-worker-count 2 -probeCommit ${{ github.sha }} -probeRunId ${{ github.run_id }}
+          dockerCpuLimit: 2
+          dockerMemoryLimit: 12g
+      - name: Verify exact play original XML and assembly ownership
+        id: playverify
+        if: ${{ always() && steps.guard.outcome == 'success' && steps.play.outcome != 'skipped' }}
+        run: python3 tasks/lottery-shop/scripts/g3_ci.py tests --stage play
+      - name: Verify original URP frames (play)
+        id: playcaptures
+        if: ${{ always() && steps.playverify.outcome == 'success' }}
+        run: python3 tasks/lottery-shop/scripts/g3_ci.py captures --stage play
+      - name: Normalize only authorized PS4 field and audit every source (play)
+        id: playaudit
+        if: ${{ always() && steps.guard.outcome == 'success' && steps.play.outcome != 'skipped' }}
+        run: python3 tasks/lottery-shop/scripts/g3_ci.py audit --stage play
+      - name: Preserve bounded play evidence
+        if: ${{ always() && steps.guard.outcome == 'success' && steps.play.outcome != 'skipped' }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: lottery-g3-play-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            tasks/lottery-shop/evidence/g3/play/guard-receipt.json
+            tasks/lottery-shop/evidence/g3/play/font-receipt.json
+            tasks/lottery-shop/evidence/g3/play/raw-test-results.xml
+            tasks/lottery-shop/evidence/g3/play/raw-test-report-receipt.json
+            tasks/lottery-shop/evidence/g3/play/test-results.xml
+            tasks/lottery-shop/evidence/g3/play/test-receipt.json
+            tasks/lottery-shop/evidence/g3/play/source-mutations.json
+            tasks/lottery-shop/evidence/g3/play/settings-normalization.json
+            tasks/lottery-shop/evidence/g3/play/manifest-before.json
+            tasks/lottery-shop/evidence/g3/play/manifest-after.json
+            tasks/lottery-shop/evidence/g3/play/manifest-diagnostic.json
+            tasks/lottery-shop/evidence/g3/play/generated-manifest.json
+            tasks/lottery-shop/evidence/g3/play/generated-assets.zip
+            tasks/lottery-shop/evidence/g3/play/packages-lock.json
+            tasks/lottery-shop/evidence/g3/play/audit-failure.json
+            tasks/lottery-shop/evidence/g3/play/empty.png
+            tasks/lottery-shop/evidence/g3/play/number-half.png
+            tasks/lottery-shop/evidence/g3/play/number-revealed.png
+            tasks/lottery-shop/evidence/g3/play/number-copy.png
+            tasks/lottery-shop/evidence/g3/play/number-settled.png
+            tasks/lottery-shop/evidence/g3/play/challenge-two-safe.png
+            tasks/lottery-shop/evidence/g3/play/challenge-selected.png
+            tasks/lottery-shop/evidence/g3/play/challenge-protected.png
+            tasks/lottery-shop/evidence/g3/play/configuration.png
+            tasks/lottery-shop/evidence/g3/play/shop-physical.png
+            tasks/lottery-shop/evidence/g3/play/shop-shortcut.png
+            tasks/lottery-shop/evidence/g3/play/phone.png
+            tasks/lottery-shop/evidence/g3/play/night.png
+            tasks/lottery-shop/evidence/g3/play/day-end.png
+            tasks/lottery-shop/evidence/g3/play/render-receipt.json
+          if-no-files-found: error
+          retention-days: 7
+      - name: Preserve bounded process receipts even if a later native test fails
+        if: ${{ always() && steps.guard.outcome == 'success' }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: lottery-g3-process-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            tasks/lottery-shop/evidence/g2/process/process-receipt.json
+            tasks/lottery-shop/evidence/g2/process/process-diagnostic.json
+            tasks/lottery-shop/evidence/g3/process/process-receipt.json
+            tasks/lottery-shop/evidence/g3/process/process-diagnostic.json
+          if-no-files-found: error
+          retention-days: 7
+  android:
+    name: Independent same-source cold ARM64 IL2CPP APK
+    needs: tests
+    if: >-
+      needs.tests.result == 'success' && needs.tests.outputs.edit_passed == 'true' && needs.tests.outputs.play_passed == 'true' &&
+      github.event_name == 'push' && github.repository == 'yangerstar1/task-workbench' &&
+      github.repository_owner == 'yangerstar1' && github.actor == 'yangerstar1' &&
+      github.triggering_actor == 'yangerstar1' && github.ref == 'refs/heads/lottery-shop-g0-20261011' &&
+      github.event.repository.private == false && github.event.repository.fork == false && github.event.deleted == false
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+          lfs: false
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /tasks/lottery-shop/
+            /.github/workflows/lottery-g3.yml
+            /.github/workflows/lottery-g2.yml
+            /.github/workflows/lottery-g0.yml
+      - name: Verify source-frozen fresh preflight and unique request
+        id: guard
+        run: python3 tasks/lottery-shop/scripts/g3_ci.py guard --stage android
+      - name: Prepare guarded cold runner
+        run: bash tasks/lottery-shop/scripts/g3_prepare_runner.sh
+      - name: Prove independent cold workspace and restore licensed font
+        run: |
+          test ! -e tasks/lottery-shop/unity/Library
+          test ! -e tasks/lottery-shop/build/G3
+          python3 tasks/lottery-shop/scripts/g3_ci.py restore-font --stage android
+          python3 tasks/lottery-shop/scripts/g3_ci.py snapshot --stage android
+      - name: Build G3 development APK with explicit versionCode 3
+        id: unity
+        uses: game-ci/unity-builder@d829bfc901f2347c8fe18898f06712b66916ef42
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+        with:
+          unityVersion: 6000.3.19f1
+          projectPath: tasks/lottery-shop/unity
+          targetPlatform: Android
+          buildMethod: Lottery.G3.Editor.G3Build.BuildAndroid
+          buildName: LotteryG3
+          buildsPath: tasks/lottery-shop/build/G3
+          androidTargetSdkVersion: 35
+          androidExportType: androidPackage
+          versioning: Custom
+          version: 0.0.3
+          androidVersionCode: 3
+          dockerCpuLimit: 2
+          dockerMemoryLimit: 12g
+          allowDirtyBuild: true
+          customParameters: >-
+            -job-worker-count 2 -probeCommit ${{ github.sha }} -probeRunId ${{ github.run_id }}
+      - name: Verify compiled APK AXML version and ARM64 source receipt
+        id: verify
+        if: ${{ always() && steps.guard.outcome == 'success' && steps.unity.outcome == 'success' }}
+        run: python3 tasks/lottery-shop/scripts/g3_ci.py apk --stage android
+      - name: Full source audit and bounded normalized generated assets
+        id: audit
+        if: ${{ always() && steps.guard.outcome == 'success' && steps.unity.outcome != 'skipped' }}
+        run: python3 tasks/lottery-shop/scripts/g3_ci.py audit --stage android
+      - name: Preserve only verified APK and bounded source evidence
+        if: ${{ always() && steps.guard.outcome == 'success' && steps.verify.outcome == 'success' && steps.audit.outcome == 'success' }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: lottery-g3-android-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            tasks/lottery-shop/build/G3/Android/LotteryG3.apk
+            tasks/lottery-shop/build/G3/Android/build-receipt.json
+            tasks/lottery-shop/build/G3/Android/resolved-packages.txt
+            tasks/lottery-shop/evidence/g3/android/cold-build-baseline.json
+            tasks/lottery-shop/evidence/g3/android/apk-receipt.json
+            tasks/lottery-shop/evidence/g3/android/guard-receipt.json
+            tasks/lottery-shop/evidence/g3/android/font-receipt.json
+            tasks/lottery-shop/evidence/g3/android/source-mutations.json
+            tasks/lottery-shop/evidence/g3/android/settings-normalization.json
+            tasks/lottery-shop/evidence/g3/android/manifest-before.json
+            tasks/lottery-shop/evidence/g3/android/manifest-after.json
+            tasks/lottery-shop/evidence/g3/android/manifest-diagnostic.json
+            tasks/lottery-shop/evidence/g3/android/generated-manifest.json
+            tasks/lottery-shop/evidence/g3/android/generated-assets.zip
+            tasks/lottery-shop/evidence/g3/android/packages-lock.json
+            tasks/lottery-shop/evidence/g3/android/audit-failure.json
+          if-no-files-found: error
+          retention-days: 7
+      - name: Prepare bounded failure diagnosis
+        id: diagnostics
+        if: ${{ always() && steps.guard.outcome == 'success' && (steps.verify.outcome != 'success' || steps.audit.outcome != 'success') }}
+        run: >-
+          python3 tasks/lottery-shop/scripts/g3_ci.py diagnostics --stage android
+          --unity-outcome '${{ steps.unity.outcome }}' --verify-outcome '${{ steps.verify.outcome }}' --audit-outcome '${{ steps.audit.outcome }}'
+      - name: Preserve fixed diagnosis without raw logs
+        if: ${{ always() && steps.diagnostics.outcome == 'success' }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: lottery-g3-android-diagnostics-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            tasks/lottery-shop/evidence/g3/android/diagnostic-receipt.json
+            tasks/lottery-shop/evidence/g3/android/guard-receipt.json
+            tasks/lottery-shop/evidence/g3/android/source-mutations.json
+            tasks/lottery-shop/evidence/g3/android/settings-normalization.json
+            tasks/lottery-shop/evidence/g3/android/audit-failure.json
+            tasks/lottery-shop/evidence/g3/android/manifest-diagnostic.json
+          if-no-files-found: error
+          retention-days: 7

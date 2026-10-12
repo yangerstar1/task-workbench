@@ -1,0 +1,300 @@
+#!/usr/bin/env python3
+"""G3 bounded CI adapter. Baseline G0/G2 validators remain byte-for-byte unchanged.
+All reported results require actual runner evidence; no Unity/.NET fallback runs here.
+"""
+import argparse
+import contextlib
+import hashlib
+import json
+import os
+from pathlib import Path
+import re
+import shutil
+import struct
+import subprocess
+import sys
+import xml.etree.ElementTree as ET
+import zipfile
+import g2_ci as g2
+
+legacy = g2.legacy
+require, digest, bounded_read, write_json = g2.require, g2.digest, g2.bounded_read, g2.write_json
+TASK, RULES_SHA = g2.TASK, g2.RULES_SHA
+BASE = '06814f520041676a50601f4e70d5ee09eae10078'
+SCOPE = 'G3_ONE_DAY_WHITEBOX_NOT_DEVICE_TESTED'
+REQUEST = dict(schemaVersion=1, requestId='lottery-g3-20261012-01', baseCommit=BASE, purpose='G3_ONE_DAY_WHITEBOX')
+REQUEST_PATH = TASK + '/ci/g3-request.json'
+SCENE = 'Assets/G3/Scenes/G3Day.unity'
+GENERATED = {SCENE, SCENE + '.meta', 'Assets/G3/Scenes.meta'}
+STAGES = ('regression-edit', 'regression-play', 'edit', 'play', 'android')
+FRAMES = ()  # Filled only after the UI author freezes the actual capture contract.
+BASELINE_CONTRACT_SHA = 'aad7c41d07d4307b4885353e3bc829b1942d58da20363306018b07e64f47f2bb'
+
+@contextlib.contextmanager
+def configured():
+    """Bind legacy helpers only within this G3 invocation, never mutate baseline files."""
+    saved = {k: getattr(legacy, k) for k in ('BASE', 'SCOPE', 'REQUEST', 'REQUEST_PATH', 'mutation_kind')}
+    old_binding = g2.normalization_binding
+    original_kind = legacy.mutation_kind
+    legacy.BASE, legacy.SCOPE, legacy.REQUEST, legacy.REQUEST_PATH = BASE, SCOPE, REQUEST, REQUEST_PATH
+    legacy.mutation_kind = lambda path: 'G3_GENERATED_SCENE' if path in GENERATED else original_kind(path)
+    def binding(identity, stage):
+        require(stage in STAGES, 'Unexpected G3 audit stage')
+        return dict(stage=stage, **{k: identity[k] for k in ('sourceCommit','runId','runAttempt','requestId')})
+    g2.normalization_binding = binding
+    try: yield
+    finally:
+        for key, value in saved.items(): setattr(legacy, key, value)
+        g2.normalization_binding = old_binding
+
+
+def baseline_contract(task):
+    require(digest(task / 'ci/g2-test-contract.json') == BASELINE_CONTRACT_SHA, 'G2 baseline contract bytes changed')
+    profiles = g2.load_contract(task / 'ci/g2-test-contract.json')
+    require(sum(map(len, profiles['edit'].values())) == 45 and sum(map(len, profiles['play'].values())) == 8,
+            'G2 exact regression count changed')
+    return profiles
+
+
+def load_contract(task):
+    data = json.loads(bounded_read(task / 'ci/g3-test-contract.json', 128*1024))
+    require(set(data) == {'schemaVersion','status','rulesSha256','profiles','frames'} and
+            type(data['schemaVersion']) is int and data['schemaVersion'] == 1 and
+            data['status'] == 'FROZEN_FOR_CI' and data['rulesSha256'] == RULES_SHA, 'G3 contract not frozen')
+    profiles = data['profiles']; baseline = baseline_contract(task)
+    require(set(profiles) == set(STAGES)-{'android'}, 'G3 native profiles mismatch')
+    require(profiles['regression-edit'] == baseline['edit'] and profiles['regression-play'] == baseline['play'], 'G2 regression identities changed')
+    for profile in ('edit','play'):
+        assemblies = profiles[profile]; wanted = 'Lottery.G3.' + ('EditMode' if profile == 'edit' else 'PlayMode') + '.Tests.dll'
+        require(isinstance(assemblies,dict) and set(assemblies)=={wanted}, 'G3 assembly ownership mismatch')
+        names = assemblies[wanted]
+        require(isinstance(names,list) and 1 <= len(names) <= 256 and len(names)==len(set(names)) and
+                all(isinstance(n,str) and re.fullmatch(r'Lottery\.G3\.[A-Za-z0-9_.]+',n) for n in names), 'G3 exact cases missing')
+    frames=data['frames']
+    require(isinstance(frames,list) and 10 <= len(frames) <= 20 and len(frames)==len(set(frames)) and
+            all(isinstance(f,str) and re.fullmatch(r'[a-z][a-z0-9-]{1,40}',f) for f in frames), 'G3 capture contract incomplete')
+    return data
+
+
+def reviewed_files(root, committed=False):
+    task=root/TASK
+    if committed:
+        names=legacy.git(root,"ls-tree","-r","--name-only","HEAD").splitlines()
+        prefixes=tuple(TASK+"/"+part+"/" for part in ("unity/Assets","unity/Packages","unity/ProjectSettings","scripts","ci","data","fonts"))
+        selected=[n for n in names if (n.startswith(prefixes) or n in {".github/workflows/lottery-"+x+".yml" for x in ("g0","g2","g3")}) and n not in {REQUEST_PATH,TASK+"/ci/g3-preflight.review.json"}]
+        require(0<len(selected)<=1024,"Committed review source bounds")
+        return {name:hashlib.sha256(subprocess.check_output(["git","-C",str(root),"show","HEAD:"+name])).hexdigest() for name in sorted(selected)}
+    selected=[]
+    for part in ('unity/Assets','unity/Packages','unity/ProjectSettings','scripts','ci','data','fonts'):
+        for path in (task/part).rglob('*'):
+            relative=path.relative_to(root).as_posix()
+            require(not path.is_symlink(), 'Review source symlink refused')
+            if not path.is_file() or '__pycache__' in path.parts or path.suffix=='.pyc': continue
+            if relative in {REQUEST_PATH,TASK+'/ci/g3-preflight.review.json'}: continue
+            if '/obj/' in relative or '/bin/' in relative: raise ValueError('Compiled output in review source')
+            selected.append(path)
+    selected += [root/'.github/workflows'/('lottery-'+x+'.yml') for x in ('g0','g2','g3')]
+    require(0 < len(selected) <= 1024, 'Review source set out of bounds')
+    result={p.relative_to(root).as_posix():digest(p) for p in sorted(selected)}
+    # Text workspaces omit this large accepted-baseline binary. Its pinned digest
+    # is subsequently verified from actual committed bytes by the runner guard.
+    result.setdefault(TASK+'/fonts/NotoSansCJKsc-Regular.otf.xz',legacy.FONT_COMPRESSED_SHA)
+    return result
+
+
+def verify_preflight(root):
+    task=root/TASK
+    review=json.loads(bounded_read(task/'ci/g3-preflight.review.json', 256*1024))
+    require(set(review)=={'schemaVersion','status','requestId','reviewedSourceCommit','reviewerId','sourceFiles','deviceQa','finalQuality'}, 'Fresh preflight schema mismatch')
+    require(type(review['schemaVersion']) is int and review['schemaVersion']==1 and review['status']=='APPROVED_FOR_TRIGGER' and
+            review['requestId']==REQUEST['requestId'] and review['deviceQa']=='NOT_RUN' and review['finalQuality']=='NOT_PASSED', 'Fresh preflight not approved')
+    require(isinstance(review['reviewerId'],str) and re.fullmatch(r'[A-Za-z0-9_./:-]{5,200}',review['reviewerId']), 'Fresh reviewer identity missing')
+    require(re.fullmatch(r'[0-9a-f]{40}',review.get('reviewedSourceCommit','')), 'Reviewed commit missing')
+    require(review['sourceFiles']==reviewed_files(root,committed=True), 'Reviewed source files drifted')
+    subprocess.run(['git','-C',str(root),'merge-base','--is-ancestor',review['reviewedSourceCommit'],'HEAD'],check=True)
+    return review
+
+
+def guard(root):
+    identity=legacy.guard(root)
+    changed=legacy.git(root,'diff-tree','--no-commit-id','--name-only','-r','HEAD').splitlines()
+    require(changed==[REQUEST_PATH], 'G3 trigger commit must change only its unique request')
+    verify_preflight(root)
+    identity.update(rulesSha256=RULES_SHA,g2SourceBase=BASE,finalQuality='NOT_PASSED')
+    return identity
+
+
+def verify_inputs(root):
+    g2.verify_inputs(root)
+    load_contract(root/TASK)
+
+
+def audit_stage(root,stage,identity):
+    task=root/TASK; common=task/'evidence'; out=common/'g3'/stage
+    out.mkdir(parents=True,exist_ok=True)
+    safe=g2.SAFE_COMMON+g2.SAFE_GENERATED
+    for name in safe+("settings-normalization.json",): (out/name).unlink(missing_ok=True)
+    success=False
+    try:
+        normalization=g2.normalize_unused_platform(root,stage,identity)
+        legacy.audit(root,identity,additional_generated_kinds=('G2_GENERATED_SCENE','G3_GENERATED_SCENE'))
+        require(digest(task/'unity/Packages/packages-lock.json')==g2.LOCK_SHA, 'Frozen G3 package lock changed')
+        for name in ('source-mutations.json','generated-manifest.json'):
+            data=json.loads(bounded_read(common/name,1024*1024))
+            data.update(archiveRepresentation=normalization['archiveRepresentation'],settingsNormalizationReceiptSha256=digest(common/'g2'/stage/'settings-normalization.json'))
+            write_json(common/name,data)
+        success=True
+    except Exception:
+        write_json(out/'audit-failure.json',dict(identity,status='FAIL',stage=stage,sourceContentExport='REFUSED'))
+        raise
+    finally:
+        norm=common/'g2'/stage/'settings-normalization.json'
+        if norm.is_file(): shutil.copyfile(norm,out/norm.name)
+        for name in g2.SAFE_COMMON+(g2.SAFE_GENERATED if success else ()):
+            path=common/name
+            if path.is_file() and not path.is_symlink():
+                require(path.stat().st_size<=32*1024*1024,'Stage artifact exceeds bound')
+                shutil.copyfile(path,out/name)
+
+
+def artifacts_stage(stage):
+    return 'g2-'+stage.removeprefix('regression-') if stage.startswith('regression-') else 'g3-'+stage
+
+
+def export_tests(task,stage,identity):
+    out=task/'evidence/g3'/stage; out.mkdir(parents=True,exist_ok=True)
+    for name in ('raw-test-results.xml','raw-test-report-receipt.json','test-results.xml','test-receipt.json'): (out/name).unlink(missing_ok=True)
+    assemblies=load_contract(task)['profiles'][stage]; directory=task/'artifacts'/artifacts_stage(stage)
+    legacy.export_raw_test_report(directory,out)
+    _,report,result=g2.inspect_tests(directory,assemblies)
+    safe=ET.Element('test-run',{k:report.get(k,'') for k in ('result','total','passed','failed','skipped','inconclusive')})
+    for suite in [n for n in report.iter('test-suite') if n.get('type')=='Assembly']:
+        target=ET.SubElement(safe,'test-suite',dict(type='Assembly',name=suite.get('name'),result='Passed'))
+        for case in suite.iter('test-case'): ET.SubElement(target,'test-case',dict(fullname=case.get('fullname'),result='Passed'))
+    ET.indent(safe); ET.ElementTree(safe).write(out/'test-results.xml',encoding='utf-8',xml_declaration=True)
+    write_json(out/'test-receipt.json',dict(identity,**result,profile=stage,scopeOfPass='EXACT_NATIVE_CASES_NOT_DEVICE_QA'))
+    with open(os.environ['GITHUB_OUTPUT'],'a',encoding='utf-8') as stream: stream.write(stage.replace('-','_')+'_passed=true\n')
+
+
+def inspect_captures(source,identity,frames):
+    data=json.loads(bounded_read(source/'render-receipt.json',128*1024))
+    required={'schemaVersion','scope','sourceCommit','runId','unityVersion','rulesSha256','captureMethod','graphicsDeviceType','graphicsDeviceName','width','height','sourceViewportWidth','sourceViewportHeight','inputEvidence','deviceQa','visualReview','frames'}
+    require(set(data)==required,'G3 render receipt schema mismatch')
+    expected=dict(schemaVersion=1,scope='G3_CAMERA_RENDER_NOT_DEVICE_TESTED',sourceCommit=identity['sourceCommit'],runId=identity['runId'],unityVersion=legacy.VERSION,rulesSha256=RULES_SHA,captureMethod='URP_STANDARD_REQUEST_READPIXELS',width=1280,height=720,inputEvidence='SIMULATED_INPUT_SYSTEM',deviceQa='NOT_RUN',visualReview='PENDING')
+    require(all(data.get(k)==v for k,v in expected.items()),'G3 render identity mismatch')
+    require(all(type(data[k]) is int and 64<=data[k]<=8192 for k in ('sourceViewportWidth','sourceViewportHeight')), 'Viewport absent')
+    for k in ('graphicsDeviceType','graphicsDeviceName'):
+        require(isinstance(data[k],str) and re.fullmatch(r'[A-Za-z0-9_., ()/+:-]{1,200}',data[k]) and 'null' not in data[k].lower(),'Graphics device absent')
+    require(isinstance(data['frames'],list) and [f.get('stage') for f in data['frames']]==frames,'Exact G3 original frame set mismatch')
+    for f in data['frames']:
+        require(set(f)=={'stage','file','sha256','bytes','stateSha256'} and f['file']==f['stage']+'.png' and re.fullmatch(r'[0-9a-f]{64}',f.get('stateSha256','')),'G3 frame metadata mismatch')
+        p=source/f['file']; raw=bounded_read(p,4*1024*1024)
+        require(f['sha256']==digest(p) and type(f['bytes']) is int and f['bytes']==len(raw),'Frame bytes mismatch')
+        g2.png_dimensions(raw)
+    require(len({f['sha256'] for f in data['frames']})==len(frames),'Original state frames must be distinct')
+    return data
+
+
+def parse_binary_manifest(raw):
+    """Bounded Android AXML parser: validates compiled APK package/version identity."""
+    require(8<=len(raw)<=2*1024*1024,'Android manifest bounds')
+    kind,header,total=struct.unpack_from('<HHI',raw,0)
+    require(kind==3 and header==8 and total==len(raw),'Expected binary AXML document')
+    strings=[]; result={}; offset=header
+    def u32(p): require(p+4<=len(raw),'Truncated AXML'); return struct.unpack_from('<I',raw,p)[0]
+    def string(i): require(0<=i<len(strings),'AXML string index'); return strings[i]
+    while offset<len(raw):
+        require(offset+8<=len(raw),'Truncated AXML chunk')
+        typ,hs,size=struct.unpack_from('<HHI',raw,offset)
+        require(hs>=8 and size>=hs and offset+size<=len(raw),'Bad AXML chunk length')
+        if typ==1:
+            require(not strings and hs>=28,'Duplicate/bad string pool')
+            count,styles,flags,start,style_start=struct.unpack_from('<IIIII',raw,offset+8)
+            require(count<=16384 and hs+4*(count+styles)<=size and start>=hs+4*(count+styles) and start<size,'Bad string pool bounds')
+            def length(p,wide):
+                n=2 if wide else 1; require(p+n<=offset+size,'Truncated string')
+                first=int.from_bytes(raw[p:p+n],'little'); p+=n; mask=0x8000 if wide else 0x80
+                if first&mask:
+                    require(p+n<=offset+size,'Truncated string length'); first=((first&(mask-1))<<(16 if wide else 8))|int.from_bytes(raw[p:p+n],'little');p+=n
+                return first,p
+            for i in range(count):
+                p=offset+start+u32(offset+hs+4*i); require(p<offset+size,'String offset')
+                if flags&0x100:
+                    _,p=length(p,False);length_bytes,p=length(p,False);end=p+length_bytes
+                    require(end<offset+size and raw[end]==0,'Bad UTF8 terminator');s=raw[p:end].decode('utf-8')
+                else:
+                    chars,p=length(p,True);end=p+chars*2
+                    require(end+2<=offset+size and raw[end:end+2]==b'\0\0','Bad UTF16 terminator');s=raw[p:end].decode('utf-16le')
+                strings.append(s)
+        elif typ==0x102:
+            require(hs==16 and size>=36,'Bad start element')
+            name=string(u32(offset+20)); attr_start,attr_size,count=struct.unpack_from('<HHH',raw,offset+24)
+            require(attr_size>=20 and count<=1024 and 16+attr_start+count*attr_size<=size,'Bad AXML attributes')
+            if name=='manifest':
+                require(not result,'Duplicate manifest element')
+                for n in range(count):
+                    p=offset+16+attr_start+n*attr_size; ns=u32(p);key=string(u32(p+4));rawidx=u32(p+8);typesize,zero,typval=struct.unpack_from('<HBB',raw,p+12);value=u32(p+16)
+                    require(typesize==8 and zero==0,'Bad typed attribute')
+                    if key in ('package','versionCode','versionName'):
+                        require(key not in result,'Duplicate identity attribute')
+                        require(ns==(0xffffffff if key=='package' else ns) and (key=='package' or string(ns)=='http://schemas.android.com/apk/res/android'),'Wrong identity namespace')
+                        if typval==3: val=string(value)
+                        elif typval in (16,17): val=value
+                        else: raise ValueError('Unexpected APK identity type')
+                        if rawidx!=0xffffffff: require(string(rawidx)==str(val),'AXML raw/typed disagreement')
+                        result[key]=val
+        offset+=size
+    require(set(result)=={'package','versionCode','versionName'},'APK identity missing')
+    return result
+
+
+def inspect_apk(task,identity):
+    directory=task/'build/G3/Android'; apk=directory/'LotteryG3.apk'
+    cold=json.loads(bounded_read(task/'evidence/g3/android/cold-build-baseline.json',16384))
+    require(all(cold.get(k)==v for k,v in identity.items()) and cold.get('status')=='VERIFIED_BEFORE_UNITY' and cold.get('libraryAbsent') is True and cold.get('buildAbsent') is True and cold.get('cacheRestored') is False,'Independent cold build observation missing')
+    receipt=json.loads(bounded_read(directory/'build-receipt.json',64*1024))
+    expected=dict(rulesSha256=RULES_SHA,runtimeScene=SCENE,fakeAd='DEVELOPMENT_FAKE_ONLY',versionCode=3,versionName='0.0.3',applicationIdentifier='com.buyuqi.lotteryprobe',normalRuntimeFixture='NONE',coldBuild=True)
+    require(all(type(receipt.get(k)) is type(v) and receipt.get(k)==v for k,v in expected.items()),'G3 build receipt declaration mismatch')
+    result=legacy.inspect_apk(apk,directory/'build-receipt.json',directory/'resolved-packages.txt',identity)
+    with zipfile.ZipFile(apk) as archive:
+        info=archive.getinfo('AndroidManifest.xml');require(info.file_size<=2*1024*1024,'Manifest exceeds limit')
+        actual=parse_binary_manifest(archive.read(info))
+    require(actual==dict(package='com.buyuqi.lotteryprobe',versionCode=3,versionName='0.0.3'),'Compiled APK version/package mismatch')
+    result.update(binaryManifest=actual,versionIdentityVerification='COMPILED_BINARY_AXML',finalQuality='NOT_PASSED')
+    return result
+
+
+def main():
+    p=argparse.ArgumentParser();p.add_argument('command',choices=('source-preflight','guard','restore-font','snapshot','audit','tests','captures','apk','diagnostics','review-manifest'))
+    p.add_argument('--root',type=Path,default=Path(__file__).resolve().parents[3]);p.add_argument('--stage',choices=STAGES,default='edit')
+    for name in ('unity','verify','audit'):p.add_argument('--'+name+'-outcome',default='unknown')
+    args=p.parse_args();root=args.root.resolve();task=root/TASK
+    if args.command=='source-preflight':g2.source_preflight(root);return
+    if args.command=='review-manifest':
+        verify_inputs(root);print(json.dumps(reviewed_files(root),sort_keys=True,indent=2));return
+    with configured():
+        identity=guard(root);out=task/'evidence/g3'/args.stage;out.mkdir(parents=True,exist_ok=True);write_json(out/'guard-receipt.json',identity);write_json(task/'evidence/guard-receipt.json',identity)
+        if args.command=='guard':verify_inputs(root)
+        elif args.command=='restore-font':legacy.restore(root)
+        elif args.command=='snapshot':
+            verify_inputs(root)
+            if args.stage=='android':
+                require(not (task/'unity/Library').exists() and not (task/'build/G3').exists(),'Android checkout is not cold')
+                write_json(out/'cold-build-baseline.json',dict(identity,status='VERIFIED_BEFORE_UNITY',libraryAbsent=True,buildAbsent=True,cacheRestored=False))
+            legacy.snapshot_project(root);g2.snapshot_settings_baseline(root,args.stage,identity)
+        elif args.command=='audit':audit_stage(root,args.stage,identity)
+        elif args.command=='tests':require(args.stage!='android','Invalid test stage');export_tests(task,args.stage,identity)
+        elif args.command=='captures':
+            require(args.stage in ('regression-play','play'),'Invalid capture stage')
+            frames=list(g2.FRAMES) if args.stage=='regression-play' else load_contract(task)['frames'];source=task/'artifacts'/artifacts_stage(args.stage)/'captures'
+            for name in [f+'.png' for f in frames]+['render-receipt.json']:(out/name).unlink(missing_ok=True)
+            (g2.inspect_captures(source,identity) if args.stage=='regression-play' else inspect_captures(source,identity,frames))
+            for name in [f+'.png' for f in frames]+['render-receipt.json']:shutil.copyfile(source/name,out/name)
+        elif args.command=='apk':write_json(out/'apk-receipt.json',inspect_apk(task,identity))
+        elif args.command=='diagnostics':write_json(out/'diagnostic-receipt.json',legacy.diagnostic_receipt(identity,args.unity_outcome,args.verify_outcome,args.audit_outcome))
+    print('G3 '+args.command+' completed; physical device QA remains NOT_RUN.')
+
+if __name__=='__main__':
+    try:main()
+    except Exception:
+        print('G3 verification refused; inspect bounded receipts. No raw logs exported.',file=sys.stderr);sys.exit(1)
