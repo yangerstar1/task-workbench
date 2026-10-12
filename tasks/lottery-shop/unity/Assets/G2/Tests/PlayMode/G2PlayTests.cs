@@ -74,6 +74,17 @@ namespace Lottery.G2.PlayMode.Tests
             Physics.SyncTransforms();
             yield return null;
             Assert.That(app.SceneCamera.orthographic,Is.True);
+            TestContext.Out.WriteLine("SIMULATED_INPUT_SYSTEM startup: "+Router.DiagnosticState);
+            // Headless Editor focus is not device focus evidence. Establish the
+            // simulated foreground state explicitly, then observe a neutral input
+            // frame before the first player press, exactly through the real router.
+            Router.NotifyPause(false); Router.NotifyFocus(true);
+            MouseEvent(Vector2.zero,false);
+            Assert.That(Router.IsFocused,Is.True,Router.DiagnosticState);
+            Assert.That(Router.AwaitingRelease,Is.False,Router.DiagnosticState);
+            Assert.That(P.View.LayoutChanged,Is.False,Router.DiagnosticState);
+            Assert.That(P.View.ConsumeUi(P.View.ButtonRect(SliceAction.Buy).center,out SliceAction firstAction),Is.True);
+            Assert.That(firstAction,Is.EqualTo(SliceAction.Buy),"The visible buy control must be the routed UI action");
         }
         [UnityTearDown]
         public IEnumerator TearDown()
@@ -101,12 +112,28 @@ namespace Lottery.G2.PlayMode.Tests
         Vector2 ScreenUv(float u,float v) => app.SceneCamera.WorldToScreenPoint(P.View.Surface.UvToWorld(new Vector2(u,v)));
         void MouseEvent(Vector2 position,bool down)
         {
+            bool wasDown=mouse.leftButton.isPressed;
             var state=new MouseState { position=position,buttons=(ushort)(down?1:0) };
-            InputSystem.QueueStateEvent(mouse,state); InputSystem.Update(); Router.PollInput();
+            InputSystem.QueueStateEvent(mouse,state); InputSystem.Update();
+            Assert.That(Mouse.current,Is.SameAs(mouse),"Queued simulated mouse must be the router's current device");
+            Assert.That(mouse.leftButton.isPressed,Is.EqualTo(down),"Input System must consume the queued button state");
+            if(down && !wasDown) Assert.That(mouse.leftButton.wasPressedThisFrame,Is.True,"Queued down must produce a press edge");
+            if(!down && wasDown) Assert.That(mouse.leftButton.wasReleasedThisFrame,Is.True,"Queued up must produce a release edge");
+            Router.PollInput();
         }
         void Click(SliceAction action)
         {
             var p=P.View.ButtonRect(action).center; MouseEvent(p,true); MouseEvent(p,false);
+        }
+        void BuyReady()
+        {
+            long cash=State.CashMinor;
+            Router.NotifyFocus(true); Router.NotifyPause(false);
+            Assert.That(Router.AwaitingRelease,Is.False,"Redundant foreground callbacks must not swallow a fresh first click");
+            Click(SliceAction.Buy);
+            Assert.That(State.CurrentTicket,Is.Not.Null,"Buy via real input must create a committed ticket. "+Router.DiagnosticState);
+            Assert.That(State.CashMinor,Is.EqualTo(cash-NumberTicketRules.PriceMinor),"Buy must debit the real ledger");
+            Assert.That(State.CurrentTicket.Phase,Is.EqualTo(TicketPhase.ACTIVE));
         }
         void TouchEvent(int id,IPhase phase,Vector2 position)
         {
@@ -133,7 +160,7 @@ namespace Lottery.G2.PlayMode.Tests
         [UnityTest]
         public IEnumerator BuyHalfScratchPanelReturnRevealAndClaimCommitsOneTicket()
         {
-            long initial=State.CashMinor; Click(SliceAction.Buy);
+            long initial=State.CashMinor; BuyReady();
             Assert.That(State.CashMinor,Is.EqualTo(initial-1000));
             string id=State.CurrentTicket.Id; long prize=State.CurrentTicket.RawPrizeMinor;
             Serpentine(.47f); Assert.That(RevealedPixels(),Is.InRange(5000,26000));
@@ -159,21 +186,24 @@ namespace Lottery.G2.PlayMode.Tests
         [UnityTest]
         public IEnumerator UiHitConsumesGestureAndPanelPreservesTicket()
         {
-            Click(SliceAction.Buy); string initial=StateCodec.ComputeHash(State);
+            BuyReady(); string initial=StateCodec.ComputeHash(State);
             MouseEvent(P.View.ButtonRect(SliceAction.Claim).center,true); MouseEvent(ScreenUv(.5f,.5f),true); MouseEvent(ScreenUv(.5f,.5f),false);
             Assert.That(StateCodec.ComputeHash(State),Is.EqualTo(initial),"Disabled claim must eat its whole gesture");
-            Click(SliceAction.OpenPanel); Click(SliceAction.ClosePanel); Click(SliceAction.OpenPanel);
+            Click(SliceAction.OpenPanel); Assert.That(P.PanelOpen,Is.True);
+            Click(SliceAction.ClosePanel); Assert.That(P.PanelOpen,Is.False);
+            Click(SliceAction.OpenPanel); Assert.That(P.PanelOpen,Is.True);
             MouseEvent(ScreenUv(.1f,.1f),true); MouseEvent(ScreenUv(.9f,.9f),true); MouseEvent(ScreenUv(.9f,.9f),false);
             Assert.That(StateCodec.ComputeHash(State),Is.EqualTo(initial));
             var cameraPosition=app.SceneCamera.transform.position; var cameraRotation=app.SceneCamera.transform.rotation;
-            Click(SliceAction.ClosePanel); Serpentine(.2f);
+            Click(SliceAction.ClosePanel); Assert.That(P.PanelOpen,Is.False); Serpentine(.2f);
+            Assert.That(RevealedPixels(),Is.GreaterThan(0),"Real scratch must resume after the panel closes");
             Assert.That(app.SceneCamera.transform.position,Is.EqualTo(cameraPosition)); Assert.That(app.SceneCamera.transform.rotation,Is.EqualTo(cameraRotation));
             yield return null;
         }
         [UnityTest]
         public IEnumerator SecondTouchCannotTakeOverAndTouchUsesSameUvProjection()
         {
-            Click(SliceAction.Buy);
+            BuyReady();
             TouchEvent(11,IPhase.Began,ScreenUv(.10f,.15f)); TouchEvent(22,IPhase.Began,ScreenUv(.90f,.85f));
             TouchEvent(11,IPhase.Moved,ScreenUv(.25f,.15f)); TouchEvent(11,IPhase.Ended,ScreenUv(.25f,.15f));
             TouchEvent(22,IPhase.Moved,ScreenUv(.75f,.85f)); TouchEvent(22,IPhase.Ended,ScreenUv(.75f,.85f));
@@ -188,7 +218,7 @@ namespace Lottery.G2.PlayMode.Tests
         [UnityTest]
         public IEnumerator PointerExitReentryAndFocusCancelDoNotBridge()
         {
-            Click(SliceAction.Buy);
+            BuyReady();
             MouseEvent(ScreenUv(.10f,.8f),true); MouseEvent(new Vector2(-100,-100),true); MouseEvent(ScreenUv(.90f,.8f),true); MouseEvent(ScreenUv(.90f,.8f),false);
             Assert.That(State.CurrentTicket.Scratch.IsRevealed(128,102),Is.False,"Out-of-ticket travel cannot bridge a scratch");
             MouseEvent(ScreenUv(.10f,.4f),true); Router.NotifyFocus(false); Router.NotifyFocus(true);
@@ -197,12 +227,16 @@ namespace Lottery.G2.PlayMode.Tests
             MouseEvent(ScreenUv(.90f,.4f),true); MouseEvent(ScreenUv(.90f,.4f),false);
             Assert.That(State.CurrentTicket.Scratch.IsRevealed(230,51),Is.True);
             Assert.That(State.CurrentTicket.Scratch.IsRevealed(128,51),Is.False);
+            MouseEvent(ScreenUv(.10f,.6f),true); Router.NotifyPause(true); Router.NotifyFocus(false); Router.NotifyPause(false);
+            Assert.That(Router.IsFocused,Is.False,"Unpausing alone cannot override a remaining focus loss");
+            Router.NotifyFocus(true); MouseEvent(ScreenUv(.90f,.6f),true); MouseEvent(ScreenUv(.90f,.6f),false);
+            Assert.That(State.CurrentTicket.Scratch.IsRevealed(230,76),Is.False,"Paused pointer must also lift before a new stroke");
             yield return null;
         }
         [UnityTest]
         public IEnumerator BackCancelsCaptureAndReturnsToCommittedTicket()
         {
-            Click(SliceAction.Buy); string id=State.CurrentTicket.Id;
+            BuyReady(); string id=State.CurrentTicket.Id;
             MouseEvent(ScreenUv(.1f,.3f),true);
             InputSystem.QueueStateEvent(keyboard,new KeyboardState(Key.Escape)); InputSystem.Update(); Router.PollInput();
             Assert.That(Router.Mode,Is.EqualTo(SliceMode.PANEL)); Assert.That(Router.CapturedPointerId,Is.EqualTo(-1));
@@ -215,7 +249,7 @@ namespace Lottery.G2.PlayMode.Tests
         [UnityTest]
         public IEnumerator SaveFailureNeverShowsUncommittedScratch()
         {
-            Click(SliceAction.Buy); string hash=StateCodec.ComputeHash(State); faults.BeforeWrite=true;
+            BuyReady(); string hash=StateCodec.ComputeHash(State); faults.BeforeWrite=true;
             MouseEvent(ScreenUv(.15f,.25f),true); MouseEvent(ScreenUv(.35f,.25f),true); MouseEvent(ScreenUv(.35f,.25f),false);
             Assert.That(StateCodec.ComputeHash(State),Is.EqualTo(hash)); Assert.That(P.IsCommitting,Is.True);
             Assert.That(P.View.Surface.CommittedMaskTexture.GetPixel(45,32).r,Is.EqualTo(0));
@@ -255,7 +289,7 @@ namespace Lottery.G2.PlayMode.Tests
             var records=new List<FrameReceipt>(); var textures=new List<Texture2D>();
             try
             {
-                Click(SliceAction.Buy); yield return null; textures.Add(Capture("initial",output,records));
+                BuyReady(); yield return null; textures.Add(Capture("initial",output,records));
                 Serpentine(.47f); yield return null; textures.Add(Capture("half",output,records));
                 Assert.That(State.CurrentTicket.Scratch.IsRevealed(45,32),Is.True); Assert.That(State.CurrentTicket.Scratch.IsRevealed(215,32),Is.False);
                 Assert.That(ChangedPixels(textures[0],textures[1],.08f,.38f),Is.GreaterThan(500),"Committed scratch must change local rendered pixels");

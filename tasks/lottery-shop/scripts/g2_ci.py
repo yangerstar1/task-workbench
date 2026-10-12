@@ -23,7 +23,7 @@ MANIFEST_SHA = "95bb5ada418c6d596d622ebd1a2e0f0b6d24422f3e525c622958cb492bae3eb2
 LOCK_SHA = "950e703b31453d45443719e88b1a37025d40d388df07c9c3bed31b507fd2f132"
 VECTORS_SHA = "22af609400604776d2801955946dacd35a057edb0563d3a6069848f6be8adcd9"
 SCOPE = "G2_TECHNICAL_SLICE_NOT_DEVICE_TESTED"
-REQUEST = {"schemaVersion": 1, "requestId": "lottery-g2-20261012-05", "baseCommit": BASE, "purpose": "G2_TECHNICAL_SLICE"}
+REQUEST = {"schemaVersion": 1, "requestId": "lottery-g2-20261012-06", "baseCommit": BASE, "purpose": "G2_TECHNICAL_SLICE"}
 G0_CASES = set(legacy.EXPECTED_CASES)
 SCENE = "Assets/G2/Scenes/G2Slice.unity"
 GENERATED = {SCENE, SCENE + ".meta", "Assets/G2/Scenes.meta"}
@@ -43,7 +43,11 @@ _SETTING_KEY = re.compile(r'^\s*(?:-\s*)?["\']?([A-Za-z_][A-Za-z0-9_.-]*)["\']?\
 _CREDENTIAL_KEY = re.compile(r'password|passwd|passcode|secret|token|private.?key|api.?key|credential|license', re.I)
 
 
-def settings_findings(root):
+KNOWN_CREDENTIAL_IDS = {"ps4Passcode", "ps4NPTitleSecret", "metroCertificatePassword"}
+SETTINGS_PATH = "ProjectSettings/ProjectSettings.asset"
+
+
+def settings_findings(root, include_field_ids=False):
     """Fail closed on nonempty credential-like fields; never return source values."""
     directory = root / TASK / "unity/ProjectSettings"
     require(directory.is_dir() and not directory.is_symlink(), "Missing/unsafe ProjectSettings directory")
@@ -55,6 +59,7 @@ def settings_findings(root):
         if path.is_dir(): continue
         raw = bounded_read(path, 2 * 1024 * 1024)
         value = raw.decode("utf-8", errors="strict")
+        field_ids = set()
         for line in value.splitlines():
             field = _SETTING_KEY.fullmatch(line)
             if not field or not _CREDENTIAL_KEY.search(field.group(1)): continue
@@ -62,14 +67,128 @@ def settings_findings(root):
             # and refused too. An optional trailing YAML comment contains no value.
             scalar = field.group(2).split(" #", 1)[0].strip()
             if scalar not in {"", '""', "''", "null", "Null", "NULL", "~"}:
-                findings.append({"path": relative, "kind": "NONEMPTY_CREDENTIAL_SETTING",
-                                 "sha256": hashlib.sha256(raw).hexdigest()})
-                break
+                field_ids.add(field.group(1) if field.group(1) in KNOWN_CREDENTIAL_IDS else "OTHER_CREDENTIAL_FIELD")
+        if field_ids:
+            item = {"path": relative, "kind": "NONEMPTY_CREDENTIAL_SETTING", "sha256": hashlib.sha256(raw).hexdigest()}
+            if include_field_ids: item["fieldIds"] = sorted(field_ids)
+            findings.append(item)
     return findings
+
+
+def validate_credential_layout(root):
+    # Native credential settings are scalar leaves, never duplicate keys or maps.
+    for path in sorted((root / TASK / "unity/ProjectSettings").rglob("*")):
+        if path.is_dir(): continue
+        lines = bounded_read(path, 2 * 1024 * 1024).decode("utf-8", errors="strict").splitlines()
+        seen = set()
+        for index, line in enumerate(lines):
+            field = _SETTING_KEY.fullmatch(line)
+            if not field or not _CREDENTIAL_KEY.search(field.group(1)): continue
+            require(field.group(1) not in seen, "Duplicate credential field refused")
+            seen.add(field.group(1))
+            require(not field.group(2).lstrip().startswith(("|", ">", "[", "{")), "Nonscalar credential field refused")
+            indent = len(line) - len(line.lstrip())
+            following = next((item for item in lines[index + 1:] if item.strip() and not item.lstrip().startswith("#")), "")
+            require(not following or len(following) - len(following.lstrip()) <= indent,
+                    "Multiline credential field refused")
+
+
+def normalization_binding(identity, stage):
+    require(stage in {"edit", "play", "android"}, "Unexpected settings stage")
+    return dict(stage=stage, **{key: identity[key] for key in ("sourceCommit", "runId", "runAttempt", "requestId")})
+
+
+def ps4_scalar_span(raw):
+    """Only one native scalar line is supported; duplicate/quoted/block keys fail closed."""
+    text = raw.decode("utf-8", errors="strict")
+    named = [line for line in text.splitlines() if (match := _SETTING_KEY.fullmatch(line)) and match.group(1) == "ps4Passcode"]
+    require(len(named) == 1, "PS4 field is absent or duplicate")
+    matches = list(re.finditer(rb"(?m)^  ps4Passcode: ([^\r\n]*)(\r?\n|$)", raw))
+    require(len(matches) == 1, "PS4 field has noncanonical layout")
+    value = matches[0].group(1)
+    require(not value or re.fullmatch(rb"[A-Za-z0-9_-]{1,256}", value), "PS4 field is not a bounded plain scalar")
+    return matches[0].span(1), bool(value)
+
+
+def snapshot_settings_baseline(root, stage, identity):
+    source_preflight(root)
+    task = root / TASK; raw = bounded_read(task / "unity" / SETTINGS_PATH, 2 * 1024 * 1024)
+    _, nonempty = ps4_scalar_span(raw); require(not nonempty, "PS4 baseline must be exactly empty")
+    source = json.loads(bounded_read(task / "evidence/pre-unity-source.json", 1024 * 1024))
+    before_hash = hashlib.sha256(raw).hexdigest()
+    require(source.get(SETTINGS_PATH) == before_hash, "Settings baseline differs from source snapshot")
+    write_json(task / "evidence/g2" / stage / "settings-baseline.internal.json",
+               dict(normalization_binding(identity, stage), schemaVersion=1, path=SETTINGS_PATH,
+                    sha256=before_hash, ps4PasscodeState="EXACT_EMPTY"))
+
+
+def normalize_unused_platform(root, stage, identity):
+    """Explicit post-Unity configuration operation, never export-time redaction."""
+    task = root / TASK; out = task / "evidence/g2" / stage
+    output = out / "settings-normalization.json"; binding = normalization_binding(identity, stage)
+    receipt = dict(binding, schemaVersion=1, status="REFUSED", operation="CLEAR_UNUSED_PS4_PASSCODE_AFTER_UNITY",
+                   path=SETTINGS_PATH, fieldIds=[], changed=False, baselineSha256=None, beforeSha256=None,
+                   afterSha256=None, archiveRepresentation="NO_GENERATED_EXPORT")
+    try:
+        raw = bounded_read(task / "unity" / SETTINGS_PATH, 2 * 1024 * 1024)
+        current_hash = hashlib.sha256(raw).hexdigest(); receipt["beforeSha256"] = current_hash
+        baseline = json.loads(bounded_read(out / "settings-baseline.internal.json", 8192))
+        source = json.loads(bounded_read(task / "evidence/pre-unity-source.json", 1024 * 1024))
+        require(set(baseline) == set(binding) | {"schemaVersion", "path", "sha256", "ps4PasscodeState"} and
+                all(baseline.get(k) == v for k, v in binding.items()) and baseline.get("schemaVersion") == 1 and
+                baseline.get("path") == SETTINGS_PATH and baseline.get("ps4PasscodeState") == "EXACT_EMPTY" and
+                re.fullmatch(r"[0-9a-f]{64}", baseline.get("sha256", "")) and
+                source.get(SETTINGS_PATH) == baseline["sha256"], "Settings normalization baseline mismatch")
+        receipt["baselineSha256"] = baseline["sha256"]
+        # A retry retains the original changed=true provenance and baseline binding.
+        if output.exists():
+            prior = json.loads(bounded_read(output, 8192))
+            require(set(prior) == set(receipt) and all(prior.get(k) == v for k, v in binding.items()) and
+                    prior.get("schemaVersion") == 1 and prior.get("status") == "PASS" and
+                    prior.get("operation") == receipt["operation"] and prior.get("path") == SETTINGS_PATH and
+                    prior.get("baselineSha256") == baseline["sha256"] and prior.get("afterSha256") == current_hash and
+                    isinstance(prior.get("beforeSha256"), str) and re.fullmatch(r"[0-9a-f]{64}", prior["beforeSha256"]) and
+                    type(prior.get("changed")) is bool and
+                    prior.get("fieldIds") == (["ps4Passcode"] if prior["changed"] else []) and
+                    prior.get("archiveRepresentation") == ("NORMALIZED_NOT_RAW" if prior["changed"] else "UNMODIFIED_BY_SETTINGS_NORMALIZATION") and
+                    (prior["beforeSha256"] != prior["afterSha256"]) == prior["changed"],
+                    "Stale or failed normalization receipt cannot be reused")
+            source_preflight(root); require(not ps4_scalar_span(raw)[1], "Normalized PS4 field no longer empty")
+            return prior
+        findings = settings_findings(root, include_field_ids=True)
+        receipt["fieldIds"] = sorted({key for item in findings for key in item["fieldIds"]})
+        validate_credential_layout(root)
+        require(all(item["path"] == SETTINGS_PATH and item["fieldIds"] == ["ps4Passcode"] for item in findings),
+                "Other nonempty credentials cannot be normalized")
+        span, changed = ps4_scalar_span(raw)
+        normalized = raw[:span[0]] + raw[span[1]:] if changed else raw
+        if changed:
+            path = task / "unity" / SETTINGS_PATH; temporary = path.with_name(path.name + ".normalizing")
+            require(not temporary.exists() and not temporary.is_symlink(), "Stale normalization temporary refused")
+            try:
+                with temporary.open("xb") as stream:
+                    stream.write(normalized); stream.flush(); os.fsync(stream.fileno())
+                require(digest(path) == current_hash, "Settings changed concurrently")
+                os.replace(temporary, path)
+            finally:
+                temporary.unlink(missing_ok=True)
+        source_preflight(root)
+        require(digest(task / "unity" / SETTINGS_PATH) == hashlib.sha256(normalized).hexdigest(), "Normalized settings readback differs")
+        receipt.update(status="PASS", changed=changed, afterSha256=hashlib.sha256(normalized).hexdigest(),
+                       archiveRepresentation="NORMALIZED_NOT_RAW" if changed else "UNMODIFIED_BY_SETTINGS_NORMALIZATION")
+        write_json(output, receipt)
+        return receipt
+    except Exception:
+        # Preserve a valid first receipt on idempotent retries; stale receipts are not
+        # exported as current evidence. Failure metadata contains no values/source.
+        if output.exists(): output.unlink()
+        write_json(output, receipt)
+        raise
 
 
 def source_preflight(root):
     require(not settings_findings(root), "Credential-bearing settings refused")
+    validate_credential_layout(root)
 
 
 def verify_inputs(root):
@@ -157,13 +276,21 @@ def audit_stage(root, stage, identity):
     (common / "source-mutations.json").unlink(missing_ok=True)
     success = False
     try:
-        findings = settings_findings(root)
-        if findings:
+        try:
+            normalization = normalize_unused_platform(root, stage, identity)
+        except Exception:
             write_json(common / "source-mutations.json", dict(identity, status="FAIL",
                        failedStage="SETTINGS_CREDENTIAL_PREFLIGHT", metadataStatus="NO_SOURCE_CONTENT_EXPORTED",
-                       changes=findings))
-            raise ValueError("Credential-bearing generated settings refused")
+                       changes=settings_findings(root, include_field_ids=True)))
+            raise
         legacy.audit(root, identity, additional_generated_kinds=("G2_GENERATED_SCENE",))
+        for name in ("source-mutations.json", "generated-manifest.json"):
+            path = common / name
+            if path.is_file():
+                data = json.loads(bounded_read(path, 1024 * 1024))
+                data.update(archiveRepresentation=normalization["archiveRepresentation"],
+                            settingsNormalizationReceiptSha256=digest(out / "settings-normalization.json"))
+                write_json(path, data)
         # Exact restored lock is immutable in G2, not merely six matching package versions.
         if digest(task / "unity/Packages/packages-lock.json") != LOCK_SHA:
             receipt = json.loads(bounded_read(common / "source-mutations.json", 1024 * 1024))
@@ -285,7 +412,7 @@ def main():
         verify_inputs(root); load_contract(task / "ci/g2-test-contract.json")
     elif args.command == "restore-font": legacy.restore(root)
     elif args.command == "snapshot":
-        verify_inputs(root); legacy.snapshot_project(root)
+        verify_inputs(root); legacy.snapshot_project(root); snapshot_settings_baseline(root, args.stage, identity)
     elif args.command == "audit": audit_stage(root, args.stage, identity)
     elif args.command == "tests":
         require(args.stage in {"edit", "play"}, "Tests require edit/play stage")

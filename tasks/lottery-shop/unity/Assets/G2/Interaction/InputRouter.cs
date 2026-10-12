@@ -10,10 +10,13 @@ namespace Lottery.G2.Interaction
     public sealed class InputRouter : MonoBehaviour
     {
         SlicePresenter presenter; G2SceneView view;
-        int captured=-1; bool capturedTouch,uiCapture,hasPrevious,touchGesture,requireRelease,focused=true;
+        int captured=-1; bool capturedTouch,uiCapture,hasPrevious,touchGesture,requireRelease,focused=true,paused;
         Vector2 previous;
         public bool PollAutomatically { get; set; } = true;
         public int CapturedPointerId => captured;
+        public bool IsFocused => focused && !paused;
+        public bool AwaitingRelease => requireRelease;
+        public string DiagnosticState => "focus="+focused+",paused="+paused+",release="+requireRelease+",capture="+captured+",touches="+ETouch.activeTouches.Count+",layoutChanged="+(view!=null && view.LayoutChanged)+",viewport="+Screen.width+"x"+Screen.height+",rawSafe="+Screen.safeArea;
         public SliceMode Mode => presenter==null?SliceMode.TABLE:presenter.IsCommitting?SliceMode.COMMITTING:presenter.PanelOpen?SliceMode.PANEL:presenter.CanScratch?SliceMode.SCRATCH:SliceMode.TABLE;
         public void Initialize(SlicePresenter owner,G2SceneView scene) { presenter=owner; view=scene; }
         void OnEnable() { EnhancedTouchSupport.Enable(); }
@@ -21,8 +24,14 @@ namespace Lottery.G2.Interaction
         void Update() { if(PollAutomatically) PollInput(); }
         public void PollInput()
         {
-            if(presenter==null || !focused) return;
-            if(view.LayoutChanged) { CancelGesture(); view.Layout(); }
+            if(presenter==null || !IsFocused) return;
+            if(view.LayoutChanged)
+            {
+                // Reprojection cancels an existing gesture. A new press on the newly
+                // laid-out screen must not be discarded when nothing was captured.
+                if(captured>=0 || touchGesture) CancelGesture();
+                view.Layout();
+            }
             if(Keyboard.current!=null && Keyboard.current.escapeKey.wasPressedThisFrame) { CancelGesture(); presenter.Back(); return; }
             var touches=ETouch.activeTouches; int live=0;
             for(int i=0;i<touches.Count;i++) if(touches[i].phase!=IPhase.Ended && touches[i].phase!=IPhase.Canceled) live++;
@@ -71,8 +80,17 @@ namespace Lottery.G2.Interaction
         }
         void End() { captured=-1; uiCapture=false; hasPrevious=false; if(presenter!=null) presenter.FlushScratch(); }
         public void CancelGesture() { End(); requireRelease=true; }
-        public void NotifyFocus(bool hasFocus) { focused=hasFocus; CancelGesture(); }
+        public void NotifyFocus(bool hasFocus)
+        {
+            bool before=IsFocused; focused=hasFocus;
+            if(before!=IsFocused) CancelGesture();
+        }
+        public void NotifyPause(bool isPaused)
+        {
+            bool before=IsFocused; paused=isPaused;
+            if(before!=IsFocused) CancelGesture();
+        }
         void OnApplicationFocus(bool value) { NotifyFocus(value); }
-        void OnApplicationPause(bool paused) { NotifyFocus(!paused); }
+        void OnApplicationPause(bool isPaused) { NotifyPause(isPaused); }
     }
 }

@@ -66,7 +66,7 @@ jobs:
         id: editverify
         if: ${{ always() && steps.guard.outcome == 'success' && steps.edit.outcome != 'skipped' }}
         run: python3 tasks/lottery-shop/scripts/g2_ci.py tests --stage edit
-      - name: Audit EditMode source against restored baseline
+      - name: Normalize authorized unused setting and audit EditMode source
         id: editaudit
         if: ${{ always() && steps.guard.outcome == 'success' && steps.edit.outcome != 'skipped' }}
         run: python3 tasks/lottery-shop/scripts/g2_ci.py audit --stage edit
@@ -84,6 +84,7 @@ jobs:
             tasks/lottery-shop/evidence/g2/edit/test-results.xml
             tasks/lottery-shop/evidence/g2/edit/test-receipt.json
             tasks/lottery-shop/evidence/g2/edit/source-mutations.json
+            tasks/lottery-shop/evidence/g2/edit/settings-normalization.json
             tasks/lottery-shop/evidence/g2/edit/manifest-before.json
             tasks/lottery-shop/evidence/g2/edit/manifest-after.json
             tasks/lottery-shop/evidence/g2/edit/manifest-diagnostic.json
@@ -141,6 +142,7 @@ jobs:
             tasks/lottery-shop/evidence/g2/edit/test-results.xml
             tasks/lottery-shop/evidence/g2/edit/test-receipt.json
             tasks/lottery-shop/evidence/g2/edit/source-mutations.json
+            tasks/lottery-shop/evidence/g2/edit/settings-normalization.json
             tasks/lottery-shop/evidence/g2/edit/manifest-before.json
             tasks/lottery-shop/evidence/g2/edit/manifest-after.json
             tasks/lottery-shop/evidence/g2/edit/manifest-diagnostic.json
@@ -154,6 +156,7 @@ jobs:
             tasks/lottery-shop/evidence/g2/play/test-results.xml
             tasks/lottery-shop/evidence/g2/play/test-receipt.json
             tasks/lottery-shop/evidence/g2/play/source-mutations.json
+            tasks/lottery-shop/evidence/g2/play/settings-normalization.json
             tasks/lottery-shop/evidence/g2/play/manifest-before.json
             tasks/lottery-shop/evidence/g2/play/manifest-after.json
             tasks/lottery-shop/evidence/g2/play/manifest-diagnostic.json
@@ -243,6 +246,7 @@ jobs:
             tasks/lottery-shop/evidence/g2/android/font-receipt.json
             tasks/lottery-shop/evidence/g2/android/apk-receipt.json
             tasks/lottery-shop/evidence/g2/android/source-mutations.json
+            tasks/lottery-shop/evidence/g2/android/settings-normalization.json
             tasks/lottery-shop/evidence/g2/android/manifest-before.json
             tasks/lottery-shop/evidence/g2/android/manifest-after.json
             tasks/lottery-shop/evidence/g2/android/manifest-diagnostic.json
@@ -267,6 +271,7 @@ jobs:
             tasks/lottery-shop/evidence/g2/android/guard-receipt.json
             tasks/lottery-shop/evidence/g2/android/font-receipt.json
             tasks/lottery-shop/evidence/g2/android/source-mutations.json
+            tasks/lottery-shop/evidence/g2/android/settings-normalization.json
             tasks/lottery-shop/evidence/g2/android/manifest-before.json
             tasks/lottery-shop/evidence/g2/android/manifest-after.json
             tasks/lottery-shop/evidence/g2/android/manifest-diagnostic.json

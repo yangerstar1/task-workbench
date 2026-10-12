@@ -26,7 +26,7 @@ in this working candidate. No external cache is used in this first iteration.
 
 After successful exact EditMode validation AND its source audit, a separate
 `lottery-g2-edit-checkpoint-<run>-<attempt>` artifact preserves the same 14
-already-screened EditMode/process files before PlayMode begins. This checkpoint
+already-screened EditMode/process files plus the fixed settings-normalization receipt before PlayMode begins. This checkpoint
 uses the pinned upload action and a subset of the existing final export list;
 it contains no Play result, raw log or unverified APK. Final combined export
 remains in place. This protects completed evidence from a later job timeout;
@@ -50,15 +50,37 @@ non-UTF-8 files, without printing any settings values. Empty unused credential
 fields are retained as empty. This is a bounded structural screen, not a promise
 that arbitrary obfuscated secrets are discoverable.
 
-The same screen runs at CI source guard/snapshot and immediately before every
-generated-assets archive. If Unity regenerates a nonempty credential field,
-the stage fails and its generated archive/lock are withheld; source bytes are
-not silently sanitized after execution. The failure receipt contains only
-canonical relative path, classification and SHA-256 for the unsafe file, plus
-fixed status/identity metadata. The artifact whitelist never includes raw
-ProjectSettings files independently of this gated archive. Synthetic tests
-cover empty scalars, nonempty keys, block values, symlinks and stale-export
-removal. Original G0 sources and historical evidence are not changed.
+The screen runs at source guard/snapshot and before every generated archive.
+Request 06 adds an explicit post-Unity configuration operation, executed within
+the audit command before the complete original source audit. It may clear only
+`ProjectSettings/ProjectSettings.asset` / `ps4Passcode`, and only if this same
+stage's pre-Unity baseline proved that field exactly empty. Baseline identity is
+bound to source commit, request, run, attempt, stage and the complete source
+snapshot hash. Other nonempty credential fields, duplicate keys, multiline or
+noncanonical PS4 scalars, missing/mismatched baselines and stale receipts fail
+without modifying the file. The entire settings set is checked before replacing
+the file atomically; all bytes outside that single scalar remain unchanged.
+
+`settings-normalization.json` records the fixed operation and field identities,
+baseline/before/after whole-file hashes, and whether a change occurred. It never
+exports values or arbitrary key names. A repeated successful invocation retains
+the original changed=true receipt rather than overwriting it as unchanged.
+Afterwards the full source audit still rejects every unrelated unexpected
+mutation, including temporary scene files. Its receipt and generated manifest
+bind the normalization receipt hash and say `NORMALIZED_NOT_RAW` if changed.
+The archive then contains the explicitly normalized settings, not original raw
+Unity settings; unsafe pre-normalization bytes are deliberately not exported or
+represented as reconstructible evidence. Every other selected output remains
+subject to its original audit. Failed normalization/audit withholds generated
+archives and emits only bounded fixed-identity/hash diagnostics.
+
+Run 05 established a nonempty credential-like setting but did not record its
+field identity. It therefore does not prove that field was ps4Passcode or that
+Unity regenerated a default. Request 06 reports only known fixed field IDs
+(`ps4Passcode`, `ps4NPTitleSecret`, `metroCertificatePassword`) or
+`OTHER_CREDENTIAL_FIELD`; only the first is eligible for the authorized clear.
+The exact normalization receipt is the sole added artifact path per stage.
+Original G0 sources and historical evidence are unchanged.
 
 ## Official graphics-path evidence
 
@@ -115,7 +137,7 @@ lock fails closed for explicit review, rather than accepting other package drift
 
 ## Local verification and remaining work
 
-On 2026-10-12 the local Python suite passed 93 methods (63 preserved plus 30 G2
+On 2026-10-12 the local Python suite passed 101 methods (63 preserved plus 38 G2
 validator fixtures). The PNG/XML fixtures are synthetic, not native evidence.
 One test actually SIGKILLed only its own simple Python child to verify supervisor
 behavior; that is not the C# process fixture. Shell syntax/Python parsing and

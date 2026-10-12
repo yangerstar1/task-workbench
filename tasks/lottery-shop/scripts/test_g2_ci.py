@@ -14,6 +14,7 @@ import unittest
 from unittest import mock
 import xml.etree.ElementTree as ET
 import zlib
+import zipfile
 import g2_ci as ci
 import run_g2_process_probe as process
 
@@ -128,29 +129,99 @@ class G2SyntheticTests(unittest.TestCase):
         path=self.path/ci.TASK/'unity/ProjectSettings/ProjectSettings.asset'
         path.symlink_to(self.path/'outside')
         with self.assertRaises(ValueError):ci.source_preflight(self.path)
+    def normalization_fixture(self,stage='edit'):
+        task=self.path/ci.TASK;settings=task/'unity/ProjectSettings/ProjectSettings.asset'
+        raw=b'PlayerSettings:\n  ps4Passcode: \n  ps4NPTitleSecret: \n  metroCertificatePassword: \n  activeInputHandler: 1\n'
+        settings.write_bytes(raw);packages=task/'unity/Packages';packages.mkdir(parents=True,exist_ok=True)
+        real=Path(ci.__file__).resolve().parents[1]/'unity/Packages'
+        for name in ('manifest.json','packages-lock.json'):shutil.copyfile(real/name,packages/name)
+        identity={'sourceCommit':'a'*40,'runId':'123','runAttempt':'1','requestId':ci.REQUEST['requestId']}
+        ci.legacy.snapshot_project(self.path);ci.snapshot_settings_baseline(self.path,stage,identity)
+        return task,settings,raw,identity
+    def test_normalization_changes_only_authorized_scalar_and_retains_retry_provenance(self):
+        task,path,raw,identity=self.normalization_fixture()
+        before=raw.replace(b'ps4Passcode: ',b'ps4Passcode: SYNTHETIC_NOT_A_CREDENTIAL')
+        path.write_bytes(before);receipt=ci.normalize_unused_platform(self.path,'edit',identity)
+        self.assertEqual(path.read_bytes(),raw);self.assertTrue(receipt['changed'])
+        self.assertEqual(receipt['beforeSha256'],hashlib.sha256(before).hexdigest());self.assertEqual(receipt['afterSha256'],hashlib.sha256(raw).hexdigest())
+        self.assertEqual(receipt['fieldIds'],['ps4Passcode']);self.assertEqual(receipt['archiveRepresentation'],'NORMALIZED_NOT_RAW')
+        saved=(task/'evidence/g2/edit/settings-normalization.json').read_bytes()
+        self.assertEqual(ci.normalize_unused_platform(self.path,'edit',identity),receipt)
+        self.assertEqual((task/'evidence/g2/edit/settings-normalization.json').read_bytes(),saved)
+        self.assertNotIn(b'SYNTHETIC_NOT_A_CREDENTIAL',saved)
+    def test_normalization_refuses_other_nonempty_fields_without_any_change(self):
+        for key in ('ps4NPTitleSecret','metroCertificatePassword','unknownApiKey'):
+            task,path,raw,identity=self.normalization_fixture()
+            (task/'evidence/g2/edit/settings-normalization.json').unlink(missing_ok=True)
+            before=raw+b'  '+key.encode()+b': SYNTHETIC_NOT_A_CREDENTIAL\n';path.write_bytes(before)
+            with self.assertRaises(ValueError):ci.normalize_unused_platform(self.path,'edit',identity)
+            self.assertEqual(path.read_bytes(),before)
+            receipt=(task/'evidence/g2/edit/settings-normalization.json').read_text()
+            self.assertNotIn('SYNTHETIC_NOT_A_CREDENTIAL',receipt);self.assertNotIn('unknownApiKey',receipt)
+            self.assertIn(key if key in ci.KNOWN_CREDENTIAL_IDS else 'OTHER_CREDENTIAL_FIELD',receipt)
+    def test_normalization_refuses_duplicate_block_and_quoted_ps4_values(self):
+        for value in (b'  ps4Passcode: SECOND\n',b'',b'BLOCK'):
+            task,path,raw,identity=self.normalization_fixture();(task/'evidence/g2/edit/settings-normalization.json').unlink(missing_ok=True)
+            before=raw+value if value.startswith(b'  ') else raw.replace(b'ps4Passcode: ',b'ps4Passcode: |\n    SYNTHETIC' if value==b'BLOCK' else b'ps4Passcode: "SYNTHETIC"')
+            path.write_bytes(before)
+            with self.assertRaises(ValueError):ci.normalize_unused_platform(self.path,'edit',identity)
+            self.assertEqual(path.read_bytes(),before)
+    def test_other_duplicate_or_multiline_credential_keys_prevent_all_writes(self):
+        for suffix in (b'  metroCertificatePassword: \n',b'  unusedToken: \n    continuation: SYNTHETIC\n'):
+            task,path,raw,identity=self.normalization_fixture();(task/'evidence/g2/edit/settings-normalization.json').unlink(missing_ok=True)
+            before=raw.replace(b'ps4Passcode: ',b'ps4Passcode: SYNTHETIC')+suffix;path.write_bytes(before)
+            with self.assertRaises(ValueError):ci.normalize_unused_platform(self.path,'edit',identity)
+            self.assertEqual(path.read_bytes(),before)
+    def test_normalization_baseline_must_be_exact_empty_bound_to_stage_and_snapshot(self):
+        task,path,raw,identity=self.normalization_fixture()
+        for field,value in [('stage','play'),('runAttempt','2'),('sha256','b'*64),('ps4PasscodeState','NONEMPTY')]:
+            baseline=task/'evidence/g2/edit/settings-baseline.internal.json';original=baseline.read_bytes();data=json.loads(original);data[field]=value;ci.write_json(baseline,data)
+            (task/'evidence/g2/edit/settings-normalization.json').unlink(missing_ok=True)
+            with self.assertRaises(ValueError):ci.normalize_unused_platform(self.path,'edit',identity)
+            self.assertEqual(path.read_bytes(),raw);baseline.write_bytes(original)
+        path.write_bytes(raw.replace(b'ps4Passcode: ',b'ps4Passcode: SYNTHETIC'))
+        with self.assertRaises(ValueError):ci.snapshot_settings_baseline(self.path,'play',identity)
+    def test_stale_normalization_receipt_cannot_authorize_new_bytes(self):
+        task,path,raw,identity=self.normalization_fixture();ci.normalize_unused_platform(self.path,'edit',identity)
+        changed=raw.replace(b'activeInputHandler: 1',b'activeInputHandler: 2');path.write_bytes(changed)
+        with self.assertRaises(ValueError):ci.normalize_unused_platform(self.path,'edit',identity)
+        self.assertEqual(path.read_bytes(),changed);self.assertEqual(json.loads((task/'evidence/g2/edit/settings-normalization.json').read_text())['status'],'REFUSED')
+    def test_normalized_generated_archive_explicitly_identifies_modified_bytes(self):
+        task,path,raw,identity=self.normalization_fixture();path.write_bytes(raw.replace(b'ps4Passcode: ',b'ps4Passcode: SYNTHETIC'))
+        ci.audit_stage(self.path,'edit',identity);out=task/'evidence/g2/edit'
+        with zipfile.ZipFile(out/'generated-assets.zip') as archive:self.assertEqual(archive.read(ci.SETTINGS_PATH),raw)
+        for name in ('source-mutations.json','generated-manifest.json'):
+            receipt=json.loads((out/name).read_text());self.assertEqual(receipt['archiveRepresentation'],'NORMALIZED_NOT_RAW')
+            self.assertEqual(receipt['settingsNormalizationReceiptSha256'],ci.digest(out/'settings-normalization.json'))
+    def test_normalization_does_not_exempt_other_source_mutation(self):
+        task,path,raw,identity=self.normalization_fixture();path.write_bytes(raw.replace(b'ps4Passcode: ',b'ps4Passcode: SYNTHETIC'))
+        unexpected=task/'unity/Assets/InitTestScene.unity';unexpected.parent.mkdir(parents=True);unexpected.write_text('SYNTHETIC')
+        with self.assertRaises(ValueError):ci.audit_stage(self.path,'edit',identity)
+        out=task/'evidence/g2/edit';self.assertFalse((out/'generated-assets.zip').exists())
+        self.assertEqual(json.loads((out/'source-mutations.json').read_text())['status'],'FAIL')
     def test_regenerated_credential_blocks_archive_and_emits_hash_only_fail(self):
         task=self.path/ci.TASK;common=task/'evidence';common.mkdir(parents=True)
         path=task/'unity/ProjectSettings/ProjectSettings.asset'
-        path.write_text('PlayerSettings:\n  ps4Passcode: SYNTHETIC_NOT_A_CREDENTIAL\n')
+        path.write_text('PlayerSettings:\n  ps4NPTitleSecret: SYNTHETIC_NOT_A_CREDENTIAL\n')
         stale=common/'g2/edit/generated-assets.zip';stale.parent.mkdir(parents=True);stale.write_bytes(b'SYNTHETIC')
-        with mock.patch.object(ci.legacy,'audit') as audit,self.assertRaises(ValueError):ci.audit_stage(self.path,'edit',{'sourceCommit':'a'*40})
+        with mock.patch.object(ci.legacy,'audit') as audit,self.assertRaises(ValueError):ci.audit_stage(self.path,'edit',{'sourceCommit':'a'*40,'runId':'123','runAttempt':'1','requestId':ci.REQUEST['requestId']})
         audit.assert_not_called();self.assertFalse(stale.exists())
         raw=(common/'g2/edit/source-mutations.json').read_text();receipt=json.loads(raw)
         self.assertEqual(receipt['status'],'FAIL');self.assertEqual(receipt['failedStage'],'SETTINGS_CREDENTIAL_PREFLIGHT')
-        self.assertEqual(set(receipt['changes'][0]),{'path','kind','sha256'})
-        self.assertNotIn('SYNTHETIC_NOT_A_CREDENTIAL',raw);self.assertNotIn('ps4Passcode',raw)
+        self.assertEqual(set(receipt['changes'][0]),{'path','kind','sha256','fieldIds'})
+        self.assertNotIn('SYNTHETIC_NOT_A_CREDENTIAL',raw);self.assertEqual(receipt['changes'][0]['fieldIds'],['ps4NPTitleSecret'])
     def test_pinned_lock_drift_emits_fail_and_withholds_generated_exports(self):
         task=self.path/ci.TASK;common=task/'evidence';common.mkdir(parents=True)
         lock=task/'unity/Packages/packages-lock.json';lock.parent.mkdir(parents=True);lock.write_text('{}')
         def fake_audit(root,identity,additional_generated_kinds):
             ci.write_json(common/'source-mutations.json',dict(identity,status='PASS',changes=[]))
             (common/'generated-assets.zip').write_bytes(b'SYNTHETIC')
-        with mock.patch.object(ci.legacy,'audit',fake_audit),self.assertRaises(ValueError):ci.audit_stage(self.path,'edit',{'sourceCommit':'a'*40})
+        with mock.patch.object(ci,'normalize_unused_platform',side_effect=lambda *args: (ci.write_json(common/'g2/edit/settings-normalization.json',{'status':'PASS'}) or {'archiveRepresentation':'UNMODIFIED_BY_SETTINGS_NORMALIZATION'})),mock.patch.object(ci.legacy,'audit',fake_audit),self.assertRaises(ValueError):ci.audit_stage(self.path,'edit',{'sourceCommit':'a'*40})
         receipt=json.loads((common/'g2/edit/source-mutations.json').read_text())
         self.assertEqual(receipt['status'],'FAIL');self.assertFalse((common/'g2/edit/generated-assets.zip').exists())
     def test_unexpected_audit_error_still_writes_small_fail_receipt(self):
         task=self.path/ci.TASK;(task/'evidence').mkdir(parents=True)
-        with mock.patch.object(ci.legacy,'audit',side_effect=RuntimeError('SYNTHETIC internal failure')),self.assertRaises(RuntimeError):
+        with mock.patch.object(ci,'normalize_unused_platform',return_value={'archiveRepresentation':'UNMODIFIED_BY_SETTINGS_NORMALIZATION'}),mock.patch.object(ci.legacy,'audit',side_effect=RuntimeError('SYNTHETIC internal failure')),self.assertRaises(RuntimeError):
             ci.audit_stage(self.path,'play',{'sourceCommit':'b'*40})
         text=(task/'evidence/g2/play/source-mutations.json').read_text();self.assertIn('FAIL',text);self.assertNotIn('internal failure',text)
     def test_synthetic_varied_png_is_decodable_not_render_evidence(self):self.assertEqual(ci.png_dimensions(png()),(1280,720))
@@ -229,7 +300,7 @@ class G2SyntheticTests(unittest.TestCase):
         checkpoint=[line.strip() for line in block.splitlines() if line.startswith('            tasks/')]
         final=workflow[workflow.index('      - name: Export only bounded non-APK evidence'):workflow.index('  android:')]
         finalpaths=[line.strip() for line in final.splitlines() if line.startswith('            tasks/')]
-        self.assertEqual(len(checkpoint),14);self.assertTrue(set(checkpoint) <= set(finalpaths))
+        self.assertEqual(len(checkpoint),15);self.assertTrue(set(checkpoint) <= set(finalpaths))
         self.assertTrue(all('/edit/' in path or path.endswith('/process/process-receipt.json') for path in checkpoint))
         self.assertIn('if-no-files-found: error',block)
     def test_workflow_exports_only_bounded_process_receipts_on_failure(self):

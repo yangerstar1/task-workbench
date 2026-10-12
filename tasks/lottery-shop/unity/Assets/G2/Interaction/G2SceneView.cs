@@ -28,7 +28,15 @@ namespace Lottery.G2.Interaction
         public bool PanelVisible { get; private set; }
         public string VisibleSummary => summary.Text;
         public Rect ButtonRect(SliceAction action) => buttons[action].Rect;
-        public bool LayoutChanged => lastWidth != Screen.width || lastHeight != Screen.height || lastSafe != Screen.safeArea;
+        public static Rect EffectiveSafeArea
+        {
+            get
+            {
+                var safe=Screen.safeArea;
+                return safe.width>0 && safe.height>0 ? safe : new Rect(0,0,Mathf.Max(1,Screen.width),Mathf.Max(1,Screen.height));
+            }
+        }
+        public bool LayoutChanged => lastWidth != Screen.width || lastHeight != Screen.height || lastSafe != EffectiveSafeArea;
         public void Initialize(Font source, Shader flat, Shader glyph, Shader scratch, Shader lit)
         {
             font=source; flatShader=flat;
@@ -107,8 +115,7 @@ namespace Lottery.G2.Interaction
         }
         public void Layout()
         {
-            lastWidth=Mathf.Max(1,Screen.width); lastHeight=Mathf.Max(1,Screen.height); lastSafe=Screen.safeArea;
-            if(lastSafe.width<=0 || lastSafe.height<=0) lastSafe=new Rect(0,0,lastWidth,lastHeight);
+            lastWidth=Mathf.Max(1,Screen.width); lastHeight=Mathf.Max(1,Screen.height); lastSafe=EffectiveSafeArea;
             SceneCamera.aspect=(float)lastWidth/lastHeight;
             float s=lastSafe.height/720f,m=16*s,bw=184*s;
             topRect=new Rect(lastSafe.x+m,lastSafe.yMax-94*s,lastSafe.width-2*m,78*s);
