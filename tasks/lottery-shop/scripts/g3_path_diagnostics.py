@@ -25,7 +25,7 @@ DIRECTORY_RE = r'lottery-g3-pathdiag-[0-9a-f]{24}'
 BUCKETS = {
     TASK+'/unity/Library/Bee/Android':'LIBRARY_BEE_ANDROID',TASK+'/unity/Library/Bee':'LIBRARY_BEE',
     TASK+'/unity/Library/Artifacts':'LIBRARY_ARTIFACTS',TASK+'/unity/Library/PackageCache':'LIBRARY_PACKAGE_CACHE',
-    TASK+'/unity/Library':'LIBRARY_OTHER',TASK+'/unity/Temp':'UNITY_TEMP',TASK+'/unity/Obj':'UNITY_OBJ',
+    TASK+'/unity/Library':'LIBRARY_OTHER',TASK+'/unity/.utmp':'UNITY_UTMP',TASK+'/unity/Temp':'UNITY_TEMP',TASK+'/unity/Obj':'UNITY_OBJ',
     TASK+'/unity/Logs':'UNITY_LOGS',TASK+'/unity/UserSettings':'UNITY_USER_SETTINGS',
     TASK+'/build/G3/Android':'APK_OUTPUT',TASK+'/build':'BUILD_OUTPUT',TASK+'/evidence':'EVIDENCE_OUTPUT',
     TASK+'/artifacts':'ARTIFACT_OUTPUT',TASK+'/unity/Assets':'UNITY_SOURCE',TASK+'/unity/Packages':'UNITY_PACKAGES',
@@ -39,7 +39,7 @@ KNOWN_DIRECTORIES = frozenset(('tasks','lottery-shop','unity','Assets','Packages
     '.gradle','gradle','caches','transforms','libs','jniLibs','arm64-v8a','unityLibrary','launcher','src','main',
     'Debug','Release','il2cppOutput','IL2CPP','il2cpp_cache','Burst','burst','StagingArea','obj','bin','generated',
     'intermediates','outputs','symbols','LibraryArtifacts','Builds','Build','output','unity-builder',
-    '.cache','.local','.config','share','unity3d','Unity','Caches','ShaderCache','BurstCache','ScriptAssemblies',
+    '.utmp','tools','.cache','.local','.config','share','unity3d','Unity','Caches','ShaderCache','BurstCache','ScriptAssemblies',
     'BuildPlayerData','Il2cppBuildCache','il2cppOutputProject','com.unity.burst','com.unity.collections',
     'G0','G2','Core','Persistence','Ads','Interaction','Scenes','Settings','fonts','process-g3'))
 CODES = frozenset(('OK','MISSING','UNSAFE','MALFORMED','IO_ERROR','NODE_LIMIT','DEPTH_LIMIT','TIME_LIMIT',
@@ -243,7 +243,7 @@ def identity(root_fd,head,env):
     validations={k:('MISSING' if expected[k] is None or observed[k] is None else 'MATCH' if expected[k]==observed[k] else 'MISMATCH') for k in fields}
     validations['gitHead']='MATCH' if head==expected['sourceCommit'] else 'MISMATCH'
     validations['job']='MATCH' if env.get('GITHUB_JOB')=='android' and cold and cold.get('job')=='android' else 'MISMATCH'
-    validations['coldObservation']='MATCH' if cold and cold.get('status')=='VERIFIED_BEFORE_UNITY' and cold.get('cachePolicy')=='LIBRARY_INTERNAL_HARDLINKS_V1' and cold.get('libraryAbsent') is True and cold.get('buildAbsent') is True and cold.get('cacheRestored') is False else 'MISSING_OR_MISMATCH'
+    validations['coldObservation']='MATCH' if cold and cold.get('status')=='VERIFIED_BEFORE_UNITY' and cold.get('cachePolicy')=='LIBRARY_UTMP_INTERNAL_HARDLINKS_V2' and cold.get('libraryAbsent') is True and cold.get('utmpAbsent') is True and cold.get('buildAbsent') is True and cold.get('cacheRestored') is False else 'MISSING_OR_MISMATCH'
     validations['snapshotBytes']='MATCH' if snapshot_sha and cold and cold.get('preUnitySourceSha256')==snapshot_sha else 'MISSING_OR_MISMATCH'
     source_map=review.get('sourceFiles') if review else None;wanted={};prefix=TASK+'/unity/'
     if isinstance(source_map,dict) and len(source_map)<=4096:

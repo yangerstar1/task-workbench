@@ -26,7 +26,7 @@ TASK, RULES_SHA = g2.TASK, g2.RULES_SHA
 BASE = '06814f520041676a50601f4e70d5ee09eae10078'
 SCOPE = 'G3_ONE_DAY_WHITEBOX_NOT_DEVICE_TESTED'
 STANDARDS_DIGEST = '1984cc8f225db73485a052942d30637127679a56b0492edf36497911373f30b1'
-REQUEST = dict(schemaVersion=1, requestId='lottery-g3-20261012-07', baseCommit=BASE, purpose='G3_ONE_DAY_WHITEBOX')
+REQUEST = dict(schemaVersion=1, requestId='lottery-g3-20261012-08', baseCommit=BASE, purpose='G3_ONE_DAY_WHITEBOX')
 REQUEST_PATH = TASK + '/ci/g3-request.json'
 SCENE = 'Assets/G3/Scenes/G3Day.unity'
 GENERATED = {SCENE, SCENE + '.meta', 'Assets/G3/Scenes.meta'}
@@ -92,7 +92,7 @@ REVIEW_PATH = TASK+'/ci/g3-preflight.review.json'
 REVIEW_EXCEPTIONS = {REQUEST_PATH, REVIEW_PATH}
 WORKFLOWS = {'.github/workflows/lottery-'+x+'.yml' for x in ('g0','g2','g3')}
 # These are outputs, not implicit source/import search directories. Exact paths only.
-OUTPUT_ROOTS = {TASK+'/'+x for x in ('artifacts','evidence','build','unity/Library','unity/Temp','unity/Obj','unity/Logs','unity/UserSettings')}
+OUTPUT_ROOTS = {TASK+'/'+x for x in ('artifacts','evidence','build','unity/Library','unity/Temp','unity/Obj','unity/Logs','unity/UserSettings','unity/.utmp')}
 
 
 def source_path(name):
@@ -131,6 +131,7 @@ def reviewed_files(root, committed=False, ref='HEAD'):
         require(0<len(names)<=4096,'Committed input set bound')
         require(all(tree[n][0] in ('100644','100755') and tree[n][1]=='blob' for n in names),'Non-regular execution input refused')
         return {n:hashlib.sha256(subprocess.check_output(['git','-C',str(root),'show',ref+':'+n])).hexdigest() for n in sorted(names)}
+    require(not os.path.lexists(root/UTMP_ROOT),'Generated output in authoring source')
     selected=[]
     for path in (root/TASK).rglob('*'):
         relative=path.relative_to(root).as_posix()
@@ -148,10 +149,13 @@ def reviewed_files(root, committed=False, ref='HEAD'):
 
 
 CACHE_ROOT=TASK+'/unity/Library'
+UTMP_ROOT=TASK+'/unity/.utmp'
+CACHE_ROOTS=(CACHE_ROOT,UTMP_ROOT)
+CACHE_POLICY='LIBRARY_UTMP_INTERNAL_HARDLINKS_V2'
 PATH_BUCKETS={
     TASK+'/unity/Library/Bee/Android':'LIBRARY_BEE_ANDROID',TASK+'/unity/Library/Bee':'LIBRARY_BEE',
     TASK+'/unity/Library/Artifacts':'LIBRARY_ARTIFACTS',TASK+'/unity/Library/PackageCache':'LIBRARY_PACKAGE_CACHE',
-    CACHE_ROOT:'LIBRARY_OTHER',TASK+'/unity/Temp':'UNITY_TEMP',TASK+'/unity/Obj':'UNITY_OBJ',
+    CACHE_ROOT:'LIBRARY_OTHER',UTMP_ROOT:'UNITY_UTMP',TASK+'/unity/Temp':'UNITY_TEMP',TASK+'/unity/Obj':'UNITY_OBJ',
     TASK+'/unity/Logs':'UNITY_LOGS',TASK+'/unity/UserSettings':'UNITY_USER_SETTINGS',
     TASK+'/build/G3/Android':'APK_OUTPUT',TASK+'/build':'BUILD_OUTPUT',TASK+'/evidence':'EVIDENCE_OUTPUT',
     TASK+'/artifacts':'ARTIFACT_OUTPUT',TASK+'/unity/Assets':'UNITY_SOURCE',TASK+'/unity/Packages':'UNITY_PACKAGES',
@@ -203,7 +207,7 @@ def verify_android_cold_cache_proof(root,expected):
     identity={'sourceCommit':legacy.git(root,'rev-parse','HEAD'),'runId':os.environ.get('GITHUB_RUN_ID',''),
               'runAttempt':os.environ.get('GITHUB_RUN_ATTEMPT',''),'requestId':REQUEST['requestId']}
     require(bool(re.fullmatch('[1-9][0-9]{0,19}',identity['runId'])) and bool(re.fullmatch('[1-9][0-9]{0,5}',identity['runAttempt'])),'Android cache proof run identity missing')
-    require(isinstance(cold,dict) and all(cold.get(k)==v for k,v in identity.items()) and cold.get('job')=='android' and cold.get('cachePolicy')=='LIBRARY_INTERNAL_HARDLINKS_V1' and cold.get('status')=='VERIFIED_BEFORE_UNITY' and cold.get('libraryAbsent') is True and cold.get('buildAbsent') is True and cold.get('cacheRestored') is False,'Android cache proof identity/status mismatch')
+    require(isinstance(cold,dict) and all(cold.get(k)==v for k,v in identity.items()) and cold.get('job')=='android' and cold.get('cachePolicy')==CACHE_POLICY and cold.get('status')=='VERIFIED_BEFORE_UNITY' and cold.get('libraryAbsent') is True and cold.get('utmpAbsent') is True and cold.get('buildAbsent') is True and cold.get('cacheRestored') is False,'Android cache proof identity/status mismatch')
     before_raw=checked_record(root,TASK+'/evidence/pre-unity-source.json',1024*1024)
     require(cold.get('preUnitySourceSha256')==hashlib.sha256(before_raw).hexdigest(),'Android cache proof snapshot hash mismatch')
     before=json.loads(before_raw);prefix=TASK+'/unity/'
@@ -212,11 +216,31 @@ def verify_android_cold_cache_proof(root,expected):
     require(isinstance(before,dict) and 0<len(before)<=1024 and before==wanted,'Android cache proof full reviewed snapshot mismatch')
 
 
+def cache_directory_stamp(info):
+    return (info.st_dev,info.st_ino,info.st_mode,info.st_nlink,info.st_uid,info.st_gid,info.st_mtime_ns,info.st_ctime_ns)
+
+
+def cold_absence_observation(root):
+    result={}
+    for field,relative in (('libraryAbsent',CACHE_ROOT),('utmpAbsent',UTMP_ROOT),('buildAbsent',TASK+'/build/G3')):
+        try:(root/relative).lstat()
+        except FileNotFoundError:result[field]=True
+        else:result[field]=False
+    return result
+
+
 def check_working_inputs(root, expected, tree=None, allow_generated_unity=False, allow_restored_font=False, android_cache=False):
     tree=tree or git_tree(root,'HEAD')
     if not allow_generated_unity:
         require(not any(os.path.lexists(root/name) for name in OUTPUT_ROOTS if name.startswith(TASK+'/unity/')),'Initial Unity runtime output/cache must be absent')
     require(not android_cache or allow_generated_unity,'Android cache scope requires post-Unity stage')
+    require(android_cache or not os.path.lexists(root/UTMP_ROOT),'Unexpected materialized checkout input')
+    if android_cache:
+        for name in CACHE_ROOTS:
+            path=root/name
+            if os.path.lexists(path):
+                info=path.lstat()
+                if not stat.S_ISDIR(info.st_mode):raise UnsafePathError('Checkout directory link/type refused',path,info,root)
     for name,sha in expected.items():
         path=root/name
         check_ancestors(root,path);info=regular_unaliased(path,root)
@@ -227,8 +251,19 @@ def check_working_inputs(root, expected, tree=None, allow_generated_unity=False,
         require(digest(path)==sha,'Working execution input bytes drifted')
     if android_cache:verify_android_cold_cache_proof(root,expected)
     # All files are still enumerated. Only complete, unchanged regular-file inode
-    # groups entirely within the proved-cold Library may have more than one link.
-    visited=0;cache_groups={}
+    # groups entirely within one proved-cold cache root may have multiple links.
+    # Never pool Library and .utmp; a cross-root group must fail both counts.
+    visited=0;cache_groups={};cache_directories={}
+    if android_cache:
+        # A stable cache inode under a moved/replaced parent is not an anchored
+        # cache root. Recheck its real checkout ancestor chain as well.
+        for name in CACHE_ROOTS:
+            check_ancestors(root,root/name)
+            for parent in (root/name).parents:
+                if parent==root.parent:break
+                info=parent.lstat()
+                if not stat.S_ISDIR(info.st_mode):raise UnsafePathError('Checkout directory link/type refused',parent,info,root)
+                cache_directories[parent]=cache_directory_stamp(info)
     def walk_error(error):raise ValueError('Checkout directory enumeration failed')
     for directory,dirs,files in os.walk(root,followlinks=False,onerror=walk_error):
         visited+=len(dirs)+len(files);require(visited<=100000,'Checkout/output entry bound exceeded')
@@ -236,13 +271,17 @@ def check_working_inputs(root, expected, tree=None, allow_generated_unity=False,
         for child in dirs:
             path=Path(directory)/child;info=path.lstat()
             if not stat.S_ISDIR(info.st_mode):raise UnsafePathError('Checkout directory link/type refused',path,info,root)
+            relative=path.relative_to(root).as_posix()
+            if android_cache and any(relative==name or relative.startswith(name+'/') for name in CACHE_ROOTS):
+                cache_directories[path]=cache_directory_stamp(info)
         dirs[:]=[d for d in dirs if not (rel=='.' and d=='.git')]
         for name in files:
             path=Path(directory)/name;relative=path.relative_to(root).as_posix()
-            if android_cache and relative.startswith(CACHE_ROOT+'/'):
+            cache_root=next((name for name in CACHE_ROOTS if relative.startswith(name+'/')),None)
+            if android_cache and cache_root is not None:
                 info=path.lstat()
                 if not stat.S_ISREG(info.st_mode):raise UnsafePathError('Non-regular or multiply-linked file refused',path,info,root)
-                cache_groups.setdefault((info.st_dev,info.st_ino),[]).append((path,info))
+                cache_groups.setdefault((cache_root,info.st_dev,info.st_ino),[]).append((path,info))
             else:regular_unaliased(path,root)
             if any(relative.startswith(x+'/') for x in OUTPUT_ROOTS):continue
             if relative in REVIEW_EXCEPTIONS:continue
@@ -258,7 +297,11 @@ def check_working_inputs(root, expected, tree=None, allow_generated_unity=False,
         for path,before in entries:
             after=path.lstat()
             if not stat.S_ISREG(after.st_mode) or (after.st_dev,after.st_ino,after.st_mode,after.st_nlink)!=(before.st_dev,before.st_ino,before.st_mode,before.st_nlink) or after.st_nlink!=len(entries):
-                raise UnsafePathError('Incomplete or changed Library inode group refused',path,after,root,len(entries))
+                raise UnsafePathError('Incomplete or changed Android cache inode group refused',path,after,root,len(entries))
+    for path,before in cache_directories.items():
+        after=path.lstat()
+        if not stat.S_ISDIR(after.st_mode) or cache_directory_stamp(after)!=before:
+            raise UnsafePathError('Changed Android cache directory refused',path,after,root)
 
 
 def verify_preflight(root, allow_generated_unity=False, android_cache=False):
@@ -432,7 +475,7 @@ def parse_binary_manifest(raw):
 def inspect_apk(task,identity):
     directory=task/'build/G3/Android'; apk=directory/'LotteryG3.apk'
     cold=json.loads(bounded_read(task/'evidence/g3/android/cold-build-baseline.json',16384))
-    require(all(cold.get(k)==v for k,v in identity.items()) and cold.get('status')=='VERIFIED_BEFORE_UNITY' and cold.get('libraryAbsent') is True and cold.get('buildAbsent') is True and cold.get('cacheRestored') is False,'Independent cold build observation missing')
+    require(all(cold.get(k)==v for k,v in identity.items()) and cold.get('status')=='VERIFIED_BEFORE_UNITY' and cold.get('libraryAbsent') is True and cold.get('utmpAbsent') is True and cold.get('buildAbsent') is True and cold.get('cacheRestored') is False,'Independent cold build observation missing')
     receipt=json.loads(bounded_read(directory/'build-receipt.json',64*1024))
     expected=dict(rulesSha256=RULES_SHA,standardsDigest=STANDARDS_DIGEST,runtimeScene=SCENE,fakeAd='DEVELOPMENT_FAKE_ONLY',versionCode=3,versionName='0.0.3',applicationIdentifier='com.buyuqi.lotteryprobe',normalRuntimeFixture='NONE',coldBuild=True)
     require(all(type(receipt.get(k)) is type(v) and receipt.get(k)==v for k,v in expected.items()),'G3 build receipt declaration mismatch')
@@ -499,7 +542,7 @@ def export_artwork_diagnostic(task,identity,required=False):
 
 CLI_STAGE='CI_START'
 FAILURE_STAGES={'CI_'+x.upper().replace('-','_') for x in ('start','source-preflight','guard','restore-font','snapshot','audit','tests','captures','apk','diagnostics','review-manifest')} | {'PROCESS_START','REGRESSION_GUARD','REGRESSION_INPUTS','REGRESSION_DELEGATE'} | {'NEW_'+x for x in ('GUARD','BASELINE','WORKSPACE','SDK_INVENTORY','RESTORE','BUILD','BINARY','PREPARE','CHECKPOINT','VERIFY','RESULT','RECEIPT')}
-FAILURE_REASONS={'Required regular evidence file missing':'EVIDENCE_FILE_MISSING','Unexpected materialized checkout input':'UNREVIEWED_WORKING_INPUT','Working execution input bytes drifted':'WORKING_BYTES_DRIFT','Non-regular or multiply-linked file refused':'UNSAFE_FILE_TYPE_OR_ALIAS','Checkout directory link/type refused':'UNSAFE_DIRECTORY_TYPE','Unreviewed repository tree change':'UNREVIEWED_TREE_CHANGE','Fresh preflight not approved':'PREFLIGHT_NOT_APPROVED','Reviewed execution input set drifted':'REVIEWED_INPUT_SET_DRIFT','Initial Unity runtime output/cache must be absent':'NONCOLD_INITIAL_CACHE','Incomplete or changed Library inode group refused':'UNSAFE_FILE_TYPE_OR_ALIAS'}
+FAILURE_REASONS={'Required regular evidence file missing':'EVIDENCE_FILE_MISSING','Unexpected materialized checkout input':'UNREVIEWED_WORKING_INPUT','Working execution input bytes drifted':'WORKING_BYTES_DRIFT','Non-regular or multiply-linked file refused':'UNSAFE_FILE_TYPE_OR_ALIAS','Checkout directory link/type refused':'UNSAFE_DIRECTORY_TYPE','Unreviewed repository tree change':'UNREVIEWED_TREE_CHANGE','Fresh preflight not approved':'PREFLIGHT_NOT_APPROVED','Reviewed execution input set drifted':'REVIEWED_INPUT_SET_DRIFT','Initial Unity runtime output/cache must be absent':'NONCOLD_INITIAL_CACHE','Incomplete or changed Library inode group refused':'UNSAFE_FILE_TYPE_OR_ALIAS','Incomplete or changed Android cache inode group refused':'UNSAFE_FILE_TYPE_OR_ALIAS','Changed Android cache directory refused':'UNSAFE_DIRECTORY_CHANGE'}
 
 def failure_line(component,stage,error):
     # Never format the exception message, command, path, environment or traceback.
@@ -538,11 +581,13 @@ def main():
             verify_inputs(root)
             check_working_inputs(root,reviewed_files(root,committed=True),allow_generated_unity=args.stage not in ('regression-edit','android'),allow_restored_font=True)
             if args.stage=='android':
-                require(not (task/'unity/Library').exists() and not (task/'build/G3').exists(),'Android checkout is not cold')
+                require(all(cold_absence_observation(root).values()),'Android checkout is not cold')
             (task/'evidence/manifest-diagnostic.json').unlink(missing_ok=True)
             legacy.snapshot_project(root);g2.snapshot_settings_baseline(root,args.stage,identity)
             if args.stage=='android':
-                write_json(out/'cold-build-baseline.json',dict(identity,status='VERIFIED_BEFORE_UNITY',job='android',libraryAbsent=True,buildAbsent=True,cacheRestored=False,cachePolicy='LIBRARY_INTERNAL_HARDLINKS_V1',preUnitySourceSha256=digest(task/'evidence/pre-unity-source.json')))
+                absence=cold_absence_observation(root)
+                require(all(absence.values()),'Android checkout is not cold')
+                write_json(out/'cold-build-baseline.json',dict(identity,status='VERIFIED_BEFORE_UNITY',job='android',**absence,cacheRestored=False,cachePolicy=CACHE_POLICY,preUnitySourceSha256=digest(task/'evidence/pre-unity-source.json')))
         elif args.command=='audit':audit_stage(root,args.stage,identity)
         elif args.command=='tests':require(args.stage!='android','Invalid test stage');export_tests(task,args.stage,identity)
         elif args.command=='captures':

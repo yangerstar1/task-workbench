@@ -320,6 +320,8 @@ jobs:
       - name: Prove independent cold workspace and restore licensed font
         run: |
           test ! -e tasks/lottery-shop/unity/Library
+          test ! -e tasks/lottery-shop/unity/.utmp
+          test ! -L tasks/lottery-shop/unity/.utmp
           test ! -e tasks/lottery-shop/build/G3
           python3 tasks/lottery-shop/scripts/g3_ci.py restore-font --stage android
           python3 tasks/lottery-shop/scripts/g3_ci.py snapshot --stage android
@@ -412,8 +414,8 @@ jobs:
           import hashlib, os, re, selectors, signal, stat, subprocess, sys, time
           from pathlib import Path
           SOURCE_PATH = 'tasks/lottery-shop/scripts/g3_path_diagnostics.py'
-          BLOB_ID = 'd1897f2c9d137579b05efe43933e7312c1915d72'
-          SOURCE_SHA256 = '53b7bac0901133f6da557c6e4af15e6ea055fcf62025aea08ea001a479b25a99'
+          BLOB_ID = '75d546b39ac7345353b11721d9f25422acb622e6'
+          SOURCE_SHA256 = '71d0f0c82046ccf1055a05d3df55759fa67975a738607a7755c7c9806e89317d'
           def terminated(signum, frame):
               raise TimeoutError('FIXED_TIMEOUT')
           signal.signal(signal.SIGTERM, terminated)

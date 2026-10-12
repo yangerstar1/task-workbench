@@ -792,8 +792,8 @@ class IdentityAndCliTests(DiagnosticFixture):
         self.write_record(diag.TASK + '/ci/g3-preflight.review.json', dict(
             requestId='lottery-g3-20261012-06', sourceFiles={diag.TASK + '/unity/Assets/source.cs': 'b' * 64}))
         cold = dict(sourceCommit=self.env['GITHUB_SHA'], runId='123', runAttempt='2', job='android',
-                    status='VERIFIED_BEFORE_UNITY', cachePolicy='LIBRARY_INTERNAL_HARDLINKS_V1',
-                    libraryAbsent=True, buildAbsent=True, cacheRestored=False,
+                    status='VERIFIED_BEFORE_UNITY', cachePolicy='LIBRARY_UTMP_INTERNAL_HARDLINKS_V2',
+                    libraryAbsent=True, utmpAbsent=True, buildAbsent=True, cacheRestored=False,
                     requestId='lottery-g3-20261012-06', preUnitySourceSha256=hashlib.sha256(raw).hexdigest(),
                     unrelatedSecret='MUST_NOT_EXPORT')
         self.write_record(diag.TASK + '/evidence/g3/android/cold-build-baseline.json', cold)
@@ -809,6 +809,28 @@ class IdentityAndCliTests(DiagnosticFixture):
         self.assertIn('NOT_SOURCE_APPROVAL', result['authority'])
         self.assertNotIn('MUST_NOT_EXPORT', json.dumps(result))
         self.assertNotIn('PASS', json.dumps(result))
+
+    def test_utmp_cold_identity_requires_new_policy_and_true_absence(self):
+        original = self.identity_records()
+        for variant in ('missing', 'false', 'old-policy'):
+            cold = dict(original)
+            if variant == 'missing': cold.pop('utmpAbsent')
+            elif variant == 'false': cold['utmpAbsent'] = False
+            else: cold['cachePolicy'] = 'LIBRARY_INTERNAL_HARDLINKS_V1'
+            self.write_record(diag.TASK + '/evidence/g3/android/cold-build-baseline.json', cold)
+            with self.root_handle() as fd:
+                result = diag.identity(fd, self.env['GITHUB_SHA'], self.env)
+            self.assertEqual(result['validation']['coldObservation'], 'MISSING_OR_MISMATCH')
+            self.assertIn('NOT_SOURCE_APPROVAL', result['authority'])
+
+    def test_utmp_metadata_bucket_uses_exact_root_and_preserves_safe_shape(self):
+        name = diag.TASK + '/unity/.utmp/tools/debug/arm64-v8a/compile_commands.json'
+        self.assertEqual(diag.sha_name(name), 'fa14f161227dcfbb4b38d856921acff371fb120e2bdcbe617293df6462dc72c7')
+        self.assertEqual(diag.bucket(name), 'UNITY_UTMP')
+        self.assertEqual(diag.bucket(name.replace('/.utmp/', '/.utmp-extra/')), 'OTHER_CHECKOUT')
+        self.assertEqual(diag.bucket(name.replace('/unity/.utmp/', '/.utmp/')), 'OTHER_CHECKOUT')
+        self.assertIn('/.utmp/tools/', diag.path_shape(name))
+        self.assertNotIn('compile_commands.json', diag.path_shape(name))
 
     def test_stale_identity_remains_observed_without_validation(self):
         self.identity_records()

@@ -285,7 +285,7 @@ class G3ValidatorTests(unittest.TestCase):
                 sentinel=Path(outside)/'sentinel';sentinel.write_text('NO_ALIAS_WRITE')
                 output=root/name/'nested/file.json';output.parent.mkdir(parents=True);os.link(sentinel,output)
                 with patch.object(ci.legacy,'guard') as writer:
-                    with self.assertRaisesRegex(ValueError,'multiply-linked'):ci.guard(root,allow_generated_unity=True)
+                    with self.assertRaisesRegex(ValueError,'Unexpected materialized checkout input' if name==ci.UTMP_ROOT else 'multiply-linked'):ci.guard(root,allow_generated_unity=True)
                     writer.assert_not_called()
                 self.assertEqual(sentinel.read_text(),'NO_ALIAS_WRITE');self.assertEqual(sentinel.stat().st_nlink,2)
     def testHardlinkedReceiptsCannotBeOverwrittenDeletedOrDiagnosed(self):
@@ -312,7 +312,7 @@ class G3ValidatorTests(unittest.TestCase):
                 root=Path(d);git,commit,trigger,review,source=self.makeReviewedGit(root);trigger()
                 fifo=root/name/'nested/not-a-file';fifo.parent.mkdir(parents=True);os.mkfifo(fifo)
                 with patch.object(ci.legacy,'guard') as writer:
-                    with self.assertRaisesRegex(ValueError,'Non-regular'):ci.guard(root,allow_generated_unity=True)
+                    with self.assertRaisesRegex(ValueError,'Unexpected materialized checkout input' if name==ci.UTMP_ROOT else 'Non-regular'):ci.guard(root,allow_generated_unity=True)
                     writer.assert_not_called()
     def testRestoredFontAndGeneratedUnityFilesRejectHardlinks(self):
         for child in ('Assets/Resources/ProbeChinese.otf','ProjectSettings/Other.asset'):
@@ -331,7 +331,8 @@ class G3ValidatorTests(unittest.TestCase):
     def testInitialUnityCacheRejectedButRegularLaterOutputTypesAllowed(self):
         with tempfile.TemporaryDirectory() as d:
             root=Path(d);git,commit,trigger,review,source=self.makeReviewedGit(root);trigger()
-            for name in sorted(ci.OUTPUT_ROOTS):
+            # .utmp additionally requires the separately tested Android cold proof.
+            for name in sorted(ci.OUTPUT_ROOTS-{ci.UTMP_ROOT}):
                 path=root/name/'nested/file.txt';path.parent.mkdir(parents=True);path.write_text('regular generated output')
             with self.assertRaisesRegex(ValueError,'Initial Unity runtime'):ci.verify_preflight(root)
             ci.verify_preflight(root,allow_generated_unity=True)
@@ -437,9 +438,21 @@ class G3ValidatorTests(unittest.TestCase):
             # metadata and real local hardlinks. No Unity/native APK is created.
             self.makeSyntheticColdProof(root,git,review);env['GITHUB_JOB']='android'
             cache=root/ci.CACHE_ROOT/'Bee/Android/private-cache-name';cache.parent.mkdir(parents=True);cache.write_bytes(b'SYNTHETIC_CACHE_ONLY');os.link(cache,cache.with_name('internal-alias'))
+            utmp,utmp_alias=self.makeSyntheticUtmpPair(root)
             result=cli('g3_ci.py','diagnostics','--stage','android',cwd=metadata)
             self.assertEqual(result.returncode,0,'Post-Android CLI rejected complete proved-scope cache group')
             self.assertFalse((task/'evidence/g3/android/apk-receipt.json').exists())
+            # The complete .utmp group is independently safe only within this
+            # synthetic post-Android scope; an external third link stays fatal.
+            os.link(utmp,metadata/'outside-utmp-alias');unchanged={p.relative_to(task).as_posix():ci.digest(p) for p in (task/'evidence').rglob('*') if p.is_file()}
+            for command in ('apk','audit','diagnostics'):
+                result=cli('g3_ci.py',command,'--stage','android',cwd=metadata)
+                self.assertEqual(result.returncode,1);self.assertIn('stage=CI_'+command.upper()+' code=UNSAFE_FILE_TYPE_OR_ALIAS',result.stderr)
+                self.assertIn('pathClass=UNITY_UTMP',result.stderr);self.assertIn('kind=regular nlink=3 internalLinks=2',result.stderr)
+                for hidden in ('SYNTHETIC_CONFIGURATION','outside-utmp-alias',str(root),str(metadata),'syntheticFixture'):self.assertNotIn(hidden,result.stderr)
+            self.assertEqual((metadata/'outside-utmp-alias').read_bytes(),b'[{"syntheticFixture":true}]\n')
+            self.assertEqual({p.relative_to(task).as_posix():ci.digest(p) for p in (task/'evidence').rglob('*') if p.is_file()},unchanged)
+            (metadata/'outside-utmp-alias').unlink()
             os.link(cache,metadata/'outside-alias');unchanged={p.relative_to(task).as_posix():ci.digest(p) for p in (task/'evidence').rglob('*') if p.is_file()}
             for command in ('apk','audit','diagnostics'):
                 result=cli('g3_ci.py',command,'--stage','android',cwd=metadata)
@@ -539,7 +552,7 @@ class G3ValidatorTests(unittest.TestCase):
         before['Assets/Resources/ProbeChinese.otf']=ci.legacy.FONT_SHA
         snapshot=root/ci.TASK/'evidence/pre-unity-source.json';snapshot.parent.mkdir(parents=True,exist_ok=True);snapshot.write_text(json.dumps(before))
         proof=root/ci.TASK/'evidence/g3/android/cold-build-baseline.json';proof.parent.mkdir(parents=True,exist_ok=True)
-        cold=dict(sourceCommit=git('rev-parse','HEAD'),runId='12345',runAttempt='1',requestId=ci.REQUEST['requestId'],job='android',cachePolicy='LIBRARY_INTERNAL_HARDLINKS_V1',status='VERIFIED_BEFORE_UNITY',libraryAbsent=True,buildAbsent=True,cacheRestored=False,preUnitySourceSha256=hashlib.sha256(snapshot.read_bytes()).hexdigest())
+        cold=dict(sourceCommit=git('rev-parse','HEAD'),runId='12345',runAttempt='1',requestId=ci.REQUEST['requestId'],job='android',cachePolicy='LIBRARY_UTMP_INTERNAL_HARDLINKS_V2',status='VERIFIED_BEFORE_UNITY',libraryAbsent=True,utmpAbsent=True,buildAbsent=True,cacheRestored=False,preUnitySourceSha256=hashlib.sha256(snapshot.read_bytes()).hexdigest())
         proof.write_text(json.dumps(cold));return proof,snapshot,cold
     def testColdLibraryCompleteInternalHardlinkGroupPassesOnlyAndroidPostScope(self):
         with tempfile.TemporaryDirectory() as d,patch.dict(os.environ,GITHUB_JOB='android',GITHUB_RUN_ID='12345',GITHUB_RUN_ATTEMPT='1'):
@@ -549,65 +562,215 @@ class G3ValidatorTests(unittest.TestCase):
             with self.assertRaises(ci.UnsafePathError):ci.verify_preflight(root,allow_generated_unity=True)
             with self.assertRaises(ValueError):ci.verify_preflight(root,android_cache=True)
             self.assertEqual(first.read_bytes(),b'SYNTHETIC_CACHE_BYTES');self.assertEqual(second.read_bytes(),first.read_bytes())
-    def testColdCacheProofRequiresExactRunAttemptSourceJobSnapshotAndAbsentObservation(self):
-        for attack in ('missing','run','attempt','source','job','status','library','build','restore','snapshot_hash','snapshot_map','proof_alias','snapshot_alias'):
-            with self.subTest(attack=attack),tempfile.TemporaryDirectory() as d,tempfile.TemporaryDirectory() as outside,patch.dict(os.environ,GITHUB_JOB='android',GITHUB_RUN_ID='12345',GITHUB_RUN_ATTEMPT='1'):
+    def makeSyntheticUtmpPair(self,root):
+        # The tools/debug path is identified by actualrun07's complete-path hash.
+        # The Debug configuration segment below is deliberately SYNTHETIC: its
+        # original name was not exported by the metadata-only diagnosis.
+        first=root/ci.UTMP_ROOT/'tools/debug/arm64-v8a/compile_commands.json'
+        second=root/ci.UTMP_ROOT/'Debug/SYNTHETIC_CONFIGURATION/arm64-v8a/compile_commands.json'
+        first.parent.mkdir(parents=True,exist_ok=True);second.parent.mkdir(parents=True,exist_ok=True)
+        first.write_bytes(b'[{"syntheticFixture":true}]\n');os.link(first,second)
+        return first,second
+    def testColdUtmpExactDiagnosedPathAndSyntheticConfigurationPairPassesOnlyAndroidPostScope(self):
+        self.assertEqual(ci.UTMP_ROOT,ci.TASK+'/unity/.utmp')
+        self.assertEqual(ci.CACHE_ROOTS,(ci.CACHE_ROOT,ci.UTMP_ROOT))
+        with tempfile.TemporaryDirectory() as d,patch.dict(os.environ,GITHUB_JOB='android',GITHUB_RUN_ID='12345',GITHUB_RUN_ATTEMPT='1'):
+            root=Path(d);git,commit,trigger,review,source=self.makeReviewedGit(root);trigger();self.makeSyntheticColdProof(root,git,review)
+            first,second=self.makeSyntheticUtmpPair(root)
+            self.assertEqual(hashlib.sha256(first.relative_to(root).as_posix().encode()).hexdigest(),'fa14f161227dcfbb4b38d856921acff371fb120e2bdcbe617293df6462dc72c7')
+            self.assertEqual(first.stat().st_nlink,2);self.assertEqual(first.stat().st_ino,second.stat().st_ino)
+            ci.verify_preflight(root,allow_generated_unity=True,android_cache=True)
+            with self.assertRaises(ValueError):ci.verify_preflight(root,allow_generated_unity=True)
+            with self.assertRaises(ValueError):ci.verify_preflight(root,android_cache=True)
+            self.assertEqual(first.read_bytes(),b'[{"syntheticFixture":true}]\n');self.assertEqual(second.read_bytes(),first.read_bytes())
+    def testUtmpSingleLinkAndEmptyDirectoriesAlsoRequireProvedAndroidPostScope(self):
+        for shape in ('empty','single_regular'):
+            with self.subTest(shape=shape),tempfile.TemporaryDirectory() as d,patch.dict(os.environ,GITHUB_JOB='android',GITHUB_RUN_ID='12345',GITHUB_RUN_ATTEMPT='1'):
                 root=Path(d);git,commit,trigger,review,source=self.makeReviewedGit(root);trigger();proof,snapshot,cold=self.makeSyntheticColdProof(root,git,review)
-                cache=root/ci.CACHE_ROOT/'a';cache.parent.mkdir(parents=True);cache.write_bytes(b'cache');os.link(cache,cache.with_name('b'))
-                if attack=='missing':proof.unlink()
-                elif attack=='job':os.environ['GITHUB_JOB']='tests'
-                elif attack=='snapshot_hash':snapshot.write_text('{}')
-                elif attack=='snapshot_map':snapshot.write_text('{}');cold['preUnitySourceSha256']=hashlib.sha256(snapshot.read_bytes()).hexdigest();proof.write_text(json.dumps(cold))
-                elif attack.endswith('_alias'):os.link(proof if attack=='proof_alias' else snapshot,Path(outside)/'alias')
-                else:
-                    key,value={'run':('runId','12346'),'attempt':('runAttempt','2'),'source':('sourceCommit','b'*40),'status':('status','unknown'),'library':('libraryAbsent',False),'build':('buildAbsent',False),'restore':('cacheRestored',True)}[attack];cold[key]=value;proof.write_text(json.dumps(cold))
-                with patch.object(ci.legacy,'guard') as writer:
-                    with self.assertRaises((ValueError,FileNotFoundError)):ci.guard(root,allow_generated_unity=True,android_cache=True)
-                    writer.assert_not_called()
+                cache=root/ci.UTMP_ROOT;cache.mkdir(parents=True)
+                if shape=='single_regular':(cache/'compile_commands.json').write_text('SYNTHETIC_SINGLE_LINK')
+                ci.verify_preflight(root,allow_generated_unity=True,android_cache=True)
+                with self.assertRaises(ValueError):ci.verify_preflight(root,allow_generated_unity=True)
+                with self.assertRaises(ValueError):ci.verify_preflight(root)
+                proof.unlink()
+                with self.assertRaises((ValueError,FileNotFoundError)):ci.verify_preflight(root,allow_generated_unity=True,android_cache=True)
+    def testPreexistingUtmpStopsInitialGuardRestoreAndSnapshotBeforeWrites(self):
+        for command in ('guard','restore-font','snapshot'):
+            for shape in ('empty','regular','linked','dangling_link'):
+                with self.subTest(command=command,shape=shape),tempfile.TemporaryDirectory() as d:
+                    root=Path(d);git,commit,trigger,review,source=self.makeReviewedGit(root);trigger()
+                    cache=root/ci.UTMP_ROOT;cache.parent.mkdir(parents=True)
+                    if shape=='dangling_link':cache.symlink_to(cache.parent/'SYNTHETIC_NONEXISTENT_TARGET',target_is_directory=True)
+                    else:cache.mkdir()
+                    if shape not in ('empty','dangling_link'):
+                        first=cache/'compile_commands.json';first.write_text('SYNTHETIC_PREEXISTING_CACHE')
+                        if shape=='linked':os.link(first,cache/'alias.json')
+                    with patch.object(sys,'argv',['g3_ci.py',command,'--root',str(root),'--stage','android']),patch.object(ci.legacy,'guard') as writer:
+                        with self.assertRaises(ValueError):ci.main()
+                        writer.assert_not_called()
+                    self.assertFalse((root/ci.TASK/'evidence').exists())
+    def testColdAbsenceUsesObservedLstatForBothCachesAndBuildIncludingDanglingLinks(self):
+        expected=dict(libraryAbsent=True,utmpAbsent=True,buildAbsent=True)
+        for field,relative in (('libraryAbsent',ci.CACHE_ROOT),('utmpAbsent',ci.UTMP_ROOT),('buildAbsent',ci.TASK+'/build/G3')):
+            for shape in ('directory','regular','dangling_link'):
+                with self.subTest(field=field,shape=shape),tempfile.TemporaryDirectory() as d:
+                    root=Path(d);self.assertEqual(ci.cold_absence_observation(root),expected)
+                    path=root/relative;path.parent.mkdir(parents=True)
+                    if shape=='directory':path.mkdir()
+                    elif shape=='regular':path.write_text('SYNTHETIC_PREEXISTING_PATH')
+                    else:path.symlink_to(path.parent/'SYNTHETIC_NONEXISTENT_TARGET',target_is_directory=True)
+                    self.assertEqual(ci.cold_absence_observation(root),dict(expected,**{field:False}))
+    def testAndroidSnapshotRechecksUtmpAbsenceAfterSnapshotBeforeColdRecord(self):
+        # Isolate the cold-record writer from source/native inputs while allowing
+        # its real pre/post lstat observations and real synthetic output writes.
+        for shape in ('directory','dangling_link'):
+            with self.subTest(shape=shape),tempfile.TemporaryDirectory() as d:
+                root=Path(d);task=root/ci.TASK
+                identity=dict(sourceCommit='a'*40,runId='12345',runAttempt='1',requestId=ci.REQUEST['requestId'])
+                def snapshot(_root):
+                    (task/'evidence/pre-unity-source.json').write_text('{"SYNTHETIC_SNAPSHOT":true}')
+                def arrive(*args):
+                    path=root/ci.UTMP_ROOT;path.parent.mkdir(parents=True,exist_ok=True)
+                    if shape=='directory':path.mkdir()
+                    else:path.symlink_to(path.parent/'SYNTHETIC_NONEXISTENT_TARGET',target_is_directory=True)
+                with patch.object(sys,'argv',['g3_ci.py','snapshot','--root',str(root),'--stage','android']),patch.object(ci,'guard',return_value=identity),patch.object(ci,'verify_inputs'),patch.object(ci,'check_working_inputs'),patch.object(ci,'reviewed_files',return_value={}),patch.object(ci.legacy,'snapshot_project',side_effect=snapshot),patch.object(ci.g2,'snapshot_settings_baseline',side_effect=arrive):
+                    with self.assertRaisesRegex(ValueError,'Android checkout is not cold'):ci.main()
+                self.assertFalse((task/'evidence/g3/android/cold-build-baseline.json').exists())
+    def testUtmpCannotBecomeReviewedSourceSnapshotOrApprovedGeneratedMutation(self):
+        with tempfile.TemporaryDirectory() as d:
+            root=Path(d);project=root/ci.TASK/'unity';source=project/'Assets/a.cs';source.parent.mkdir(parents=True);source.write_bytes(b'SYNTHETIC_REVIEWED_SOURCE')
+            for name in ('source.cs','Directory.Build.targets'):
+                path=root/ci.UTMP_ROOT/name;path.parent.mkdir(parents=True,exist_ok=True);path.write_bytes(b'SYNTHETIC_CACHE_MUST_NOT_BE_SNAPSHOT_SOURCE')
+            original_digest=ci.legacy.digest;read_paths=[]
+            def source_only_digest(path):
+                self.assertEqual(path,source,'Snapshot tried to hash a cache file');read_paths.append(path);return original_digest(path)
+            with ci.configured(),patch.object(ci.legacy,'digest',side_effect=source_only_digest):
+                self.assertEqual(ci.legacy.snapshot_files(root),{'Assets/a.cs':hashlib.sha256(b'SYNTHETIC_REVIEWED_SOURCE').hexdigest()})
+                self.assertEqual(ci.legacy.mutation_kind('.utmp/source.cs'),'UNEXPECTED_SOURCE_CHANGE')
+                self.assertEqual(ci.legacy.mutation_kind('.utmp/Directory.Build.targets'),'UNEXPECTED_SOURCE_CHANGE')
+            self.assertEqual(read_paths,[source])
+            with self.assertRaises(ValueError):ci.reviewed_files(root)
+        with tempfile.TemporaryDirectory() as d:
+            root=Path(d);(root/ci.UTMP_ROOT).mkdir(parents=True)
+            with self.assertRaises(ValueError):ci.reviewed_files(root)
+    def testColdCacheProofRequiresExactRunAttemptSourceJobSnapshotAndAbsentObservation(self):
+        attacks=('missing','run','attempt','source','request','job','proof_job','status','library','utmp','utmp_missing','utmp_wrong_type','build','restore','old_policy','missing_policy','wrong_policy','snapshot_hash','snapshot_map','snapshot_extra','snapshot_wrong_font','proof_alias','snapshot_alias')+tuple('missing_field_'+key for key in ('sourceCommit','runId','runAttempt','requestId','job','status','libraryAbsent','buildAbsent','cacheRestored','preUnitySourceSha256'))
+        for cache_root in ci.CACHE_ROOTS:
+            for attack in attacks:
+                with self.subTest(cache_root=cache_root,attack=attack),tempfile.TemporaryDirectory() as d,tempfile.TemporaryDirectory() as outside,patch.dict(os.environ,GITHUB_JOB='android',GITHUB_RUN_ID='12345',GITHUB_RUN_ATTEMPT='1'):
+                    root=Path(d);git,commit,trigger,review,source=self.makeReviewedGit(root);trigger();proof,snapshot,cold=self.makeSyntheticColdProof(root,git,review)
+                    cache=root/cache_root/'a';cache.parent.mkdir(parents=True);cache.write_bytes(b'cache');os.link(cache,cache.with_name('b'))
+                    if attack=='missing':proof.unlink()
+                    elif attack=='job':os.environ['GITHUB_JOB']='tests'
+                    elif attack=='snapshot_hash':snapshot.write_text('{}')
+                    elif attack in ('snapshot_map','snapshot_extra','snapshot_wrong_font'):
+                        before={} if attack=='snapshot_map' else json.loads(snapshot.read_text())
+                        if attack=='snapshot_extra':before['Assets/SYNTHETIC_UNREVIEWED.cs']='f'*64
+                        elif attack=='snapshot_wrong_font':before['Assets/Resources/ProbeChinese.otf']='0'*64
+                        snapshot.write_text(json.dumps(before));cold['preUnitySourceSha256']=hashlib.sha256(snapshot.read_bytes()).hexdigest();proof.write_text(json.dumps(cold))
+                    elif attack.startswith('missing_field_'):cold.pop(attack[len('missing_field_'):]);proof.write_text(json.dumps(cold))
+                    elif attack.endswith('_alias'):os.link(proof if attack=='proof_alias' else snapshot,Path(outside)/'alias')
+                    else:
+                        if attack in ('utmp_missing','missing_policy'):cold.pop('utmpAbsent' if attack=='utmp_missing' else 'cachePolicy')
+                        else:
+                            key,value={'run':('runId','12346'),'attempt':('runAttempt','2'),'source':('sourceCommit','b'*40),'request':('requestId','SYNTHETIC_WRONG_REQUEST'),'proof_job':('job','tests'),'status':('status','unknown'),'library':('libraryAbsent',False),'utmp':('utmpAbsent',False),'utmp_wrong_type':('utmpAbsent',1),'build':('buildAbsent',False),'restore':('cacheRestored',True),'old_policy':('cachePolicy','LIBRARY_INTERNAL_HARDLINKS_V1'),'wrong_policy':('cachePolicy','SYNTHETIC_UNKNOWN_POLICY')}[attack];cold[key]=value
+                        proof.write_text(json.dumps(cold))
+                    with patch.object(ci.legacy,'guard') as writer:
+                        with self.assertRaises((ValueError,FileNotFoundError)):ci.guard(root,allow_generated_unity=True,android_cache=True)
+                        writer.assert_not_called()
     def testColdCacheExternalAndCrossBoundaryHardlinksRefusedWithoutWrites(self):
-        for destination in ('external','evidence','build','temp','source','three_links'):
-            with self.subTest(destination=destination),tempfile.TemporaryDirectory() as d,tempfile.TemporaryDirectory() as outside,patch.dict(os.environ,GITHUB_JOB='android',GITHUB_RUN_ID='12345',GITHUB_RUN_ATTEMPT='1'):
+        for cache_root in ci.CACHE_ROOTS:
+            for destination in ('external','evidence','build','temp','source','three_links','other_cache','other_checkout'):
+                with self.subTest(cache_root=cache_root,destination=destination),tempfile.TemporaryDirectory() as d,tempfile.TemporaryDirectory() as outside,patch.dict(os.environ,GITHUB_JOB='android',GITHUB_RUN_ID='12345',GITHUB_RUN_ATTEMPT='1'):
+                    root=Path(d);git,commit,trigger,review,source=self.makeReviewedGit(root);trigger();self.makeSyntheticColdProof(root,git,review)
+                    first=root/cache_root/'Bee/Android/cache.bin';first.parent.mkdir(parents=True)
+                    if destination=='source':os.link(source,first);sentinel=source
+                    else:
+                        if destination in ('external','three_links'):sentinel=Path(outside)/'untouched'
+                        elif destination=='other_cache':sentinel=root/(ci.UTMP_ROOT if cache_root==ci.CACHE_ROOT else ci.CACHE_ROOT)/'cross-root-alias.bin'
+                        elif destination=='other_checkout':sentinel=root/'SYNTHETIC_UNREVIEWED_INPUT'
+                        else:sentinel=root/ci.TASK/{'evidence':'evidence/guard-receipt.json','build':'build/G3/Android/LotteryG3.apk','temp':'unity/Temp/staged.bin'}[destination]
+                        sentinel.parent.mkdir(parents=True,exist_ok=True);sentinel.write_bytes(b'OUTSIDE_OR_PROTECTED_SENTINEL');os.link(sentinel,first)
+                        if destination=='three_links':os.link(first,first.with_name('second.bin'))
+                    before=sentinel.read_bytes();files_before={p.relative_to(root).as_posix() for p in root.rglob('*') if p.is_file()}
+                    with patch.object(ci.legacy,'guard') as writer:
+                        with self.assertRaises(ci.UnsafePathError):ci.guard(root,allow_generated_unity=True,android_cache=True)
+                        writer.assert_not_called()
+                    self.assertEqual(sentinel.read_bytes(),before);self.assertEqual({p.relative_to(root).as_posix() for p in root.rglob('*') if p.is_file()},files_before)
+    def testColdCacheRootsNeverExemptUnknownCheckoutFilesOrSimilarPrefixes(self):
+        for relative in ('SYNTHETIC_UNKNOWN.txt',ci.TASK+'/unity/.utmp-other/compile_commands.json',ci.TASK+'/unity/Library-other/cache.bin',ci.TASK+'/unity/.utmp'):
+            with self.subTest(relative=relative),tempfile.TemporaryDirectory() as d,patch.dict(os.environ,GITHUB_JOB='android',GITHUB_RUN_ID='12345',GITHUB_RUN_ATTEMPT='1'):
                 root=Path(d);git,commit,trigger,review,source=self.makeReviewedGit(root);trigger();self.makeSyntheticColdProof(root,git,review)
-                first=root/ci.CACHE_ROOT/'Bee/Android/cache.bin';first.parent.mkdir(parents=True)
-                if destination=='source':os.link(source,first);sentinel=source
-                else:
-                    sentinel=Path(outside)/'untouched' if destination in ('external','three_links') else root/ci.TASK/{'evidence':'evidence/guard-receipt.json','build':'build/G3/Android/LotteryG3.apk','temp':'unity/Temp/staged.bin'}[destination]
-                    sentinel.parent.mkdir(parents=True,exist_ok=True);sentinel.write_bytes(b'OUTSIDE_OR_PROTECTED_SENTINEL');os.link(sentinel,first)
-                    if destination=='three_links':os.link(first,first.with_name('second.bin'))
-                before=sentinel.read_bytes();files_before={p.relative_to(root).as_posix() for p in root.rglob('*') if p.is_file()}
+                # A real Unity checkout anchor exists even when both caches do not.
+                (root/ci.TASK/'unity').mkdir(parents=True)
+                ci.verify_preflight(root,allow_generated_unity=True,android_cache=True)
+                path=root/relative;path.parent.mkdir(parents=True,exist_ok=True);path.write_text('SYNTHETIC_UNREVIEWED_FILE')
                 with patch.object(ci.legacy,'guard') as writer:
-                    with self.assertRaises(ci.UnsafePathError):ci.guard(root,allow_generated_unity=True,android_cache=True)
+                    with self.assertRaises(ValueError):ci.guard(root,allow_generated_unity=True,android_cache=True)
                     writer.assert_not_called()
-                self.assertEqual(sentinel.read_bytes(),before);self.assertEqual({p.relative_to(root).as_posix() for p in root.rglob('*') if p.is_file()},files_before)
     def testColdCacheSymlinkDirectorySymlinkAndSpecialFilesRemainRefused(self):
-        for kind in ('file_link','directory_link','fifo'):
-            with self.subTest(kind=kind),tempfile.TemporaryDirectory() as d,tempfile.TemporaryDirectory() as outside,patch.dict(os.environ,GITHUB_JOB='android',GITHUB_RUN_ID='12345',GITHUB_RUN_ATTEMPT='1'):
-                root=Path(d);git,commit,trigger,review,source=self.makeReviewedGit(root);trigger();self.makeSyntheticColdProof(root,git,review)
-                path=root/ci.CACHE_ROOT/'Bee/Android/unknown';path.parent.mkdir(parents=True);sentinel=Path(outside)/'sentinel';sentinel.write_bytes(b'UNCHANGED')
-                if kind=='file_link':path.symlink_to(sentinel)
-                elif kind=='directory_link':path.symlink_to(Path(outside),target_is_directory=True)
-                else:os.mkfifo(path)
-                with self.assertRaises(ci.UnsafePathError) as caught:ci.verify_preflight(root,allow_generated_unity=True,android_cache=True)
-                line=ci.failure_line('CI','CI_APK',caught.exception);self.assertIn('pathClass=LIBRARY_BEE_ANDROID',line);self.assertIn('kind='+('fifo' if kind=='fifo' else 'symbolic_link'),line);self.assertEqual(sentinel.read_bytes(),b'UNCHANGED')
-                self.assertNotIn(str(outside),line);self.assertNotIn('sentinel',line);self.assertNotIn('unknown',line)
+        for cache_root in ci.CACHE_ROOTS:
+            for kind in ('file_link','directory_link','fifo','root_link'):
+                with self.subTest(cache_root=cache_root,kind=kind),tempfile.TemporaryDirectory() as d,tempfile.TemporaryDirectory() as outside,patch.dict(os.environ,GITHUB_JOB='android',GITHUB_RUN_ID='12345',GITHUB_RUN_ATTEMPT='1'):
+                    root=Path(d);git,commit,trigger,review,source=self.makeReviewedGit(root);trigger();self.makeSyntheticColdProof(root,git,review)
+                    path=root/cache_root if kind=='root_link' else root/cache_root/'Bee/Android/unknown';path.parent.mkdir(parents=True);sentinel=Path(outside)/'sentinel';sentinel.write_bytes(b'UNCHANGED')
+                    if kind=='file_link':path.symlink_to(sentinel)
+                    elif kind in ('directory_link','root_link'):path.symlink_to(Path(outside),target_is_directory=True)
+                    else:os.mkfifo(path)
+                    with self.assertRaises(ci.UnsafePathError) as caught:ci.verify_preflight(root,allow_generated_unity=True,android_cache=True)
+                    expected_class='UNITY_UTMP' if cache_root==ci.UTMP_ROOT else ('LIBRARY_OTHER' if kind=='root_link' else 'LIBRARY_BEE_ANDROID')
+                    line=ci.failure_line('CI','CI_APK',caught.exception);self.assertIn('pathClass='+expected_class,line);self.assertIn('kind='+('fifo' if kind=='fifo' else 'symbolic_link'),line);self.assertEqual(sentinel.read_bytes(),b'UNCHANGED')
+                    self.assertNotIn(str(outside),line);self.assertNotIn('sentinel',line);self.assertNotIn('unknown',line)
     def testColdCacheIncompleteTraversalAndChangedInodeOrNlinkRefused(self):
-        for attack in ('omitted','changed_inode','changed_nlink','enumeration_error'):
-            with self.subTest(attack=attack),tempfile.TemporaryDirectory() as d,tempfile.TemporaryDirectory() as outside,patch.dict(os.environ,GITHUB_JOB='android',GITHUB_RUN_ID='12345',GITHUB_RUN_ATTEMPT='1'):
-                root=Path(d);git,commit,trigger,review,source=self.makeReviewedGit(root);trigger();self.makeSyntheticColdProof(root,git,review)
-                first=root/ci.CACHE_ROOT/'one.bin';second=first.with_name('two.bin');first.parent.mkdir(parents=True);first.write_bytes(b'cache');os.link(first,second)
-                original_walk=os.walk;original_lstat=Path.lstat;hits=[0]
-                def walking(*args,**kwargs):
-                    if attack=='enumeration_error':kwargs['onerror'](PermissionError('PRIVATE_PATH_MUST_NOT_LEAK'))
-                    for directory,dirs,files in original_walk(*args,**kwargs):yield directory,dirs,[x for x in files if not (attack=='omitted' and Path(directory)/x==second)]
-                def lstat(path,*args,**kwargs):
-                    if path==first:
-                        hits[0]+=1
-                        if hits[0]==2:
-                            if attack=='changed_nlink':os.link(first,Path(outside)/'late_alias')
-                            elif attack=='changed_inode':replacement=first.with_name('replacement');replacement.write_bytes(b'cache');os.replace(replacement,first)
-                    return original_lstat(path,*args,**kwargs)
-                with patch.object(ci.os,'walk',side_effect=walking),patch.object(Path,'lstat',lstat):
-                    with self.assertRaises(ValueError):ci.verify_preflight(root,allow_generated_unity=True,android_cache=True)
+        for cache_root in ci.CACHE_ROOTS:
+            for attack in ('omitted','changed_inode','changed_nlink','enumeration_error'):
+                with self.subTest(cache_root=cache_root,attack=attack),tempfile.TemporaryDirectory() as d,tempfile.TemporaryDirectory() as outside,patch.dict(os.environ,GITHUB_JOB='android',GITHUB_RUN_ID='12345',GITHUB_RUN_ATTEMPT='1'):
+                    root=Path(d);git,commit,trigger,review,source=self.makeReviewedGit(root);trigger();self.makeSyntheticColdProof(root,git,review)
+                    first=root/cache_root/'one.bin';second=first.with_name('two.bin');first.parent.mkdir(parents=True);first.write_bytes(b'cache');os.link(first,second)
+                    original_walk=os.walk;original_lstat=Path.lstat;hits=[0]
+                    def walking(*args,**kwargs):
+                        if attack=='enumeration_error':kwargs['onerror'](PermissionError('PRIVATE_PATH_MUST_NOT_LEAK'))
+                        for directory,dirs,files in original_walk(*args,**kwargs):yield directory,dirs,[x for x in files if not (attack=='omitted' and Path(directory)/x==second)]
+                    def lstat(path,*args,**kwargs):
+                        if path==first:
+                            hits[0]+=1
+                            if hits[0]==2:
+                                if attack=='changed_nlink':os.link(first,Path(outside)/'late_alias')
+                                elif attack=='changed_inode':replacement=first.with_name('replacement');replacement.write_bytes(b'cache');os.replace(replacement,first)
+                        return original_lstat(path,*args,**kwargs)
+                    with patch.object(ci.os,'walk',side_effect=walking),patch.object(Path,'lstat',lstat):
+                        with self.assertRaises(ValueError):ci.verify_preflight(root,allow_generated_unity=True,android_cache=True)
+    def testColdCacheDirectoryPermissionIdentityOrLateMembershipChangeRefused(self):
+        for cache_root in ci.CACHE_ROOTS:
+            for level in ('cache_root','nested','empty_nested','unity_parent','task_parent'):
+                for attack in ('permissions','directory_inode','add_file'):
+                    with self.subTest(cache_root=cache_root,level=level,attack=attack),tempfile.TemporaryDirectory() as d,patch.dict(os.environ,GITHUB_JOB='android',GITHUB_RUN_ID='12345',GITHUB_RUN_ATTEMPT='1'):
+                        root=Path(d);git,commit,trigger,review,source=self.makeReviewedGit(root);trigger();self.makeSyntheticColdProof(root,git,review)
+                        cache=root/cache_root;cache.mkdir(parents=True)
+                        target={'cache_root':cache,'nested':cache/'nested','empty_nested':cache/'nested','unity_parent':cache.parent,'task_parent':root/ci.TASK}[level]
+                        target.mkdir(parents=True,exist_ok=True);original_mode=target.stat().st_mode&0o777
+                        if level!='empty_nested':
+                            # Ancestor replacement must preserve the actual cache
+                            # file inodes, link counts and all inner directories.
+                            files=cache if level in ('unity_parent','task_parent') else target
+                            first=files/'one.bin';first.write_bytes(b'SYNTHETIC_CACHE');os.link(first,files/'two.bin')
+                        original_walk=os.walk;changed=[False]
+                        def walking(*args,**kwargs):
+                            yield from original_walk(*args,**kwargs)
+                            if attack=='permissions':target.chmod(original_mode^0o010)
+                            elif attack=='directory_inode':
+                                displaced=target.with_name(target.name+'-synthetic-displaced');target.rename(displaced);target.mkdir(mode=original_mode)
+                                for child in displaced.iterdir():child.rename(target/child.name)
+                                displaced.rmdir()
+                            else:(target/'late-unenumerated.bin').write_bytes(b'SYNTHETIC_LATE_FILE')
+                            changed[0]=True
+                        try:
+                            with patch.object(ci.os,'walk',side_effect=walking),patch.object(ci.legacy,'guard') as writer:
+                                with self.assertRaises(ci.UnsafePathError) as caught:ci.guard(root,allow_generated_unity=True,android_cache=True)
+                                writer.assert_not_called()
+                            self.assertIn('code=UNSAFE_DIRECTORY_CHANGE',ci.failure_line('CI','CI_APK',caught.exception))
+                            self.assertTrue(changed[0],'Fixture did not reach the post-enumeration mutation boundary')
+                        finally:target.chmod(original_mode)
     def testUnsafePathStdoutIsWhitelistedAndDoesNotPublishNamesContentsOrTargets(self):
         with tempfile.TemporaryDirectory() as d:
             root=Path(d);path=root/ci.TASK/'build/G3/Android/PRIVATE_SECRET.apk';path.parent.mkdir(parents=True);path.write_bytes(b'PRIVATE_FILE_CONTENT');os.link(path,path.with_suffix('.alias'))
@@ -620,7 +783,7 @@ class G3ValidatorTests(unittest.TestCase):
             error.path_class=['SECRET'];error.kind={'SECRET':True};error.path_shape='SECRET/raw/path'
             self.assertNotIn('SECRET',ci.failure_line('CI','CI_APK',error))
     def testOnlyAndroidPostCommandsRequestBoundedCacheCompatibility(self):
-        for stage in ('edit','play','android'):
+        for stage in ci.STAGES:
             for command in ('guard','restore-font','snapshot','tests','captures','apk','audit','diagnostics'):
                 with self.subTest(stage=stage,command=command),patch.object(sys,'argv',['g3_ci.py',command,'--stage',stage]),patch.object(ci,'guard',side_effect=ValueError('synthetic stop before any writes')) as gate:
                     with self.assertRaises(ValueError):ci.main()
@@ -689,6 +852,18 @@ class G3ValidatorTests(unittest.TestCase):
         self.assertIn("steps.pathdiagnostics.outputs.diagnostic_relative_path != ''",text)
         self.assertIn('path: ${{ runner.temp }}/${{ steps.pathdiagnostics.outputs.diagnostic_relative_path }}',text)
         self.assertIn('group: unity-personal-proof',text);self.assertIn('androidVersionCode: 3',text);self.assertNotIn('actions/cache',text);self.assertNotIn('workflow_dispatch',text)
+        self.assertIn('test ! -e tasks/lottery-shop/unity/.utmp',text);self.assertIn('test ! -L tasks/lottery-shop/unity/.utmp',text)
+        upload_paths=[];collect=False
+        for line in text.splitlines():
+            if line.startswith('          path:'):
+                collect=line.strip()=='path: |'
+                if not collect:upload_paths.append(line.split('path:',1)[1].strip())
+            elif collect and line.startswith('            '):upload_paths.append(line.strip())
+            else:collect=False
+        self.assertTrue(upload_paths)
+        for path in upload_paths:
+            self.assertNotIn('.utmp',path);self.assertNotIn('/Library',path);self.assertNotIn('*',path)
+            self.assertTrue(path.startswith(ci.TASK+'/evidence/') or path.startswith(ci.TASK+'/build/') or path=='${{ runner.temp }}/${{ steps.pathdiagnostics.outputs.diagnostic_relative_path }}')
         actions=set(__import__('re').findall(r'uses: ([^\s]+)',text))
         self.assertEqual(actions,{'actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683','actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02','game-ci/unity-test-runner@0ff419b913a3630032cbe0de48a0099b5a9f0ed9','game-ci/unity-builder@d829bfc901f2347c8fe18898f06712b66916ef42'})
         prepare=(ROOT/ci.TASK/'scripts/g3_prepare_runner.sh').read_text()
