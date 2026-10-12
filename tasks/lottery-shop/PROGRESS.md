@@ -1,13 +1,18 @@
 # Progress checkpoint
 
-Updated: 2026-10-12 10:04 UTC
+Updated: 2026-10-12 10:17 UTC
 
-Stage: G1 rule specification; not yet accepted.
+Current stage: G2 one-ticket technical slice implementation.
 
-G0 technical capability and build probe independently accepted. [Native + Android run 38226292711](https://github.com/yangerstar1/task-workbench/actions/runs/38226292711) succeeded. The 49,385,658-byte ARM64 development APK is a technical probe, not a playable lottery game; it has been persistently saved and recovered with matching SHA256.
+G1 PASSED independent rule specification and calibration. The accepted candidate is bound to private source commit 230c90aedf6363435a39c55ad1c3531df8f5cec3, with all 301 candidate files plus manifest verified. Three earlier findings were repaired and independently retested; no game/device acceptance is implied.
 
-G1 candidate 001 independent review found three issues: final split debt payment omitted automatic clear rewards; six original interaction-fault categories were missing from blind calibration; one first-day ad observation was worded incorrectly.
+Parallel implementation now active:
+1. Actual ticket rules, wallet commands, atomic persistence/recovery and development-only FakeAd transactions.
+2. Real 3D six-cell scratch surface, committed bitset mask, Chinese HUD and unified mouse/touch input.
+3. Native Edit/Play test orchestration, actual rendered frames, process-recovery checks and Android build.
 
-Candidate 002 is now frozen with those repairs. Author checks: 133 reference tests, original 16 mutation cases and 7 manifest regressions, 17 rule calibration cases, 21 synthetic interaction cases and 21 requirement-matrix mutation cases pass. Independent retest and private remote identity binding are in progress; these counts are not gameplay acceptance.
+G2 is not yet built or accepted. Full-day debt/shop/second ticket and full-round systems remain later gates.
 
-The private-backup permission block was explicitly resolved by the owner; uploading new G1 candidates has resumed. G2 one-ticket technical slice plan has independent conditional approval, but implementation waits for G1 acceptance. Full gameplay, art, rendering, touch/device and release acceptance remain NOT_RUN.
+G0 technical proof: [run 38226292711](https://github.com/yangerstar1/task-workbench/actions/runs/38226292711) succeeded with six actual Unity tests, source audits and ARM64 IL2CPP APK. Its APK is a technical probe, not the lottery game; persistent recovery and binary/font/license checks are verified.
+
+Rendered game frames, device touch/install/performance, final art, real ad SDK and release remain unverified.
