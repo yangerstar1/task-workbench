@@ -282,11 +282,14 @@ def parse_diagnostic_manifest(raw):
 def snapshot_project(root):
     task = root / TASK
     (task / "evidence").mkdir(parents=True, exist_ok=True)
+    (task / "evidence/manifest-before.json").unlink(missing_ok=True)
+    (task / "evidence/manifest-after.json").unlink(missing_ok=True)
     files = snapshot_files(root)
     raw = bounded_read(task / "unity/Packages/manifest.json", 64 * 1024)
     parse_diagnostic_manifest(raw)
     require(hashlib.sha256(raw).hexdigest() == files.get("Packages/manifest.json"), "Manifest changed during snapshot")
-    (task / "evidence/manifest-before.json").write_bytes(raw)
+    # Baseline is private to the validator and is never an artifact input.
+    (task / "evidence/manifest-baseline.internal.json").write_bytes(raw)
     write_json(task / "evidence/pre-unity-source.json", files)
 
 
@@ -296,16 +299,16 @@ def capture_manifest_change(task, before_hash, after_hash):
                "status": "DIAGNOSTIC_ONLY_NOT_A_MUTATION_APPROVAL", "semanticComparison": "UNAVAILABLE",
                "beforeExport": "UNAVAILABLE", "afterExport": "UNAVAILABLE"}
     decoded = {}
+    (task / "evidence/manifest-before.json").unlink(missing_ok=True)
     (task / "evidence/manifest-after.json").unlink(missing_ok=True)
     for label, path, expected_hash in (
-        ("before", task / "evidence/manifest-before.json", before_hash),
+        ("before", task / "evidence/manifest-baseline.internal.json", before_hash),
         ("after", task / "unity/Packages/manifest.json", after_hash)):
         try:
             raw = bounded_read(path, 64 * 1024)
             require(hashlib.sha256(raw).hexdigest() == expected_hash, "Manifest snapshot identity mismatch")
             data = parse_diagnostic_manifest(raw)
-            if label == "after":
-                (task / "evidence/manifest-after.json").write_bytes(raw)
+            (task / ("evidence/manifest-" + label + ".json")).write_bytes(raw)
             decoded[label] = data
             receipt[label + "Export"] = "SAFE_SCHEMA_ACTUAL_BYTES"
         except (ValueError, OSError, TypeError):

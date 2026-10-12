@@ -1,6 +1,6 @@
 # G0 CI validator scope
 
-The local Python suite uses synthetic fixtures. Its 60 passing test methods
+The local Python suite uses synthetic fixtures. Its 61 passing test methods
 on 2026-10-12 validate guard, XML, font-restoration, source-mutation and APK
 inspection code. They do not execute Unity, import a real font, build an app,
 render a frame, or test a physical device.
@@ -89,6 +89,9 @@ response; helpers must not echo a suspected value during diagnosis.
   removals or changes still fail the source audit. Safe actual before/after bytes
   and a separate bounded semantic-diff receipt are preserved through explicit
   artifact paths; unsafe raw bytes are withheld, not silently approved.
+  The internal baseline is not an artifact input. Before/after public export
+  paths are cleared before revalidation and written only after their own checks
+  succeed, so a refused baseline cannot remain at an upload-listed path.
 - Resolved-lock root, dependencies, package entries and transitive dependency
   maps are type-checked before lookup. Array-shaped malformed locks produce a
   bounded `FAIL` source-audit receipt instead of escaping through AttributeError.

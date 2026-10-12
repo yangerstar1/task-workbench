@@ -413,8 +413,34 @@ class SourceMutationSyntheticTests(unittest.TestCase):
             path = task / "unity/Packages/manifest.json"
             ci.write_json(path, {"dependencies": ci.PACKAGES})
             self.assertFalse(ci.capture_manifest_change(task, "a" * 64, ci.digest(path)))
-            (task / "evidence/manifest-before.json").write_bytes(path.read_bytes())
+            (task / "evidence/manifest-baseline.internal.json").write_bytes(path.read_bytes())
             self.assertFalse(ci.capture_manifest_change(task, "a" * 64, ci.digest(path)))
+
+    def test_refused_before_baseline_cannot_remain_in_public_artifact_path(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            task = root / ci.TASK
+            manifest = task / "unity/Packages/manifest.json"
+            ci.write_json(manifest, {"dependencies": ci.PACKAGES})
+            ci.snapshot_project(root)
+            internal = task / "evidence/manifest-baseline.internal.json"
+            public_before = task / "evidence/manifest-before.json"
+            self.assertTrue(internal.is_file())
+            self.assertFalse(public_before.exists())
+            marker = b"SYNTHETIC-UNSAFE-BASELINE-MUST-NOT-BE-UPLOADED"
+            internal.write_bytes(marker)
+            # An old or tampered export must also be removed before revalidation.
+            public_before.write_bytes(marker)
+            manifest.write_bytes(json.dumps({"dependencies": ci.PACKAGES}, separators=(",", ":")).encode())
+            with self.assertRaises(ValueError):
+                ci.audit(root, {"sourceCommit": "a" * 40})
+            diagnostic = json.loads((task / "evidence/manifest-diagnostic.json").read_text())
+            self.assertEqual(diagnostic["beforeExport"], "REFUSED_OR_UNAVAILABLE")
+            self.assertFalse(public_before.exists())
+            self.assertNotIn(marker, (task / "evidence/manifest-diagnostic.json").read_bytes())
+            self.assertEqual(json.loads((task / "evidence/source-mutations.json").read_text())["status"], "FAIL")
+            workflow = Path(ci.__file__).resolve().parents[3] / ".github/workflows/lottery-g0.yml"
+            self.assertNotIn("evidence/manifest-baseline.internal.json", workflow.read_text())
 
     def test_manifest_diagnostic_rejects_arbitrary_content_urls_arrays_and_duplicate_keys(self):
         bad = [[], {"dependencies": []}, {"dependencies": {"com.unity.inputsystem": "https://private.invalid/token"}},
