@@ -35,3 +35,7 @@ G3 has not been compiled, built, device-tested or accepted yet. Its legal diagno
 ## G3 WIP checkpoint 001
 
 Saved at 2026-10-12 14:45 UTC. Partial uncompiled source only, no CI request or playable-G3 claim. Core/persistence/FakeAd structures and their draft tests, the verification scaffold, approved art and partial presentation are checkpointed. The scene view, input/bootstrap wiring, final exact test identities, native compilation and real execution are unfinished. Existing G2 source and evidence remain unchanged. Local helper results (108 baseline plus 17 G3 synthetic checks) are not C# or Unity results.
+
+## G3 source candidate 001
+
+Prepared at 2026-10-12 15:07 UTC for independent source preflight. First-day service/store, all initially offerable tools and consumables, shop/input/paper rendering, 225 authored EditMode cases, 12 authored PlayMode cases and 14 planned original captures are now present. Counts describe source identities, not passing execution. The captures use disclosed diagnostic fixtures; they are not physical-device or exact 75-step UI evidence. Native C# compilation, Unity execution, G3 process kills, APK and six-action physical-device acceptance remain NOT_RUN. No actual G3 request has been created.

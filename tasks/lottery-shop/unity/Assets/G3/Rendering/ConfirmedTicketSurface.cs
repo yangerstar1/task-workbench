@@ -69,8 +69,8 @@ namespace Lottery.G3.Rendering
         public bool ShowConfirmed(Guid callbackToken,RunState confirmed)
         {
             var t=confirmed?.CurrentTicket;
-            if(confirmed==null||confirmed.RecoveryRequired||t==null){Invalidate();return false;}
-            if(!isActiveAndEnabled||!session.IsCurrent(callbackToken,t.Id,confirmed.Revision))return false;
+            if(!isActiveAndEnabled||confirmed==null||t==null||!session.IsCurrent(callbackToken,t.Id,confirmed.Revision))return false;
+            if(confirmed.RecoveryRequired){Invalidate();return false;}
             try
             {
                 if(t.TicketType!=Layout.Id||t.Scratch==null||t.Scratch.CellCount!=Layout.Cells.Count)throw new InvalidOperationException("Snapshot/layout mismatch");
@@ -87,7 +87,7 @@ namespace Lottery.G3.Rendering
                         // No unopened outcome is put in a text label at all. Selected
                         // results still pass the exact confirmed per-pixel mask fence.
                         bool permitted=peek||t.RevealedCells[core]||t.SelectedCell==core;
-                        values[i]=!permitted?"":(t.ChallengeSafe[core]?"安全":"危险")+"\n"+(peek&&!t.RevealedCells[core]?"仅查看":"已承诺");
+                        values[i]=!permitted?"":(t.ChallengeSafe[core]?"安全":"危险")+"\n"+(t.RevealedCells[core]?"已揭晓":peek?"仅查看":"已承诺");
                     }
                     signature.Append('|').Append(values[i]).Append(':').Append(Convert.ToBase64String(crops[i]));
                 }

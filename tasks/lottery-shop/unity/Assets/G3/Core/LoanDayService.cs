@@ -66,7 +66,7 @@ namespace Lottery.G3.Core
         }
         public CommandResult RestartDay(string newRunId,string seed,string commandId,long expectedRevision)
         {
-            return store.Execute(commandId,CommandDigest.Create(Snapshot.RunId,"RESTART_DAY",w=>{w.Write(newRunId??"");w.Write(seed??"");}),expectedRevision,s=>
+            return store.Execute(commandId,CommandDigest.Create("G3_RESTART_INTENT","RESTART_DAY",w=>{w.Write(newRunId??"");w.Write(seed??"");}),expectedRevision,s=>
             {
                 if(s.Phase!=DayPhase.DAY_COMPLETE&&s.Phase!=DayPhase.RUN_FAILED)throw new RuleViolation("DAY_NOT_FINISHED");if(AdReservations.HasPending(s.Ad))throw new RuleViolation("AD_RESOLUTION_REQUIRED");
                 if(newRunId==s.RunId||s.Commands.Any(x=>x.Kind=="RESTART_DAY"&&x.TicketId==newRunId))throw new RuleViolation("RUN_ID_REUSED");RunState fresh;
@@ -74,7 +74,7 @@ namespace Lottery.G3.Core
                 int lifetime=s.LifetimeEffectiveTickets;
                 s.RunId=fresh.RunId;s.Seed=fresh.Seed;s.FixtureLabel="";s.InitialCashMinor=fresh.InitialCashMinor;s.CashMinor=fresh.CashMinor;s.PrincipalMinor=fresh.PrincipalMinor;s.PrincipalAtOpenMinor=fresh.PrincipalAtOpenMinor;s.PrincipalRepaidMinor=0;s.InterestDueMinor=fresh.InterestDueMinor;s.InterestPaidMinor=0;
                 s.DayNumber=1;s.Phase=DayPhase.DAY_OPEN;s.TicketsPurchasedToday=0;s.SettledTicketCount=0;s.LifetimeEffectiveTickets=lifetime;s.LifetimeEffectiveAtOpen=lifetime;s.EconomicCounter=0;s.ChallengeCounter=0;s.ShopCounter=fresh.ShopCounter;
-                s.Tickets=fresh.Tickets;s.Stock=fresh.Stock;s.Tools=fresh.Tools;s.NextToolIds=fresh.NextToolIds;s.Drawers=fresh.Drawers;s.ToolCounters=fresh.ToolCounters;s.Loans=fresh.Loans;s.Contacts=fresh.Contacts;s.Settlements=fresh.Settlements;s.Ledger=fresh.Ledger;s.PhoneEvents=fresh.PhoneEvents;s.ConsumableBatch=fresh.ConsumableBatch;s.Ad=null;s.AdSuccessesToday=0;s.SettledCountAtLastAdSuccess=0;s.FixtureBaseSettlements=0;s.AdEvents=fresh.AdEvents;s.FakeShownRequests=fresh.FakeShownRequests;s.DiagnosticChallengeArrangements=fresh.DiagnosticChallengeArrangements;s.ClaimBuyIntents=fresh.ClaimBuyIntents;
+                s.Tickets=fresh.Tickets;s.Stock=fresh.Stock;s.Tools=fresh.Tools;s.NextToolIds=fresh.NextToolIds;s.Drawers=fresh.Drawers;s.ToolCounters=fresh.ToolCounters;s.Loans=fresh.Loans;s.Contacts=fresh.Contacts;s.Settlements=fresh.Settlements;s.Ledger=fresh.Ledger;s.PhoneEvents=fresh.PhoneEvents;s.ConsumableBatch=fresh.ConsumableBatch;s.Ad=null;s.AdSuccessesToday=0;s.SettledCountAtLastAdSuccess=0;s.FixtureBaseSettlements=0;s.AdEvents=fresh.AdEvents;s.FakeShownRequests=fresh.FakeShownRequests;s.DiagnosticChallengeArrangements=fresh.DiagnosticChallengeArrangements;s.ClaimBuyIntents=fresh.ClaimBuyIntents;s.FirstLaunchElapsedSeconds=0;
                 return new CommandReceipt{Kind="RESTART_DAY",TicketId=newRunId,CashDeltaMinor=0};
             });
         }

@@ -67,7 +67,7 @@ namespace Lottery.G3.Rendering
         public readonly Uv FromLocal,ToLocal;
         public readonly bool HasFrom;
         // A circular footprint in original paper pixels becomes these local radii.
-        // Future authority MUST clip rasterization to this one logical cell.
+        // DayGameService.ApplyCellScratch clips rasterization to this logical cell.
         public readonly double RadiusLocalU,RadiusLocalV;
         public CellBrushProposal(CellRegion cell,Uv from,Uv to,bool hasFrom,double paperRadius)
         { VisualId=cell.Id; CoreIndex=cell.CoreIndex; FromLocal=from; ToLocal=to; HasFrom=hasFrom; RadiusLocalU=paperRadius/cell.Silver.Width; RadiusLocalV=paperRadius/cell.Silver.Height; }
@@ -85,30 +85,6 @@ namespace Lottery.G3.Rendering
             if(!layout.TrySilverLocal(paper,out CellRegion cell,out Uv local)) { Cancel(); proposal=default; return false; }
             proposal=new CellBrushProposal(cell,previousLocal,local,previous==cell.VisualIndex,radiusPaperPixels);
             previous=cell.VisualIndex; previousLocal=local; return true;
-        }
-    }
-    public static class ConfirmedMaskProjection
-    {
-        public const string SupportedVersion="g2-cpu-mask-256x128-circle90-v1";
-        public const int Width=256,Height=128,ByteCount=4096;
-        public static PixelRect LogicalCell(int coreIndex)
-        {
-            if(coreIndex<0 || coreIndex>=6) throw new ArgumentOutOfRangeException(nameof(coreIndex));
-            int column=coreIndex%3,row=coreIndex/3,left=column*Width/3,right=(column+1)*Width/3;
-            // This PixelRect has logical-mask BOTTOM-left coordinates, not artwork coordinates.
-            return new PixelRect(left,row*64,right-left,64);
-        }
-        public static byte[] CopyCell(byte[] confirmedBits,string maskVersion,int coreIndex)
-        {
-            if(maskVersion!=SupportedVersion) throw new NotSupportedException("Mask version needs explicit recovery compatibility review");
-            if(confirmedBits==null || confirmedBits.Length!=ByteCount) throw new ArgumentException("Expected unchanged confirmed 256x128 bitset");
-            var r=LogicalCell(coreIndex); var pixels=new byte[r.Width*r.Height];
-            for(int y=0;y<r.Height;y++) for(int x=0;x<r.Width;x++)
-            {
-                int bit=(r.Y+y)*Width+r.X+x;
-                pixels[y*r.Width+x]=(confirmedBits[bit>>3]&(1<<(bit&7)))!=0?(byte)255:(byte)0;
-            }
-            return pixels; // Bottom row first, suitable for Texture2D.SetPixels32.
         }
     }
 }

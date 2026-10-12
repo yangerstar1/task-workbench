@@ -1,4 +1,4 @@
-// PREPARATION_NOT_STAGE_ADVANCE. Runtime uses an Editor-verified pairing,
+// G3 runtime uses the reviewed source-SHA-bound artwork pairing,
 // never claims that compressed GPU pixels prove an original PNG SHA.
 using System;
 using UnityEngine;

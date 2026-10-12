@@ -1,0 +1,13 @@
+{
+  "name": "Lottery.G3.Interaction",
+  "rootNamespace": "Lottery.G3.Interaction",
+  "references": [
+    "Lottery.G3.Core",
+    "Lottery.G2.Core",
+    "Lottery.G3.Rendering",
+    "Unity.InputSystem",
+    "Unity.RenderPipelines.Universal.Runtime",
+    "Unity.RenderPipelines.Core.Runtime"
+  ],
+  "autoReferenced": true
+}

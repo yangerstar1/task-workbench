@@ -27,6 +27,10 @@ namespace Lottery.G3.Core
         public static readonly string[] ConsumableIds={"reveal_film","seal_sticker","copy_paper","boost_coupon"};
         public static readonly string[] Qualities={"common","rare","precious"};
         public static readonly long[] ChallengePrizes={1000,2000,3000,5000,9000,18000};
+        public static string ShopRarityForSample(int sample)
+        {if(sample<0||sample>=1000000)throw new ArgumentOutOfRangeException(nameof(sample));return sample<800000?"common":sample<995000?"rare":"precious";}
+        public static string ConsumableQualityForSample(int sample)
+        {if(sample<0||sample>=1000000)throw new ArgumentOutOfRangeException(nameof(sample));return sample<800000?"common":sample<990000?"rare":"precious";}
         public static ToolDefinition Tool(string id) => Tools.FirstOrDefault(t=>t.Id==id) ?? throw new RuleViolation("UNKNOWN_TOOL");
         public static int QualityIndex(string quality) { int i=Array.IndexOf(Qualities,quality); if(i<0) throw new RuleViolation("UNKNOWN_QUALITY"); return i; }
         public static long ConsumablePrice(string id,string quality)

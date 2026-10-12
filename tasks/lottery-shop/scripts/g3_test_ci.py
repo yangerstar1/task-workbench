@@ -29,7 +29,7 @@ def axml(version=3,package='com.buyuqi.lotteryprobe',namespace='http://schemas.a
 
 def case(s,p):
     before='a'*64;after='b'*64
-    return dict(status='PASS',scenario=s,point=p,recoveryStatus='COMMITTED' if p in ('AfterPublish','BeforeResponse') else 'PROVEN_NOT_COMMITTED',beforeHash=before,expectedHash=after,recoveredHash=after if p in ('AfterPublish','BeforeResponse') else before,finalHash=after,finalCashMinor=process.CASH[s],finalCommands=5,attemptCommandOccurrences=1,staleRevisionReplayUnchanged=True,observation=process.expected_observation(s))
+    return dict(status='PASS',scenario=s,point=p,recoveryStatus='COMMITTED' if p in ('AfterPublish','BeforeResponse') else 'PROVEN_NOT_COMMITTED',beforeHash=before,expectedHash=after,recoveredHash=after if p in ('AfterPublish','BeforeResponse') else before,finalHash=after,finalCashMinor=process.CASH[s],finalCommands=process.COMMANDS[s],attemptCommandOccurrences=1,staleRevisionReplayUnchanged=True,observation=process.expected_observation(s))
 
 class G3ValidatorTests(unittest.TestCase):
     def testBaselineExactContractPreserved(self):
@@ -86,6 +86,35 @@ class G3ValidatorTests(unittest.TestCase):
         files=ci.reviewed_files(ROOT);self.assertNotIn(ci.REQUEST_PATH,files);self.assertNotIn(ci.TASK+'/ci/g3-preflight.review.json',files)
         self.assertIn(ci.TASK+'/scripts/process-g3/Program.cs',files);self.assertIn('.github/workflows/lottery-g3.yml',files)
         self.assertEqual(files[ci.TASK+'/fonts/NotoSansCJKsc-Regular.otf.xz'],ci.legacy.FONT_COMPRESSED_SHA)
+    def testProcessCompileInputsMatchReceipt(self):
+        import glob
+        import xml.etree.ElementTree as ET
+        project=ROOT/ci.TASK/'scripts/process-g3/G3.ProcessProbe.csproj'
+        xml=ET.parse(project).getroot();paths=set()
+        for node in xml.findall('.//Compile'):
+            paths.update(Path(p).resolve() for p in glob.glob(str(project.parent/node.get('Include')),recursive=True))
+        actual={p.resolve() for p in process.source_paths(ROOT/ci.TASK) if p.suffix=='.cs'}
+        self.assertEqual(paths,actual)
+        self.assertEqual(xml.find('.//EnableDefaultCompileItems').text,'false')
+        self.assertIn('LOTTERY_G3_TEST_FIXTURE',xml.find('.//DefineConstants').text)
+        self.assertNotIn(ROOT/ci.TASK/'unity/Assets/G2/Core/RunState.cs',paths)
+    def testFreshReviewMustApproveExactSourceMap(self):
+        with tempfile.TemporaryDirectory() as d:
+            root=Path(d);target=root/ci.TASK/'ci/g3-preflight.review.json';target.parent.mkdir(parents=True)
+            review=dict(schemaVersion=1,status='APPROVED_FOR_TRIGGER',requestId=ci.REQUEST['requestId'],reviewedSourceCommit='a'*40,reviewerId='fresh-reviewer-001',sourceFiles={'source.cs':'b'*64},deviceQa='NOT_RUN',finalQuality='NOT_PASSED')
+            target.write_text(json.dumps(review))
+            with patch.object(ci,'reviewed_files',return_value=review['sourceFiles']),patch.object(ci.subprocess,'run'):
+                self.assertEqual(ci.verify_preflight(root)['status'],'APPROVED_FOR_TRIGGER')
+                for key,value in [('status','DRAFT_NOT_APPROVED'),('deviceQa','PASS'),('finalQuality','PASS'),('sourceFiles',{'source.cs':'c'*64})]:
+                    changed=copy.deepcopy(review);changed[key]=value;target.write_text(json.dumps(changed))
+                    with self.assertRaises(ValueError):ci.verify_preflight(root)
+    def testMixedTriggerCommitRefused(self):
+        with patch.object(ci.legacy,'guard',return_value={}),patch.object(ci.legacy,'git',return_value=ci.REQUEST_PATH+'\nother.cs'),patch.object(ci,'verify_preflight'):
+            with self.assertRaises(ValueError):ci.guard(ROOT)
+    def testUnknownGeneratedProbeAssetRejected(self):
+        with ci.configured():
+            self.assertEqual(ci.legacy.mutation_kind('Assets/GeneratedProbe/extra.asset'),'UNEXPECTED_SOURCE_CHANGE')
+            self.assertEqual(ci.legacy.mutation_kind('Assets/GeneratedProbe/Probe.unity'),'GENERATED_PROBE_ASSET')
     def testWorkflowMaintainsLockedActionsAndNoCache(self):
         text=(ROOT/'.github/workflows/lottery-g3.yml').read_text()
         self.assertIn('group: unity-personal-proof',text);self.assertIn('androidVersionCode: 3',text);self.assertNotIn('actions/cache',text);self.assertNotIn('workflow_dispatch',text)

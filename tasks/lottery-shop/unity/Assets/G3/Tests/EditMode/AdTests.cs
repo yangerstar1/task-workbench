@@ -166,12 +166,14 @@ namespace Lottery.G3.EditMode.Tests
         }
         [Test] public void ReservedCoinsCannotFundAnOrdinaryTicket()
         {
-            var initial = Fixture(); long price = initial.Stock.First(s => s.IsConsumable).PriceMinor / 2;
-            initial.InitialCashMinor = initial.CashMinor = price + DayRules.TicketPriceMinor - 1;
-            var store = Open(initial: initial); Begin(store, Service(store));
-            var result = new DayGameService(store).BuyNumberTicket("spend-reservation", store.Read().Revision);
+            var store = Open(); var game = new DayGameService(store);
+            long price = Stock(store).PriceMinor / 2, remaining = price + DayRules.TicketPriceMinor - 1;
+            Ok(game.RepayPrincipal(store.Read().CashMinor - remaining, "prepare-low-available-cash", store.Read().Revision));
+            Begin(store, Service(store));
+            var result = game.BuyNumberTicket("spend-reservation", store.Read().Revision);
             Assert.That(result.Code, Is.EqualTo("INSUFFICIENT_CASH"));
-            Assert.That(store.Read().CashMinor, Is.EqualTo(initial.CashMinor));
+            Assert.That(store.Read().InitialCashMinor, Is.EqualTo(30000));
+            Assert.That(store.Read().CashMinor, Is.EqualTo(remaining));
             Assert.That(store.Read().CurrentTicket, Is.Null);
             Assert.That(AdReservations.HasReservation(store.Read().Ad), Is.True);
         }
@@ -201,7 +203,9 @@ namespace Lottery.G3.EditMode.Tests
             var store = Open(); var fake = new FakeRewardedAdService(store); var ad = Service(store); Begin(store, ad);
             Ok(fake.QueueEvent("wrong-request", store.Read().RunId, AdEventKind.Reward));
             Ok(fake.QueueEvent("request", "wrong-run", AdEventKind.Reward, "wrong-run-event"));
-            Ok(Poll(store, ad));
+            var waiting = Poll(store, ad);
+            Assert.That(waiting.Code, Is.EqualTo("AD_AWAITING_REWARD"));
+            Assert.That(waiting.CommitStatus, Is.EqualTo(CommitStatus.PROVEN_NOT_COMMITTED));
             var forged = new FakeAdEvent { EventId = "forged", RequestId = "request", RunId = store.Read().RunId, Kind = AdEventKind.Reward };
             Assert.That(ad.RecordEvent(forged, "forged", store.Read().Revision).Code, Is.EqualTo("AD_RECEIPT_UNVERIFIED"));
             Assert.That(ad.RecordEvent(fake.ReadEvents("wrong-request").Single(), "wrong-request", store.Read().Revision).Code, Is.EqualTo("AD_REQUEST_MISMATCH"));
@@ -210,7 +214,7 @@ namespace Lottery.G3.EditMode.Tests
             Assert.That(store.Read().CashMinor, Is.EqualTo(30000));
             Assert.That(store.Read().Ledger, Is.Empty);
         }
-        [TestCase(AdEventKind.NoFill)] [TestCase(AdEventKind.NotShown)] [TestCase(AdEventKind.NoRewardTerminal)]
+        [TestCase(AdEventKind.NoFill, TestName = "OnlyVerifiedNoRewardTerminalReleasesReservation_NoFill")] [TestCase(AdEventKind.NotShown, TestName = "OnlyVerifiedNoRewardTerminalReleasesReservation_NotShown")] [TestCase(AdEventKind.NoRewardTerminal, TestName = "OnlyVerifiedNoRewardTerminalReleasesReservation_NoRewardTerminal")]
         public void OnlyVerifiedNoRewardTerminalReleasesReservation(AdEventKind terminal)
         {
             var store = Open(); var fake = new FakeRewardedAdService(store); var ad = Service(store); Begin(store, ad);
@@ -280,14 +284,15 @@ namespace Lottery.G3.EditMode.Tests
                 Assert.That(store.Read().CashMinor, Is.EqualTo(30000));
             }
         }
-        [TestCase(false)] [TestCase(true)]
+        [TestCase(false, TestName = "CreatedAndReservedTransactionsResumeOriginalPersistedStepIds_Created")] [TestCase(true, TestName = "CreatedAndReservedTransactionsResumeOriginalPersistedStepIds_Reserved")]
         public void CreatedAndReservedTransactionsResumeOriginalPersistedStepIds(bool reserve)
         {
             var store = Open(); var ad = Service(store);
             Ok(ad.CreateAd("request", Stock(store).StockId, 60, "original-create", 0));
             if (reserve) Ok(ad.ReserveAd("request", "original-reserve", store.Read().Revision));
             store.Dispose(); var reload = Open(); var restored = Service(reload);
-            Ok(Poll(reload, restored)); Ok(Poll(reload, restored));
+            Ok(Poll(reload, restored));
+            Assert.That(Poll(reload, restored).Code, Is.EqualTo("AD_AWAITING_REWARD"));
             Assert.That(reload.Read().Ad.Phase, Is.EqualTo(AdPhase.SHOWING));
             Assert.That(reload.Read().FakeShownRequests.Count, Is.EqualTo(1));
             Assert.That(reload.Read().Ad.CreateCommandId, Is.EqualTo("original-create"));
@@ -334,9 +339,9 @@ namespace Lottery.G3.EditMode.Tests
             Assert.That(store.Read().CashMinor, Is.EqualTo(30000 - discount));
             Assert.That(store.Read().Ledger.Count(x => x.Kind == "AD_PURCHASE"), Is.EqualTo(1));
         }
-        [TestCase(StoreFaultPoint.BeforeWrite)] [TestCase(StoreFaultPoint.TempHalfWritten)]
-        [TestCase(StoreFaultPoint.TempFlushed)] [TestCase(StoreFaultPoint.BeforePublish)]
-        [TestCase(StoreFaultPoint.AfterPublish)] [TestCase(StoreFaultPoint.BeforeResponse)]
+        [TestCase(StoreFaultPoint.BeforeWrite, TestName = "CommitFaultWindowsRecoverToExactlyOneEconomicEffect_BeforeWrite")] [TestCase(StoreFaultPoint.TempHalfWritten, TestName = "CommitFaultWindowsRecoverToExactlyOneEconomicEffect_TempHalfWritten")]
+        [TestCase(StoreFaultPoint.TempFlushed, TestName = "CommitFaultWindowsRecoverToExactlyOneEconomicEffect_TempFlushed")] [TestCase(StoreFaultPoint.BeforePublish, TestName = "CommitFaultWindowsRecoverToExactlyOneEconomicEffect_BeforePublish")]
+        [TestCase(StoreFaultPoint.AfterPublish, TestName = "CommitFaultWindowsRecoverToExactlyOneEconomicEffect_AfterPublish")] [TestCase(StoreFaultPoint.BeforeResponse, TestName = "CommitFaultWindowsRecoverToExactlyOneEconomicEffect_BeforeResponse")]
         public void CommitFaultWindowsRecoverToExactlyOneEconomicEffect(StoreFaultPoint point)
         {
             var faults = new Faults(); var store = Open(faults: faults); var fake = new FakeRewardedAdService(store); var ad = Service(store);

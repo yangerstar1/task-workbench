@@ -72,6 +72,7 @@ static class Program
         cashMinor=s.CashMinor,principalMinor=s.PrincipalMinor,interestDueMinor=s.InterestDueMinor,interestPaidMinor=s.InterestPaidMinor,
         motherBorrowedMinor=s.Contacts.Single(x=>x.ContactId=="mother").BorrowedLifetimeMinor,
         motherOutstandingMinor=s.Loans.Where(x=>x.ContactId=="mother").Sum(x=>x.RemainingMinor),
+        motherLoanCount=s.Loans.Count(x=>x.ContactId=="mother"),motherDueNight=s.Loans.Where(x=>x.ContactId=="mother").Select(x=>x.DueNight).DefaultIfEmpty(0).Max(),
         toolCount=s.Tools.Count,drawerCount=s.Drawers.Count(x=>x!=null),phase=s.Phase.ToString(),
         selectedCell=s.CurrentTicket==null ? -1 : s.CurrentTicket.SelectedCell,
         safeCount=s.CurrentTicket==null ? 0 : s.CurrentTicket.SafeCount,
@@ -81,11 +82,14 @@ static class Program
     static void AssertIndependent(string scenario,RunState s)
     {
         check="INDEPENDENT_INVARIANTS";StateInvariants.Validate(s);
+        int commands=scenario=="borrow"?1:scenario=="consumable"?4:scenario=="night"?3:2;
+        if(s.Commands.Count!=commands)throw new InvalidOperationException();
         long cash=scenario=="challenge"?29000:scenario=="consumable"?26000:scenario=="replacement"?8000:scenario=="borrow"?40000:scenario=="repay"?35000:28500;
         if(s.CashMinor!=cash || s.PrincipalMinor!=300000 || s.InterestDueMinor!=1500 || s.InterestPaidMinor!=(scenario=="night"?1500:0)) throw new InvalidOperationException();
         long borrowed=s.Contacts.Single(x=>x.ContactId=="mother").BorrowedLifetimeMinor;
         long outstanding=s.Loans.Where(x=>x.ContactId=="mother").Sum(x=>x.RemainingMinor);
         if(borrowed!=(scenario=="replacement"?20000:(scenario=="borrow"||scenario=="repay")?10000:0) || outstanding!=(scenario=="repay"?5000:borrowed)) throw new InvalidOperationException();
+        if(s.Loans.Count(x=>x.ContactId=="mother")!=(borrowed>0?1:0) || s.Loans.Any(x=>x.ContactId=="mother"&&x.DueNight!=7))throw new InvalidOperationException();
         if(scenario=="challenge" && (s.CurrentTicket.SelectedCell!=0 || s.CurrentTicket.SelectionId=="" || s.CurrentTicket.SafeCount!=0 || s.CurrentTicket.RevealedCells.Any(x=>x) || s.CurrentTicket.Scratch.RevealedCellCount!=0)) throw new InvalidOperationException();
         if(scenario=="consumable" && (s.CurrentTicket.CopyMinor!=5000 || s.CurrentTicket.ConsumableCostMinor!=3000 || s.CurrentTicket.UsedConsumableTypes.Count!=1 || s.CurrentTicket.UsedConsumableTypes[0]!="copy_paper" || s.Drawers.Any(x=>x!=null) || s.Stock.Single(x=>x.ItemId=="copy_paper").Quantity!=0 || s.CurrentTicket.Phase!=TicketPhase.REVEALED_UNCLAIMED)) throw new InvalidOperationException();
         if(scenario=="replacement" && (s.Tools.Count!=6 || s.Tools.Any(x=>x.ItemId=="loss_mat") || s.Tools.Count(x=>x.ItemId=="alternating_stamp")!=1 || s.Stock.Single(x=>x.ItemId=="alternating_stamp").Quantity!=0 || s.FixtureLabel!="SYNTHETIC_INVENTORY_BOUNDARY_FIXTURE")) throw new InvalidOperationException();

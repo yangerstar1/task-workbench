@@ -120,6 +120,26 @@ namespace Lottery.G3.EditMode.Tests
             result.Receipt.Kind = "changed"; result.State.Stock.Clear(); result.State.NextToolIds[0] = "changed";
             Assert.That(StateCodec.ComputeHash(store.Read()), Is.EqualTo(hash)); Committed(service.BuyNumberTicket("buy", 0));
         }
+        [Test] public void PrepublicationCapacityFailureLeavesStoreUsable()
+        {
+            var store = Open(); var before = store.Read(); string hash = store.ConfirmedHash;
+            string directory = Path.GetDirectoryName(PathFor("state.bin"));
+            var files = Directory.GetFiles(directory).Where(p => Path.GetFileName(p) != "writer.lock").ToDictionary(Path.GetFileName, File.ReadAllBytes);
+            bool applied = false;
+            var result = store.Execute("oversize", new string('a', 64), before.Revision, state =>
+            { applied = true; return new CommandReceipt { Kind = new string('K', 4097) }; });
+            Assert.That(applied, Is.True); Assert.That(result.CommitStatus, Is.EqualTo(CommitStatus.PROVEN_NOT_COMMITTED));
+            Assert.That(result.Code, Is.EqualTo("SAVE_CAPACITY_REACHED")); Assert.That(result.Receipt, Is.Null);
+            Assert.That(result.State.Revision, Is.EqualTo(before.Revision)); Assert.That(StateCodec.ComputeHash(result.State), Is.EqualTo(hash));
+            Assert.That(result.State.PendingCommandId, Is.Empty); Assert.That(result.State.RecoveryRequired, Is.False);
+            Assert.That(store.ConfirmedHash, Is.EqualTo(hash)); Assert.That(store.CanMutate, Is.True);
+            string[] afterFiles = Directory.GetFiles(directory).Where(p => Path.GetFileName(p) != "writer.lock").Select(Path.GetFileName).ToArray();
+            Assert.That(afterFiles, Is.EquivalentTo(files.Keys));
+            foreach (var file in files) Assert.That(File.ReadAllBytes(Path.Combine(directory, file.Key)), Is.EqualTo(file.Value), file.Key);
+            Committed(new DayGameService(store).BuyNumberTicket("real-buy", before.Revision));
+            Assert.That(store.Read().Commands.Any(c => c.CommandId == "oversize"), Is.False);
+            Assert.That(store.Read().Revision, Is.EqualTo(before.Revision + 1));
+        }
         [Test] public void InvalidCommandIdentifiersAndNonHexDigestAreRejectedBeforeApply()
         {
             var store = Open(); string hash = store.ConfirmedHash; bool ran = false;
@@ -213,6 +233,35 @@ namespace Lottery.G3.EditMode.Tests
             byte[] conflict = Encoding.UTF8.GetBytes("pending\n" + new string('a', 64) + "\n0\n" + new string('b', 64) + "\n1\n" + hash);
             AssertBlockedPreserved("intent.record", Envelope(conflict));
         }
+        void AssertChecksummedStateFailsInvariants(RunState state)
+        {
+            byte[] payload = StateCodec.SerializeCanonical(state);
+            byte[] envelope = Envelope(payload);
+            byte[] marker = Envelope(Encoding.UTF8.GetBytes(state.Revision.ToString(CultureInfo.InvariantCulture) + "\n" + StateCodec.HashBytes(payload)));
+            File.WriteAllBytes(PathFor("state.bin"), envelope); File.WriteAllBytes(PathFor("commit.record"), marker);
+            // Both transport checksums and the marker agree. Only domain/journal validation can reject this save.
+            var reload = Open(); Assert.That(reload.CanMutate, Is.False); Assert.That(reload.Read().RecoveryRequired, Is.True);
+            Assert.That(reload.Recover("unresolved").CommitStatus, Is.EqualTo(CommitStatus.COMMIT_UNKNOWN));
+            Assert.That(File.ReadAllBytes(PathFor("state.bin")), Is.EqualTo(envelope)); Assert.That(File.ReadAllBytes(PathFor("commit.record")), Is.EqualTo(marker));
+        }
+        [Test] public void ChecksummedUnjournaledCashCreditFailsClosed()
+        {
+            var store = Open(); var state = store.Read(); store.Dispose();
+            state.CashMinor++;
+            state.Ledger.Add(new LedgerEntry { CommandId = "forged", Kind = "BORROW", ReferenceId = "mother", DeltaMinor = 1, BalanceMinor = state.CashMinor });
+            AssertChecksummedStateFailsInvariants(state);
+        }
+        [Test] public void ChecksummedOrphanPurchaseReceiptFailsClosed()
+        {
+            var store = Open(); Committed(new DayGameService(store).BuyNumberTicket("buy", 0)); var state = store.Read(); store.Dispose();
+            state.Commands.Single().CommandId = "orphan-receipt"; state.Ledger.Single().CommandId = "orphan-receipt";
+            AssertChecksummedStateFailsInvariants(state);
+        }
+        [Test] public void ChecksummedChangedStartingCashFailsClosed()
+        {
+            var store = Open(); var state = store.Read(); store.Dispose(); state.InitialCashMinor++; state.CashMinor++;
+            AssertChecksummedStateFailsInvariants(state);
+        }
         [Test] public void MalformedTextAndNoncanonicalLengthFailBeforeAllocation()
         {
             foreach (byte[] bytes in new[] { new byte[0], new byte[] { 0x80 }, new byte[] { 0x80, 0x80, 0x80, 0x80, 0x80 }, new byte[] { 0xff, 0xff, 0xff, 0xff, 0x0f } })
@@ -252,6 +301,7 @@ namespace Lottery.G3.EditMode.Tests
         }
         [Test] public void DiagnosticAndCompleteNestedStateRoundTripWithoutAliasing()
         {
+            // Deliberately non-admissible values exercise field fidelity only. No store or StateInvariants admits this object.
             var s = RunFactory.CreateDiagnostic("codec-run"); s.Revision = 9; s.InitialCashMinor = 32000; s.CashMinor = 23456; s.DayNumber = 2; s.Phase = DayPhase.NIGHT_BILL;
             s.PrincipalMinor = 290000; s.PrincipalAtOpenMinor = 299000; s.PrincipalRepaidMinor = 9000; s.InterestDueMinor = 1450; s.InterestPaidMinor = 450;
             s.TicketsPurchasedToday = 1; s.SettledTicketCount = 3; s.LifetimeEffectiveTickets = 9; s.LifetimeEffectiveAtOpen = 6;

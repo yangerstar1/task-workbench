@@ -7,7 +7,8 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="Program.cs" />
-    <Compile Include="../../unity/Assets/G2/Core/**/*.cs" />
+    <Compile Include="../../unity/Assets/G2/Core/NumberTicketRules.cs" />
+    <Compile Include="../../unity/Assets/G2/Core/ScratchMask.cs" />
     <Compile Include="../../unity/Assets/G3/Core/**/*.cs" />
     <Compile Include="../../unity/Assets/G3/Persistence/**/*.cs" />
     <Compile Include="../../unity/Assets/G3/Ads/**/*.cs" />

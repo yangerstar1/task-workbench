@@ -202,6 +202,8 @@ namespace Lottery.G3.Ads
             }
             if (state.Ad.Phase == AdPhase.COMMITTING) return CommitAd(requestId, state.Ad.CommitCommandId, state.Revision);
             if (state.Ad.Phase == AdPhase.COMMITTED) return store.Recover(state.Ad.CommitCommandId);
+            // Replaying an old provider/show receipt is not progress or a new reward confirmation.
+            if (state.Revision == expectedRevision) return Rejection("AD_AWAITING_REWARD");
             return result ?? Rejection(state.Ad.Phase == AdPhase.RECOVERY_CONFLICT ? "RECOVERY_REQUIRED" : "AD_AWAITING_REWARD");
         }
         CommandResult Step(string requestId, string commandId, long revision, string kind, Action<RunState> action)

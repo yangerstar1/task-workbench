@@ -22,12 +22,16 @@ require, digest, bounded_read, write_json = g2.require, g2.digest, g2.bounded_re
 TASK, RULES_SHA = g2.TASK, g2.RULES_SHA
 BASE = '06814f520041676a50601f4e70d5ee09eae10078'
 SCOPE = 'G3_ONE_DAY_WHITEBOX_NOT_DEVICE_TESTED'
+STANDARDS_DIGEST = '1984cc8f225db73485a052942d30637127679a56b0492edf36497911373f30b1'
 REQUEST = dict(schemaVersion=1, requestId='lottery-g3-20261012-01', baseCommit=BASE, purpose='G3_ONE_DAY_WHITEBOX')
 REQUEST_PATH = TASK + '/ci/g3-request.json'
 SCENE = 'Assets/G3/Scenes/G3Day.unity'
 GENERATED = {SCENE, SCENE + '.meta', 'Assets/G3/Scenes.meta'}
 STAGES = ('regression-edit', 'regression-play', 'edit', 'play', 'android')
-FRAMES = ()  # Filled only after the UI author freezes the actual capture contract.
+G0_GENERATED = {'Assets/GeneratedProbe.meta'} | {'Assets/GeneratedProbe/'+name+suffix for name,suffixes in
+    (('Pipeline',('.asset','.asset.meta')),('Renderer',('.asset','.asset.meta')),('Probe',('.unity','.unity.meta')),('ProbeSurface',('.mat','.mat.meta'))) for suffix in suffixes}
+ARTWORK = {'number':'aa9cd14c555cb2db4b402508ddee91e65a02b415e9226a0d99270b3d2e823e14',
+           'challenge':'4d1bc2a0999439014db391bd1754ef053f8729f699dbc02af05100ddc83a5384'}
 BASELINE_CONTRACT_SHA = 'aad7c41d07d4307b4885353e3bc829b1942d58da20363306018b07e64f47f2bb'
 
 @contextlib.contextmanager
@@ -37,7 +41,12 @@ def configured():
     old_binding = g2.normalization_binding
     original_kind = legacy.mutation_kind
     legacy.BASE, legacy.SCOPE, legacy.REQUEST, legacy.REQUEST_PATH = BASE, SCOPE, REQUEST, REQUEST_PATH
-    legacy.mutation_kind = lambda path: 'G3_GENERATED_SCENE' if path in GENERATED else original_kind(path)
+    def mutation_kind(path):
+        if path in GENERATED:return 'G3_GENERATED_SCENE'
+        kind=original_kind(path)
+        if kind=='GENERATED_PROBE_ASSET' and path not in G0_GENERATED:return 'UNEXPECTED_SOURCE_CHANGE'
+        return kind
+    legacy.mutation_kind=mutation_kind
     def binding(identity, stage):
         require(stage in STAGES, 'Unexpected G3 audit stage')
         return dict(stage=stage, **{k: identity[k] for k in ('sourceCommit','runId','runAttempt','requestId')})
@@ -68,7 +77,7 @@ def load_contract(task):
         assemblies = profiles[profile]; wanted = 'Lottery.G3.' + ('EditMode' if profile == 'edit' else 'PlayMode') + '.Tests.dll'
         require(isinstance(assemblies,dict) and set(assemblies)=={wanted}, 'G3 assembly ownership mismatch')
         names = assemblies[wanted]
-        require(isinstance(names,list) and 1 <= len(names) <= 256 and len(names)==len(set(names)) and
+        require(isinstance(names,list) and 1 <= len(names) <= 512 and len(names)==len(set(names)) and
                 all(isinstance(n,str) and re.fullmatch(r'Lottery\.G3\.[A-Za-z0-9_.]+',n) for n in names), 'G3 exact cases missing')
     frames=data['frames']
     require(isinstance(frames,list) and 10 <= len(frames) <= 20 and len(frames)==len(set(frames)) and
@@ -99,6 +108,10 @@ def reviewed_files(root, committed=False):
     # Text workspaces omit this large accepted-baseline binary. Its pinned digest
     # is subsequently verified from actual committed bytes by the runner guard.
     result.setdefault(TASK+'/fonts/NotoSansCJKsc-Regular.otf.xz',legacy.FONT_COMPRESSED_SHA)
+    # Accepted baseline request may be intentionally omitted from an authoring
+    # workspace to avoid accidental retriggering. Its reviewed bytes are expected,
+    # not claimed read locally; CI checks the actual committed request bytes.
+    result.setdefault(TASK+'/ci/g2-request.json',digest(task/'ci/g2-request.review.json'))
     return result
 
 
@@ -120,13 +133,19 @@ def guard(root):
     changed=legacy.git(root,'diff-tree','--no-commit-id','--name-only','-r','HEAD').splitlines()
     require(changed==[REQUEST_PATH], 'G3 trigger commit must change only its unique request')
     verify_preflight(root)
-    identity.update(rulesSha256=RULES_SHA,g2SourceBase=BASE,finalQuality='NOT_PASSED')
+    identity.update(rulesSha256=RULES_SHA,g2SourceBase=BASE,standardsDigest=STANDARDS_DIGEST,contractVersion='1.0.1',qualityBarVersion='QB-2',finalQuality='NOT_PASSED')
     return identity
 
 
+def verify_artwork(root):
+    for name,expected in ARTWORK.items():
+        path=root/TASK/'unity/Assets/G3/Rendering/Resources/G3'/(name+'-ticket-albedo.png')
+        raw=bounded_read(path,8*1024*1024)
+        require(hashlib.sha256(raw).hexdigest()==expected and raw[:8]==b'\x89PNG\r\n\x1a\n' and len(raw)>=33 and struct.unpack_from('>II',raw,16)==(1536,1024),'Original approved G3 artwork source changed')
+
+
 def verify_inputs(root):
-    g2.verify_inputs(root)
-    load_contract(root/TASK)
+    g2.verify_inputs(root);verify_artwork(root);load_contract(root/TASK)
 
 
 def audit_stage(root,stage,identity):
@@ -135,6 +154,7 @@ def audit_stage(root,stage,identity):
     safe=g2.SAFE_COMMON+g2.SAFE_GENERATED
     for name in safe+("settings-normalization.json",): (out/name).unlink(missing_ok=True)
     success=False
+    (common/'source-mutations.json').unlink(missing_ok=True)
     try:
         normalization=g2.normalize_unused_platform(root,stage,identity)
         legacy.audit(root,identity,additional_generated_kinds=('G2_GENERATED_SCENE','G3_GENERATED_SCENE'))
@@ -145,6 +165,7 @@ def audit_stage(root,stage,identity):
             write_json(common/name,data)
         success=True
     except Exception:
+        if not (common/'source-mutations.json').is_file():write_json(common/'source-mutations.json',dict(identity,status='FAIL',failedStage='G3_SOURCE_AUDIT',changes=[],metadataStatus='NO_SOURCE_CONTENT_EXPORTED'))
         write_json(out/'audit-failure.json',dict(identity,status='FAIL',stage=stage,sourceContentExport='REFUSED'))
         raise
     finally:
@@ -181,13 +202,16 @@ def inspect_captures(source,identity,frames):
     required={'schemaVersion','scope','sourceCommit','runId','unityVersion','rulesSha256','captureMethod','graphicsDeviceType','graphicsDeviceName','width','height','sourceViewportWidth','sourceViewportHeight','inputEvidence','deviceQa','visualReview','frames'}
     require(set(data)==required,'G3 render receipt schema mismatch')
     expected=dict(schemaVersion=1,scope='G3_CAMERA_RENDER_NOT_DEVICE_TESTED',sourceCommit=identity['sourceCommit'],runId=identity['runId'],unityVersion=legacy.VERSION,rulesSha256=RULES_SHA,captureMethod='URP_STANDARD_REQUEST_READPIXELS',width=1280,height=720,inputEvidence='SIMULATED_INPUT_SYSTEM',deviceQa='NOT_RUN',visualReview='PENDING')
-    require(all(data.get(k)==v for k,v in expected.items()),'G3 render identity mismatch')
+    require(all(data.get(k)==v for k,v in expected.items()) and type(data['schemaVersion']) is int,'G3 render identity mismatch')
     require(all(type(data[k]) is int and 64<=data[k]<=8192 for k in ('sourceViewportWidth','sourceViewportHeight')), 'Viewport absent')
     for k in ('graphicsDeviceType','graphicsDeviceName'):
         require(isinstance(data[k],str) and re.fullmatch(r'[A-Za-z0-9_., ()/+:-]{1,200}',data[k]) and 'null' not in data[k].lower(),'Graphics device absent')
     require(isinstance(data['frames'],list) and [f.get('stage') for f in data['frames']]==frames,'Exact G3 original frame set mismatch')
     for f in data['frames']:
-        require(set(f)=={'stage','file','sha256','bytes','stateSha256'} and f['file']==f['stage']+'.png' and re.fullmatch(r'[0-9a-f]{64}',f.get('stateSha256','')),'G3 frame metadata mismatch')
+        require(set(f)=={'stage','file','sha256','bytes','stateSha256','gameRunId','fixtureLabel'} and f['file']==f['stage']+'.png' and re.fullmatch(r'[0-9a-f]{64}',f.get('stateSha256','')),'G3 frame metadata mismatch')
+        require(isinstance(f['gameRunId'],str) and re.fullmatch(r'[A-Za-z0-9_.:-]{1,128}',f['gameRunId']) and isinstance(f['fixtureLabel'],str) and (f['fixtureLabel']=='NORMAL_UNINJECTED' or re.fullmatch(r'(?:G3|SYNTHETIC)_[A-Z0-9_]{3,100}',f['fixtureLabel'])),'G3 per-frame fixture provenance missing')
+        expected_provenance=('g3-protected-render-fixture','SYNTHETIC_CONSUMABLE_BOUNDARY_FIXTURE') if f['stage']=='challenge-protected' else ('g3-day-qafixture-001','G3_DIAGNOSTIC_VECTOR_NOT_NATURAL')
+        require((f['gameRunId'],f['fixtureLabel'])==expected_provenance,'G3 main-day/separate-fixture provenance mismatch')
         p=source/f['file']; raw=bounded_read(p,4*1024*1024)
         require(f['sha256']==digest(p) and type(f['bytes']) is int and f['bytes']==len(raw),'Frame bytes mismatch')
         g2.png_dimensions(raw)
@@ -253,7 +277,7 @@ def inspect_apk(task,identity):
     cold=json.loads(bounded_read(task/'evidence/g3/android/cold-build-baseline.json',16384))
     require(all(cold.get(k)==v for k,v in identity.items()) and cold.get('status')=='VERIFIED_BEFORE_UNITY' and cold.get('libraryAbsent') is True and cold.get('buildAbsent') is True and cold.get('cacheRestored') is False,'Independent cold build observation missing')
     receipt=json.loads(bounded_read(directory/'build-receipt.json',64*1024))
-    expected=dict(rulesSha256=RULES_SHA,runtimeScene=SCENE,fakeAd='DEVELOPMENT_FAKE_ONLY',versionCode=3,versionName='0.0.3',applicationIdentifier='com.buyuqi.lotteryprobe',normalRuntimeFixture='NONE',coldBuild=True)
+    expected=dict(rulesSha256=RULES_SHA,standardsDigest=STANDARDS_DIGEST,runtimeScene=SCENE,fakeAd='DEVELOPMENT_FAKE_ONLY',versionCode=3,versionName='0.0.3',applicationIdentifier='com.buyuqi.lotteryprobe',normalRuntimeFixture='NONE',coldBuild=True)
     require(all(type(receipt.get(k)) is type(v) and receipt.get(k)==v for k,v in expected.items()),'G3 build receipt declaration mismatch')
     result=legacy.inspect_apk(apk,directory/'build-receipt.json',directory/'resolved-packages.txt',identity)
     with zipfile.ZipFile(apk) as archive:
@@ -269,7 +293,7 @@ def main():
     p.add_argument('--root',type=Path,default=Path(__file__).resolve().parents[3]);p.add_argument('--stage',choices=STAGES,default='edit')
     for name in ('unity','verify','audit'):p.add_argument('--'+name+'-outcome',default='unknown')
     args=p.parse_args();root=args.root.resolve();task=root/TASK
-    if args.command=='source-preflight':g2.source_preflight(root);return
+    if args.command=='source-preflight':g2.source_preflight(root);verify_artwork(root);baseline_contract(task);print('G3 static settings/artwork/baseline-contract preflight PASS; native execution NOT_RUN.');return
     if args.command=='review-manifest':
         verify_inputs(root);print(json.dumps(reviewed_files(root),sort_keys=True,indent=2));return
     with configured():
@@ -281,6 +305,7 @@ def main():
             if args.stage=='android':
                 require(not (task/'unity/Library').exists() and not (task/'build/G3').exists(),'Android checkout is not cold')
                 write_json(out/'cold-build-baseline.json',dict(identity,status='VERIFIED_BEFORE_UNITY',libraryAbsent=True,buildAbsent=True,cacheRestored=False))
+            (task/'evidence/manifest-diagnostic.json').unlink(missing_ok=True)
             legacy.snapshot_project(root);g2.snapshot_settings_baseline(root,args.stage,identity)
         elif args.command=='audit':audit_stage(root,args.stage,identity)
         elif args.command=='tests':require(args.stage!='android','Invalid test stage');export_tests(task,args.stage,identity)

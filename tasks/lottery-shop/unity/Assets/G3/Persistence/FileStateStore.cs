@@ -64,7 +64,12 @@ namespace Lottery.G3.Persistence
                     next.Revision = receipt.Revision; next.Commands.Add(receipt); StateInvariants.Validate(next);
                 }
                 catch (RuleViolation e) { return Result(CommitStatus.PROVEN_NOT_COMMITTED, e.Code); }
-                byte[] payload = StateCodec.SerializeCanonical(next); string nextHash = StateCodec.HashBytes(payload);
+                byte[] payload;
+                // Encoding bounds are decided before any durable intent or pending command exists.
+                // They prove non-commit and must not enter the ambiguous storage-failure path.
+                try { payload = StateCodec.SerializeCanonical(next); }
+                catch (InvalidDataException) { return Result(CommitStatus.PROVEN_NOT_COMMITTED, "SAVE_CAPACITY_REACHED"); }
+                string nextHash = StateCodec.HashBytes(payload);
                 pendingCommand = commandId;
                 try
                 {

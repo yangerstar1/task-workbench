@@ -33,8 +33,15 @@ namespace Lottery.G3.Editor
             if(android.overridden && (android.maxTextureSize<1536 ||
                 (android.format!=TextureImporterFormat.RGBA32 && android.format!=TextureImporterFormat.RGB24)))
                 throw new InvalidOperationException("G3 Android override may distort or downsize reviewed source");
-            binding.SetEditorVerification(layout.ArtworkSha256,AssetDatabase.AssetPathToGUID(path));
-            binding.RequireVerifiedPair();EditorUtility.SetDirty(binding);
+            // Committed verification is checked, never silently repaired during import.
+            var serialized=new SerializedObject(binding);string guid=AssetDatabase.AssetPathToGUID(path);
+            if(serialized.FindProperty("verifiedTexture").objectReferenceValue!=tex ||
+                serialized.FindProperty("verifiedArtworkId").stringValue!=expectedId ||
+                serialized.FindProperty("verifiedSourceSha256").stringValue!=layout.ArtworkSha256 ||
+                serialized.FindProperty("verifiedAssetGuid").stringValue!=guid)
+                throw new InvalidOperationException("G3 committed artwork verification is stale");
+            binding.SetEditorVerification(layout.ArtworkSha256,guid);
+            binding.RequireVerifiedPair(); // Identical values; do not dirty/rewrite a source binding asset.
         }
         public static void Prepare()
         {
@@ -85,7 +92,7 @@ namespace Lottery.G3.Editor
         [Serializable]sealed class Receipt {
             public string scope="G3_ONE_DAY_WHITEBOX_NOT_DEVICE_TESTED",sourceCommit,runId,unityVersion,apkSha256,builtAtUtc;
             public long apkBytes;public string buildResult,buildTarget,scriptingBackend,architecture,graphicsApis,editorRevision;public int minSdk,targetSdk;
-            public string rulesSha256=RulesSha256,runtimeScene=ScenePath,fakeAd="DEVELOPMENT_FAKE_ONLY";
+            public string rulesSha256=RulesSha256,standardsDigest="1984cc8f225db73485a052942d30637127679a56b0492edf36497911373f30b1",runtimeScene=ScenePath,fakeAd="DEVELOPMENT_FAKE_ONLY";
             public int versionCode=3;public string versionName="0.0.3",applicationIdentifier="com.buyuqi.lotteryprobe",normalRuntimeFixture="NONE";public bool coldBuild=true;
             public string deviceQa="NOT_RUN",renderedFrameQa="NOT_RUN",gameplayQa="NOT_RUN",signing="development-debug",finalQuality="NOT_PASSED";
         }

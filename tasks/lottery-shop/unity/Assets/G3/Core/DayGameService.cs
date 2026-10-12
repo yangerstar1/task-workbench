@@ -75,7 +75,8 @@ namespace Lottery.G3.Core
         {
             return Execute("CELL_SCRATCH",commandId,expectedRevision,w=>
             {w.Write(ticketId??"");w.Write(strokes==null?-1:strokes.Length);if(strokes!=null)foreach(var x in strokes){w.Write(x.CellIndex);w.Write(x.FromU);w.Write(x.FromV);w.Write(x.ToU);w.Write(x.ToV);w.Write(x.HasFrom);w.Write(x.RadiusU);w.Write(x.RadiusV);}},s=>
-            {var t=RequireActive(s,ticketId);if(t.Phase!=TicketPhase.ACTIVE)throw new RuleViolation("ALREADY_REVEALED");if(t.TicketType=="challenge"&&t.SelectedCell<0)throw new RuleViolation("SELECT_CELL_FIRST");
+            {if(s.Commands.Count>=90000||StateCodec.SerializeCanonical(s).Length>=14*1024*1024)throw new RuleViolation("SCRATCH_JOURNAL_CAPACITY_USE_QUICK_REVEAL");
+                var t=RequireActive(s,ticketId);if(t.Phase!=TicketPhase.ACTIVE)throw new RuleViolation("ALREADY_REVEALED");if(t.TicketType=="challenge"&&t.SelectedCell<0)throw new RuleViolation("SELECT_CELL_FIRST");
                 bool changed;try{changed=t.Scratch.Apply(strokes,t.TicketType=="challenge"?t.SelectedCell:-1);}catch(ArgumentException){throw new RuleViolation("INVALID_STROKE");}
                 if(!changed)throw new RuleViolation("NO_CHANGE");CompleteReveal(t);return t.Id;});
         }

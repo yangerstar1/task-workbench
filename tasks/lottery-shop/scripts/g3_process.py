@@ -17,13 +17,14 @@ SCENARIOS=('challenge','consumable','replacement','borrow','repay','night')
 CASES=tuple((s,p) for s in SCENARIOS for p in POINTS)
 COMMON=regression.CASE_KEYS|{'observation'}
 CASH=dict(challenge=29000,consumable=26000,replacement=8000,borrow=40000,repay=35000,night=28500)
+COMMANDS=dict(challenge=2,consumable=4,replacement=2,borrow=1,repay=2,night=3)
 ASSERTIONS={'ARGUMENTS','CRASH_APPLY','KILL_POINT_NOT_REACHED','SETUP','PREPARE_DIRECTORY','PREPARE_EQUAL','PREPARE_APPLY','INDEPENDENT_INVARIANTS','RECOVERY_BOUNDARY','RECOVERY_REPLAY','STALE_REPLAY','EXACTLY_ONCE','RESULT_WRITE'}
 
 
 def expected_observation(scenario):
     mother=20000 if scenario=='replacement' else 10000 if scenario in ('borrow','repay') else 0
     return dict(cashMinor=CASH[scenario],principalMinor=300000,interestDueMinor=1500,interestPaidMinor=1500 if scenario=='night' else 0,
-                motherBorrowedMinor=mother,motherOutstandingMinor=5000 if scenario=='repay' else mother,
+                motherBorrowedMinor=mother,motherOutstandingMinor=5000 if scenario=='repay' else mother,motherLoanCount=1 if mother else 0,motherDueNight=7 if mother else 0,
                 toolCount=6 if scenario=='replacement' else 0,drawerCount=0,phase='DAY_COMPLETE' if scenario=='night' else 'DAY_OPEN',
                 selectedCell=0 if scenario=='challenge' else -1,safeCount=0,copyMinor=5000 if scenario=='consumable' else 0,
                 fixtureLabel='SYNTHETIC_INVENTORY_BOUNDARY_FIXTURE' if scenario=='replacement' else 'G3_DIAGNOSTIC_VECTOR_NOT_NATURAL')
@@ -37,7 +38,7 @@ def validate_case(data,scenario,point):
     ci.require(data['beforeHash']!=data['expectedHash'] and data['finalHash']==data['expectedHash'] and data['recoveredHash']==data['expectedHash' if published else 'beforeHash'],'G3 recovery hash mismatch')
     for key,value in (('finalCashMinor',CASH[scenario]),('attemptCommandOccurrences',1)):
         ci.require(type(data[key]) is int and data[key]==value,'G3 independent money/exactly-once mismatch')
-    ci.require(type(data['finalCommands']) is int and 1<=data['finalCommands']<=32 and data['staleRevisionReplayUnchanged'] is True,'G3 replay failed')
+    ci.require(type(data['finalCommands']) is int and data['finalCommands']==COMMANDS[scenario] and data['staleRevisionReplayUnchanged'] is True,'G3 replay failed')
     expected=expected_observation(scenario);observed=data['observation']
     ci.require(isinstance(observed,dict) and set(observed)==set(expected) and all(type(observed[k]) is type(v) and observed[k]==v for k,v in expected.items()),'G3 independent fixed observation differs')
     return data
@@ -53,7 +54,7 @@ def validate_suite(cases):
 
 def source_paths(task):
     paths=[task/'scripts/process-g3/Program.cs',task/'scripts/process-g3/G3.ProcessProbe.csproj',task/'scripts/process-g3/NuGet.Config']
-    paths+=list((task/'unity/Assets/G2/Core').rglob('*.cs'))
+    paths += [task/'unity/Assets/G2/Core'/name for name in ('NumberTicketRules.cs','ScratchMask.cs')]
     paths+=[p for part in ('Core','Persistence','Ads') for p in (task/'unity/Assets/G3'/part).rglob('*.cs')]
     return sorted(paths)
 
@@ -67,9 +68,12 @@ def failure(task,identity,context,error):
             aliases={str(p):p.relative_to(task).as_posix() for p in source_paths(task)}
             raw=ci.bounded_read(work/'compile.log',2*1024*1024).decode('utf-8',errors='replace')
             for line in raw.splitlines():
-                m=re.match(r'^\s*(.*?)\(([0-9]{1,7}),([0-9]{1,7})\)\s*:\s*error ((?:CS|MSB|NETSDK|NU)[0-9]{4,5})(?=[:\s])',line)
+                m=re.match(r'^\s*(.*?)\s*:\s*error ((?:CS|MSB|NETSDK|NU)[0-9]{4,5})(?=[:\s])',line)
                 if m:
-                    item=dict(file=aliases.get(m[1],'UNMAPPED'),line=int(m[2]),column=int(m[3]),code=m[4])
+                    prefix,code=m.groups();line_number=column=0
+                    location=re.fullmatch(r'(.*?)\(([0-9]{1,7}),([0-9]{1,7})\)',prefix)
+                    if location:prefix,line_number,column=location[1],int(location[2]),int(location[3])
+                    item=dict(file=aliases.get(prefix,'UNMAPPED'),line=line_number,column=column,code=code)
                     if item not in codes:codes.append(item)
                 if len(codes)>=32:break
         elif context['stage'] in ('prepare','checkpoint','verify','result'):
