@@ -1,14 +1,13 @@
 # Progress checkpoint
 
-Updated: 2026-10-12 08:26 UTC
+Updated: 2026-10-12 08:38 UTC
 
-Current stage: G0 technical validation, not an accepted playable game.
+Stage: G0 technical validation. No playable APK yet.
 
-- Repair source: 5dbb94096c9583e1ddd6a1a17e618e2fdb6d7238.
-- Independent review: PASS_LIMITED_CI_RETEST; 61 local synthetic checks and 13 impact scenarios passed. These are not Unity/device results.
-- New native probe: [run 38223507667](https://github.com/yangerstar1/task-workbench/actions/runs/38223507667), triggered from 99645798cf1df6b8f9daecd28c78ccb1c518c92b; queued at this checkpoint. Open the run for live state.
-- Previous native run 38177246584 failed compiler and source-audit gates; Android skipped.
-- Rule preparation: independent limited local acceptance completed. Remote private evidence backup is in progress.
+- Latest native run: [38223507667](https://github.com/yangerstar1/task-workbench/actions/runs/38223507667), source 99645798cf1df6b8f9daecd28c78ccb1c518c92b. Overall FAILED; Android skipped.
+- All six exact Unity EditMode tests genuinely PASSED; raw NUnit XML preserved. Compiler failure fixed.
+- Remaining failure: source audit correctly rejected three automatically added Linux SDK/toolchain packages, each 1.1.0. Before/after exact manifests now preserved and diagnosis underway; the audit has not been disabled.
+- Private rules and review backup verified: 276 files, commit 2f7c222c2c137f8acc4acfc4abfc7cad241c485e in the private project repository.
 - Full gameplay, final art, real-device acceptance: NOT_RUN.
 
-Latest repair corrects a read-only URP API assignment and preserves strict dependency audit plus safe diagnostics. No test or build is called passed before its real result. Source checkpoints are saved on this branch; private contract/review material stays private.
+Next: verify the origin of the three toolchain dependencies, pin a reproducible reviewed dependency set, then rerun the unchanged native and Android gates. CI results are technical evidence, not gameplay or device acceptance.
