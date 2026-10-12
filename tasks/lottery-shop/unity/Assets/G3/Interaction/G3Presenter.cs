@@ -20,6 +20,12 @@ namespace Lottery.G3.Interaction
         public int SelectedBoostSlot=>boostSlot;
         readonly HashSet<int> informationCells=new HashSet<int>();
         Action afterCommit;
+        G3Panel settingsReturn;G3QaEvidenceSnapshot evidence;string[] evidenceLines=new string[0];int evidenceOffset;string evidenceFeedback="";
+        public const int EvidencePageLines=14;
+        public string EvidenceText=>evidence?.Text??"";
+        public int EvidenceScrollOffset=>evidenceOffset;
+        public int EvidenceLineCount=>evidenceLines.Length;
+        public bool IsReadOnlyEvidence=>Panel==G3Panel.QaEvidence;
         public G3InputRouter Router {get;set;}
         public DayGameService Service=>service;
         public RunState Snapshot=>confirmed??(confirmed=service.Snapshot);
@@ -58,6 +64,10 @@ namespace Lottery.G3.Interaction
         }
         public void OpenPanel(G3Panel panel)
         {
+            // Settings is also the route to diagnostic evidence while a challenge cell
+            // is selected. Never use the general panel's automatic QuickReveal here.
+            if(panel==G3Panel.QaEvidence){OpenEvidence();return;}
+            if(panel==G3Panel.Settings){if(strokes.Count>0)return;if(Panel!=G3Panel.Settings)settingsReturn=Panel;Router?.ReleaseCapture();Panel=panel;Refresh();return;}
             ticketRulesReturn=Panel==G3Panel.Tickets&&panel==G3Panel.Rules;
             FlushScratch();if(IsCommitting)return;Router?.ReleaseCapture();
             var t=Snapshot.CurrentTicket;
@@ -71,6 +81,9 @@ namespace Lottery.G3.Interaction
         }
         public void Execute(G3Action a)
         {
+            if(a.Kind==G3ActionKind.Open&&(a.Slot==(int)G3Panel.QaEvidence||a.Slot==(int)G3Panel.Settings)){OpenPanel((G3Panel)a.Slot);return;}
+            if(a.Kind==G3ActionKind.CopyEvidence){CopyEvidence();return;}
+            if(a.Kind==G3ActionKind.ScrollEvidence){ScrollEvidence(a.Slot);return;}
             if(a.Kind==G3ActionKind.Retry){RetryOrRecover();return;}
             if(a.Kind==G3ActionKind.Close||a.Kind==G3ActionKind.Cancel){ClosePanel();return;}
             if(IsCommitting)return;
@@ -122,6 +135,26 @@ namespace Lottery.G3.Interaction
                 case G3ActionKind.Restart:Ask(a,"开启新的 G3 首日。当前日末收据保留；新局重置现金、库存、工具和借款。");break;
             }
             Refresh();
+        }
+        void OpenEvidence()
+        {
+            if(!G3QaEvidence.Enabled||Panel!=G3Panel.Settings||strokes.Count>0)return;
+            // Capture once. Refresh, scroll, copy and close do not re-read or write the run.
+            evidence=G3QaEvidence.Capture(service.Snapshot,IsCommitting,view,Router);
+            evidenceLines=G3QaEvidence.DisplayLines(evidence.DisplayText);evidenceOffset=0;evidenceFeedback="";
+            Router?.ReleaseCapture();Panel=G3Panel.QaEvidence;Refresh();
+        }
+        void CopyEvidence()
+        {
+            if(!G3QaEvidence.Enabled||Panel!=G3Panel.QaEvidence||evidence==null)return;
+            try{GUIUtility.systemCopyBuffer=evidence.Text;evidenceFeedback="已复制本次快照全文。请自行保存到验收记录。";}
+            catch(Exception){evidenceFeedback="系统剪贴板不可用，请保留屏幕记录；本次未保存文件。";}
+            Refresh();
+        }
+        public void ScrollEvidence(int lines)
+        {
+            if(!G3QaEvidence.Enabled||Panel!=G3Panel.QaEvidence)return;
+            evidenceOffset=Math.Max(0,Math.Min(Math.Max(0,evidenceLines.Length-EvidencePageLines),evidenceOffset+lines));Refresh();
         }
         void OpenStable(Action action)
         {
@@ -273,13 +306,15 @@ namespace Lottery.G3.Interaction
         void ClearBoost(){boostSlot=-1;boostStockId="";boostRunId="";}
         void ClosePanel()
         {
+            if(Panel==G3Panel.QaEvidence){Panel=G3Panel.Settings;Router?.ReleaseCapture();Refresh();return;}
+            if(Panel==G3Panel.Settings){Panel=settingsReturn;Router?.ReleaseCapture();Refresh();return;}
             if(IsCommitting)return;
             if(Panel==G3Panel.Rules&&ticketRulesReturn){Panel=G3Panel.Tickets;ticketRulesReturn=false;}
             else if(Panel==G3Panel.Confirm){if(confirmation.Kind==G3ActionKind.BuyTicket)ClearBoost();Panel=confirmationReturn;}
             else{if(Panel==G3Panel.Tickets)ClearBoost();Panel=G3Panel.None;ticketRulesReturn=false;}
             informationCells.Clear();Router?.ReleaseCapture();Refresh();
         }
-        public void Back(){if(IsCommitting)return;FlushScratch();if(IsCommitting)return;if(Panel!=G3Panel.None)ClosePanel();else OpenPanel(G3Panel.Settings);}
+        public void Back(){if(Panel==G3Panel.QaEvidence||Panel==G3Panel.Settings){ClosePanel();return;}if(IsCommitting)return;FlushScratch();if(IsCommitting)return;if(Panel!=G3Panel.None)ClosePanel();else OpenPanel(G3Panel.Settings);}
         public void Refresh()
         {
             if(service==null||view==null)return;
@@ -364,8 +399,16 @@ namespace Lottery.G3.Interaction
                     m.Add("information-confirm","确认查看 "+informationCount+" 格",new G3Action(G3ActionKind.ConfirmTargets),informationCount>0&&informationCells.Count==informationCount);break;
                 case G3Panel.Rules:
                     m.Title=string.IsNullOrEmpty(s.FixtureLabel)?"规则 · 虚构金币，不能兑换现金":"QA 固定诊断局 · 不代表自然中奖概率";m.Body="号码票先锁一个原始奖，六格只有一格匹配或全部不匹配。\n奖额：0 / 50 / 100 / 200 / 500 / 2000 / 10000 / 100000\n概率：40% / 20% / 22% / 13% / 4.7% / 0.28% / 0.018% / 0.002%\n挑战票：8 格、6 安全 2 危险，无放回。安全 1～6 格可收 100 / 200 / 300 / 500 / 900 / 1800。\n危险原奖为 0；封存只按之前锁定金额赔付。每次继续都须主动选格。\n首日利息 150，白天还本不退当日利息。所有花费、选择和刮痕确认保存后显示。";break;
+                case G3Panel.QaEvidence:
+                    m.Evidence=true;m.Title="QA 只读取证 · 开发构建";
+                    m.Body=string.Join("\n",evidenceLines.Skip(evidenceOffset).Take(EvidencePageLines));
+                    m.Add("evidence-up","向上",new G3Action(G3ActionKind.ScrollEvidence,slot:-EvidencePageLines),evidenceOffset>0);
+                    m.Add("evidence-down","向下",new G3Action(G3ActionKind.ScrollEvidence,slot:EvidencePageLines),evidenceOffset+EvidencePageLines<evidenceLines.Length);
+                    m.Add("evidence-copy","复制完整快照",new G3Action(G3ActionKind.CopyEvidence));
+                    m.Footnote=evidenceFeedback!=""?evidenceFeedback:"第 "+(evidenceOffset+1)+"–"+Math.Min(evidenceOffset+EvidencePageLines,evidenceLines.Length)+" / "+evidenceLines.Length+" 行；关闭后重新打开可取下一快照。";return m;
                 case G3Panel.Settings:
-                    m.Title="操作与可访问性";m.Body="可自由走动或原位采购，价格与效果相同。\n挑战快揭只完成已选格。完整品质尚未验收。";
+                    m.Grid=true;m.Title="操作与可访问性";m.Body="可自由走动或原位采购，价格与效果相同。\n挑战快揭只完成已选格。完整品质尚未验收。";
+                    if(G3QaEvidence.Enabled)m.Add("settings-evidence","QA 只读取证",new G3Action(G3ActionKind.Open,slot:(int)G3Panel.QaEvidence));
                     m.Add("settings-rules","完整规则与概率",new G3Action(G3ActionKind.Open,slot:(int)G3Panel.Rules));
                     m.Add("setting-quick","快揭按钮："+(QuickEnabled?"显示":"隐藏"),new G3Action(G3ActionKind.ToggleQuick));m.Add("setting-flash","减弱闪光："+(ReduceFlash?"开":"关"),new G3Action(G3ActionKind.ToggleFlash));m.Add("setting-vibration","结算震动："+(Vibration?"开":"关"),new G3Action(G3ActionKind.ToggleVibration));break;
                 case G3Panel.Confirm:

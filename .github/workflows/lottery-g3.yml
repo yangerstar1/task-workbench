@@ -345,7 +345,7 @@ jobs:
           dockerMemoryLimit: 12g
           allowDirtyBuild: true
           customParameters: >-
-            -job-worker-count 2 -probeCommit ${{ github.sha }} -probeRunId ${{ github.run_id }}
+            -job-worker-count 2 -probeCommit ${{ github.sha }} -probeRunId ${{ github.run_id }} -probeRunAttempt ${{ github.run_attempt }}
       - name: Verify compiled APK AXML version and ARM64 source receipt
         id: verify
         if: ${{ always() && steps.guard.outcome == 'success' && steps.unity.outcome == 'success' }}
@@ -366,6 +366,7 @@ jobs:
             tasks/lottery-shop/evidence/g3/android/cold-build-baseline.json
             tasks/lottery-shop/evidence/g3/android/apk-receipt.json
             tasks/lottery-shop/evidence/g3/android/guard-receipt.json
+            tasks/lottery-shop/evidence/g3/android/artwork-import-diagnostic.json
             tasks/lottery-shop/evidence/g3/android/font-receipt.json
             tasks/lottery-shop/evidence/g3/android/source-mutations.json
             tasks/lottery-shop/evidence/g3/android/settings-normalization.json
@@ -392,6 +393,7 @@ jobs:
           path: |
             tasks/lottery-shop/evidence/g3/android/diagnostic-receipt.json
             tasks/lottery-shop/evidence/g3/android/guard-receipt.json
+            tasks/lottery-shop/evidence/g3/android/artwork-import-diagnostic.json
             tasks/lottery-shop/evidence/g3/android/source-mutations.json
             tasks/lottery-shop/evidence/g3/android/settings-normalization.json
             tasks/lottery-shop/evidence/g3/android/audit-failure.json

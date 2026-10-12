@@ -38,6 +38,20 @@ def case(s,p):
         return dict(status='PASS',scenario=s,point=p,recoveryStatus='COMMITTED',beforeHash=before,expectedHash=after,recoveredHash=before,finalHash=after,finalCashMinor=28500,finalCommands=10,attemptCommandOccurrences=1,staleRevisionReplayUnchanged=True,waitingPollUnchanged=True,reservedStockRejected=True,reservedCashRejected=True,duplicateRewardUnchanged=True,waitingObservation=process.waiting_observation(False),observation=process.waiting_observation(True))
     return dict(status='PASS',scenario=s,point=p,recoveryStatus='COMMITTED' if p in ('AfterPublish','BeforeResponse') else 'PROVEN_NOT_COMMITTED',beforeHash=before,expectedHash=after,recoveredHash=after if p in ('AfterPublish','BeforeResponse') else before,finalHash=after,finalCashMinor=process.CASH[s],finalCommands=process.COMMANDS[s],attemptCommandOccurrences=1,staleRevisionReplayUnchanged=True,observation=process.expected_observation(s))
 
+def synthetic_import_diagnostic():
+    """Synthetic serializer fixtures, never observations from a native import."""
+    rows=[]
+    for id,sha in ci.ARTWORK.items():
+        o={k:True for k in ci.IMPORT_BOOL_FIELDS};o.update({k:0 for k in ci.IMPORT_INT_FIELDS})
+        o.update(artworkId=id,sourceSha256=sha,layoutSha256=sha,assetGuid='a'*32,sourceWidth=1536,sourceHeight=1024,layoutWidth=1536,layoutHeight=1024,textureWidth=1536,textureHeight=1024,textureFormat=3,wrapU=1,wrapV=1,wrapW=1,maxTextureSize=2048)
+        o['defaultPlatform']=dict(overridden=False,crunchedCompression=False,allowsAlphaSplitting=False,maxTextureSize=2048,format=-1,textureCompression=0)
+        o['androidPlatform']=dict(o['defaultPlatform'],overridden=True,format=3)
+        # Independent fixed identities; do not compute test expected outcomes through the validator.
+        o['checks']=[dict(id=k,passed=True) for k in ('BINDING_ID','SOURCE_BYTES','SOURCE_LAYOUT','TEXTURE_BINDING','TEXTURE_DIMENSIONS','TEXTURE_UNCOMPRESSED','IMPORTER_SHAPE','IMPORTER_DEFAULT','DEFAULT_PLATFORM','ANDROID_PLATFORM','COMMITTED_VERIFICATION')]
+        rows.append(o)
+    return dict(schemaVersion=1,sourceCommit='a'*40,runId='123',runAttempt='1',unityVersion='6000.3.19f1',stage='ANDROID_IMPORT_PREFLIGHT',artworks=rows)
+
+
 class G3ValidatorTests(unittest.TestCase):
     def testBaselineExactContractPreserved(self):
         p=ci.baseline_contract(ROOT/ci.TASK);self.assertEqual(sum(map(len,p['edit'].values())),45);self.assertEqual(sum(map(len,p['play'].values())),8)
@@ -409,6 +423,59 @@ class G3ValidatorTests(unittest.TestCase):
             diagnostic=json.loads((task/'evidence/g3/process/process-diagnostic.json').read_text());self.assertEqual(diagnostic['stage'],'baseline');self.assertEqual(diagnostic['status'],'FAIL')
             self.assertFalse((task/'evidence/g3/process/process-receipt.json').exists());self.assertFalse(list((task/'scripts').rglob('*.pyc')))
             result=cli('g3_ci.py','guard',cwd=metadata);self.assertEqual(result.returncode,0,'Root resolution or output closure changed after independent CLIs')
+    def testArtworkImportDiagnosticAcceptsExactBoundedNativeSchema(self):
+        data=synthetic_import_diagnostic();self.assertEqual(ci.validate_artwork_diagnostic(data,data),data)
+    def testArtworkImportDiagnosticRejectsOtherSourceRunAttemptOrVersion(self):
+        identity=synthetic_import_diagnostic()
+        for key,value in [('sourceCommit','b'*40),('runId','124'),('runAttempt','2'),('unityVersion','6000.3.20f1')]:
+            data=copy.deepcopy(identity);data[key]=value
+            with self.assertRaises(ValueError):ci.validate_artwork_diagnostic(data,identity)
+    def testArtworkImportDiagnosticRefusesUnboundedTextExtraFieldsAndWrongTypes(self):
+        base=synthetic_import_diagnostic()
+        for attack in ('field','text','bool','number','platform','checks'):
+            data=copy.deepcopy(base);o=data['artworks'][0]
+            if attack=='field':o['rawPath']='not-exportable'
+            elif attack=='text':o['assetGuid']='not-a-guid'
+            elif attack=='bool':o['sourcePng']=1
+            elif attack=='number':o['sourceWidth']=True
+            elif attack=='platform':o['androidPlatform']['secret']='not-exportable'
+            else:o['checks'][0]['passed']=1
+            with self.assertRaises(ValueError):ci.validate_artwork_diagnostic(data,base)
+    def testArtworkImportDiagnosticRecomputesChecksAndKeepsRealFailureValues(self):
+        base=synthetic_import_diagnostic();data=copy.deepcopy(base)
+        data['artworks'][0]['textureCompression']=1
+        with self.assertRaises(ValueError):ci.validate_artwork_diagnostic(data,base)
+        data['artworks'][0]['checks'][7]['passed']=False
+        self.assertEqual(ci.validate_artwork_diagnostic(data,base)['artworks'][0]['textureCompression'],1)
+        for value in (False,1024,4,1):
+            row=copy.deepcopy(base);key=('overridden' if type(value) is bool else {1024:'maxTextureSize',4:'format',1:'textureCompression'}[value]);row['artworks'][0]['androidPlatform'][key]=value
+            with self.assertRaises(ValueError):ci.validate_artwork_diagnostic(row,base)
+    def testArtworkImportExportRequiresActualFileAndNeverPromotesFailure(self):
+        with tempfile.TemporaryDirectory() as d:
+            task=Path(d);data=synthetic_import_diagnostic();source=task/'artifacts/g3-android-import-diagnostic.json';source.parent.mkdir()
+            self.assertIsNone(ci.export_artwork_diagnostic(task,data))
+            with self.assertRaises(ValueError):ci.export_artwork_diagnostic(task,data,required=True)
+            source.write_text(json.dumps(data));ci.export_artwork_diagnostic(task,data,required=True)
+            target=task/'evidence/g3/android/artwork-import-diagnostic.json';self.assertEqual(json.loads(target.read_text())['status'],'IMPORT_FIELDS_PASS')
+            data['artworks'][0]['textureWidth']=1024;data['artworks'][0]['checks'][4]['passed']=False;source.write_text(json.dumps(data))
+            ci.export_artwork_diagnostic(task,data);self.assertEqual(json.loads(target.read_text())['status'],'IMPORT_FIELDS_FAIL')
+            with self.assertRaises(ValueError):ci.export_artwork_diagnostic(task,data,required=True)
+    def testCommittedArtworkPlatformSettingsAreCompleteAndOriginalBytesUnchanged(self):
+        root=ROOT/ci.TASK/'unity/Assets/G3/Rendering/Resources/G3'
+        for id,sha in ci.ARTWORK.items():
+            self.assertEqual(hashlib.sha256((root/(id+'-ticket-albedo.png')).read_bytes()).hexdigest(),sha)
+            meta=(root/(id+'-ticket-albedo.png.meta')).read_text();self.assertEqual(meta.count('  platformSettings:\n'),1)
+            self.assertIn('  serializedVersion: 13\n',meta);self.assertIn('  nPOTScale: 0\n',meta)
+            entries=meta.split('  platformSettings:\n')[1].split('  userData:')[0].split('  - ')[1:];settings=[]
+            for entry in entries:
+                values={}
+                for line in entry.strip().splitlines():
+                    key,value=line.strip().split(': ',1);self.assertNotIn(key,values);values[key]=value if key=='buildTarget' else int(value)
+                settings.append(values)
+            self.assertEqual([p['buildTarget'] for p in settings],['DefaultTexturePlatform','Android'])
+            for i,p in enumerate(settings):
+                self.assertEqual(p,dict(serializedVersion=4,buildTarget=['DefaultTexturePlatform','Android'][i],maxTextureSize=2048,resizeAlgorithm=0,textureFormat=[-1,3][i],textureCompression=0,compressionQuality=50,crunchedCompression=0,allowsAlphaSplitting=0,overridden=i,ignorePlatformSupport=0,androidETC2FallbackOverride=0,forceMaximumCompressionQuality_BC6H_BC7=0))
+
     def testWorkflowMaintainsLockedActionsAndNoCache(self):
         text=(ROOT/'.github/workflows/lottery-g3.yml').read_text()
         self.assertIn('group: unity-personal-proof',text);self.assertIn('androidVersionCode: 3',text);self.assertNotIn('actions/cache',text);self.assertNotIn('workflow_dispatch',text)

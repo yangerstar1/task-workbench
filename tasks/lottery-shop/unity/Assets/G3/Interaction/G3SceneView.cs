@@ -15,17 +15,20 @@ namespace Lottery.G3.Interaction
         Font font;Shader flat;Material fontMat;Transform hud,header,footer,modal;BoundedGlyphLabel headerText,statusText,resultText,panelTitle,panelBody,panelFoot,emptyText;
         readonly List<Renderer> toolObjects=new List<Renderer>();readonly List<BoundedGlyphLabel> toolLabels=new List<BoundedGlyphLabel>();
         ConfirmedTicketSurface number,challenge;G3Presenter current;G3PanelModel panelModel;
-        float settlementPulse;bool pulseReduced;int lastWidth,lastHeight,used;Rect lastSafe,headerRect,footerRect,modalRect;bool walking;
+        float settlementPulse;bool pulseReduced;int lastWidth,lastHeight,used;Rect lastSafe,headerRect,footerRect,modalRect,evidenceBodyRect;bool walking;
         public Camera SceneCamera {get;private set;}
         public G3ShopWalk Walk {get;private set;}
         public ConfirmedTicketSurface Surface=>current?.Snapshot.CurrentTicket?.TicketType=="challenge"?challenge:number;
         public bool PanelVisible=>current!=null&&current.Panel!=G3Panel.None;
         public string VisibleSummary=>resultText.Text;
+        public string VisibleStatus=>statusText.Text;
         public string VisibleToolSlot(int slot)=>toolLabels[slot].Text;
         public Color VisibleToolColor(int slot)=>toolObjects[slot].sharedMaterial.color;
         public int PresentationWidth=>SceneCamera!=null&&SceneCamera.targetTexture!=null?SceneCamera.targetTexture.width:Mathf.Max(1,Screen.width);
         public int PresentationHeight=>SceneCamera!=null&&SceneCamera.targetTexture!=null?SceneCamera.targetTexture.height:Mathf.Max(1,Screen.height);
         public Rect? SimulatedSafeArea {get;set;}
+        public Rect PresentationSafeArea=>Safe;
+        public Rect EvidenceBodyRect=>evidenceBodyRect;
         Rect Safe=>SimulatedSafeArea??(SceneCamera!=null&&SceneCamera.targetTexture!=null?new Rect(0,0,PresentationWidth,PresentationHeight):(Screen.safeArea.width>0?Screen.safeArea:new Rect(0,0,PresentationWidth,PresentationHeight)));
         public bool LayoutChanged=>lastWidth!=PresentationWidth||lastHeight!=PresentationHeight||lastSafe!=Safe;
         public void Initialize(Font chinese,Shader flatShader,Shader glyph,Shader lit,Shader paper,Shader silver,Shader maskedFont,ApprovedArtworkBinding numberArt,ApprovedArtworkBinding challengeArt)
@@ -114,7 +117,10 @@ namespace Lottery.G3.Interaction
             else if(t.Phase==TicketPhase.SETTLED){var record=state.Settlements.LastOrDefault(x=>x.TicketId==t.Id);summary=record==null?"已结算": "原奖 "+G3Text.Money(record.RawPrizeMinor)+" · 已收 "+G3Text.Money(record.TotalMinor)+" · 净额 "+G3Text.Signed(record.NetMinor);}
             else{var p=presenter.Service.PreviewSettlement();summary=p==null?(t.TicketType=="number"?"号码票 · 已揭 "+t.Scratch.RevealedCellCount+" / 6":"挑战票 · 安全 "+t.SafeCount+" 格 · "+(t.SelectedCell>=0?"完成已选格":"请主动选格")):"原奖 "+G3Text.Money(p.RawPrizeMinor)+" · 追加 "+G3Text.Money(p.TotalMinor-p.RawPrizeMinor)+" · 待收 "+G3Text.Money(p.TotalMinor)+" · 净额 "+G3Text.Signed(p.NetMinor);}
             resultText.SetText(summary+(t!=null?" · 点此明细":""));PlaceLabel(resultText,new Rect(footerRect.x+14*s,footerRect.y+51*s,footerRect.width-28*s,34*s),28*s,.47f,false);
-            statusText.SetText(presenter.Status);PlaceLabel(statusText,new Rect(footerRect.x+14*s,footerRect.y+10*s,footerRect.width-28*s,34*s),24*s,.47f,false);
+            string feedback=presenter.Status;
+            if(G3QaEvidence.Enabled&&!presenter.IsCommitting&&!state.RecoveryRequired&&t!=null&&t.SelectedCell>=0&&!PanelVisible)
+                feedback="已保存格 "+(((t.SelectedCell+4)%8)+1)+" · QA r"+state.Revision+" · selection="+G3QaEvidence.SelectionMarker(t);
+            statusText.SetText(feedback);PlaceLabel(statusText,new Rect(footerRect.x+14*s,footerRect.y+10*s,footerRect.width-28*s,34*s),24*s,.47f,false);
             bool empty=t==null&&!state.RecoveryRequired;emptyText.gameObject.SetActive(empty);
             if(!presenter.IsCommitting&&!state.RecoveryRequired){number.Show(state);challenge.Show(state);}else InvalidateTicket();
             for(int i=0;i<3;i++)
@@ -158,8 +164,18 @@ namespace Lottery.G3.Interaction
             if(!PanelVisible)return;
             modalRect=new Rect(lastSafe.x+12*s,lastSafe.y+12*s,lastSafe.width-24*s,lastSafe.height-24*s);PlacePlate(modal,modalRect,.33f);
             panelTitle.SetText(model.Title);PlaceLabel(panelTitle,new Rect(modalRect.x+24*s,modalRect.yMax-68*s,modalRect.width-250*s,50*s),32*s,.22f,false);
-            AddButton("close-panel","返回",new G3Action(G3ActionKind.Close),new Rect(modalRect.xMax-200*s,modalRect.yMax-106*s,176*s,88*s),true,.25f);
+            bool pendingQa=G3QaEvidence.Enabled&&current.IsCommitting&&current.Panel!=G3Panel.QaEvidence&&current.Panel!=G3Panel.Settings;
+            AddButton(pendingQa?"qa-settings":"close-panel",pendingQa?"QA 设置":"返回",pendingQa?new G3Action(G3ActionKind.Open,slot:(int)G3Panel.Settings):new G3Action(G3ActionKind.Close),new Rect(modalRect.xMax-200*s,modalRect.yMax-106*s,176*s,88*s),true,.25f);
             panelBody.SetText(model.Body);panelFoot.SetText(model.Footnote);
+            if(model.Evidence)
+            {
+                evidenceBodyRect=new Rect(modalRect.x+24*s,modalRect.y+184*s,modalRect.width-48*s,modalRect.height-302*s);
+                PlaceLabel(panelBody,evidenceBodyRect,24*s,.22f,false);
+                PlaceLabel(panelFoot,new Rect(modalRect.x+24*s,modalRect.y+18*s,modalRect.width-48*s,52*s),23*s,.22f,true);
+                float gap=12*s,w=(modalRect.width-48*s-2*gap)/3;
+                for(int i=0;i<model.Cards.Count;i++){var card=model.Cards[i];AddButton(card.Id,card.Text,card.Action,new Rect(modalRect.x+24*s+i*(w+gap),modalRect.y+80*s,w,88*s),card.Enabled,.25f,28);}
+                return;
+            }
             bool grid=model.Grid;float bodyHeight;
             if(model.Cards.Count==0)bodyHeight=modalRect.height-180*s;
             else if(grid)bodyHeight=(model.LargeGrid?92:172)*s;
@@ -181,7 +197,8 @@ namespace Lottery.G3.Interaction
         }
         void AddButton(string id,string text,G3Action action,Rect rect,bool enabled=true,float z=.51f,float fontPixels=30)
         {
-            if(used>=pool.Count)throw new InvalidOperationException("UI button capacity exceeded");var b=pool[used++];b.Id=id;b.Action=action;b.Rect=rect;b.Enabled=enabled&&!current.IsCommitting||action.Kind==G3ActionKind.Retry;b.Root.SetActive(true);
+            if(used>=pool.Count)throw new InvalidOperationException("UI button capacity exceeded");var b=pool[used++];b.Id=id;b.Action=action;b.Rect=rect;bool evidenceControl=G3QaEvidence.Enabled&&(action.Kind==G3ActionKind.Open&&(action.Slot==(int)G3Panel.Settings||action.Slot==(int)G3Panel.QaEvidence)||(current.Panel==G3Panel.QaEvidence&&(action.Kind==G3ActionKind.CopyEvidence||action.Kind==G3ActionKind.ScrollEvidence))||(action.Kind==G3ActionKind.Close&&(current.Panel==G3Panel.QaEvidence||current.Panel==G3Panel.Settings)));
+            b.Enabled=enabled&&(!current.IsCommitting||evidenceControl)||action.Kind==G3ActionKind.Retry;b.Root.SetActive(true);
             PlacePlate(b.Plate,rect,z);b.Plate.GetComponent<Renderer>().sharedMaterial.color=b.Enabled?new Color(.16f,.35f,.28f):new Color(.18f,.23f,.21f);
             b.Label.SetText(text);PlaceLabel(b.Label,Inset(rect,13*lastSafe.height/720f,10*lastSafe.height/720f),fontPixels*lastSafe.height/720f,z-.025f,true);
         }

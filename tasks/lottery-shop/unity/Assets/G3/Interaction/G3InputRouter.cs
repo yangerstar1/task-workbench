@@ -11,7 +11,8 @@ namespace Lottery.G3.Interaction
     {
         G3Presenter presenter;G3SceneView view;RegionPointerTracker tracker;string layoutId="";
         int captured=-1;bool capturedTouch,uiCapture,touchGesture,requireRelease,focused=true,paused;
-        Vector2 previous;G3Action held;float lastPoll;
+        Vector2 previous;G3Action held;float lastPoll,evidenceDrag;bool evidenceScrollCapture;
+        public string LastInputSource {get;private set;}="NONE_OBSERVED";
         public bool PollAutomatically {get;set;}=true;
         public int CapturedPointerId=>captured;
         public bool IsFocused=>focused&&!paused;
@@ -43,6 +44,7 @@ namespace Lottery.G3.Interaction
             var mouse=Mouse.current;
             if(mouse!=null)
             {
+                if(presenter.IsReadOnlyEvidence&&mouse.scroll.ReadValue().y!=0){LastInputSource="MOUSE";presenter.ScrollEvidence(mouse.scroll.ReadValue().y>0?-3:3);}
                 if(requireRelease){if(!mouse.leftButton.isPressed)requireRelease=false;return;}
                 if(mouse.leftButton.wasPressedThisFrame)Begin(0,false,mouse.position.ReadValue());
                 else if(captured==0&&!capturedTouch&&mouse.leftButton.isPressed)Move(mouse.position.ReadValue());
@@ -59,6 +61,8 @@ namespace Lottery.G3.Interaction
         void Begin(int id,bool touch,Vector2 pixel)
         {
             if(captured>=0)return;captured=id;capturedTouch=touch;previous=pixel;tracker?.Cancel();
+            LastInputSource=touch?"TOUCHSCREEN":"MOUSE";evidenceDrag=0;
+            evidenceScrollCapture=presenter.IsReadOnlyEvidence&&view.EvidenceBodyRect.Contains(pixel);
             uiCapture=view.ConsumeUi(pixel,out G3Action action);
             if(uiCapture){held=action;if(!Movement(action.Kind)&&action.Kind!=G3ActionKind.None)presenter.Execute(action);return;}
             if(Mode==G3Mode.WALK)
@@ -82,6 +86,13 @@ namespace Lottery.G3.Interaction
         {
             if(uiCapture)
             {
+                if(evidenceScrollCapture&&presenter.IsReadOnlyEvidence)
+                {
+                    evidenceDrag+=pixel.y-previous.y;previous=pixel;
+                    float row=28*view.PresentationSafeArea.height/720f;int lines=(int)(evidenceDrag/Mathf.Max(1,row));
+                    if(lines!=0){presenter.ScrollEvidence(lines);evidenceDrag-=lines*row;}
+                    return;
+                }
                 // Moving off a held walk button cancels movement; it cannot become
                 // a camera drag or a scratch in the same gesture.
                 if(Movement(held.Kind)&&(!view.ConsumeUi(pixel,out var now)||now.Id!=held.Id))held=default;
@@ -102,7 +113,7 @@ namespace Lottery.G3.Interaction
             if(v!=Vector2.zero||turn!=0)view.Walk.Move(v,turn,dt);
         }
         void End(){ReleaseCapture();presenter?.FlushScratch();}
-        public void ReleaseCapture(){captured=-1;uiCapture=false;held=default;tracker?.Cancel();}
+        public void ReleaseCapture(){captured=-1;uiCapture=false;evidenceScrollCapture=false;evidenceDrag=0;held=default;tracker?.Cancel();}
         public void CancelGesture(){End();requireRelease=true;}
         public void NotifyFocus(bool value){bool prior=IsFocused;focused=value;if(prior!=IsFocused){CancelGesture();if(!IsFocused)view?.InvalidateTicket();else presenter?.Refresh();}}
         public void NotifyPause(bool value){bool prior=IsFocused;paused=value;if(prior!=IsFocused){CancelGesture();if(!IsFocused)view?.InvalidateTicket();else presenter?.Refresh();}}

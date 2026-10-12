@@ -25,7 +25,7 @@ TASK, RULES_SHA = g2.TASK, g2.RULES_SHA
 BASE = '06814f520041676a50601f4e70d5ee09eae10078'
 SCOPE = 'G3_ONE_DAY_WHITEBOX_NOT_DEVICE_TESTED'
 STANDARDS_DIGEST = '1984cc8f225db73485a052942d30637127679a56b0492edf36497911373f30b1'
-REQUEST = dict(schemaVersion=1, requestId='lottery-g3-20261012-03', baseCommit=BASE, purpose='G3_ONE_DAY_WHITEBOX')
+REQUEST = dict(schemaVersion=1, requestId='lottery-g3-20261012-04', baseCommit=BASE, purpose='G3_ONE_DAY_WHITEBOX')
 REQUEST_PATH = TASK + '/ci/g3-request.json'
 SCENE = 'Assets/G3/Scenes/G3Day.unity'
 GENERATED = {SCENE, SCENE + '.meta', 'Assets/G3/Scenes.meta'}
@@ -375,6 +375,58 @@ def inspect_apk(task,identity):
     return result
 
 
+IMPORT_BOOL_FIELDS={'sourcePng','bindingPresent','bindingIdMatches','texturePresent','bindingTextureMatches','bindingPathMatches','verificationMatches','importerPresent','sRGBTexture'}
+IMPORT_INT_FIELDS={'sourceWidth','sourceHeight','layoutWidth','layoutHeight','textureWidth','textureHeight','textureFormat','npotScale','textureType','wrapU','wrapV','wrapW','maxTextureSize','textureCompression'}
+IMPORT_PLATFORM_BOOLS={'overridden','crunchedCompression','allowsAlphaSplitting'}
+IMPORT_PLATFORM_INTS={'maxTextureSize','format','textureCompression'}
+
+
+def artwork_import_checks(o):
+    """Independent numeric interpretation of the bounded actual Unity observations."""
+    d,a=o['defaultPlatform'],o['androidPlatform']
+    def platform(p,override,fmt):
+        return p==dict(overridden=override,crunchedCompression=False,allowsAlphaSplitting=False,maxTextureSize=2048,format=fmt,textureCompression=0)
+    return dict(BINDING_ID=o['bindingPresent'] and o['bindingIdMatches'],
+        SOURCE_BYTES=o['sourcePng'] and o['sourceSha256']==ARTWORK[o['artworkId']] and (o['sourceWidth'],o['sourceHeight'])==(1536,1024),
+        SOURCE_LAYOUT=(o['layoutWidth'],o['layoutHeight'])==(1536,1024) and o['layoutSha256']==ARTWORK[o['artworkId']],
+        TEXTURE_BINDING=o['texturePresent'] and o['bindingTextureMatches'] and o['bindingPathMatches'],
+        TEXTURE_DIMENSIONS=(o['textureWidth'],o['textureHeight'])==(1536,1024),TEXTURE_UNCOMPRESSED=o['textureFormat'] in (3,4),
+        IMPORTER_SHAPE=o['importerPresent'] and o['npotScale']==0 and o['textureType']==0 and o['sRGBTexture'] and (o['wrapU'],o['wrapV'],o['wrapW'])==(1,1,1),
+        IMPORTER_DEFAULT=o['maxTextureSize']==2048 and o['textureCompression']==0,
+        DEFAULT_PLATFORM=platform(d,False,-1),ANDROID_PLATFORM=platform(a,True,3),
+        COMMITTED_VERIFICATION=o['verificationMatches'] and bool(re.fullmatch('[0-9a-f]{32}',o['assetGuid'])))
+
+
+def validate_artwork_diagnostic(data,identity):
+    require(isinstance(data,dict) and set(data)=={'schemaVersion','sourceCommit','runId','runAttempt','unityVersion','stage','artworks'},'Artwork diagnostic fields refused')
+    require(type(data['schemaVersion']) is int and data['schemaVersion']==1 and data['stage']=='ANDROID_IMPORT_PREFLIGHT' and data['unityVersion']=='6000.3.19f1','Artwork diagnostic schema/version mismatch')
+    require(all(data[k]==identity[k] for k in ('sourceCommit','runId','runAttempt')),'Artwork diagnostic source/run mismatch')
+    rows=data['artworks'];require(isinstance(rows,list) and len(rows)==2,'Artwork diagnostic row count')
+    for expected_id,o in zip(('number','challenge'),rows):
+        fields=IMPORT_BOOL_FIELDS|IMPORT_INT_FIELDS|{'artworkId','sourceSha256','layoutSha256','assetGuid','defaultPlatform','androidPlatform','checks'}
+        require(isinstance(o,dict) and set(o)==fields and o['artworkId']==expected_id,'Artwork observation fields refused')
+        require(all(type(o[k]) is bool for k in IMPORT_BOOL_FIELDS) and all(type(o[k]) is int and -1<=o[k]<=65536 for k in IMPORT_INT_FIELDS),'Artwork observation scalar types refused')
+        for key,length in (('sourceSha256',64),('layoutSha256',64),('assetGuid',32)):
+            require(isinstance(o[key],str) and (o[key]=='' or bool(re.fullmatch('[0-9a-f]{'+str(length)+'}',o[key]))),'Artwork observation text refused')
+        for key in ('defaultPlatform','androidPlatform'):
+            p=o[key];require(isinstance(p,dict) and set(p)==IMPORT_PLATFORM_BOOLS|IMPORT_PLATFORM_INTS and all(type(p[k]) is bool for k in IMPORT_PLATFORM_BOOLS) and all(type(p[k]) is int and -1<=p[k]<=65536 for k in IMPORT_PLATFORM_INTS),'Artwork platform fields refused')
+        expected=[dict(id=k,passed=v) for k,v in artwork_import_checks(o).items()]
+        checks=o['checks'];require(isinstance(checks,list) and len(checks)==len(expected) and all(isinstance(c,dict) and set(c)=={'id','passed'} and type(c['passed']) is bool for c in checks) and checks==expected,'Artwork check identities/results disagree with observed values')
+    return data
+
+
+def export_artwork_diagnostic(task,identity,required=False):
+    source=task/'artifacts/g3-android-import-diagnostic.json';target=task/'evidence/g3/android/artwork-import-diagnostic.json'
+    target.unlink(missing_ok=True)
+    if not source.exists():
+        require(not required,'Required artwork import diagnostic missing');return None
+    data=validate_artwork_diagnostic(json.loads(bounded_read(source,16384)),identity)
+    passed=all(c['passed'] for o in data['artworks'] for c in o['checks'])
+    write_json(target,dict(identity,status='IMPORT_FIELDS_PASS' if passed else 'IMPORT_FIELDS_FAIL',nativeImport=data))
+    if required:require(passed,'Native artwork import checks failed')
+    return data
+
+
 CLI_STAGE='CI_START'
 FAILURE_STAGES={'CI_'+x.upper().replace('-','_') for x in ('start','source-preflight','guard','restore-font','snapshot','audit','tests','captures','apk','diagnostics','review-manifest')} | {'PROCESS_START','REGRESSION_GUARD','REGRESSION_INPUTS','REGRESSION_DELEGATE'} | {'NEW_'+x for x in ('GUARD','BASELINE','WORKSPACE','SDK_INVENTORY','RESTORE','BUILD','BINARY','PREPARE','CHECKPOINT','VERIFY','RESULT','RECEIPT')}
 FAILURE_REASONS={'Required regular evidence file missing':'EVIDENCE_FILE_MISSING','Unexpected materialized checkout input':'UNREVIEWED_WORKING_INPUT','Working execution input bytes drifted':'WORKING_BYTES_DRIFT','Non-regular or multiply-linked file refused':'UNSAFE_FILE_TYPE_OR_ALIAS','Checkout directory link/type refused':'UNSAFE_DIRECTORY_TYPE','Unreviewed repository tree change':'UNREVIEWED_TREE_CHANGE','Fresh preflight not approved':'PREFLIGHT_NOT_APPROVED','Reviewed execution input set drifted':'REVIEWED_INPUT_SET_DRIFT','Initial Unity runtime output/cache must be absent':'NONCOLD_INITIAL_CACHE'}
@@ -418,8 +470,12 @@ def main():
             for name in [f+'.png' for f in frames]+['render-receipt.json']:(out/name).unlink(missing_ok=True)
             (g2.inspect_captures(source,identity) if args.stage=='regression-play' else inspect_captures(source,identity,frames))
             for name in [f+'.png' for f in frames]+['render-receipt.json']:shutil.copyfile(source/name,out/name)
-        elif args.command=='apk':write_json(out/'apk-receipt.json',inspect_apk(task,identity))
-        elif args.command=='diagnostics':write_json(out/'diagnostic-receipt.json',legacy.diagnostic_receipt(identity,args.unity_outcome,args.verify_outcome,args.audit_outcome))
+        elif args.command=='apk':
+            export_artwork_diagnostic(task,identity,required=True)
+            write_json(out/'apk-receipt.json',inspect_apk(task,identity))
+        elif args.command=='diagnostics':
+            write_json(out/'diagnostic-receipt.json',legacy.diagnostic_receipt(identity,args.unity_outcome,args.verify_outcome,args.audit_outcome))
+            if args.stage=='android':export_artwork_diagnostic(task,identity)
     print('G3 '+args.command+' completed; physical device QA remains NOT_RUN.')
 
 if __name__=='__main__':

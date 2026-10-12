@@ -18,31 +18,11 @@ namespace Lottery.G3.Editor
         public const string RulesSha256="e959108cb2a4ef080862565de5b87814ccdfae14026204227e767d049bbdf668";
         public static void ValidateArtwork(ApprovedArtworkBinding binding,string expectedId)
         {
-            if(binding==null || binding.ArtworkId!=expectedId) throw new InvalidOperationException("G3 artwork identity mismatch");
-            string path="Assets/G3/Rendering/Resources/G3/"+expectedId+"-ticket-albedo.png";
-            var layout=binding.GetReviewedLayout();var tex=AssetDatabase.LoadAssetAtPath<Texture2D>(path);
-            var importer=AssetImporter.GetAtPath(path) as TextureImporter;
-            if(tex==null || binding.Albedo!=tex || AssetDatabase.GetAssetPath(binding.Albedo)!=path ||
-                Hash(path)!=layout.ArtworkSha256 || layout.Width!=1536 || layout.Height!=1024 ||
-                tex.width!=1536 || tex.height!=1024 || tex.width*2!=tex.height*3 || importer==null ||
-                importer.npotScale!=TextureImporterNPOTScale.None || importer.textureType!=TextureImporterType.Default ||
-                !importer.sRGBTexture || importer.wrapMode!=TextureWrapMode.Clamp || importer.maxTextureSize<1536 ||
-                importer.textureCompression!=TextureImporterCompression.Uncompressed)
-                throw new InvalidOperationException("G3 approved original source/import binding failed");
-            var android=importer.GetPlatformTextureSettings("Android");
-            if(android.overridden && (android.maxTextureSize<1536 ||
-                (android.format!=TextureImporterFormat.RGBA32 && android.format!=TextureImporterFormat.RGB24)))
-                throw new InvalidOperationException("G3 Android override may distort or downsize reviewed source");
-            // Committed verification is checked, never silently repaired during import.
-            var serialized=new SerializedObject(binding);string guid=AssetDatabase.AssetPathToGUID(path);
-            if(serialized.FindProperty("verifiedTexture").objectReferenceValue!=tex ||
-                serialized.FindProperty("verifiedArtworkId").stringValue!=expectedId ||
-                serialized.FindProperty("verifiedSourceSha256").stringValue!=layout.ArtworkSha256 ||
-                serialized.FindProperty("verifiedAssetGuid").stringValue!=guid)
-                throw new InvalidOperationException("G3 committed artwork verification is stale");
-            binding.SetEditorVerification(layout.ArtworkSha256,guid);
-            binding.RequireVerifiedPair(); // Identical values; do not dirty/rewrite a source binding asset.
+            var observation=G3ArtworkValidation.Inspect(binding,expectedId);
+            G3ArtworkValidation.Require(observation);
+            binding.RequireVerifiedPair(); // Read-only; committed verification must already be correct.
         }
+
         public static void Prepare()
         {
             Lottery.Probe.Editor.ProbeBuild.Prepare();
@@ -69,8 +49,10 @@ namespace Lottery.G3.Editor
         public static void BuildAndroid()
         {
             if(Lottery.G2.Core.NumberTicketRules.RulesSha256!=RulesSha256)throw new InvalidOperationException("Frozen rules mismatch");
-            Prepare();string commit=Arg("-probeCommit"),run=Arg("-probeRunId");
+            string commit=Arg("-probeCommit"),run=Arg("-probeRunId");
             if(!System.Text.RegularExpressions.Regex.IsMatch(commit,"^[0-9a-f]{40}$") || !System.Text.RegularExpressions.Regex.IsMatch(run,"^[1-9][0-9]*$"))throw new InvalidOperationException("Invalid source/run identity");
+            G3ArtworkValidation.WriteAndroidDiagnostic(commit,run,Arg("-probeRunAttempt"));
+            Prepare();
             PlayerSettings.companyName="BuYuQi";PlayerSettings.productName="Lottery G3 One Day Whitebox";
             PlayerSettings.bundleVersion="0.0.3";PlayerSettings.Android.bundleVersionCode=3;
             PlayerSettings.SetApplicationIdentifier(UnityEditor.Build.NamedBuildTarget.Android,"com.buyuqi.lotteryprobe");

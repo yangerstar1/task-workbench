@@ -1,1 +1,1 @@
-{"name":"Lottery.G3.EditMode.Tests","rootNamespace":"Lottery.G3.EditMode.Tests","references":["Lottery.G3.Core","Lottery.G2.Core"],"includePlatforms":["Editor"],"optionalUnityReferences":["TestAssemblies"],"autoReferenced":false}
+{"name":"Lottery.G3.EditMode.Tests","rootNamespace":"Lottery.G3.EditMode.Tests","references":["Lottery.G3.Core","Lottery.G2.Core","Lottery.G3.Editor","Lottery.G3.Rendering"],"includePlatforms":["Editor"],"optionalUnityReferences":["TestAssemblies"],"autoReferenced":false}

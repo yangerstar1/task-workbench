@@ -5,8 +5,8 @@ using Lottery.G3.Core;
 namespace Lottery.G3.Interaction
 {
     public enum G3Mode { WALK,TABLE_SCRATCH,CELL_REVEAL,PANEL,COMMITTING,NIGHT_BILL }
-    public enum G3Panel { None,Settlement,Tickets,Shop,StockDetail,Inventory,ToolDetail,Drawer,Phone,Contact,CustomAmount,Bill,Rules,Settings,Confirm,InformationTargets }
-    public enum G3ActionKind { None,CancelBoost,ResumeNext,CancelNext,Open,Close,Stand,Sit,InspectStock,InspectTool,InspectContact,BuyTicket,Claim,ClaimThenBuy,QuickReveal,BuyStock,Upgrade,Sell,Equip,Remove,UseDrawer,UseLamp,TargetCell,ConfirmTargets,Borrow,RepayLoan,RepayPrincipal,BeginClosing,EnterNight,PayNight,Restart,Retry,Confirm,Cancel,Digit,Backspace,AmountAccept,ToggleQuick,ToggleFlash,ToggleVibration,MoveForward,MoveBack,MoveLeft,MoveRight,TurnLeft,TurnRight }
+    public enum G3Panel { None,Settlement,Tickets,Shop,StockDetail,Inventory,ToolDetail,Drawer,Phone,Contact,CustomAmount,Bill,Rules,Settings,Confirm,InformationTargets,QaEvidence }
+    public enum G3ActionKind { None,CancelBoost,ResumeNext,CancelNext,Open,Close,Stand,Sit,InspectStock,InspectTool,InspectContact,BuyTicket,Claim,ClaimThenBuy,QuickReveal,BuyStock,Upgrade,Sell,Equip,Remove,UseDrawer,UseLamp,TargetCell,ConfirmTargets,Borrow,RepayLoan,RepayPrincipal,BeginClosing,EnterNight,PayNight,Restart,Retry,Confirm,Cancel,Digit,Backspace,AmountAccept,ToggleQuick,ToggleFlash,ToggleVibration,CopyEvidence,ScrollEvidence,MoveForward,MoveBack,MoveLeft,MoveRight,TurnLeft,TurnRight }
     public readonly struct G3Action
     {
         public readonly G3ActionKind Kind;public readonly string Key;public readonly int Slot;public readonly long Amount;
@@ -21,7 +21,7 @@ namespace Lottery.G3.Interaction
     public sealed class G3PanelModel
     {
         public string Title="",Body="";public readonly List<G3Card> Cards=new List<G3Card>();
-        public bool Grid,LargeGrid;public string Footnote="";
+        public bool Grid,LargeGrid,Evidence;public string Footnote="";
         public void Add(string id,string text,G3Action action,bool enabled=true)=>Cards.Add(new G3Card(id,text,action,enabled));
     }
     public static class G3Text
