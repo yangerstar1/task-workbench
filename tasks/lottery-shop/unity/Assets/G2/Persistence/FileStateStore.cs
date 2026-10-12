@@ -159,7 +159,8 @@ namespace Lottery.G2.Persistence
             var state = Read(); var copiedReceipt = receipt == null ? null : state.Commands.SingleOrDefault(c => c.CommandId == receipt.CommandId);
             return new CommandResult { CommitStatus = status, Code = code, Receipt = copiedReceipt, State = state };
         }
-        static bool IsStorageFailure(Exception e) => e is IOException || e is UnauthorizedAccessException || e is InvalidOperationException || e is System.Security.SecurityException || e is NotSupportedException;
+        // InvalidDataException is not assumed to derive from IOException (Unity/Mono included).
+        static bool IsStorageFailure(Exception e) => e is InvalidDataException || e is IOException || e is UnauthorizedAccessException || e is InvalidOperationException || e is System.Security.SecurityException || e is NotSupportedException;
         static byte[] Wrap(byte[] payload)
         {
             using (var stream = new MemoryStream()) using (var w = new BinaryWriter(stream))

@@ -193,7 +193,9 @@ namespace Lottery.G2.EditMode.Tests
         {
             var store = Open(); var service = new TicketService(store); Buy(service); Reveal(service); store.Dispose();
             string path = Path.Combine(root, "normal", "state.bin"); File.WriteAllBytes(path, new byte[] { 1, 2, 3 });
-            var reload = Open(); Assert.That(reload.CanMutate, Is.False); Assert.That(reload.Read().RecoveryRequired, Is.True); Assert.That(File.ReadAllBytes(path), Is.EqualTo(new byte[] { 1, 2, 3 })); Assert.That(File.Exists(Path.Combine(root, "normal", "previous.bin")), Is.True);
+            FileStateStore reload = null; Assert.DoesNotThrow(() => reload = Open()); Assert.That(reload.CanMutate, Is.False); Assert.That(reload.Read().RecoveryRequired, Is.True);
+            Assert.That(reload.Recover("buy").Code, Is.EqualTo("RECOVERY_REQUIRED")); Assert.That(new TicketService(reload).BuyNumberTicket("must-stay-blocked", reload.Read().Revision).Code, Is.EqualTo("RECOVERY_REQUIRED"));
+            Assert.That(File.ReadAllBytes(path), Is.EqualTo(new byte[] { 1, 2, 3 })); Assert.That(File.Exists(Path.Combine(root, "normal", "previous.bin")), Is.True);
         }
         [Test] public void MalformedLengthPrefixesBlockStateCommitAndIntentWithoutChangingFiles()
         {
@@ -205,8 +207,9 @@ namespace Lottery.G2.EditMode.Tests
                 {
                     string name = "malformed-" + i + "-" + filename; var original = Open(name); original.Dispose();
                     string path = Path.Combine(root, name, filename); File.WriteAllBytes(path, malformed);
-                    var reload = Open(name); Assert.That(reload.CanMutate, Is.False, filename); Assert.That(reload.Read().RecoveryRequired, Is.True, filename);
+                    FileStateStore reload = null; Assert.DoesNotThrow(() => reload = Open(name), filename); Assert.That(reload.CanMutate, Is.False, filename); Assert.That(reload.Read().RecoveryRequired, Is.True, filename);
                     var result = reload.Recover("unresolved"); Assert.That(result.Code, Is.EqualTo("RECOVERY_REQUIRED"), filename); Assert.That(result.Status, Is.EqualTo(CommitStatus.COMMIT_UNKNOWN), filename);
+                    Assert.That(new TicketService(reload).BuyNumberTicket("must-stay-blocked", reload.Read().Revision).Code, Is.EqualTo("RECOVERY_REQUIRED"), filename);
                     Assert.That(File.ReadAllBytes(path), Is.EqualTo(malformed), filename);
                 }
             }
@@ -218,8 +221,9 @@ namespace Lottery.G2.EditMode.Tests
             string path = Path.Combine(root, "normal", "state.bin");
             using (var stream = new MemoryStream()) using (var writer = new BinaryWriter(stream))
             { writer.Write("LOTTERY-G2-CHECKSUM-v1"); writer.Write(bytes.Length); writer.Write(StateCodec.HashBytes(bytes)); writer.Write(bytes); writer.Flush(); File.WriteAllBytes(path, stream.ToArray()); }
-            byte[] unknownVersionFile = File.ReadAllBytes(path); var reload = Open();
-            Assert.That(reload.CanMutate, Is.False); Assert.That(reload.Read().RecoveryRequired, Is.True); Assert.That(File.ReadAllBytes(path), Is.EqualTo(unknownVersionFile));
+            byte[] unknownVersionFile = File.ReadAllBytes(path); FileStateStore reload = null; Assert.DoesNotThrow(() => reload = Open());
+            Assert.That(reload.CanMutate, Is.False); Assert.That(reload.Read().RecoveryRequired, Is.True); Assert.That(reload.Recover("unresolved").Code, Is.EqualTo("RECOVERY_REQUIRED"));
+            Assert.That(new TicketService(reload).BuyNumberTicket("must-stay-blocked", reload.Read().Revision).Code, Is.EqualTo("RECOVERY_REQUIRED")); Assert.That(File.ReadAllBytes(path), Is.EqualTo(unknownVersionFile));
         }
         [Test] public void ExclusiveWriterRejectsSecondStoreWithoutDeletingSave()
         { var store = Open(); var second = Open(); Assert.That(store.CanMutate, Is.True); Assert.That(second.CanMutate, Is.False); Assert.That(second.Read().RecoveryRequired, Is.True); }
