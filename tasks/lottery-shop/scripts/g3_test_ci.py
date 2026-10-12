@@ -234,6 +234,63 @@ class G3ValidatorTests(unittest.TestCase):
             with patch.object(process.regression,'main') as legacy_runner:
                 with self.assertRaises(ValueError):process.run_regression(root)
                 legacy_runner.assert_not_called()
+    def testAllOutputSubtreesRejectHardlinkedFilesBeforeGuardWrite(self):
+        for name in sorted(ci.OUTPUT_ROOTS):
+            with self.subTest(name=name),tempfile.TemporaryDirectory() as d,tempfile.TemporaryDirectory() as outside:
+                root=Path(d);git,commit,trigger,review,source=self.makeReviewedGit(root);trigger()
+                sentinel=Path(outside)/'sentinel';sentinel.write_text('NO_ALIAS_WRITE')
+                output=root/name/'nested/file.json';output.parent.mkdir(parents=True);os.link(sentinel,output)
+                with patch.object(ci.legacy,'guard') as writer:
+                    with self.assertRaisesRegex(ValueError,'multiply-linked'):ci.guard(root,allow_generated_unity=True)
+                    writer.assert_not_called()
+                self.assertEqual(sentinel.read_text(),'NO_ALIAS_WRITE');self.assertEqual(sentinel.stat().st_nlink,2)
+    def testHardlinkedReceiptsCannotBeOverwrittenDeletedOrDiagnosed(self):
+        for relative in ('evidence/guard-receipt.json','evidence/g3/process/process-receipt.json','evidence/g3/process/process-diagnostic.json'):
+            with self.subTest(relative=relative),tempfile.TemporaryDirectory() as d,tempfile.TemporaryDirectory() as outside:
+                root=Path(d);git,commit,trigger,review,source=self.makeReviewedGit(root);trigger()
+                sentinel=Path(outside)/'sentinel';sentinel.write_text('PRESERVE_INODE')
+                output=root/ci.TASK/relative;output.parent.mkdir(parents=True,exist_ok=True);os.link(sentinel,output)
+                with patch.object(ci.legacy,'guard') as writer,patch.object(process,'failure') as diagnostic:
+                    with self.assertRaises(ValueError):process.run_new(root)
+                    writer.assert_not_called();diagnostic.assert_not_called()
+                self.assertTrue(output.exists());self.assertEqual(sentinel.read_text(),'PRESERVE_INODE');self.assertEqual(output.read_text(),'PRESERVE_INODE')
+    def testSourceAndControlHardlinksRejectedWithoutChangingBytes(self):
+        for location in ('source','review','request'):
+            with self.subTest(location=location),tempfile.TemporaryDirectory() as d,tempfile.TemporaryDirectory() as outside:
+                root=Path(d);git,commit,trigger,review,source=self.makeReviewedGit(root);trigger()
+                path=source if location=='source' else root/(ci.REVIEW_PATH if location=='review' else ci.REQUEST_PATH)
+                original=path.read_bytes();sentinel=Path(outside)/'sentinel';sentinel.write_bytes(original);path.unlink();os.link(sentinel,path)
+                with self.assertRaises(ValueError):ci.verify_preflight(root)
+                self.assertEqual(path.read_bytes(),original);self.assertEqual(sentinel.read_bytes(),original)
+    def testOutputFifosAndSpecialFileTypesRefusedWithoutOpening(self):
+        for name in sorted(ci.OUTPUT_ROOTS):
+            with self.subTest(name=name),tempfile.TemporaryDirectory() as d:
+                root=Path(d);git,commit,trigger,review,source=self.makeReviewedGit(root);trigger()
+                fifo=root/name/'nested/not-a-file';fifo.parent.mkdir(parents=True);os.mkfifo(fifo)
+                with patch.object(ci.legacy,'guard') as writer:
+                    with self.assertRaisesRegex(ValueError,'Non-regular'):ci.guard(root,allow_generated_unity=True)
+                    writer.assert_not_called()
+    def testRestoredFontAndGeneratedUnityFilesRejectHardlinks(self):
+        for child in ('Assets/Resources/ProbeChinese.otf','ProjectSettings/Other.asset'):
+            with self.subTest(child=child),tempfile.TemporaryDirectory() as d,tempfile.TemporaryDirectory() as outside:
+                root=Path(d);git,commit,trigger,review,source=self.makeReviewedGit(root);trigger()
+                sentinel=Path(outside)/'sentinel';sentinel.write_bytes(b'SYNTHETIC_SAFE_BYTES')
+                path=root/ci.TASK/'unity'/child;path.parent.mkdir(parents=True);os.link(sentinel,path)
+                with self.assertRaisesRegex(ValueError,'multiply-linked'):ci.check_working_inputs(root,review['sourceFiles'],allow_generated_unity=True)
+    def testNonregularReviewControlRejectedBeforeJsonRead(self):
+        with tempfile.TemporaryDirectory() as d:
+            root=Path(d);git,commit,trigger,review,source=self.makeReviewedGit(root);trigger()
+            control=root/ci.REVIEW_PATH;control.unlink();os.mkfifo(control)
+            with patch.object(ci,'bounded_read') as reader:
+                with self.assertRaisesRegex(ValueError,'Non-regular'):ci.verify_preflight(root)
+                reader.assert_not_called()
+    def testInitialUnityCacheRejectedButRegularLaterOutputTypesAllowed(self):
+        with tempfile.TemporaryDirectory() as d:
+            root=Path(d);git,commit,trigger,review,source=self.makeReviewedGit(root);trigger()
+            for name in sorted(ci.OUTPUT_ROOTS):
+                path=root/name/'nested/file.txt';path.parent.mkdir(parents=True);path.write_text('regular generated output')
+            with self.assertRaisesRegex(ValueError,'Initial Unity runtime'):ci.verify_preflight(root)
+            ci.verify_preflight(root,allow_generated_unity=True)
     def testFreshReviewRejectsOmittedTaskRootInputFromSourceMap(self):
         with tempfile.TemporaryDirectory() as d:
             root=Path(d);git,commit,trigger,review,source=self.makeReviewedGit(root)
