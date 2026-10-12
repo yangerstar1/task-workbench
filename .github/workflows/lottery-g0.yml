@@ -84,6 +84,9 @@ jobs:
             tasks/lottery-shop/evidence/test-results.xml
             tasks/lottery-shop/evidence/test-receipt.json
             tasks/lottery-shop/evidence/source-mutations.json
+            tasks/lottery-shop/evidence/manifest-before.json
+            tasks/lottery-shop/evidence/manifest-after.json
+            tasks/lottery-shop/evidence/manifest-diagnostic.json
             tasks/lottery-shop/evidence/generated-manifest.json
             tasks/lottery-shop/evidence/generated-assets.zip
             tasks/lottery-shop/evidence/packages-lock.json
@@ -171,6 +174,9 @@ jobs:
             tasks/lottery-shop/evidence/font-receipt.json
             tasks/lottery-shop/evidence/apk-receipt.json
             tasks/lottery-shop/evidence/source-mutations.json
+            tasks/lottery-shop/evidence/manifest-before.json
+            tasks/lottery-shop/evidence/manifest-after.json
+            tasks/lottery-shop/evidence/manifest-diagnostic.json
             tasks/lottery-shop/evidence/generated-manifest.json
             tasks/lottery-shop/evidence/generated-assets.zip
             tasks/lottery-shop/evidence/packages-lock.json
@@ -194,5 +200,8 @@ jobs:
             tasks/lottery-shop/evidence/guard-receipt.json
             tasks/lottery-shop/evidence/font-receipt.json
             tasks/lottery-shop/evidence/source-mutations.json
+            tasks/lottery-shop/evidence/manifest-before.json
+            tasks/lottery-shop/evidence/manifest-after.json
+            tasks/lottery-shop/evidence/manifest-diagnostic.json
           if-no-files-found: error
           retention-days: 7

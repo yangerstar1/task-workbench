@@ -30,6 +30,7 @@ namespace Lottery.Probe.Tests
             Assert.That(data.GetArrayElementAtIndex(0).objectReferenceValue, Is.EqualTo(renderer));
             Assert.That(GraphicsSettings.defaultRenderPipeline, Is.EqualTo(pipeline));
             Assert.That(QualitySettings.renderPipeline, Is.EqualTo(pipeline));
+            Assert.That(pipeline.shadowDistance, Is.Zero);
         }
         [Test] public void ChineseFontContainsRequiredGlyphs()
         {
@@ -69,6 +70,8 @@ namespace Lottery.Probe.Tests
             Assert.That(material.shader.name, Is.EqualTo("Universal Render Pipeline/Lit"));
             Assert.That(AssetDatabase.GetAssetPath(material), Does.StartWith(ProbeBuild.Generated));
             Assert.That(roots.SelectMany(r => r.GetComponentsInChildren<Camera>()).Count(), Is.EqualTo(1));
+            Assert.That(roots.SelectMany(r => r.GetComponentsInChildren<Light>()).Single().shadows,
+                Is.EqualTo(LightShadows.None));
         }
     }
 }

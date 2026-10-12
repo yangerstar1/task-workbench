@@ -258,6 +258,87 @@ def snapshot_files(root):
     return files
 
 
+def parse_diagnostic_manifest(raw):
+    """Only small official-registry package/version maps may become artifacts."""
+    require(len(raw) <= 64 * 1024, "Manifest diagnostic exceeds size limit")
+    def unique_keys(pairs):
+        result = {}
+        for key, value in pairs:
+            require(key not in result, "Duplicate manifest key rejected")
+            result[key] = value
+        return result
+    data = json.loads(raw, object_pairs_hook=unique_keys)
+    require(isinstance(data, dict) and set(data) == {"dependencies"}, "Manifest diagnostic schema rejected")
+    dependencies = data["dependencies"]
+    require(isinstance(dependencies, dict) and len(dependencies) <= 128, "Manifest dependency map rejected")
+    for name, version in dependencies.items():
+        require(isinstance(name, str) and re.fullmatch(r"com\.unity\.[a-z0-9][a-z0-9._-]{0,99}", name),
+                "Manifest package identity rejected")
+        require(isinstance(version, str) and re.fullmatch(r"[0-9]{1,4}\.[0-9]{1,4}\.[0-9]{1,4}(?:-[a-z0-9.]{1,32})?", version),
+                "Manifest non-pinned or non-registry version rejected")
+    return data
+
+
+def snapshot_project(root):
+    task = root / TASK
+    (task / "evidence").mkdir(parents=True, exist_ok=True)
+    files = snapshot_files(root)
+    raw = bounded_read(task / "unity/Packages/manifest.json", 64 * 1024)
+    parse_diagnostic_manifest(raw)
+    require(hashlib.sha256(raw).hexdigest() == files.get("Packages/manifest.json"), "Manifest changed during snapshot")
+    (task / "evidence/manifest-before.json").write_bytes(raw)
+    write_json(task / "evidence/pre-unity-source.json", files)
+
+
+def capture_manifest_change(task, before_hash, after_hash):
+    """Preserve reviewed-shaped actual bytes; never treat a semantic change as OK."""
+    receipt = {"path": "Packages/manifest.json", "beforeSha256": before_hash, "afterSha256": after_hash,
+               "status": "DIAGNOSTIC_ONLY_NOT_A_MUTATION_APPROVAL", "semanticComparison": "UNAVAILABLE",
+               "beforeExport": "UNAVAILABLE", "afterExport": "UNAVAILABLE"}
+    decoded = {}
+    (task / "evidence/manifest-after.json").unlink(missing_ok=True)
+    for label, path, expected_hash in (
+        ("before", task / "evidence/manifest-before.json", before_hash),
+        ("after", task / "unity/Packages/manifest.json", after_hash)):
+        try:
+            raw = bounded_read(path, 64 * 1024)
+            require(hashlib.sha256(raw).hexdigest() == expected_hash, "Manifest snapshot identity mismatch")
+            data = parse_diagnostic_manifest(raw)
+            if label == "after":
+                (task / "evidence/manifest-after.json").write_bytes(raw)
+            decoded[label] = data
+            receipt[label + "Export"] = "SAFE_SCHEMA_ACTUAL_BYTES"
+        except (ValueError, OSError, TypeError):
+            receipt[label + "Export"] = "REFUSED_OR_UNAVAILABLE"
+    if set(decoded) == {"before", "after"}:
+        before = decoded["before"]["dependencies"]
+        after = decoded["after"]["dependencies"]
+        identical = before == after
+        receipt["semanticComparison"] = "IDENTICAL" if identical else "DIFFERENT"
+        receipt["addedPackages"] = [{"name": name, "version": after[name]} for name in sorted(after.keys() - before.keys())]
+        receipt["removedPackages"] = [{"name": name, "version": before[name]} for name in sorted(before.keys() - after.keys())]
+        receipt["changedPackages"] = [{"name": name, "before": before[name], "after": after[name]}
+                                      for name in sorted(before.keys() & after.keys()) if before[name] != after[name]]
+    write_json(task / "evidence/manifest-diagnostic.json", receipt)
+    return receipt["semanticComparison"] == "IDENTICAL"
+
+
+def validate_resolved_lock(data):
+    require(isinstance(data, dict), "Resolved lock root must be an object")
+    dependencies = data.get("dependencies")
+    require(isinstance(dependencies, dict) and len(dependencies) <= 256, "Resolved lock dependencies must be a bounded object")
+    require(all(isinstance(name, str) and isinstance(entry, dict) for name, entry in dependencies.items()),
+            "Resolved lock package entries must be objects")
+    for entry in dependencies.values():
+        require(isinstance(entry.get("version"), str), "Resolved lock versions must be strings")
+        if "dependencies" in entry:
+            require(isinstance(entry["dependencies"], dict)
+                    and all(isinstance(name, str) and isinstance(version, str) for name, version in entry["dependencies"].items()),
+                    "Resolved lock transitive dependencies must be a string map")
+    for name, version in PACKAGES.items():
+        require(dependencies.get(name, {}).get("version") == version, "Resolved lock mismatch: " + name)
+
+
 def mutation_kind(path):
     if path in URP_GENERATED_GLOBAL_ASSETS:
         return "URP_GENERATED_GLOBAL_SETTING"
@@ -274,14 +355,16 @@ def mutation_kind(path):
     return "UNEXPECTED_SOURCE_CHANGE"
 
 
-def collect_mutations(before, after):
+def collect_mutations(before, after, manifest_format_only=False):
     return [{"path": path, "beforeSha256": before.get(path), "afterSha256": after.get(path),
-                "kind": mutation_kind(path)} for path in sorted(before.keys() | after.keys())
+                "kind": "MANIFEST_FORMAT_ONLY" if manifest_format_only and path == "Packages/manifest.json"
+                        and before.get(path) is not None and after.get(path) is not None else mutation_kind(path)}
+               for path in sorted(before.keys() | after.keys())
                if before.get(path) != after.get(path)]
 
 
-def inspect_mutations(before, after):
-    changes = collect_mutations(before, after)
+def inspect_mutations(before, after, manifest_format_only=False):
+    changes = collect_mutations(before, after, manifest_format_only)
     require(all(item["kind"] != "UNEXPECTED_SOURCE_CHANGE" and item["afterSha256"] is not None
                 for item in changes), "Unexpected source mutation or deletion during Unity execution")
     return changes
@@ -301,7 +384,8 @@ def diagnostic_changes(changes):
             value = item[key]
             require(value is None or (isinstance(value, str) and re.fullmatch(r"[0-9a-f]{64}", value)),
                     "Malformed source hash cannot be exported")
-        result.append({"path": path, "kind": mutation_kind(path),
+        kind = "MANIFEST_FORMAT_ONLY" if path == "Packages/manifest.json" and item.get("kind") == "MANIFEST_FORMAT_ONLY" else mutation_kind(path)
+        result.append({"path": path, "kind": kind,
                        "beforeSha256": item["beforeSha256"], "afterSha256": item["afterSha256"]})
     return result
 
@@ -317,18 +401,20 @@ def audit(root, identity):
                     for key, value in before.items()), "Malformed source baseline hash map")
         stage = "SNAPSHOT_SOURCE"
         after = snapshot_files(root)
+        manifest_format_only = False
+        if before.get("Packages/manifest.json") != after.get("Packages/manifest.json"):
+            stage = "CAPTURE_MANIFEST_DIAGNOSTIC"
+            manifest_format_only = capture_manifest_change(task, before.get("Packages/manifest.json"), after.get("Packages/manifest.json"))
         stage = "VALIDATE_SOURCE_MUTATIONS"
-        changes = collect_mutations(before, after)
+        changes = collect_mutations(before, after, manifest_format_only)
         safe_changes = diagnostic_changes(changes)
-        inspect_mutations(before, after)
+        inspect_mutations(before, after, manifest_format_only)
         # Validate the resolved lock before exposing any generated archive.
         stage = "VALIDATE_RESOLVED_LOCK"
         lock = task / "unity/Packages/packages-lock.json"
         require(lock.is_file(), "Unity did not produce its resolved package lock")
         lock_data = json.loads(bounded_read(lock, 1024 * 1024))
-        for name, version in PACKAGES.items():
-            require(lock_data.get("dependencies", {}).get(name, {}).get("version") == version,
-                    "Resolved lock mismatch: " + name)
+        validate_resolved_lock(lock_data)
         stage = "ARCHIVE_GENERATED_EVIDENCE"
         selected = sorted(path for path in after if mutation_kind(path) in
                           {"GENERATED_PROBE_ASSET", "URP_GENERATED_GLOBAL_SETTING", "UNITY_PROJECT_SETTING",
@@ -432,7 +518,7 @@ def main():
     if args.command == "restore-font":
         restore(root)
     elif args.command == "snapshot":
-        write_json(evidence / "pre-unity-source.json", snapshot_files(root))
+        snapshot_project(root)
     else:
         identity = guard(root)
         if args.command == "audit":

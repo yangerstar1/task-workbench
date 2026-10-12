@@ -351,6 +351,90 @@ class FontSyntheticTests(unittest.TestCase):
 
 
 class SourceMutationSyntheticTests(unittest.TestCase):
+    def test_lock_arrays_produce_fail_receipt_instead_of_attribute_error(self):
+        bad_locks = [[], {"dependencies": []}, {"dependencies": {name: [] for name in ci.PACKAGES}},
+                     {"dependencies": {name: {"version": version, "dependencies": []} for name, version in ci.PACKAGES.items()}}]
+        for lock in bad_locks:
+            with self.subTest(lock=lock), tempfile.TemporaryDirectory() as temp:
+                root = Path(temp)
+                task = root / ci.TASK
+                ci.write_json(task / "evidence/pre-unity-source.json", {})
+                ci.write_json(task / "unity/Packages/packages-lock.json", lock)
+                with self.assertRaisesRegex(ValueError, "bounded diagnostic receipt saved"):
+                    ci.audit(root, {"sourceCommit": "a" * 40})
+                receipt = json.loads((task / "evidence/source-mutations.json").read_text())
+                self.assertEqual(receipt["status"], "FAIL")
+                self.assertEqual(receipt["failedStage"], "VALIDATE_RESOLVED_LOCK")
+                self.assertFalse((task / "evidence/generated-assets.zip").exists())
+
+    def test_manifest_format_only_requires_actual_baseline_and_preserves_both_byte_sequences(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            task = root / ci.TASK
+            manifest = task / "unity/Packages/manifest.json"
+            ci.write_json(manifest, {"dependencies": ci.PACKAGES})
+            original = manifest.read_bytes()
+            ci.snapshot_project(root)
+            changed = json.dumps({"dependencies": ci.PACKAGES}, separators=(",", ":")).encode()
+            manifest.write_bytes(changed)
+            ci.write_json(task / "unity/Packages/packages-lock.json", {
+                "dependencies": {name: {"version": version} for name, version in ci.PACKAGES.items()}})
+            ci.audit(root, {"sourceCommit": "a" * 40})
+            receipt = json.loads((task / "evidence/source-mutations.json").read_text())
+            self.assertEqual(receipt["status"], "PASS")
+            row = next(row for row in receipt["changes"] if row["path"] == "Packages/manifest.json")
+            self.assertEqual(row["kind"], "MANIFEST_FORMAT_ONLY")
+            self.assertEqual((task / "evidence/manifest-before.json").read_bytes(), original)
+            self.assertEqual((task / "evidence/manifest-after.json").read_bytes(), changed)
+
+    def test_manifest_semantic_change_is_diagnosed_but_still_fails(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            task = root / ci.TASK
+            manifest = task / "unity/Packages/manifest.json"
+            ci.write_json(manifest, {"dependencies": ci.PACKAGES})
+            ci.snapshot_project(root)
+            altered = dict(ci.PACKAGES, **{"com.unity.inputsystem": "1.20.0"})
+            ci.write_json(manifest, {"dependencies": altered})
+            with self.assertRaises(ValueError):
+                ci.audit(root, {"sourceCommit": "a" * 40})
+            receipt = json.loads((task / "evidence/source-mutations.json").read_text())
+            diagnostic = json.loads((task / "evidence/manifest-diagnostic.json").read_text())
+            self.assertEqual(receipt["status"], "FAIL")
+            self.assertEqual(diagnostic["semanticComparison"], "DIFFERENT")
+            self.assertEqual(diagnostic["changedPackages"], [{"name": "com.unity.inputsystem", "before": "1.20.1", "after": "1.20.0"}])
+            self.assertTrue((task / "evidence/manifest-after.json").is_file())
+            self.assertFalse((task / "evidence/generated-assets.zip").exists())
+
+    def test_manifest_without_matching_baseline_is_never_format_only(self):
+        with tempfile.TemporaryDirectory() as temp:
+            task = Path(temp)
+            (task / "evidence").mkdir()
+            path = task / "unity/Packages/manifest.json"
+            ci.write_json(path, {"dependencies": ci.PACKAGES})
+            self.assertFalse(ci.capture_manifest_change(task, "a" * 64, ci.digest(path)))
+            (task / "evidence/manifest-before.json").write_bytes(path.read_bytes())
+            self.assertFalse(ci.capture_manifest_change(task, "a" * 64, ci.digest(path)))
+
+    def test_manifest_diagnostic_rejects_arbitrary_content_urls_arrays_and_duplicate_keys(self):
+        bad = [[], {"dependencies": []}, {"dependencies": {"com.unity.inputsystem": "https://private.invalid/token"}},
+               {"dependencies": ci.PACKAGES, "credentials": "synthetic"}, {"dependencies": {"other.organization.package": "1.0.0"}}]
+        for data in bad:
+            with self.subTest(data=data), self.assertRaises(ValueError):
+                ci.parse_diagnostic_manifest(json.dumps(data).encode())
+        with self.assertRaises(ValueError):
+            ci.parse_diagnostic_manifest(b'{"dependencies":{"com.unity.inputsystem":"synthetic-secret","com.unity.inputsystem":"1.20.1"}}')
+
+    def test_unsafe_manifest_bytes_are_not_exported(self):
+        with tempfile.TemporaryDirectory() as temp:
+            task = Path(temp)
+            (task / "evidence").mkdir()
+            path = task / "unity/Packages/manifest.json"
+            ci.write_json(path, {"dependencies": {"com.unity.inputsystem": "synthetic-private-string"}})
+            self.assertFalse(ci.capture_manifest_change(task, None, ci.digest(path)))
+            self.assertFalse((task / "evidence/manifest-after.json").exists())
+            self.assertNotIn("synthetic-private-string", (task / "evidence/manifest-diagnostic.json").read_text())
+
     def test_failed_audit_records_path_classification_and_hash_without_source_contents(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)

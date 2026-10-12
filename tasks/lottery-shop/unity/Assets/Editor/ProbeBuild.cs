@@ -31,7 +31,9 @@ namespace Lottery.Probe.Editor
             pipeline.renderScale = 1;
             pipeline.supportsCameraDepthTexture = false;
             pipeline.supportsCameraOpaqueTexture = false;
-            pipeline.supportsMainLightShadows = false;
+            // supportsMainLightShadows has no public setter in this URP API.
+            // Use the public distance control and disable shadows on our light.
+            pipeline.shadowDistance = 0f;
             renderer.depthPrimingMode = DepthPrimingMode.Disabled;
             EditorUtility.SetDirty(renderer);
             GraphicsSettings.defaultRenderPipeline = pipeline;
@@ -48,6 +50,7 @@ namespace Lottery.Probe.Editor
             camera.GetUniversalAdditionalCameraData().renderPostProcessing = false;
             var light = new GameObject("Probe Key Light").AddComponent<Light>();
             light.type = LightType.Directional; light.intensity = 1.8f;
+            light.shadows = LightShadows.None;
             light.transform.rotation = Quaternion.Euler(45, -25, 0);
             RenderSettings.ambientLight = new Color(.35f, .35f, .35f);
             var shader = Shader.Find("Universal Render Pipeline/Lit");
