@@ -423,6 +423,22 @@ class G3ValidatorTests(unittest.TestCase):
             diagnostic=json.loads((task/'evidence/g3/process/process-diagnostic.json').read_text());self.assertEqual(diagnostic['stage'],'baseline');self.assertEqual(diagnostic['status'],'FAIL')
             self.assertFalse((task/'evidence/g3/process/process-receipt.json').exists());self.assertFalse(list((task/'scripts').rglob('*.pyc')))
             result=cli('g3_ci.py','guard',cwd=metadata);self.assertEqual(result.returncode,0,'Root resolution or output closure changed after independent CLIs')
+            # Actual independent post-Android CLI, with disclosed synthetic cold
+            # metadata and real local hardlinks. No Unity/native APK is created.
+            self.makeSyntheticColdProof(root,git,review);env['GITHUB_JOB']='android'
+            cache=root/ci.CACHE_ROOT/'Bee/Android/private-cache-name';cache.parent.mkdir(parents=True);cache.write_bytes(b'SYNTHETIC_CACHE_ONLY');os.link(cache,cache.with_name('internal-alias'))
+            result=cli('g3_ci.py','diagnostics','--stage','android',cwd=metadata)
+            self.assertEqual(result.returncode,0,'Post-Android CLI rejected complete proved-scope cache group')
+            self.assertFalse((task/'evidence/g3/android/apk-receipt.json').exists())
+            os.link(cache,metadata/'outside-alias');unchanged={p.relative_to(task).as_posix():ci.digest(p) for p in (task/'evidence').rglob('*') if p.is_file()}
+            for command in ('apk','audit','diagnostics'):
+                result=cli('g3_ci.py',command,'--stage','android',cwd=metadata)
+                self.assertEqual(result.returncode,1);self.assertIn('stage=CI_'+command.upper()+' code=UNSAFE_FILE_TYPE_OR_ALIAS',result.stderr)
+                self.assertIn('pathClass=LIBRARY_BEE_ANDROID',result.stderr);self.assertIn('kind=regular nlink=3 internalLinks=2',result.stderr)
+                for hidden in ('private-cache-name','outside-alias',str(root),str(metadata),'SYNTHETIC_CACHE_ONLY'):self.assertNotIn(hidden,result.stderr)
+            self.assertEqual((metadata/'outside-alias').read_bytes(),b'SYNTHETIC_CACHE_ONLY')
+            self.assertEqual({p.relative_to(task).as_posix():ci.digest(p) for p in (task/'evidence').rglob('*') if p.is_file()},unchanged)
+
     def testArtworkImportDiagnosticAcceptsExactBoundedNativeSchema(self):
         data=synthetic_import_diagnostic();self.assertEqual(ci.validate_artwork_diagnostic(data,data),data)
     def testArtworkImportDiagnosticRejectsOtherSourceRunAttemptOrVersion(self):
@@ -475,6 +491,101 @@ class G3ValidatorTests(unittest.TestCase):
             self.assertEqual([p['buildTarget'] for p in settings],['DefaultTexturePlatform','Android'])
             for i,p in enumerate(settings):
                 self.assertEqual(p,dict(serializedVersion=4,buildTarget=['DefaultTexturePlatform','Android'][i],maxTextureSize=2048,resizeAlgorithm=0,textureFormat=[-1,3][i],textureCompression=0,compressionQuality=50,crunchedCompression=0,allowsAlphaSplitting=0,overridden=i,ignorePlatformSupport=0,androidETC2FallbackOverride=0,forceMaximumCompressionQuality_BC6H_BC7=0))
+
+    def makeSyntheticColdProof(self,root,git,review):
+        # Actual temporary Git/paths/inodes; source/run/cold records are disclosed
+        # synthetic fixture metadata, not observations of an executed Unity build.
+        prefix=ci.TASK+'/unity/'
+        before={n[len(prefix):]:sha for n,sha in review['sourceFiles'].items() if n.startswith(prefix) and n[len(prefix):].split('/',1)[0] in ('Assets','Packages','ProjectSettings')}
+        before['Assets/Resources/ProbeChinese.otf']=ci.legacy.FONT_SHA
+        snapshot=root/ci.TASK/'evidence/pre-unity-source.json';snapshot.parent.mkdir(parents=True,exist_ok=True);snapshot.write_text(json.dumps(before))
+        proof=root/ci.TASK/'evidence/g3/android/cold-build-baseline.json';proof.parent.mkdir(parents=True,exist_ok=True)
+        cold=dict(sourceCommit=git('rev-parse','HEAD'),runId='12345',runAttempt='1',requestId=ci.REQUEST['requestId'],job='android',cachePolicy='LIBRARY_INTERNAL_HARDLINKS_V1',status='VERIFIED_BEFORE_UNITY',libraryAbsent=True,buildAbsent=True,cacheRestored=False,preUnitySourceSha256=hashlib.sha256(snapshot.read_bytes()).hexdigest())
+        proof.write_text(json.dumps(cold));return proof,snapshot,cold
+    def testColdLibraryCompleteInternalHardlinkGroupPassesOnlyAndroidPostScope(self):
+        with tempfile.TemporaryDirectory() as d,patch.dict(os.environ,GITHUB_JOB='android',GITHUB_RUN_ID='12345',GITHUB_RUN_ATTEMPT='1'):
+            root=Path(d);git,commit,trigger,review,source=self.makeReviewedGit(root);trigger();self.makeSyntheticColdProof(root,git,review)
+            first=root/ci.CACHE_ROOT/'Bee/Android/one.bin';second=root/ci.CACHE_ROOT/'Artifacts/two.bin';first.parent.mkdir(parents=True);second.parent.mkdir(parents=True);first.write_bytes(b'SYNTHETIC_CACHE_BYTES');os.link(first,second)
+            self.assertEqual(first.stat().st_nlink,2);ci.verify_preflight(root,allow_generated_unity=True,android_cache=True)
+            with self.assertRaises(ci.UnsafePathError):ci.verify_preflight(root,allow_generated_unity=True)
+            with self.assertRaises(ValueError):ci.verify_preflight(root,android_cache=True)
+            self.assertEqual(first.read_bytes(),b'SYNTHETIC_CACHE_BYTES');self.assertEqual(second.read_bytes(),first.read_bytes())
+    def testColdCacheProofRequiresExactRunAttemptSourceJobSnapshotAndAbsentObservation(self):
+        for attack in ('missing','run','attempt','source','job','status','library','build','restore','snapshot_hash','snapshot_map','proof_alias','snapshot_alias'):
+            with self.subTest(attack=attack),tempfile.TemporaryDirectory() as d,tempfile.TemporaryDirectory() as outside,patch.dict(os.environ,GITHUB_JOB='android',GITHUB_RUN_ID='12345',GITHUB_RUN_ATTEMPT='1'):
+                root=Path(d);git,commit,trigger,review,source=self.makeReviewedGit(root);trigger();proof,snapshot,cold=self.makeSyntheticColdProof(root,git,review)
+                cache=root/ci.CACHE_ROOT/'a';cache.parent.mkdir(parents=True);cache.write_bytes(b'cache');os.link(cache,cache.with_name('b'))
+                if attack=='missing':proof.unlink()
+                elif attack=='job':os.environ['GITHUB_JOB']='tests'
+                elif attack=='snapshot_hash':snapshot.write_text('{}')
+                elif attack=='snapshot_map':snapshot.write_text('{}');cold['preUnitySourceSha256']=hashlib.sha256(snapshot.read_bytes()).hexdigest();proof.write_text(json.dumps(cold))
+                elif attack.endswith('_alias'):os.link(proof if attack=='proof_alias' else snapshot,Path(outside)/'alias')
+                else:
+                    key,value={'run':('runId','12346'),'attempt':('runAttempt','2'),'source':('sourceCommit','b'*40),'status':('status','unknown'),'library':('libraryAbsent',False),'build':('buildAbsent',False),'restore':('cacheRestored',True)}[attack];cold[key]=value;proof.write_text(json.dumps(cold))
+                with patch.object(ci.legacy,'guard') as writer:
+                    with self.assertRaises((ValueError,FileNotFoundError)):ci.guard(root,allow_generated_unity=True,android_cache=True)
+                    writer.assert_not_called()
+    def testColdCacheExternalAndCrossBoundaryHardlinksRefusedWithoutWrites(self):
+        for destination in ('external','evidence','build','temp','source','three_links'):
+            with self.subTest(destination=destination),tempfile.TemporaryDirectory() as d,tempfile.TemporaryDirectory() as outside,patch.dict(os.environ,GITHUB_JOB='android',GITHUB_RUN_ID='12345',GITHUB_RUN_ATTEMPT='1'):
+                root=Path(d);git,commit,trigger,review,source=self.makeReviewedGit(root);trigger();self.makeSyntheticColdProof(root,git,review)
+                first=root/ci.CACHE_ROOT/'Bee/Android/cache.bin';first.parent.mkdir(parents=True)
+                if destination=='source':os.link(source,first);sentinel=source
+                else:
+                    sentinel=Path(outside)/'untouched' if destination in ('external','three_links') else root/ci.TASK/{'evidence':'evidence/guard-receipt.json','build':'build/G3/Android/LotteryG3.apk','temp':'unity/Temp/staged.bin'}[destination]
+                    sentinel.parent.mkdir(parents=True,exist_ok=True);sentinel.write_bytes(b'OUTSIDE_OR_PROTECTED_SENTINEL');os.link(sentinel,first)
+                    if destination=='three_links':os.link(first,first.with_name('second.bin'))
+                before=sentinel.read_bytes();files_before={p.relative_to(root).as_posix() for p in root.rglob('*') if p.is_file()}
+                with patch.object(ci.legacy,'guard') as writer:
+                    with self.assertRaises(ci.UnsafePathError):ci.guard(root,allow_generated_unity=True,android_cache=True)
+                    writer.assert_not_called()
+                self.assertEqual(sentinel.read_bytes(),before);self.assertEqual({p.relative_to(root).as_posix() for p in root.rglob('*') if p.is_file()},files_before)
+    def testColdCacheSymlinkDirectorySymlinkAndSpecialFilesRemainRefused(self):
+        for kind in ('file_link','directory_link','fifo'):
+            with self.subTest(kind=kind),tempfile.TemporaryDirectory() as d,tempfile.TemporaryDirectory() as outside,patch.dict(os.environ,GITHUB_JOB='android',GITHUB_RUN_ID='12345',GITHUB_RUN_ATTEMPT='1'):
+                root=Path(d);git,commit,trigger,review,source=self.makeReviewedGit(root);trigger();self.makeSyntheticColdProof(root,git,review)
+                path=root/ci.CACHE_ROOT/'Bee/Android/unknown';path.parent.mkdir(parents=True);sentinel=Path(outside)/'sentinel';sentinel.write_bytes(b'UNCHANGED')
+                if kind=='file_link':path.symlink_to(sentinel)
+                elif kind=='directory_link':path.symlink_to(Path(outside),target_is_directory=True)
+                else:os.mkfifo(path)
+                with self.assertRaises(ci.UnsafePathError) as caught:ci.verify_preflight(root,allow_generated_unity=True,android_cache=True)
+                line=ci.failure_line('CI','CI_APK',caught.exception);self.assertIn('pathClass=LIBRARY_BEE_ANDROID',line);self.assertIn('kind='+('fifo' if kind=='fifo' else 'symbolic_link'),line);self.assertEqual(sentinel.read_bytes(),b'UNCHANGED')
+                self.assertNotIn(str(outside),line);self.assertNotIn('sentinel',line);self.assertNotIn('unknown',line)
+    def testColdCacheIncompleteTraversalAndChangedInodeOrNlinkRefused(self):
+        for attack in ('omitted','changed_inode','changed_nlink','enumeration_error'):
+            with self.subTest(attack=attack),tempfile.TemporaryDirectory() as d,tempfile.TemporaryDirectory() as outside,patch.dict(os.environ,GITHUB_JOB='android',GITHUB_RUN_ID='12345',GITHUB_RUN_ATTEMPT='1'):
+                root=Path(d);git,commit,trigger,review,source=self.makeReviewedGit(root);trigger();self.makeSyntheticColdProof(root,git,review)
+                first=root/ci.CACHE_ROOT/'one.bin';second=first.with_name('two.bin');first.parent.mkdir(parents=True);first.write_bytes(b'cache');os.link(first,second)
+                original_walk=os.walk;original_lstat=Path.lstat;hits=[0]
+                def walking(*args,**kwargs):
+                    if attack=='enumeration_error':kwargs['onerror'](PermissionError('PRIVATE_PATH_MUST_NOT_LEAK'))
+                    for directory,dirs,files in original_walk(*args,**kwargs):yield directory,dirs,[x for x in files if not (attack=='omitted' and Path(directory)/x==second)]
+                def lstat(path,*args,**kwargs):
+                    if path==first:
+                        hits[0]+=1
+                        if hits[0]==2:
+                            if attack=='changed_nlink':os.link(first,Path(outside)/'late_alias')
+                            elif attack=='changed_inode':replacement=first.with_name('replacement');replacement.write_bytes(b'cache');os.replace(replacement,first)
+                    return original_lstat(path,*args,**kwargs)
+                with patch.object(ci.os,'walk',side_effect=walking),patch.object(Path,'lstat',lstat):
+                    with self.assertRaises(ValueError):ci.verify_preflight(root,allow_generated_unity=True,android_cache=True)
+    def testUnsafePathStdoutIsWhitelistedAndDoesNotPublishNamesContentsOrTargets(self):
+        with tempfile.TemporaryDirectory() as d:
+            root=Path(d);path=root/ci.TASK/'build/G3/Android/PRIVATE_SECRET.apk';path.parent.mkdir(parents=True);path.write_bytes(b'PRIVATE_FILE_CONTENT');os.link(path,path.with_suffix('.alias'))
+            with self.assertRaises(ci.UnsafePathError) as caught:ci.regular_unaliased(path,root)
+            error=caught.exception;line=ci.failure_line('CI','CI_APK',error)
+            self.assertIn('pathClass=APK_OUTPUT',line);self.assertIn('kind=regular nlink=2',line);self.assertIn(hashlib.sha256(path.relative_to(root).as_posix().encode()).hexdigest(),line)
+            for secret in ('PRIVATE_SECRET','PRIVATE_FILE_CONTENT',str(root)):self.assertNotIn(secret,line)
+            error.path_class='SECRET';error.path_sha256='SECRET';error.kind='SECRET';error.nlink='SECRET';error.internal_links='SECRET'
+            self.assertNotIn('SECRET',ci.failure_line('CI','CI_APK',error))
+            error.path_class=['SECRET'];error.kind={'SECRET':True}
+            self.assertNotIn('SECRET',ci.failure_line('CI','CI_APK',error))
+    def testOnlyAndroidPostCommandsRequestBoundedCacheCompatibility(self):
+        for stage in ('edit','play','android'):
+            for command in ('guard','restore-font','snapshot','tests','captures','apk','audit','diagnostics'):
+                with self.subTest(stage=stage,command=command),patch.object(sys,'argv',['g3_ci.py',command,'--stage',stage]),patch.object(ci,'guard',side_effect=ValueError('synthetic stop before any writes')) as gate:
+                    with self.assertRaises(ValueError):ci.main()
+                    self.assertEqual(gate.call_args.kwargs['android_cache'],stage=='android' and command in ('apk','audit','diagnostics'))
 
     def testWorkflowMaintainsLockedActionsAndNoCache(self):
         text=(ROOT/'.github/workflows/lottery-g3.yml').read_text()
