@@ -40,6 +40,7 @@ jobs:
         run: |
           PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tasks/lottery-shop/scripts -p 'test_*.py' -v
           PYTHONDONTWRITEBYTECODE=1 python3 tasks/lottery-shop/scripts/g3_test_ci.py -v
+          PYTHONDONTWRITEBYTECODE=1 python3 tasks/lottery-shop/scripts/g3_test_path_diagnostics.py -v
       - name: Preserve existing 25 real G2 process kills
         run: python3 tasks/lottery-shop/scripts/g3_process.py regression
       - name: 36 G3 commit-window kills plus closed-waiting late-reward kill
@@ -398,5 +399,20 @@ jobs:
             tasks/lottery-shop/evidence/g3/android/settings-normalization.json
             tasks/lottery-shop/evidence/g3/android/audit-failure.json
             tasks/lottery-shop/evidence/g3/android/manifest-diagnostic.json
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Collect independent metadata-only path diagnosis
+        id: pathdiagnostics
+        if: ${{ always() && steps.guard.outcome == 'success' && steps.unity.outcome != 'skipped' && (steps.verify.outcome != 'success' || steps.audit.outcome != 'success') }}
+        run: |
+          set -euo pipefail
+          git show "$GITHUB_SHA:tasks/lottery-shop/scripts/g3_path_diagnostics.py" 2>/dev/null | timeout --signal=TERM --kill-after=5s 40s python3 -I -B -
+      - name: Preserve diagnostic-only filesystem metadata
+        if: ${{ always() && steps.pathdiagnostics.outcome == 'success' && steps.pathdiagnostics.outputs.diagnostic_relative_path != '' }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: lottery-g3-path-diagnostic-only-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/${{ steps.pathdiagnostics.outputs.diagnostic_relative_path }}
           if-no-files-found: error
           retention-days: 7

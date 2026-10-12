@@ -18,6 +18,7 @@ import xml.etree.ElementTree as ET
 import zipfile
 sys.dont_write_bytecode = True
 import g2_ci as g2
+from g3_path_diagnostics import path_shape, KNOWN_DIRECTORIES
 
 legacy = g2.legacy
 require, digest, bounded_read, write_json = g2.require, g2.digest, g2.bounded_read, g2.write_json
@@ -25,7 +26,7 @@ TASK, RULES_SHA = g2.TASK, g2.RULES_SHA
 BASE = '06814f520041676a50601f4e70d5ee09eae10078'
 SCOPE = 'G3_ONE_DAY_WHITEBOX_NOT_DEVICE_TESTED'
 STANDARDS_DIGEST = '1984cc8f225db73485a052942d30637127679a56b0492edf36497911373f30b1'
-REQUEST = dict(schemaVersion=1, requestId='lottery-g3-20261012-05', baseCommit=BASE, purpose='G3_ONE_DAY_WHITEBOX')
+REQUEST = dict(schemaVersion=1, requestId='lottery-g3-20261012-06', baseCommit=BASE, purpose='G3_ONE_DAY_WHITEBOX')
 REQUEST_PATH = TASK + '/ci/g3-request.json'
 SCENE = 'Assets/G3/Scenes/G3Day.unity'
 GENERATED = {SCENE, SCENE + '.meta', 'Assets/G3/Scenes.meta'}
@@ -167,6 +168,7 @@ class UnsafePathError(ValueError):
         except ValueError:relative=''
         self.path_class=next((PATH_BUCKETS[p] for p in sorted(PATH_BUCKETS,key=len,reverse=True) if relative==p or relative.startswith(p+'/')),'OTHER_CHECKOUT' if relative else 'UNKNOWN')
         self.path_sha256=hashlib.sha256(relative.encode('utf-8','surrogateescape')).hexdigest()
+        self.path_shape=path_shape(relative)
         self.kind=next((name for predicate,name in ((stat.S_ISREG,'regular'),(stat.S_ISDIR,'directory'),(stat.S_ISLNK,'symbolic_link'),(stat.S_ISFIFO,'fifo'),(stat.S_ISSOCK,'socket'),(stat.S_ISCHR,'character_device'),(stat.S_ISBLK,'block_device')) if predicate(info.st_mode)),'unknown')
         self.nlink=info.st_nlink if type(info.st_nlink) is int and 0<=info.st_nlink<=2147483647 else -1
         self.internal_links=internal_links if type(internal_links) is int and 0<=internal_links<=100000 else -1
@@ -513,7 +515,9 @@ def failure_line(component,stage,error):
         kind=error.kind if isinstance(error.kind,str) and error.kind in FILE_KINDS else 'unknown'
         nlink=error.nlink if type(error.nlink) is int and -1<=error.nlink<=2147483647 else -1
         internal=error.internal_links if type(error.internal_links) is int and -1<=error.internal_links<=100000 else -1
-        line+=' pathClass='+bucket+' relativePathSha256='+sha+' kind='+kind+' nlink='+str(nlink)+' internalLinks='+str(internal)
+        shape=getattr(error,'path_shape','UNKNOWN')
+        shape=shape if isinstance(shape,str) and len(shape)<=1024 and all(part in KNOWN_DIRECTORIES or re.fullmatch(r'u[0-9]{1,2}_[0-9a-f]{64}',part) or part in ('TRUNCATED','UNKNOWN') for part in shape.split('/')) else 'UNKNOWN'
+        line+=' pathClass='+bucket+' relativePathSha256='+sha+' kind='+kind+' nlink='+str(nlink)+' internalLinks='+str(internal)+' pathShape='+shape
     return line
 
 

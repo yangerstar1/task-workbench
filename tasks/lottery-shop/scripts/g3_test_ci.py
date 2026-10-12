@@ -402,6 +402,7 @@ class G3ValidatorTests(unittest.TestCase):
             self.assertEqual(result.returncode,0,'Independent baseline helper CLI failed')
             cases=['G3ValidatorTests.'+name for name in unittest.defaultTestLoader.getTestCaseNames(type(self)) if name!=self._testMethodName]
             result=cli('g3_test_ci.py',*cases,environment=helpers_env);self.assertEqual(result.returncode,0,'Independent G3 helper CLI failed')
+            result=cli('g3_test_path_diagnostics.py',environment=helpers_env);self.assertEqual(result.returncode,0,'Independent metadata helper CLI failed')
             self.assertEqual(ci.digest(receipt),receipt_before)
             self.assertFalse(list((task/'scripts').rglob('*.pyc')))
             binary_dir=metadata/'bin';binary_dir.mkdir();marker=metadata/'synthetic-sdk-boundary';stub=binary_dir/'dotnet'
@@ -438,6 +439,35 @@ class G3ValidatorTests(unittest.TestCase):
                 for hidden in ('private-cache-name','outside-alias',str(root),str(metadata),'SYNTHETIC_CACHE_ONLY'):self.assertNotIn(hidden,result.stderr)
             self.assertEqual((metadata/'outside-alias').read_bytes(),b'SYNTHETIC_CACHE_ONLY')
             self.assertEqual({p.relative_to(task).as_posix():ci.digest(p) for p in (task/'evidence').rglob('*') if p.is_file()},unchanged)
+            # Match the independent diagnostic workflow: execute committed source
+            # through isolated Python stdin, despite an intentionally dirty local
+            # module and a real OTHER_CHECKOUT alias. No content from either alias
+            # may be opened or exported by this metadata collector.
+            sentinel=metadata/'sensitive-outside';sentinel.write_bytes(b'NEVER_EXPORT_SENTINEL')
+            other=root/'unexpected-private-name';os.link(sentinel,other)
+            runner=metadata/'runner-temp';runner.mkdir(mode=0o700);channel=runner/'github-output';channel.touch()
+            env.update(GITHUB_WORKSPACE=str(root),RUNNER_TEMP=str(runner),GITHUB_OUTPUT=str(channel))
+            committed=git('show','HEAD:'+ci.TASK+'/scripts/g3_path_diagnostics.py')
+            (task/'scripts/g3_path_diagnostics.py').write_text('raise RuntimeError("DIRTY_MODULE_MUST_NOT_EXECUTE")\n')
+            result=subprocess.run(['bash','-c','set -euo pipefail; git show "$GITHUB_SHA:tasks/lottery-shop/scripts/g3_path_diagnostics.py" 2>/dev/null | timeout --signal=TERM --kill-after=5s 40s python3 -I -B -'],cwd=root,env=env,stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True,timeout=50)
+            self.assertEqual(result.returncode,0,result.stderr);self.assertIn('status=DIAGNOSTIC_ONLY',result.stdout)
+            entry=channel.read_text().strip();self.assertRegex(entry,r'^diagnostic_relative_path=lottery-g3-pathdiag-[0-9a-f]{24}/diagnostic.json$')
+            path=runner/entry.split('=',1)[1];raw=path.read_text();report=json.loads(raw)
+            self.assertEqual(report['status'],'DIAGNOSTIC_ONLY');self.assertEqual(report['acceptance'],'NONE')
+            self.assertTrue(report['scan']['complete']);self.assertTrue(report['scan']['stable'])
+            self.assertTrue(all(v=='MATCH' for v in report['identity']['validation'].values()))
+            group=next(g for g in report['scan']['hardlinkGroups'] if any(m['relativePathSha256']==hashlib.sha256(b'unexpected-private-name').hexdigest() for m in g['members']))
+            self.assertEqual(group['observedCheckoutMembers'],1);self.assertEqual(group['observedNlinkValues'],[2]);self.assertFalse(group['membershipEqualsNlink'])
+            for hidden in ('unexpected-private-name','sensitive-outside','NEVER_EXPORT_SENTINEL','DIRTY_MODULE_MUST_NOT_EXECUTE',str(root),str(metadata)):
+                self.assertNotIn(hidden,raw+result.stdout+result.stderr)
+            self.assertEqual(sentinel.read_bytes(),b'NEVER_EXPORT_SENTINEL')
+            self.assertEqual({p.relative_to(task).as_posix():ci.digest(p) for p in (task/'evidence').rglob('*') if p.is_file()},unchanged)
+            self.assertFalse(list(root.rglob('*.pyc')))
+            # Restore only this disclosed fixture mutation to prove collector
+            # success never clears the original production guard rejection.
+            (task/'scripts/g3_path_diagnostics.py').write_text(committed+'\n')
+            result=cli('g3_ci.py','apk','--stage','android');self.assertEqual(result.returncode,1)
+            self.assertFalse((task/'evidence/g3/android/apk-receipt.json').exists())
 
     def testArtworkImportDiagnosticAcceptsExactBoundedNativeSchema(self):
         data=synthetic_import_diagnostic();self.assertEqual(ci.validate_artwork_diagnostic(data,data),data)
@@ -578,7 +608,7 @@ class G3ValidatorTests(unittest.TestCase):
             for secret in ('PRIVATE_SECRET','PRIVATE_FILE_CONTENT',str(root)):self.assertNotIn(secret,line)
             error.path_class='SECRET';error.path_sha256='SECRET';error.kind='SECRET';error.nlink='SECRET';error.internal_links='SECRET'
             self.assertNotIn('SECRET',ci.failure_line('CI','CI_APK',error))
-            error.path_class=['SECRET'];error.kind={'SECRET':True}
+            error.path_class=['SECRET'];error.kind={'SECRET':True};error.path_shape='SECRET/raw/path'
             self.assertNotIn('SECRET',ci.failure_line('CI','CI_APK',error))
     def testOnlyAndroidPostCommandsRequestBoundedCacheCompatibility(self):
         for stage in ('edit','play','android'):
@@ -589,6 +619,9 @@ class G3ValidatorTests(unittest.TestCase):
 
     def testWorkflowMaintainsLockedActionsAndNoCache(self):
         text=(ROOT/'.github/workflows/lottery-g3.yml').read_text()
+        self.assertIn('git show "$GITHUB_SHA:tasks/lottery-shop/scripts/g3_path_diagnostics.py" 2>/dev/null | timeout --signal=TERM --kill-after=5s 40s python3 -I -B -',text)
+        self.assertIn("steps.pathdiagnostics.outputs.diagnostic_relative_path != ''",text)
+        self.assertIn('path: ${{ runner.temp }}/${{ steps.pathdiagnostics.outputs.diagnostic_relative_path }}',text)
         self.assertIn('group: unity-personal-proof',text);self.assertIn('androidVersionCode: 3',text);self.assertNotIn('actions/cache',text);self.assertNotIn('workflow_dispatch',text)
         actions=set(__import__('re').findall(r'uses: ([^\s]+)',text))
         self.assertEqual(actions,{'actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683','actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02','game-ci/unity-test-runner@0ff419b913a3630032cbe0de48a0099b5a9f0ed9','game-ci/unity-builder@d829bfc901f2347c8fe18898f06712b66916ef42'})
