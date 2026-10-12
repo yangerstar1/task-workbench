@@ -8,6 +8,9 @@ import struct
 import subprocess
 import os
 import tempfile
+import shutil
+import sys
+sys.dont_write_bytecode = True  # Project imports must never write checkout inputs.
 import unittest
 from unittest.mock import patch
 import g3_ci as ci
@@ -342,6 +345,70 @@ class G3ValidatorTests(unittest.TestCase):
         with ci.configured():
             self.assertEqual(ci.legacy.mutation_kind('Assets/GeneratedProbe/extra.asset'),'UNEXPECTED_SOURCE_CHANGE')
             self.assertEqual(ci.legacy.mutation_kind('Assets/GeneratedProbe/Probe.unity'),'GENERATED_PROBE_ASSET')
+    def testSafeCliFailureCodesNeverPrintExceptionData(self):
+        for error in (ValueError('SECRET /private/raw/path'),subprocess.CalledProcessError(97,['SECRET_COMMAND']),FileNotFoundError('/private/SECRET')):
+            line=ci.failure_line('PROCESS','REGRESSION_GUARD',error)
+            self.assertNotIn('SECRET',line);self.assertNotIn('/private',line);self.assertNotIn('Traceback',line)
+            self.assertRegex(line,r'^G3_PROCESS_ERROR stage=REGRESSION_GUARD code=[A-Z_]+ exception=[A-Za-z]+ exit=-?[0-9]+$')
+        self.assertIn('code=UNREVIEWED_WORKING_INPUT',ci.failure_line('PROCESS','REGRESSION_GUARD',ValueError('Unexpected materialized checkout input')))
+    def testIndependentCliSequenceReachesOnlySyntheticSdkBoundary(self):
+        # Independent Python interpreters, matching workflow order. No dotnet,
+        # Unity, network, native process proof or secret access occurs here.
+        with tempfile.TemporaryDirectory() as d,tempfile.TemporaryDirectory() as external:
+            root=Path(d);metadata=Path(external);task=root/ci.TASK
+            def git(*args):return subprocess.check_output(['git','-C',str(root),*args],stderr=subprocess.DEVNULL,text=True).strip()
+            def commit(message):
+                git('add','-A','-f');git('-c','user.name=Synthetic CLI Fixture','-c','user.email=fixture@example.invalid','commit','-q','-m',message)
+            git('init','-q');git('-c','user.name=Synthetic CLI Fixture','-c','user.email=fixture@example.invalid','commit','--allow-empty','-q','-m','synthetic ancestry anchor');anchor=git('rev-parse','HEAD')
+            names=ci.reviewed_files(ROOT,committed=(ROOT/'.git').exists())
+            for name in names:
+                source=ROOT/name
+                if not source.is_file():
+                    self.assertIn(name,(ci.TASK+'/fonts/NotoSansCJKsc-Regular.otf.xz',ci.TASK+'/ci/g2-request.json'));continue
+                target=root/name;target.parent.mkdir(parents=True,exist_ok=True);shutil.copy2(source,target)
+            # Only metadata pins differ in this local fixture: its actual empty
+            # ancestor must replace the production repository's unavailable SHA.
+            target=task/'scripts/g3_ci.py';text=target.read_text();original="BASE = '"+ci.BASE+"'";self.assertIn(original,text);target.write_text(text.replace(original,"BASE = '"+anchor+"'",1))
+            request=dict(ci.REQUEST,baseCommit=anchor);(task/'ci/g3-request.review.json').write_text(json.dumps(request))
+            commit('copied source with disclosed synthetic ancestry pin');reviewed=git('rev-parse','HEAD')
+            review=dict(schemaVersion=1,status='APPROVED_FOR_TRIGGER',requestId=request['requestId'],reviewedSourceCommit=reviewed,reviewerId='synthetic-independent-cli',sourceFiles=ci.reviewed_files(root,committed=True),deviceQa='NOT_RUN',finalQuality='NOT_PASSED')
+            (root/ci.REVIEW_PATH).write_text(json.dumps(review));commit('synthetic review metadata');(root/ci.REQUEST_PATH).write_text(json.dumps(request));commit('synthetic unique request');head=git('rev-parse','HEAD')
+            event=dict(after=head,ref='refs/heads/'+ci.legacy.BRANCH,deleted=False,repository=dict(full_name=ci.legacy.REPOSITORY,private=False,fork=False,owner=dict(login=ci.legacy.OWNER)),sender=dict(login=ci.legacy.OWNER))
+            event_path=metadata/'event.json';event_path.write_text(json.dumps(event))
+            env=dict(os.environ,GITHUB_ACTIONS='true',GITHUB_EVENT_NAME='push',GITHUB_REPOSITORY=ci.legacy.REPOSITORY,GITHUB_REPOSITORY_OWNER=ci.legacy.OWNER,GITHUB_ACTOR=ci.legacy.OWNER,GITHUB_TRIGGERING_ACTOR=ci.legacy.OWNER,GITHUB_REF='refs/heads/'+ci.legacy.BRANCH,RUNNER_ENVIRONMENT='github-hosted',RUNNER_OS='Linux',GITHUB_SHA=head,GITHUB_RUN_ID='12345',GITHUB_RUN_ATTEMPT='1',GITHUB_EVENT_PATH=str(event_path))
+            env.pop('PYTHONDONTWRITEBYTECODE',None);env.pop('PYTHONPYCACHEPREFIX',None)
+            def cli(script,*args,environment=None,cwd=None):
+                return subprocess.run([sys.executable,str(task/'scripts'/script),*args],cwd=cwd or root,env=environment or env,stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True,timeout=90)
+            result=cli('g3_ci.py','guard');self.assertEqual(result.returncode,0,'Independent guard CLI failed')
+            receipt=task/'evidence/guard-receipt.json';self.assertTrue(receipt.is_file());receipt_before=ci.digest(receipt)
+            # Match both helper commands. Exclude only this outer orchestrator
+            # from its inner helper process, preventing recursive fixture launch.
+            helpers_env=dict(env,PYTHONDONTWRITEBYTECODE='1')
+            result=subprocess.run([sys.executable,'-m','unittest','discover','-s',str(task/'scripts'),'-p','test_*.py'],cwd=root,env=helpers_env,stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True,timeout=90)
+            self.assertEqual(result.returncode,0,'Independent baseline helper CLI failed')
+            cases=['G3ValidatorTests.'+name for name in unittest.defaultTestLoader.getTestCaseNames(type(self)) if name!=self._testMethodName]
+            result=cli('g3_test_ci.py',*cases,environment=helpers_env);self.assertEqual(result.returncode,0,'Independent G3 helper CLI failed')
+            self.assertEqual(ci.digest(receipt),receipt_before)
+            self.assertFalse(list((task/'scripts').rglob('*.pyc')))
+            binary_dir=metadata/'bin';binary_dir.mkdir();marker=metadata/'synthetic-sdk-boundary';stub=binary_dir/'dotnet'
+            stub.write_text('#!/bin/sh\n[ "$#" = 1 ] && [ "$1" = "--list-sdks" ] || exit 98\nprintf SDK_INVENTORY_ONLY > "'+str(marker)+'"\nexit 97\n');stub.chmod(0o755)
+            env['PATH']=str(binary_dir)+os.pathsep+env.get('PATH','')
+            result=cli('g3_process.py','regression')
+            self.assertEqual(result.returncode,1);self.assertTrue(marker.is_file(),'Regression CLI never reached the safe SDK stub')
+            self.assertEqual(marker.read_text(),'SDK_INVENTORY_ONLY')
+            self.assertIn('stage=REGRESSION_DELEGATE code=SUBPROCESS_FAILED exception=CalledProcessError exit=97',result.stderr)
+            self.assertNotIn(str(root),result.stderr);self.assertNotIn('Traceback',result.stderr)
+            diagnostic=json.loads((task/'evidence/g2/process/process-diagnostic.json').read_text())
+            self.assertEqual(diagnostic['stage'],'sdk_inventory');self.assertEqual(diagnostic['status'],'FAIL');self.assertEqual(diagnostic['exitCode'],97)
+            self.assertFalse((task/'evidence/g2/process/process-receipt.json').exists())
+            self.assertFalse(list((task/'scripts').rglob('*.pyc')))
+            # New-suite CLI must independently pass its guard, then fail closed
+            # because no real G2 native receipt exists. Do not synthesize a PASS.
+            result=cli('g3_process.py','new',cwd=metadata)
+            self.assertEqual(result.returncode,1);self.assertIn('stage=NEW_BASELINE code=EVIDENCE_FILE_MISSING',result.stderr)
+            diagnostic=json.loads((task/'evidence/g3/process/process-diagnostic.json').read_text());self.assertEqual(diagnostic['stage'],'baseline');self.assertEqual(diagnostic['status'],'FAIL')
+            self.assertFalse((task/'evidence/g3/process/process-receipt.json').exists());self.assertFalse(list((task/'scripts').rglob('*.pyc')))
+            result=cli('g3_ci.py','guard',cwd=metadata);self.assertEqual(result.returncode,0,'Root resolution or output closure changed after independent CLIs')
     def testWorkflowMaintainsLockedActionsAndNoCache(self):
         text=(ROOT/'.github/workflows/lottery-g3.yml').read_text()
         self.assertIn('group: unity-personal-proof',text);self.assertIn('androidVersionCode: 3',text);self.assertNotIn('actions/cache',text);self.assertNotIn('workflow_dispatch',text)

@@ -25,7 +25,7 @@ TASK, RULES_SHA = g2.TASK, g2.RULES_SHA
 BASE = '06814f520041676a50601f4e70d5ee09eae10078'
 SCOPE = 'G3_ONE_DAY_WHITEBOX_NOT_DEVICE_TESTED'
 STANDARDS_DIGEST = '1984cc8f225db73485a052942d30637127679a56b0492edf36497911373f30b1'
-REQUEST = dict(schemaVersion=1, requestId='lottery-g3-20261012-02', baseCommit=BASE, purpose='G3_ONE_DAY_WHITEBOX')
+REQUEST = dict(schemaVersion=1, requestId='lottery-g3-20261012-03', baseCommit=BASE, purpose='G3_ONE_DAY_WHITEBOX')
 REQUEST_PATH = TASK + '/ci/g3-request.json'
 SCENE = 'Assets/G3/Scenes/G3Day.unity'
 GENERATED = {SCENE, SCENE + '.meta', 'Assets/G3/Scenes.meta'}
@@ -375,11 +375,26 @@ def inspect_apk(task,identity):
     return result
 
 
+CLI_STAGE='CI_START'
+FAILURE_STAGES={'CI_'+x.upper().replace('-','_') for x in ('start','source-preflight','guard','restore-font','snapshot','audit','tests','captures','apk','diagnostics','review-manifest')} | {'PROCESS_START','REGRESSION_GUARD','REGRESSION_INPUTS','REGRESSION_DELEGATE'} | {'NEW_'+x for x in ('GUARD','BASELINE','WORKSPACE','SDK_INVENTORY','RESTORE','BUILD','BINARY','PREPARE','CHECKPOINT','VERIFY','RESULT','RECEIPT')}
+FAILURE_REASONS={'Required regular evidence file missing':'EVIDENCE_FILE_MISSING','Unexpected materialized checkout input':'UNREVIEWED_WORKING_INPUT','Working execution input bytes drifted':'WORKING_BYTES_DRIFT','Non-regular or multiply-linked file refused':'UNSAFE_FILE_TYPE_OR_ALIAS','Checkout directory link/type refused':'UNSAFE_DIRECTORY_TYPE','Unreviewed repository tree change':'UNREVIEWED_TREE_CHANGE','Fresh preflight not approved':'PREFLIGHT_NOT_APPROVED','Reviewed execution input set drifted':'REVIEWED_INPUT_SET_DRIFT','Initial Unity runtime output/cache must be absent':'NONCOLD_INITIAL_CACHE'}
+
+def failure_line(component,stage,error):
+    # Never format the exception message, command, path, environment or traceback.
+    component=component if component in ('CI','PROCESS') else 'UNKNOWN'
+    stage=stage if stage in FAILURE_STAGES else 'UNKNOWN'
+    name=type(error).__name__;name=name if name in {'ValueError','TypeError','KeyError','OSError','FileNotFoundError','PermissionError','CalledProcessError','TimeoutExpired'} else 'Other'
+    reason=FAILURE_REASONS.get(str(error),'VALIDATION_FAILED') if isinstance(error,ValueError) else {'FileNotFoundError':'FILE_MISSING','CalledProcessError':'SUBPROCESS_FAILED','TimeoutExpired':'SUBPROCESS_TIMEOUT'}.get(name,'INTERNAL_ERROR')
+    code=error.returncode if isinstance(error,subprocess.CalledProcessError) and type(error.returncode) is int and -255<=error.returncode<=255 else 0
+    return 'G3_'+component+'_ERROR stage='+stage+' code='+reason+' exception='+name+' exit='+str(code)
+
+
 def main():
+    global CLI_STAGE
     p=argparse.ArgumentParser();p.add_argument('command',choices=('source-preflight','guard','restore-font','snapshot','audit','tests','captures','apk','diagnostics','review-manifest'))
     p.add_argument('--root',type=Path,default=Path(__file__).resolve().parents[3]);p.add_argument('--stage',choices=STAGES,default='edit')
     for name in ('unity','verify','audit'):p.add_argument('--'+name+'-outcome',default='unknown')
-    args=p.parse_args();root=args.root.resolve();task=root/TASK
+    args=p.parse_args();CLI_STAGE='CI_'+args.command.upper().replace('-','_');root=args.root.resolve();task=root/TASK
     if args.command=='source-preflight':g2.source_preflight(root);verify_artwork(root);baseline_contract(task);print('G3 static settings/artwork/baseline-contract preflight PASS; native execution NOT_RUN.');return
     if args.command=='review-manifest':
         verify_inputs(root);print(json.dumps(reviewed_files(root),sort_keys=True,indent=2));return
@@ -409,5 +424,5 @@ def main():
 
 if __name__=='__main__':
     try:main()
-    except Exception:
-        print('G3 verification refused; inspect bounded receipts. No raw logs exported.',file=sys.stderr);sys.exit(1)
+    except Exception as error:
+        print(failure_line('CI',CLI_STAGE,error),file=sys.stderr);sys.exit(1)

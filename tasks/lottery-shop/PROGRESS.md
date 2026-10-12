@@ -47,3 +47,7 @@ Prepared at 2026-10-12 15:07 UTC for independent source preflight. First-day ser
 ## G3 first native request and candidate005
 
 2026-10-12 16:10 UTC. Candidate004 passed independent source preflight only. Request01 run38275073822 (commit15f3d2aaf146c3e7e5f7fb7c91bec484d107ac7b) passed its guard and108 existing Python checks but failed one of42 G3 helper checks: an authoring-manifest test incorrectly inspected the runner after guard had created its legitimate evidence. All .NET/Unity/Android stages were skipped; no native result or APK exists for G3. Candidate005 isolates that helper fixture and adds a real temporary-Git guard-then-entire-helper-suite regression without loosening production input checks. Request02 remains untriggered until its own independent source review.
+
+## G3 request02 and candidate006
+
+2026-10-12 16:29 UTC. Request02 run38276542600 passed the guard and108+43 helper checks, then failed before the existing process suite produced evidence. Unity and Android were skipped. Independent local reproduction identified Python import-time bytecode created before the process entry disabled caching; the strict input check correctly rejected that new file. Candidate006 disables bytecode before project imports and adds complete separate-process CLI sequencing without allowing cached input. The local SDK-inventory stub checks Python routing only and executes no .NET code. Native verification remains pending independent review and request03.
