@@ -118,12 +118,21 @@ def failure(task,identity,context,error):
     ci.write_json(task/'evidence/g3/process/process-diagnostic.json',dict(identity,status='FAIL',scope='BOUNDED_IDENTIFIERS_ONLY_NOT_TEST_PASS',stage=context['stage'],scenario=context.get('scenario'),point=context.get('point'),exceptionType=typ,exitCode=code if type(code) is int and -255<=code<=255 else None,compilerErrors=codes,workerError=worker,deviceQa='NOT_RUN'))
 
 
+def run_regression(root):
+    # The unchanged G2 runner cleans its receipts before its own legacy guard.
+    # This G3 boundary must therefore close all destinations before delegation.
+    ci.guard(root)
+    ci.check_working_inputs(root,ci.reviewed_files(root,committed=True),allow_generated_unity=False)
+    regression.main(root)
+
+
 def run_new(root):
-    task=root/ci.TASK;output=task/'evidence/g3/process/process-receipt.json';output.unlink(missing_ok=True)
-    output.with_name('process-diagnostic.json').unlink(missing_ok=True)
+    task=root/ci.TASK;output=task/'evidence/g3/process/process-receipt.json'
     identity={};context=dict(stage='guard')
     try:
         identity=ci.guard(root);ci.verify_inputs(root);ci.check_working_inputs(root,ci.reviewed_files(root,committed=True),allow_generated_unity=False)
+        # No deletion or diagnostic write is allowed until destination closure passes.
+        output.unlink(missing_ok=True);output.with_name('process-diagnostic.json').unlink(missing_ok=True)
         baseline=json.loads(ci.bounded_read(task/'evidence/g2/process/process-receipt.json',256*1024))
         ci.require(baseline.get('sourceCommit')==identity['sourceCommit'] and baseline.get('runId')==identity['runId'] and baseline.get('runAttempt')==identity['runAttempt'] and baseline.get('requestId')==identity['requestId'] and baseline.get('status')=='PASS' and baseline.get('count')==25,'Same-source G2 process regression required first')
         regression.validate_suite(baseline['cases'])
@@ -154,7 +163,9 @@ def run_new(root):
                 context['stage']='result';data=json.loads(ci.bounded_read(directory/'result.json',8192));cases.append(dict(validate_case(data,scenario,point),exitSignal='SIGKILL',childExitCode=-9))
         context['stage']='receipt';validate_suite(cases)
         ci.write_json(output,dict(identity,status='PASS',scope='SYNTHETIC_FIXTURES_REAL_LINUX_DOTNET_PROCESS_KILL_NOT_UNITY_NOT_ANDROID',count=37,commitWindowCount=36,waitingLifecycleCount=1,cases=cases,dotnetSdk=sdk,sourceFiles=sources,workerBinarySha256=ci.digest(binary),g2RegressionReceiptSha256=ci.digest(task/'evidence/g2/process/process-receipt.json'),unityProcessKill='NOT_RUN',androidForceStop='NOT_RUN',powerLossQa='NOT_RUN',deviceQa='NOT_RUN'))
-    except Exception as error:failure(task,identity,context,error);raise
+    except Exception as error:
+        if context['stage']!='guard':failure(task,identity,context,error)
+        raise
     print('37 actual .NET process SIGKILL cases passed (36 commit windows + 1 waiting lifecycle); Unity/Android kill and physical input remain NOT_RUN.')
 
 if __name__=='__main__':
@@ -163,7 +174,7 @@ if __name__=='__main__':
         with ci.configured():
             root=Path(__file__).resolve().parents[3]
             if args.stage=='regression':
-                ci.guard(root);ci.check_working_inputs(root,ci.reviewed_files(root,committed=True),allow_generated_unity=False);regression.main(root)
+                run_regression(root)
             else:run_new(root)
     except Exception:
         print('G3 process verification failed; no raw logs exported.',file=sys.stderr);sys.exit(1)

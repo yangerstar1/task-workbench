@@ -183,6 +183,57 @@ class G3ValidatorTests(unittest.TestCase):
             with patch.object(ci.legacy,'FONT_SHA',hashlib.sha256(b'synthetic font').hexdigest()):ci.check_working_inputs(root,review['sourceFiles'],allow_restored_font=True)
             font.write_bytes(b'wrong font')
             with self.assertRaises(ValueError):ci.check_working_inputs(root,review['sourceFiles'],allow_restored_font=True)
+    def testOutputRootSymlinksAreRejectedBeforeOutputPruning(self):
+        for name in sorted(ci.OUTPUT_ROOTS):
+            with self.subTest(name=name),tempfile.TemporaryDirectory() as d,tempfile.TemporaryDirectory() as target:
+                root=Path(d);git,commit,trigger,review,source=self.makeReviewedGit(root);trigger()
+                output=root/name;output.parent.mkdir(parents=True,exist_ok=True);output.symlink_to(target,target_is_directory=True)
+                with self.assertRaises(ValueError):ci.verify_preflight(root)
+                with self.assertRaises(ValueError):ci.check_working_inputs(root,review['sourceFiles'],allow_generated_unity=True)
+    def testOutputLinksAreRejectedBeforeLegacyGuardCanWrite(self):
+        for attack in ('evidence-root','guard-receipt','nested-stage-directory','artifact-file'):
+            with self.subTest(attack=attack),tempfile.TemporaryDirectory() as d,tempfile.TemporaryDirectory() as outside:
+                root=Path(d);git,commit,trigger,review,source=self.makeReviewedGit(root);trigger()
+                sentinel=Path(outside)/'guard-receipt.json';sentinel.write_text('DO_NOT_WRITE')
+                if attack=='evidence-root':
+                    (root/ci.TASK/'evidence').symlink_to(outside,target_is_directory=True)
+                else:
+                    relative={'guard-receipt':'evidence/guard-receipt.json','nested-stage-directory':'evidence/g3/edit','artifact-file':'artifacts/g3-process/compile.log'}[attack]
+                    destination=root/ci.TASK/relative;destination.parent.mkdir(parents=True)
+                    destination.symlink_to(outside if attack=='nested-stage-directory' else sentinel,target_is_directory=attack=='nested-stage-directory')
+                with patch.object(ci.legacy,'guard') as guarded_write:
+                    with self.assertRaises(ValueError):ci.guard(root)
+                    guarded_write.assert_not_called()
+                self.assertEqual(sentinel.read_text(),'DO_NOT_WRITE')
+    def testFailedProcessGuardCannotDeleteOrWriteThroughLinkedEvidence(self):
+        with tempfile.TemporaryDirectory() as d,tempfile.TemporaryDirectory() as outside:
+            root=Path(d);git,commit,trigger,review,source=self.makeReviewedGit(root);trigger()
+            destination=Path(outside)/'g3/process';destination.mkdir(parents=True)
+            receipt=destination/'process-receipt.json';diagnostic=destination/'process-diagnostic.json'
+            receipt.write_text('PRESERVE_RECEIPT');diagnostic.write_text('PRESERVE_DIAGNOSTIC')
+            (root/ci.TASK/'evidence').symlink_to(outside,target_is_directory=True)
+            with patch.object(process,'failure') as diagnostic_write:
+                with self.assertRaises(ValueError):process.run_new(root)
+                diagnostic_write.assert_not_called()
+            self.assertEqual(receipt.read_text(),'PRESERVE_RECEIPT');self.assertEqual(diagnostic.read_text(),'PRESERVE_DIAGNOSTIC')
+    def testEveryMutatingCiCommandRejectsOutputLinkBeforeAnyGuardWrite(self):
+        for command in ('guard','restore-font','snapshot','audit','tests','captures','apk','diagnostics'):
+            with self.subTest(command=command),tempfile.TemporaryDirectory() as d,tempfile.TemporaryDirectory() as outside:
+                root=Path(d);git,commit,trigger,review,source=self.makeReviewedGit(root);trigger()
+                sentinel=Path(outside)/'guard-receipt.json';sentinel.write_text('UNCHANGED')
+                (root/ci.TASK/'evidence').symlink_to(outside,target_is_directory=True)
+                with patch('sys.argv',['g3_ci.py',command,'--root',str(root)]),patch.object(ci.legacy,'guard') as writer:
+                    with self.assertRaises(ValueError):ci.main()
+                    writer.assert_not_called()
+                self.assertEqual(sentinel.read_text(),'UNCHANGED')
+                self.assertEqual([p.name for p in Path(outside).iterdir()],['guard-receipt.json'])
+    def testRegressionDelegationCannotCleanBeforeG3GuardClosure(self):
+        with tempfile.TemporaryDirectory() as d,tempfile.TemporaryDirectory() as outside:
+            root=Path(d);git,commit,trigger,review,source=self.makeReviewedGit(root);trigger()
+            (root/ci.TASK/'evidence').symlink_to(outside,target_is_directory=True)
+            with patch.object(process.regression,'main') as legacy_runner:
+                with self.assertRaises(ValueError):process.run_regression(root)
+                legacy_runner.assert_not_called()
     def testFreshReviewRejectsOmittedTaskRootInputFromSourceMap(self):
         with tempfile.TemporaryDirectory() as d:
             root=Path(d);git,commit,trigger,review,source=self.makeReviewedGit(root)
@@ -203,6 +254,8 @@ class G3ValidatorTests(unittest.TestCase):
         self.assertIn('group: unity-personal-proof',text);self.assertIn('androidVersionCode: 3',text);self.assertNotIn('actions/cache',text);self.assertNotIn('workflow_dispatch',text)
         actions=set(__import__('re').findall(r'uses: ([^\s]+)',text))
         self.assertEqual(actions,{'actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683','actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02','game-ci/unity-test-runner@0ff419b913a3630032cbe0de48a0099b5a9f0ed9','game-ci/unity-builder@d829bfc901f2347c8fe18898f06712b66916ef42'})
+        prepare=(ROOT/ci.TASK/'scripts/g3_prepare_runner.sh').read_text()
+        self.assertIn('set -euo pipefail',prepare);self.assertLess(prepare.index('g3_ci.py guard'),prepare.index('sudo rm -rf'))
         self.assertLess(text.index('name: Native regression-edit'),text.index('name: Native regression-play'));self.assertLess(text.index('name: Native regression-play'),text.index('name: Native edit'))
 
 if __name__=='__main__':unittest.main()

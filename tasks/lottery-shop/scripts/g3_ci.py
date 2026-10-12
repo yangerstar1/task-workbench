@@ -91,6 +91,7 @@ REVIEW_EXCEPTIONS = {REQUEST_PATH, REVIEW_PATH}
 WORKFLOWS = {'.github/workflows/lottery-'+x+'.yml' for x in ('g0','g2','g3')}
 # These are outputs, not implicit source/import search directories. Exact paths only.
 OUTPUT_ROOTS = {TASK+'/'+x for x in ('artifacts','evidence','build','unity/Library','unity/Temp','unity/Obj','unity/Logs','unity/UserSettings')}
+WRITE_OUTPUT_ROOTS = {TASK+'/'+x for x in ('artifacts','evidence','build')}
 
 
 def source_path(name):
@@ -158,12 +159,18 @@ def check_working_inputs(root, expected, tree=None, allow_generated_unity=False,
     # Enumerate actual checkout files, ignoring only explicit runtime-output roots.
     # Thus untracked/ignored Directory.Build.*, sitecustomize.py and arbitrary
     # source additions are refused; this does not depend on Git ignore patterns.
+    visited=0
     for directory,dirs,files in os.walk(root,followlinks=False):
+        visited+=len(dirs)+len(files);require(visited<=100000,'Checkout/output entry bound exceeded')
         rel=Path(directory).relative_to(root).as_posix()
-        dirs[:]=[d for d in dirs if not (rel=='.' and d=='.git') and (Path(directory)/d).relative_to(root).as_posix() not in OUTPUT_ROOTS]
+        # Output roots are excluded from source enumeration only after proving
+        # they are real directories. A symlink must not redirect runner writes.
         require(all(not (Path(directory)/d).is_symlink() for d in dirs),'Checkout directory symlink refused')
+        dirs[:]=[d for d in dirs if not (rel=='.' and d=='.git') and (Path(directory)/d).relative_to(root).as_posix() not in (OUTPUT_ROOTS-WRITE_OUTPUT_ROOTS)]
         for name in files:
             path=Path(directory)/name;relative=path.relative_to(root).as_posix()
+            if any(relative.startswith(x+'/') for x in WRITE_OUTPUT_ROOTS):
+                require(not path.is_symlink() and path.is_file(),'Output destination link/type refused');continue
             if relative in REVIEW_EXCEPTIONS:continue
             if relative in expected:continue
             if (allow_generated_unity or allow_restored_font) and relative.startswith(TASK+'/unity/'):
@@ -197,10 +204,11 @@ def verify_preflight(root, allow_generated_unity=False):
 
 
 def guard(root, allow_generated_unity=False):
-    identity=legacy.guard(root)
+    # No receipt write may occur before checkout and output-destination closure.
     changed=legacy.git(root,'diff-tree','--no-commit-id','--name-only','-r','HEAD').splitlines()
     require(changed==[REQUEST_PATH], 'G3 trigger commit must change only its unique request')
     verify_preflight(root,allow_generated_unity=allow_generated_unity)
+    identity=legacy.guard(root)
     identity.update(rulesSha256=RULES_SHA,g2SourceBase=BASE,standardsDigest=STANDARDS_DIGEST,contractVersion='1.0.1',qualityBarVersion='QB-2',finalQuality='NOT_PASSED')
     return identity
 
