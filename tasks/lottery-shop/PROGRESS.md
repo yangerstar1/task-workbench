@@ -51,3 +51,15 @@ sets 2 explicitly; binary verification and device upgrade remain pending.
 The two flat ticket artwork candidates have since been explicitly approved;
 the rejected whole-scene images remain excluded. Artwork approval is not a
 full visual, device or G5 acceptance.
+
+## Actual request 09 and request 10 repair
+
+Run38254407558/sourcec3d9195681ff6139c4e6e62cec004240ff0465a2
+passed 45 EditMode and all25 actual .NET SIGKILL cases. PlayMode passed6/8.
+Both failures were the new fixture attempting to raycast the intentionally
+inactive ticket collider before buying a ticket. No new frames were produced,
+and Android was skipped. The previously verified request07 APK is preserved.
+Request10 keeps the target/projection checks before buying, explicitly checks
+that there is no active ticket/hit, and performs the original five-point collider
+roundtrip after actual BuyReady input. It does not weaken assertions or change
+production state. Native rerun remains pending; overall G2 is not accepted.

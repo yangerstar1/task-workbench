@@ -198,6 +198,21 @@ namespace Lottery.G2.PlayMode.Tests
             Assert.That(presentationTarget.Create(),Is.True,"A real 1280x720 presentation target is required");
             app.SceneCamera.targetTexture=presentationTarget; P.View.Layout(); Physics.SyncTransforms();
             AssertPresentationProjection();
+            Assert.That(State.CurrentTicket,Is.Null,"The viewport is bound before the first real purchase");
+            Assert.That(P.View.Surface.gameObject.activeInHierarchy,Is.False,"No owned ticket must mean no active scratch surface");
+            Assert.That(P.View.TryScratchUv(ScreenUv(.5f,.5f),out _),Is.False,"An unpurchased hidden ticket must not receive scratch hits");
+            TestContext.Out.WriteLine("SIMULATED_INPUT_SYSTEM owned target: sourceViewport="+Screen.width+"x"+Screen.height+
+                ",presentationViewport="+P.View.PresentationWidth+"x"+P.View.PresentationHeight+
+                ",renderTarget="+presentationTarget.width+"x"+presentationTarget.height+",cameraAspect="+app.SceneCamera.aspect.ToString("R",System.Globalization.CultureInfo.InvariantCulture)+
+                "; source environment is unchanged; no device adaptation claim");
+        }
+        void AssertPurchasedTicketInputProjection()
+        {
+            Assert.That(State.CurrentTicket,Is.Not.Null,"A real committed purchase must precede ticket collider checks");
+            Assert.That(State.CurrentTicket.Phase,Is.EqualTo(TicketPhase.ACTIVE));
+            Assert.That(P.View.Surface.gameObject.activeInHierarchy,Is.True,"Confirmed ticket must activate its scratch surface");
+            Assert.That(P.View.Surface.GetComponent<MeshCollider>().enabled,Is.True);
+            Physics.SyncTransforms(); AssertPresentationProjection();
             foreach(var uv in new[] {new Vector2(.05f,.05f),new Vector2(.95f,.05f),new Vector2(.05f,.95f),new Vector2(.95f,.95f),new Vector2(.5f,.5f)})
             {
                 var pixel=ScreenUv(uv.x,uv.y);
@@ -207,10 +222,6 @@ namespace Lottery.G2.PlayMode.Tests
                 Assert.That(Vector2.Distance(hit,uv),Is.LessThan(.002f),"Projection and input ray must share the owned viewport");
             }
             Assert.That(P.View.TryScratchUv(new Vector2(-1,-1),out _),Is.False);
-            TestContext.Out.WriteLine("SIMULATED_INPUT_SYSTEM owned target: sourceViewport="+Screen.width+"x"+Screen.height+
-                ",presentationViewport="+P.View.PresentationWidth+"x"+P.View.PresentationHeight+
-                ",renderTarget="+presentationTarget.width+"x"+presentationTarget.height+",cameraAspect="+app.SceneCamera.aspect.ToString("R",System.Globalization.CultureInfo.InvariantCulture)+
-                "; source environment is unchanged; no device adaptation claim");
         }
         void AssertPresentationProjection()
         {
@@ -343,7 +354,7 @@ namespace Lottery.G2.PlayMode.Tests
             // Buy uses the mouse and scratch uses EnhancedTouch at the same actual
             // 16:9 presentation size, independently of the Editor window size.
             BindPresentationTarget();
-            BuyReady();
+            BuyReady(); AssertPurchasedTicketInputProjection();
             TouchEvent(11,IPhase.Began,ScreenUv(.10f,.15f)); TouchEvent(22,IPhase.Began,ScreenUv(.90f,.85f));
             TouchEvent(11,IPhase.Moved,ScreenUv(.25f,.15f)); TouchEvent(11,IPhase.Ended,ScreenUv(.25f,.15f));
             TouchEvent(22,IPhase.Moved,ScreenUv(.75f,.85f)); TouchEvent(22,IPhase.Ended,ScreenUv(.75f,.85f));
@@ -432,7 +443,7 @@ namespace Lottery.G2.PlayMode.Tests
                 // Bind before any purchase/input. All four frames, HUD hit areas
                 // and rays now share 1280x720 geometry, not a stretched 4:3 image.
                 BindPresentationTarget();
-                BuyReady(); yield return null; textures.Add(Capture("initial",output,records));
+                BuyReady(); AssertPurchasedTicketInputProjection(); yield return null; textures.Add(Capture("initial",output,records));
                 Serpentine(.47f); yield return null; textures.Add(Capture("half",output,records));
                 Assert.That(State.CurrentTicket.Scratch.IsRevealed(45,32),Is.True); Assert.That(State.CurrentTicket.Scratch.IsRevealed(215,32),Is.False);
                 Assert.That(ChangedPixels(textures[0],textures[1],.08f,.38f),Is.GreaterThan(500),"Committed scratch must change local rendered pixels");
