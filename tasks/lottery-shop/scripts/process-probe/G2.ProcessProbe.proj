@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <AssemblyName>Lottery.G2.ProcessProbe</AssemblyName>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <Nullable>disable</Nullable>
+    <LangVersion>9.0</LangVersion>
+    <DefineConstants>LOTTERY_G2_TEST_FIXTURE</DefineConstants>
+    <Deterministic>true</Deterministic>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="Program.cs" />
+    <Compile Include="../../unity/Assets/G2/Core/**/*.cs" />
+    <Compile Include="../../unity/Assets/G2/Persistence/**/*.cs" />
+    <Compile Include="../../unity/Assets/G2/Ads/**/*.cs" />
+  </ItemGroup>
+</Project>

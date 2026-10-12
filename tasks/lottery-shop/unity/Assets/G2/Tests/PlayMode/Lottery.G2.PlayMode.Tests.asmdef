@@ -1,0 +1,7 @@
+{
+  "name": "Lottery.G2.PlayMode.Tests",
+  "rootNamespace": "Lottery.G2.PlayMode.Tests",
+  "references": ["Lottery.G2.Core", "Lottery.G2.Interaction", "Unity.InputSystem", "Unity.RenderPipelines.Universal.Runtime", "Unity.RenderPipelines.Core.Runtime"],
+  "optionalUnityReferences": ["TestAssemblies"],
+  "autoReferenced": false
+}

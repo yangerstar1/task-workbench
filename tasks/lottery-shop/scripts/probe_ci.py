@@ -395,7 +395,7 @@ def diagnostic_changes(changes):
     return result
 
 
-def audit(root, identity):
+def audit(root, identity, additional_generated_kinds=()):
     task = root / TASK
     changes = []
     stage = "READ_SOURCE_BASELINE"
@@ -423,7 +423,7 @@ def audit(root, identity):
         stage = "ARCHIVE_GENERATED_EVIDENCE"
         selected = sorted(path for path in after if mutation_kind(path) in
                           {"GENERATED_PROBE_ASSET", "URP_GENERATED_GLOBAL_SETTING", "UNITY_PROJECT_SETTING",
-                           "FONT_IMPORT_METADATA", "RESOLVED_PACKAGE_LOCK"})
+                           "FONT_IMPORT_METADATA", "RESOLVED_PACKAGE_LOCK"}.union(additional_generated_kinds))
         total = 0
         manifest = []
         archive_temp = task / "evidence/generated-assets.zip.tmp"

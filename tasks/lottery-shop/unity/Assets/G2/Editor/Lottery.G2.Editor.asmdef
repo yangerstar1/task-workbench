@@ -1,0 +1,5 @@
+{
+  "name": "Lottery.G2.Editor",
+  "references": ["Lottery.Probe.Editor", "Lottery.G2.Core", "Lottery.G2.Interaction", "Unity.RenderPipelines.Universal.Runtime", "Unity.RenderPipelines.Core.Runtime"],
+  "includePlatforms": ["Editor"]
+}

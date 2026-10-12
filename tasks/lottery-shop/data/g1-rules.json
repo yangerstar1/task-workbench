@@ -1,0 +1,1457 @@
+{
+  "schema_version": 1,
+  "rules_version": "lottery-v4-g1-candidate-001",
+  "currency": {
+    "minor_units_per_coin": 10,
+    "rounding": "half_up",
+    "money_storage": "nonnegative_integer_minor_units",
+    "probability_weight_denominator": 1000000
+  },
+  "tickets": {
+    "number": {
+      "name": "号码票",
+      "base_price_minor": 1000,
+      "raw_prize_distribution": [
+        {
+          "raw_prize_minor": 0,
+          "weight": 400000
+        },
+        {
+          "raw_prize_minor": 500,
+          "weight": 200000
+        },
+        {
+          "raw_prize_minor": 1000,
+          "weight": 220000
+        },
+        {
+          "raw_prize_minor": 2000,
+          "weight": 130000
+        },
+        {
+          "raw_prize_minor": 5000,
+          "weight": 47000
+        },
+        {
+          "raw_prize_minor": 20000,
+          "weight": 2800
+        },
+        {
+          "raw_prize_minor": 100000,
+          "weight": 180
+        },
+        {
+          "raw_prize_minor": 1000000,
+          "weight": 20
+        }
+      ],
+      "hidden_cells": 6,
+      "match_count_positive_prize": 1,
+      "match_count_zero_prize": 0,
+      "draw_prize_once_before_constructing_cells": true,
+      "payout": "claim_after_full_reveal",
+      "expected_base_raw_return_minor": 909,
+      "face_generation": {
+        "algorithm": "N-1",
+        "generator_version": "number-face-n1-sha256-v1",
+        "number_min": 1,
+        "number_max": 49,
+        "number_display_width": 2,
+        "hidden_numbers_unique": true,
+        "public_number_uniform": true,
+        "positive_winning_position_uniform": true,
+        "unmatched_number_sampling": "without_replacement_excluding_public_number",
+        "distractor_base_amounts_minor": [
+          500,
+          1000,
+          2000,
+          5000
+        ],
+        "distractor_amount_weights": [
+          1,
+          1,
+          1,
+          1
+        ],
+        "distractor_amounts_independent": true,
+        "distractor_amounts_may_repeat": true,
+        "distractors_scale_with_denomination": true,
+        "allow_unmatched_tail_prizes": false,
+        "near_miss_feedback": false,
+        "display_probabilities_are_award_odds": false,
+        "award_source": "locked_raw_prize",
+        "persist_entire_face": true,
+        "persist_generator_version": true,
+        "random_stream_domains": {
+          "economic": "economic-awards-v1",
+          "shop": "shop-supply-v1",
+          "display": "ticket-display-v1"
+        },
+        "display_consumes_economic_stream": false,
+        "display_consumes_shop_stream": false
+      }
+    },
+    "challenge": {
+      "name": "挑战票",
+      "base_price_minor": 1000,
+      "cells": 8,
+      "safe_cells": 6,
+      "danger_cells": 2,
+      "sampling": "without_replacement",
+      "arrangement": "locked_at_purchase",
+      "safe_step_raw_prizes_minor": [
+        1000,
+        2000,
+        3000,
+        5000,
+        9000,
+        18000
+      ],
+      "danger_raw_prize_minor": 0,
+      "minimum_revealed_cells_before_settlement": 1,
+      "voluntary_cashout": true,
+      "continue_requires_player_choice": true
+    },
+    "endless": {
+      "available_prices_minor": [
+        1000,
+        5000
+      ],
+      "raw_prize_scale_by_price": true,
+      "probabilities_change": false,
+      "fixed_additions_scale": false,
+      "fixed_caps_scale": false,
+      "cash_thresholds_scale": false,
+      "consumable_prices_scale": false,
+      "information_cells_scale": false,
+      "boost_draw_count_scales": false,
+      "growth_per_ticket_scales": false,
+      "small_large_thresholds_scale_with_ticket_price": true
+    }
+  },
+  "debt": {
+    "initial_cash_minor": 30000,
+    "original_principal_minor": 300000,
+    "interest_rate_per_day": {
+      "numerator": 1,
+      "denominator": 200
+    },
+    "interest_basis": "remaining_principal_at_day_open",
+    "interest_locked_for_day": true,
+    "intraday_principal_payment_refunds_accrued_interest": false,
+    "standard": {
+      "max_days": 18,
+      "tickets_per_day": 12,
+      "cumulative_principal_schedule": [
+        {
+          "night": 6,
+          "cumulative_principal_minor": 30000
+        },
+        {
+          "night": 12,
+          "cumulative_principal_minor": 150000
+        },
+        {
+          "night": 18,
+          "cumulative_principal_minor": 300000
+        }
+      ]
+    },
+    "advanced_candidate": {
+      "max_days": 16,
+      "tickets_per_day": 12,
+      "cumulative_principal_schedule": [
+        {
+          "night": 6,
+          "cumulative_principal_minor": 30000
+        },
+        {
+          "night": 11,
+          "cumulative_principal_minor": 150000
+        },
+        {
+          "night": 16,
+          "cumulative_principal_minor": 300000
+        }
+      ],
+      "requires_standard_validation": true,
+      "unlocked_after_first_clear": true
+    },
+    "early_clear": {
+      "required_before_reward": [
+        "remaining_principal",
+        "accrued_unpaid_interest"
+      ],
+      "cash_test_includes_reward": false,
+      "already_paid_interest_charged_again": false,
+      "reward_minor": 5000,
+      "reward_events_per_run": 1,
+      "retain_unsettled_ticket": true,
+      "friend_debt_cleared": false,
+      "win_survives_endless_bankruptcy": true
+    }
+  },
+  "loans": {
+    "contacts": [
+      {
+        "id": "mother",
+        "name": "妈妈",
+        "cumulative_borrow_limit_minor": 50000,
+        "due_night_offset": 6
+      },
+      {
+        "id": "girlfriend",
+        "name": "女友",
+        "cumulative_borrow_limit_minor": 30000,
+        "due_night_offset": 3
+      }
+    ],
+    "interest_rate": {
+      "numerator": 0,
+      "denominator": 1
+    },
+    "late_fee_minor": 0,
+    "freeze_begins": "day_after_due_night_if_unpaid",
+    "due_night_is_actionable_window": true,
+    "repayment_restores_cumulative_limit": false,
+    "overdue_repayment_unfreezes_unused_limit": true,
+    "repayment_order": "earliest_due_first",
+    "one_contact_overdue_freezes_other": false,
+    "overdue_causes_run_failure": false,
+    "allow_borrow_before_night_bill_final_confirmation": true,
+    "quick_borrow_amounts_minor": [
+      10000,
+      20000
+    ],
+    "custom_borrow_amount_supported": true,
+    "resets_at": "new_run",
+    "debt_clear_resets": false
+  },
+  "special_items": [
+    {
+      "id": "small_prize_box",
+      "name": "零钱兑奖匣",
+      "rarity": "common",
+      "purchase_price_minor": 6000,
+      "initial_catalog": true,
+      "trigger": {
+        "ticket_type": "number",
+        "raw_prize_gt_minor": 0,
+        "raw_prize_lte_ticket_price_multiple": 2
+      },
+      "effect": "fixed_addition",
+      "level_cap": 3,
+      "levels": [
+        {
+          "level": 1,
+          "addition_minor": 300
+        },
+        {
+          "level": 2,
+          "addition_minor": 700
+        },
+        {
+          "level": 3,
+          "addition_minor": 1500
+        }
+      ],
+      "upgrade_prices_minor": [
+        9000,
+        13500
+      ]
+    },
+    {
+      "id": "ticket_clip",
+      "name": "票根夹",
+      "rarity": "common",
+      "purchase_price_minor": 4500,
+      "initial_catalog": true,
+      "trigger": {
+        "raw_prize_gt_minor": 0,
+        "positive_ticket_ticks_required": 3
+      },
+      "effect": "consume_ticks_and_add",
+      "level_cap": 3,
+      "levels": [
+        {
+          "level": 1,
+          "addition_minor": 750
+        },
+        {
+          "level": 2,
+          "addition_minor": 1500
+        },
+        {
+          "level": 3,
+          "addition_minor": 3000
+        }
+      ],
+      "upgrade_prices_minor": [
+        6750,
+        10500
+      ],
+      "counter": {
+        "carry_remainder_min": 0,
+        "carry_remainder_max": 2,
+        "persists_across": [
+          "days",
+          "unequip",
+          "sale",
+          "repurchase",
+          "upgrade"
+        ],
+        "counts_only_when_equipped_in_purchase_snapshot": true,
+        "ticks_per_positive_raw_ticket": 1
+      }
+    },
+    {
+      "id": "large_prize_stamp",
+      "name": "大额兑奖章",
+      "rarity": "common",
+      "purchase_price_minor": 7500,
+      "initial_catalog": true,
+      "trigger": {
+        "ticket_type": "number",
+        "raw_prize_gte_ticket_price_multiple": 5
+      },
+      "effect": "capped_raw_percentage",
+      "level_cap": 3,
+      "levels": [
+        {
+          "level": 1,
+          "raw_multiplier": {
+            "numerator": 1,
+            "denominator": 2
+          },
+          "cap_minor": 3000
+        },
+        {
+          "level": 2,
+          "raw_multiplier": {
+            "numerator": 1,
+            "denominator": 1
+          },
+          "cap_minor": 6000
+        },
+        {
+          "level": 3,
+          "raw_multiplier": {
+            "numerator": 2,
+            "denominator": 1
+          },
+          "cap_minor": 12000
+        }
+      ],
+      "upgrade_prices_minor": [
+        12000,
+        18000
+      ]
+    },
+    {
+      "id": "loss_mat",
+      "name": "止损垫",
+      "rarity": "common",
+      "purchase_price_minor": 3000,
+      "initial_catalog": true,
+      "trigger": {
+        "raw_prize_eq_minor": 0
+      },
+      "effect": "capped_actual_ticket_payment_refund",
+      "level_cap": 3,
+      "levels": [
+        {
+          "level": 1,
+          "actual_payment_multiplier": {
+            "numerator": 20,
+            "denominator": 100
+          },
+          "cap_minor": 200
+        },
+        {
+          "level": 2,
+          "actual_payment_multiplier": {
+            "numerator": 35,
+            "denominator": 100
+          },
+          "cap_minor": 350
+        },
+        {
+          "level": 3,
+          "actual_payment_multiplier": {
+            "numerator": 50,
+            "denominator": 100
+          },
+          "cap_minor": 500
+        }
+      ],
+      "upgrade_prices_minor": [
+        4500,
+        7000
+      ],
+      "copyable_by_base": false
+    },
+    {
+      "id": "inspection_lamp",
+      "name": "检票灯",
+      "rarity": "common",
+      "purchase_price_minor": 4000,
+      "initial_catalog": true,
+      "trigger": {
+        "ticket_type": "challenge",
+        "phase": "stable_before_next_cell_selection",
+        "target": "one_unrevealed_cell"
+      },
+      "effect": "peek_safe_or_danger",
+      "level_cap": 3,
+      "levels": [
+        {
+          "level": 1,
+          "daily_use_cap": 1,
+          "cells": 1
+        },
+        {
+          "level": 2,
+          "daily_use_cap": 2,
+          "cells": 1
+        },
+        {
+          "level": 3,
+          "daily_use_cap": 3,
+          "cells": 1
+        }
+      ],
+      "upgrade_prices_minor": [
+        6000,
+        9000
+      ],
+      "per_ticket_use_cap": 1,
+      "information_source_exclusive_with": [
+        "reveal_film"
+      ],
+      "daily_usage_key": "item_id",
+      "upgrade_remaining_formula": "new_level_daily_capacity_minus_used_today"
+    },
+    {
+      "id": "cashout_stamp",
+      "name": "收手章",
+      "rarity": "common",
+      "purchase_price_minor": 4500,
+      "initial_catalog": true,
+      "trigger": {
+        "ticket_type": "challenge",
+        "settlement": "voluntary_cashout",
+        "safe_cells_in": [
+          2,
+          3
+        ]
+      },
+      "effect": "fixed_addition",
+      "level_cap": 3,
+      "levels": [
+        {
+          "level": 1,
+          "addition_minor": 400
+        },
+        {
+          "level": 2,
+          "addition_minor": 800
+        },
+        {
+          "level": 3,
+          "addition_minor": 1500
+        }
+      ],
+      "upgrade_prices_minor": [
+        6500,
+        10000
+      ]
+    },
+    {
+      "id": "alternating_stamp",
+      "name": "双面章",
+      "rarity": "rare",
+      "purchase_price_minor": 14000,
+      "initial_catalog": true,
+      "trigger": {
+        "previous_settled_ticket_required": true,
+        "ticket_type_differs_from_previous_settled": true,
+        "raw_prize_gt_minor": 0
+      },
+      "effect": "capped_raw_percentage",
+      "level_cap": 1,
+      "raw_multiplier": {
+        "numerator": 3,
+        "denominator": 4
+      },
+      "cap_minor": 6000
+    },
+    {
+      "id": "recycling_box",
+      "name": "回收匣",
+      "rarity": "rare",
+      "purchase_price_minor": 10000,
+      "initial_catalog": false,
+      "trigger": {
+        "legal_consumable_used_on_ticket": true,
+        "raw_prize_gt_minor": 0
+      },
+      "effect": "fixed_addition",
+      "level_cap": 1,
+      "addition_minor": 3000,
+      "daily_use_cap": 1,
+      "per_ticket_use_cap": 1
+    },
+    {
+      "id": "reserve_box",
+      "name": "备用金盒",
+      "rarity": "rare",
+      "purchase_price_minor": 18000,
+      "initial_catalog": false,
+      "trigger": {
+        "cash_after_ticket_payment_gte_minor": 20000,
+        "raw_prize_gt_minor": 0
+      },
+      "effect": "capped_raw_percentage",
+      "level_cap": 1,
+      "raw_multiplier": {
+        "numerator": 1,
+        "denominator": 1
+      },
+      "cap_minor": 6000
+    },
+    {
+      "id": "emergency_jar",
+      "name": "急用零钱罐",
+      "rarity": "rare",
+      "purchase_price_minor": 8000,
+      "initial_catalog": false,
+      "trigger": {
+        "cash_after_ticket_payment_lte_minor": 5000,
+        "raw_prize_eq_minor": 0
+      },
+      "effect": "fixed_compensation",
+      "level_cap": 1,
+      "addition_minor": 2000,
+      "daily_use_cap": 2,
+      "copyable_by_base": false
+    },
+    {
+      "id": "copy_base",
+      "name": "复印底座",
+      "rarity": "precious",
+      "purchase_price_minor": 30000,
+      "initial_catalog": false,
+      "trigger": {
+        "phase": "settlement",
+        "positive_eligible_source_required": true
+      },
+      "effect": "copy_largest_single_whitelisted_entry",
+      "level_cap": 1,
+      "raw_multiplier": {
+        "numerator": 1,
+        "denominator": 1
+      },
+      "cap_minor": 10000,
+      "per_ticket_use_cap": 1,
+      "copyable_sources": [
+        "raw_prize",
+        "small_prize_box",
+        "ticket_clip",
+        "large_prize_stamp",
+        "cashout_stamp",
+        "alternating_stamp",
+        "recycling_box",
+        "reserve_box",
+        "last_tickets_stamp"
+      ],
+      "excluded_sources": [
+        "loss_mat",
+        "emergency_jar",
+        "seal_sticker",
+        "copy_paper",
+        "any_copy_income"
+      ],
+      "copy_can_trigger_other_effects": false
+    },
+    {
+      "id": "last_tickets_stamp",
+      "name": "尾票加印章",
+      "rarity": "precious",
+      "purchase_price_minor": 14000,
+      "initial_catalog": true,
+      "trigger": {
+        "purchased_ticket_position_in_segment": [
+          10,
+          11,
+          12
+        ],
+        "raw_prize_gt_minor": 0
+      },
+      "effect": "capped_raw_percentage",
+      "level_cap": 1,
+      "raw_multiplier": {
+        "numerator": 2,
+        "denominator": 1
+      },
+      "cap_minor": 30000
+    }
+  ],
+  "inventory": {
+    "special_total_cap": 6,
+    "table_slots": 3,
+    "reserve_slots": 3,
+    "same_special_id_max": 1,
+    "drawer_slots": 2,
+    "drawer_stack_size": 1,
+    "same_consumable_type_may_occupy_two_slots": true,
+    "special_resale_actual_initial_payment_ratio": {
+      "numerator": 1,
+      "denominator": 2
+    },
+    "upgrade_cost_refunded": false,
+    "consumables_resellable": false,
+    "select_legal_sale_before_seventh_purchase": true,
+    "purchase_snapshot_items_sellable_before_settlement": false,
+    "daily_counts_keyed_by_item_id": true,
+    "daily_counts_reset_on_unequip_upgrade_sale_repurchase": false,
+    "reacquired_common_level": 1
+  },
+  "shop": {
+    "special_slots_per_day": 3,
+    "special_rarity_weights": {
+      "common": 800000,
+      "rare": 195000,
+      "precious": 5000
+    },
+    "first_day_guaranteed_distinct_common_slots": 2,
+    "selection": "rarity_first_then_uniform_available_unowned_same_rarity",
+    "same_day_duplicate_specials": false,
+    "empty_rarity_upgrades_to_higher": false,
+    "empty_rarity_probability_redistributed": false,
+    "empty_common_slot": "owned_common_upgrade_entry_or_collected_notice",
+    "ordinary_upgrade_always_available": true,
+    "stock_per_visible_item": 1,
+    "entering_shop_restock": false,
+    "consumables_per_day": 1,
+    "consumable_four_day_batch_each_type_once": true,
+    "consumable_sequence_locked_in_advance": true,
+    "consumable_quality_weights": {
+      "common": 800000,
+      "rare": 190000,
+      "precious": 10000
+    },
+    "unbought_removed_next_day": true,
+    "paid_inventory_carried_across_days": true,
+    "endless_free_skip_day": false,
+    "endless_new_stock_after_segment_settlements": 12
+  },
+  "consumables": [
+    {
+      "id": "reveal_film",
+      "name": "显影片",
+      "ticket_type": "challenge",
+      "timing": "stable_before_next_cell_selection",
+      "qualities": [
+        {
+          "quality": "common",
+          "purchase_price_minor": 1000,
+          "cells": 1
+        },
+        {
+          "quality": "rare",
+          "purchase_price_minor": 3000,
+          "cells": 2
+        },
+        {
+          "quality": "precious",
+          "purchase_price_minor": 6000,
+          "cells": 3
+        }
+      ],
+      "target": "unrevealed_cells",
+      "information": "safe_or_danger_only",
+      "information_source_exclusive_with": [
+        "inspection_lamp"
+      ],
+      "fewer_remaining_cells": "show_actual_count_before_use",
+      "commit": "consume_and_save_before_information_display"
+    },
+    {
+      "id": "seal_sticker",
+      "name": "封存贴",
+      "ticket_type": "challenge",
+      "timing": "at_least_one_safe_cell_before_next_selection",
+      "qualities": [
+        {
+          "quality": "common",
+          "purchase_price_minor": 500,
+          "locked_raw_prize_multiplier": {
+            "numerator": 1,
+            "denominator": 2
+          },
+          "cap_minor": 3000
+        },
+        {
+          "quality": "rare",
+          "purchase_price_minor": 1000,
+          "locked_raw_prize_multiplier": {
+            "numerator": 3,
+            "denominator": 4
+          },
+          "cap_minor": 6000
+        },
+        {
+          "quality": "precious",
+          "purchase_price_minor": 2000,
+          "locked_raw_prize_multiplier": {
+            "numerator": 1,
+            "denominator": 1
+          },
+          "cap_minor": 12000
+        }
+      ],
+      "protection_locks_on_application": true,
+      "pays_only_if_subsequently_busted": true,
+      "stacks_on_normal_cashout": false,
+      "commit": "consume_on_confirm"
+    },
+    {
+      "id": "copy_paper",
+      "name": "中奖复写纸",
+      "ticket_type": "number",
+      "timing": "fully_revealed_before_claim",
+      "qualities": [
+        {
+          "quality": "common",
+          "purchase_price_minor": 3000,
+          "raw_prize_multiplier": {
+            "numerator": 1,
+            "denominator": 1
+          },
+          "cap_minor": 10000
+        },
+        {
+          "quality": "rare",
+          "purchase_price_minor": 4500,
+          "raw_prize_multiplier": {
+            "numerator": 3,
+            "denominator": 2
+          },
+          "cap_minor": 15000
+        },
+        {
+          "quality": "precious",
+          "purchase_price_minor": 6000,
+          "raw_prize_multiplier": {
+            "numerator": 2,
+            "denominator": 1
+          },
+          "cap_minor": 20000
+        }
+      ],
+      "requires_positive_raw_prize": true,
+      "source": "raw_prize_only",
+      "excluded_sources": [
+        "table_additions",
+        "copy_paper",
+        "copy_base",
+        "any_copy_income"
+      ],
+      "commit": "additional_amount_and_consumption_same_transaction"
+    },
+    {
+      "id": "boost_coupon",
+      "name": "冲奖券",
+      "ticket_type": "number",
+      "timing": "before_next_ticket_purchase_confirm",
+      "qualities": [
+        {
+          "quality": "common",
+          "purchase_price_minor": 800,
+          "independent_draws_take_max": 2
+        },
+        {
+          "quality": "rare",
+          "purchase_price_minor": 1600,
+          "independent_draws_take_max": 3
+        },
+        {
+          "quality": "precious",
+          "purchase_price_minor": 3200,
+          "independent_draws_take_max": 5
+        }
+      ],
+      "cancel_before_purchase_consumes": false,
+      "redraw_existing_ticket": false,
+      "display_discarded_draws": false,
+      "commit": "consume_on_ticket_purchase_confirm"
+    }
+  ],
+  "consumable_limits": {
+    "different_types_per_ticket_max": 2,
+    "uses_of_same_type_per_ticket_max": 1,
+    "information_source_per_ticket_max": 1,
+    "buy_does_not_auto_use": true,
+    "display_description_consumes": false
+  },
+  "ticket_snapshot": {
+    "unique_active_ticket": true,
+    "atomic_purchase_fields": [
+      "transaction_id",
+      "ticket_id",
+      "locked_outcome_or_arrangement",
+      "ticket_type",
+      "actual_payment_minor",
+      "ticket_price_minor",
+      "purchased_position_in_day_segment",
+      "previous_settled_ticket_type",
+      "cash_after_ticket_payment_minor",
+      "table_item_ids_levels_and_counter_references",
+      "cash_debit",
+      "occupied_ticket_slot"
+    ],
+    "subsequent_purchase_upgrade_swap_applies_to": "next_ticket",
+    "subsequent_cash_changes_requalify_current_ticket": false,
+    "early_close_changes_ticket_position": false,
+    "selected_cell_commit_before_reveal": true,
+    "settlement_idempotency_key": "ticket_id"
+  },
+  "settlement": {
+    "calculation_order": [
+      "raw_prize",
+      "counter_updates_and_noncopy_table_additions",
+      "copy_base",
+      "consumable_copy_and_protection_and_refunds",
+      "single_wallet_credit"
+    ],
+    "raw_prize_drives_positive_triggers": true,
+    "refund_and_compensation_count_as_positive_raw_prize": false,
+    "copy_recursion": false,
+    "growth_ticket_count_per_settlement": 1
+  },
+  "growth": {
+    "paid_effective_unique_tickets_per_point": 24,
+    "remainder_persists_across_runs": true,
+    "principal_milestone_first_account_rewards": [
+      {
+        "cumulative_principal_minor": 30000,
+        "points": 3
+      },
+      {
+        "cumulative_principal_minor": 150000,
+        "points": 3
+      },
+      {
+        "cumulative_principal_minor": 300000,
+        "points": 6
+      }
+    ],
+    "principal_milestone_rewards_repeat_per_run": false,
+    "early_full_clear_awards_unreceived_milestones": true,
+    "excluded_growth_sources": [
+      "prize_amount",
+      "assets",
+      "interest",
+      "borrowing",
+      "item_sale",
+      "advertisement",
+      "copied_reward",
+      "gift_ticket",
+      "replayed_ticket",
+      "abandoned_unrevealed_ticket",
+      "free_test_ticket"
+    ],
+    "discounted_paid_ticket_qualifies_if_payment_positive_and_day_slot_used": true,
+    "cashout_and_bust_qualify": true,
+    "base_statistics_and_accessibility_unlocked": true,
+    "permanent_nodes": [
+      {
+        "id": 1,
+        "name": "备用金 I",
+        "cost_points": 2,
+        "category": "funding",
+        "effect": "starting_cash_addition",
+        "effective_at": "new_run_creation",
+        "addition_minor": 1000,
+        "cumulative_cap_minor": 1000,
+        "reserve_tier": 1,
+        "purchase_requirements": {
+          "all_of": [],
+          "any_of": []
+        }
+      },
+      {
+        "id": 2,
+        "name": "备用金 II",
+        "cost_points": 3,
+        "category": "funding",
+        "effect": "starting_cash_addition",
+        "effective_at": "new_run_creation",
+        "addition_minor": 1000,
+        "cumulative_cap_minor": 2000,
+        "reserve_tier": 2,
+        "purchase_requirements": {
+          "all_of": [
+            1
+          ],
+          "any_of": []
+        }
+      },
+      {
+        "id": 3,
+        "name": "备用金 III",
+        "cost_points": 4,
+        "category": "funding",
+        "effect": "starting_cash_addition",
+        "effective_at": "new_run_creation",
+        "addition_minor": 1000,
+        "cumulative_cap_minor": 3000,
+        "reserve_tier": 3,
+        "purchase_requirements": {
+          "all_of": [
+            2
+          ],
+          "any_of": []
+        }
+      },
+      {
+        "id": 4,
+        "name": "首次采购",
+        "cost_points": 4,
+        "category": "funding",
+        "effect": "first_special_item_purchase_discount",
+        "effective_at": "new_run_creation",
+        "discount_ratio": {
+          "numerator": 1,
+          "denominator": 10
+        },
+        "discount_cap_minor": 1000,
+        "per_run_uses": 1,
+        "resale_basis": "actual_purchase_payment",
+        "purchase_requirements": {
+          "all_of": [],
+          "any_of": []
+        }
+      },
+      {
+        "id": 5,
+        "name": "首批偏好",
+        "cost_points": 3,
+        "category": "procurement",
+        "effect": "first_day_first_guaranteed_common_slot_preference",
+        "effective_at": "new_run_creation",
+        "choices": [
+          "prize_income",
+          "loss_and_information"
+        ],
+        "extra_slots": 0,
+        "normal_third_slot_changed": false,
+        "purchase_requirements": {
+          "all_of": [],
+          "any_of": []
+        }
+      },
+      {
+        "id": 6,
+        "name": "耗材预订",
+        "cost_points": 3,
+        "category": "procurement",
+        "effect": "first_day_consumable_type_preference",
+        "effective_at": "new_run_creation",
+        "choices": [
+          "number_support",
+          "challenge_support"
+        ],
+        "remaining_three_types_complete_first_four_day_batch": true,
+        "quality_probability_changed": false,
+        "purchase_requirements": {
+          "all_of": [],
+          "any_of": []
+        }
+      },
+      {
+        "id": 7,
+        "name": "留货夹",
+        "cost_points": 4,
+        "category": "procurement",
+        "effect": "hold_one_seen_unpurchased_special_item_overnight",
+        "effective_at": "new_run_creation",
+        "held_slots": 1,
+        "next_day_total_slots": 3,
+        "held_slot_rerolls_rarity": false,
+        "can_hold_rare": true,
+        "creates_unseen_item": false,
+        "purchase_requirements": {
+          "all_of": [],
+          "any_of": []
+        }
+      },
+      {
+        "id": 8,
+        "name": "中途订单",
+        "cost_points": 5,
+        "category": "procurement",
+        "effect": "next_naturally_common_slot_preference",
+        "effective_at": "new_run_creation",
+        "per_run_uses": 1,
+        "select_at": "night",
+        "no_common_slot": "defer",
+        "group_unavailable": "normal_common_selection_and_do_not_consume_order",
+        "consume_at": "successful_application",
+        "purchase_requirements": {
+          "all_of": [],
+          "any_of": []
+        }
+      },
+      {
+        "id": 9,
+        "name": "回收匣目录",
+        "cost_points": 5,
+        "category": "catalog",
+        "effect": "unlock_item_in_existing_rarity_pool",
+        "effective_at": "new_run_creation",
+        "item_id": "recycling_box",
+        "grants_item": false,
+        "purchase_requirements": {
+          "all_of": [],
+          "any_of": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8
+          ]
+        }
+      },
+      {
+        "id": 10,
+        "name": "备用金盒目录",
+        "cost_points": 5,
+        "category": "catalog",
+        "effect": "unlock_item_in_existing_rarity_pool",
+        "effective_at": "new_run_creation",
+        "item_id": "reserve_box",
+        "grants_item": false,
+        "purchase_requirements": {
+          "all_of": [],
+          "any_of": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8
+          ]
+        }
+      },
+      {
+        "id": 11,
+        "name": "急用零钱罐目录",
+        "cost_points": 5,
+        "category": "catalog",
+        "effect": "unlock_item_in_existing_rarity_pool",
+        "effective_at": "new_run_creation",
+        "item_id": "emergency_jar",
+        "grants_item": false,
+        "purchase_requirements": {
+          "all_of": [],
+          "any_of": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8
+          ]
+        }
+      },
+      {
+        "id": 12,
+        "name": "复印底座目录",
+        "cost_points": 5,
+        "category": "catalog",
+        "effect": "unlock_item_in_existing_rarity_pool",
+        "effective_at": "new_run_creation",
+        "item_id": "copy_base",
+        "grants_item": false,
+        "purchase_requirements": {
+          "all_of": [],
+          "any_of": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8
+          ]
+        }
+      },
+      {
+        "id": 13,
+        "name": "旧物回购",
+        "cost_points": 5,
+        "category": "convenience",
+        "effect": "first_paid_item_sale_bonus",
+        "effective_at": "new_run_creation",
+        "actual_purchase_price_ratio": {
+          "numerator": 1,
+          "denominator": 10
+        },
+        "bonus_cap_minor": 1000,
+        "per_run_uses": 1,
+        "requires_positive_purchase_payment": true,
+        "total_resale_strictly_below_purchase_payment": true,
+        "repurchase_resets_uses": false,
+        "purchase_requirements": {
+          "all_of": [],
+          "any_of": [
+            9,
+            10,
+            11,
+            12
+          ]
+        }
+      },
+      {
+        "id": 14,
+        "name": "再订一次",
+        "cost_points": 5,
+        "category": "convenience",
+        "effect": "increase_midrun_order_uses",
+        "effective_at": "new_run_creation",
+        "per_run_uses": 2,
+        "replaces_effect_node_id": 8,
+        "extra_slots": 0,
+        "rarity_changed": false,
+        "purchase_requirements": {
+          "all_of": [
+            8
+          ],
+          "any_of": [
+            9,
+            10,
+            11,
+            12
+          ]
+        }
+      },
+      {
+        "id": 15,
+        "name": "显影熟练",
+        "cost_points": 6,
+        "category": "consumable_mastery",
+        "effect": "first_effective_nonprecious_use_upgrades_one_quality",
+        "effective_at": "new_run_creation",
+        "consumable_id": "reveal_film",
+        "per_run_uses": 1,
+        "quality_map": {
+          "common": "rare",
+          "rare": "precious"
+        },
+        "precious_consumes_mastery": false,
+        "no_actual_improvement_consumes_mastery": false,
+        "cancel_consumes_mastery": false,
+        "debt_clear_resets_mastery": false,
+        "purchase_requirements": {
+          "all_of": [],
+          "any_of": [
+            9,
+            10,
+            11,
+            12
+          ]
+        }
+      },
+      {
+        "id": 16,
+        "name": "封存熟练",
+        "cost_points": 6,
+        "category": "consumable_mastery",
+        "effect": "first_effective_nonprecious_use_upgrades_one_quality",
+        "effective_at": "new_run_creation",
+        "consumable_id": "seal_sticker",
+        "per_run_uses": 1,
+        "quality_map": {
+          "common": "rare",
+          "rare": "precious"
+        },
+        "precious_consumes_mastery": false,
+        "no_actual_improvement_consumes_mastery": false,
+        "cancel_consumes_mastery": false,
+        "debt_clear_resets_mastery": false,
+        "purchase_requirements": {
+          "all_of": [],
+          "any_of": [
+            9,
+            10,
+            11,
+            12
+          ]
+        }
+      },
+      {
+        "id": 17,
+        "name": "复写熟练",
+        "cost_points": 6,
+        "category": "consumable_mastery",
+        "effect": "first_effective_nonprecious_use_upgrades_one_quality",
+        "effective_at": "new_run_creation",
+        "consumable_id": "copy_paper",
+        "per_run_uses": 1,
+        "quality_map": {
+          "common": "rare",
+          "rare": "precious"
+        },
+        "precious_consumes_mastery": false,
+        "no_actual_improvement_consumes_mastery": false,
+        "cancel_consumes_mastery": false,
+        "debt_clear_resets_mastery": false,
+        "purchase_requirements": {
+          "all_of": [],
+          "any_of": [
+            9,
+            10,
+            11,
+            12
+          ]
+        }
+      },
+      {
+        "id": 18,
+        "name": "冲奖熟练",
+        "cost_points": 6,
+        "category": "consumable_mastery",
+        "effect": "first_effective_nonprecious_use_upgrades_one_quality",
+        "effective_at": "new_run_creation",
+        "consumable_id": "boost_coupon",
+        "per_run_uses": 1,
+        "quality_map": {
+          "common": "rare",
+          "rare": "precious"
+        },
+        "precious_consumes_mastery": false,
+        "no_actual_improvement_consumes_mastery": false,
+        "cancel_consumes_mastery": false,
+        "debt_clear_resets_mastery": false,
+        "purchase_requirements": {
+          "all_of": [],
+          "any_of": [
+            9,
+            10,
+            11,
+            12
+          ]
+        }
+      },
+      {
+        "id": 19,
+        "name": "桌面外观",
+        "cost_points": 3,
+        "category": "display",
+        "effect": "cosmetic_material_variants",
+        "effective_at": "new_run_creation",
+        "changes_odds": false,
+        "changes_prices": false,
+        "changes_slots": false,
+        "purchase_requirements": {
+          "all_of": [],
+          "any_of": [
+            9,
+            10,
+            11,
+            12
+          ]
+        }
+      },
+      {
+        "id": 20,
+        "name": "纪念票展示",
+        "cost_points": 7,
+        "category": "display",
+        "effect": "display_one_settled_personal_high_prize_ticket",
+        "effective_at": "new_run_creation",
+        "display_slots": 1,
+        "replacement_price_minor": 0,
+        "claimable_again": false,
+        "base_statistics_available_without_node": true,
+        "purchase_requirements": {
+          "all_of": [],
+          "any_of": [
+            9,
+            10,
+            11,
+            12
+          ]
+        }
+      }
+    ],
+    "total_tree_cost_points": 92,
+    "starting_cash_addition_cap_minor": 3000,
+    "consumable_mastery_effective_uses_cap_per_run": 4,
+    "current_endless_spending_applies_immediately": false,
+    "points_can_accumulate_after_tree_max": true,
+    "catalog_current_run_refresh": false,
+    "mastery_resets_at": "new_run_creation",
+    "preference_groups": {
+      "prize_income": [
+        "small_prize_box",
+        "ticket_clip",
+        "large_prize_stamp",
+        "cashout_stamp"
+      ],
+      "loss_and_information": [
+        "loss_mat",
+        "inspection_lamp"
+      ],
+      "number_support": [
+        "copy_paper",
+        "boost_coupon"
+      ],
+      "challenge_support": [
+        "reveal_film",
+        "seal_sticker"
+      ]
+    },
+    "purchase_graph": {
+      "algorithm": "G-1",
+      "layers": {
+        "A": [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8
+        ],
+        "B": [
+          9,
+          10,
+          11,
+          12
+        ],
+        "C": [
+          13,
+          14,
+          15,
+          16,
+          17,
+          18,
+          19,
+          20
+        ]
+      },
+      "layer_requirements": {
+        "A": [],
+        "B": [
+          {
+            "operator": "any",
+            "node_ids": [
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              7,
+              8
+            ]
+          }
+        ],
+        "C": [
+          {
+            "operator": "any",
+            "node_ids": [
+              9,
+              10,
+              11,
+              12
+            ]
+          }
+        ]
+      },
+      "explicit_dependencies": {
+        "2": [
+          1
+        ],
+        "3": [
+          2
+        ],
+        "14": [
+          8
+        ]
+      },
+      "already_owned_repurchase": false,
+      "extra_prerequisite_cost_points": 0,
+      "require_previous_clear": false,
+      "require_advertisement": false,
+      "all_nodes_visible": true,
+      "purchase_eligibility_updates_immediately": true,
+      "effects_apply": "new_run_only",
+      "order_14_operation": "replace_capacity_with_2",
+      "account_purchase_idempotency": "transaction_id_and_node_ownership"
+    },
+    "milestone_timing": {
+      "algorithm": "M-N",
+      "partial_repayment_awards_immediately": false,
+      "award_trigger": "successful_corresponding_night_bill",
+      "night_bill_must_pay_all_due_interest": true,
+      "only_corresponding_night_node": true,
+      "early_full_clear_awards_all_unreceived": true,
+      "principal_zero_with_unpaid_interest_is_clear": false,
+      "reward_scope": "account_once",
+      "principal_progress_scope": "current_run",
+      "standard_schedule_source": "debt.standard.cumulative_principal_schedule",
+      "advanced_schedule_source": "debt.advanced_candidate.cumulative_principal_schedule",
+      "advanced_uses_same_account_reward_ids": true,
+      "commit_together": [
+        "principal_payment",
+        "interest_payment",
+        "cash_change",
+        "account_points",
+        "account_milestone_flags",
+        "transaction_receipt"
+      ]
+    }
+  },
+  "advertisement": {
+    "discount_ratio": {
+      "numerator": 1,
+      "denominator": 2
+    },
+    "same_item_quality_and_stock": true,
+    "daily_success_cap": 1,
+    "qualification_capacity": 1,
+    "new_settlements_since_previous_success_required": 12,
+    "first_use_minimum_total_settlements": 12,
+    "first_launch_seconds_minimum": 60,
+    "show_on_tutorial_day": false,
+    "adds_stock": false,
+    "changes_odds": false,
+    "clear_resets_cooldown": false
+  },
+  "flow": {
+    "realtime_advances_day": false,
+    "unsettled_ticket_allows_early_close": false,
+    "full_day_enters_closing_preparation": true,
+    "closing_preparation_allows": [
+      "claim_current_ticket",
+      "buy_remaining_daily_stock",
+      "configure_next_ticket",
+      "repay",
+      "legal_borrow"
+    ],
+    "closing_preparation_allows_new_ticket": false,
+    "interest_continues_in_endless": false
+  }
+}

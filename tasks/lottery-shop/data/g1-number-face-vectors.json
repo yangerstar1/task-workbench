@@ -1,0 +1,695 @@
+{
+  "schemaVersion": 1,
+  "rulesSha256": "e959108cb2a4ef080862565de5b87814ccdfae14026204227e767d049bbdf668",
+  "numberFaces": [
+    {
+      "input": {
+        "ticket_id": "EX-1000-0",
+        "ticket_price_minor": 1000,
+        "locked_raw_prize_minor": 0,
+        "display_master_seed": "g1-fixed-example",
+        "display_domain": "EX-1000-0"
+      },
+      "face": {
+        "ticket_id": "EX-1000-0",
+        "generator_version": "number-face-n1-sha256-v1",
+        "ticket_price_minor": 1000,
+        "locked_raw_prize_minor": 0,
+        "public_number": 22,
+        "cells": [
+          {
+            "number": 48,
+            "amount_minor": 500
+          },
+          {
+            "number": 21,
+            "amount_minor": 1000
+          },
+          {
+            "number": 42,
+            "amount_minor": 1000
+          },
+          {
+            "number": 25,
+            "amount_minor": 500
+          },
+          {
+            "number": 18,
+            "amount_minor": 500
+          },
+          {
+            "number": 49,
+            "amount_minor": 5000
+          }
+        ]
+      },
+      "claim_minor": 0
+    },
+    {
+      "input": {
+        "ticket_id": "EX-1000-1",
+        "ticket_price_minor": 1000,
+        "locked_raw_prize_minor": 500,
+        "display_master_seed": "g1-fixed-example",
+        "display_domain": "EX-1000-1"
+      },
+      "face": {
+        "ticket_id": "EX-1000-1",
+        "generator_version": "number-face-n1-sha256-v1",
+        "ticket_price_minor": 1000,
+        "locked_raw_prize_minor": 500,
+        "public_number": 11,
+        "cells": [
+          {
+            "number": 48,
+            "amount_minor": 2000
+          },
+          {
+            "number": 11,
+            "amount_minor": 500
+          },
+          {
+            "number": 47,
+            "amount_minor": 1000
+          },
+          {
+            "number": 29,
+            "amount_minor": 5000
+          },
+          {
+            "number": 23,
+            "amount_minor": 500
+          },
+          {
+            "number": 6,
+            "amount_minor": 2000
+          }
+        ]
+      },
+      "claim_minor": 500
+    },
+    {
+      "input": {
+        "ticket_id": "EX-1000-2",
+        "ticket_price_minor": 1000,
+        "locked_raw_prize_minor": 1000,
+        "display_master_seed": "g1-fixed-example",
+        "display_domain": "EX-1000-2"
+      },
+      "face": {
+        "ticket_id": "EX-1000-2",
+        "generator_version": "number-face-n1-sha256-v1",
+        "ticket_price_minor": 1000,
+        "locked_raw_prize_minor": 1000,
+        "public_number": 40,
+        "cells": [
+          {
+            "number": 44,
+            "amount_minor": 500
+          },
+          {
+            "number": 34,
+            "amount_minor": 2000
+          },
+          {
+            "number": 49,
+            "amount_minor": 2000
+          },
+          {
+            "number": 18,
+            "amount_minor": 5000
+          },
+          {
+            "number": 40,
+            "amount_minor": 1000
+          },
+          {
+            "number": 1,
+            "amount_minor": 5000
+          }
+        ]
+      },
+      "claim_minor": 1000
+    },
+    {
+      "input": {
+        "ticket_id": "EX-1000-3",
+        "ticket_price_minor": 1000,
+        "locked_raw_prize_minor": 2000,
+        "display_master_seed": "g1-fixed-example",
+        "display_domain": "EX-1000-3"
+      },
+      "face": {
+        "ticket_id": "EX-1000-3",
+        "generator_version": "number-face-n1-sha256-v1",
+        "ticket_price_minor": 1000,
+        "locked_raw_prize_minor": 2000,
+        "public_number": 26,
+        "cells": [
+          {
+            "number": 49,
+            "amount_minor": 1000
+          },
+          {
+            "number": 7,
+            "amount_minor": 1000
+          },
+          {
+            "number": 38,
+            "amount_minor": 500
+          },
+          {
+            "number": 34,
+            "amount_minor": 500
+          },
+          {
+            "number": 43,
+            "amount_minor": 5000
+          },
+          {
+            "number": 26,
+            "amount_minor": 2000
+          }
+        ]
+      },
+      "claim_minor": 2000
+    },
+    {
+      "input": {
+        "ticket_id": "EX-1000-4",
+        "ticket_price_minor": 1000,
+        "locked_raw_prize_minor": 5000,
+        "display_master_seed": "g1-fixed-example",
+        "display_domain": "EX-1000-4"
+      },
+      "face": {
+        "ticket_id": "EX-1000-4",
+        "generator_version": "number-face-n1-sha256-v1",
+        "ticket_price_minor": 1000,
+        "locked_raw_prize_minor": 5000,
+        "public_number": 1,
+        "cells": [
+          {
+            "number": 38,
+            "amount_minor": 1000
+          },
+          {
+            "number": 31,
+            "amount_minor": 500
+          },
+          {
+            "number": 21,
+            "amount_minor": 2000
+          },
+          {
+            "number": 23,
+            "amount_minor": 1000
+          },
+          {
+            "number": 28,
+            "amount_minor": 1000
+          },
+          {
+            "number": 1,
+            "amount_minor": 5000
+          }
+        ]
+      },
+      "claim_minor": 5000
+    },
+    {
+      "input": {
+        "ticket_id": "EX-1000-5",
+        "ticket_price_minor": 1000,
+        "locked_raw_prize_minor": 20000,
+        "display_master_seed": "g1-fixed-example",
+        "display_domain": "EX-1000-5"
+      },
+      "face": {
+        "ticket_id": "EX-1000-5",
+        "generator_version": "number-face-n1-sha256-v1",
+        "ticket_price_minor": 1000,
+        "locked_raw_prize_minor": 20000,
+        "public_number": 39,
+        "cells": [
+          {
+            "number": 37,
+            "amount_minor": 5000
+          },
+          {
+            "number": 5,
+            "amount_minor": 1000
+          },
+          {
+            "number": 39,
+            "amount_minor": 20000
+          },
+          {
+            "number": 16,
+            "amount_minor": 500
+          },
+          {
+            "number": 38,
+            "amount_minor": 1000
+          },
+          {
+            "number": 2,
+            "amount_minor": 500
+          }
+        ]
+      },
+      "claim_minor": 20000
+    },
+    {
+      "input": {
+        "ticket_id": "EX-1000-6",
+        "ticket_price_minor": 1000,
+        "locked_raw_prize_minor": 100000,
+        "display_master_seed": "g1-fixed-example",
+        "display_domain": "EX-1000-6"
+      },
+      "face": {
+        "ticket_id": "EX-1000-6",
+        "generator_version": "number-face-n1-sha256-v1",
+        "ticket_price_minor": 1000,
+        "locked_raw_prize_minor": 100000,
+        "public_number": 13,
+        "cells": [
+          {
+            "number": 21,
+            "amount_minor": 5000
+          },
+          {
+            "number": 30,
+            "amount_minor": 500
+          },
+          {
+            "number": 8,
+            "amount_minor": 5000
+          },
+          {
+            "number": 26,
+            "amount_minor": 500
+          },
+          {
+            "number": 39,
+            "amount_minor": 1000
+          },
+          {
+            "number": 13,
+            "amount_minor": 100000
+          }
+        ]
+      },
+      "claim_minor": 100000
+    },
+    {
+      "input": {
+        "ticket_id": "EX-1000-7",
+        "ticket_price_minor": 1000,
+        "locked_raw_prize_minor": 1000000,
+        "display_master_seed": "g1-fixed-example",
+        "display_domain": "EX-1000-7"
+      },
+      "face": {
+        "ticket_id": "EX-1000-7",
+        "generator_version": "number-face-n1-sha256-v1",
+        "ticket_price_minor": 1000,
+        "locked_raw_prize_minor": 1000000,
+        "public_number": 40,
+        "cells": [
+          {
+            "number": 45,
+            "amount_minor": 2000
+          },
+          {
+            "number": 44,
+            "amount_minor": 1000
+          },
+          {
+            "number": 14,
+            "amount_minor": 2000
+          },
+          {
+            "number": 41,
+            "amount_minor": 2000
+          },
+          {
+            "number": 19,
+            "amount_minor": 2000
+          },
+          {
+            "number": 40,
+            "amount_minor": 1000000
+          }
+        ]
+      },
+      "claim_minor": 1000000
+    },
+    {
+      "input": {
+        "ticket_id": "EX-5000-0",
+        "ticket_price_minor": 5000,
+        "locked_raw_prize_minor": 0,
+        "display_master_seed": "g1-fixed-example",
+        "display_domain": "EX-5000-0"
+      },
+      "face": {
+        "ticket_id": "EX-5000-0",
+        "generator_version": "number-face-n1-sha256-v1",
+        "ticket_price_minor": 5000,
+        "locked_raw_prize_minor": 0,
+        "public_number": 28,
+        "cells": [
+          {
+            "number": 43,
+            "amount_minor": 25000
+          },
+          {
+            "number": 41,
+            "amount_minor": 2500
+          },
+          {
+            "number": 16,
+            "amount_minor": 2500
+          },
+          {
+            "number": 9,
+            "amount_minor": 2500
+          },
+          {
+            "number": 36,
+            "amount_minor": 25000
+          },
+          {
+            "number": 49,
+            "amount_minor": 25000
+          }
+        ]
+      },
+      "claim_minor": 0
+    },
+    {
+      "input": {
+        "ticket_id": "EX-5000-1",
+        "ticket_price_minor": 5000,
+        "locked_raw_prize_minor": 2500,
+        "display_master_seed": "g1-fixed-example",
+        "display_domain": "EX-5000-1"
+      },
+      "face": {
+        "ticket_id": "EX-5000-1",
+        "generator_version": "number-face-n1-sha256-v1",
+        "ticket_price_minor": 5000,
+        "locked_raw_prize_minor": 2500,
+        "public_number": 19,
+        "cells": [
+          {
+            "number": 49,
+            "amount_minor": 5000
+          },
+          {
+            "number": 19,
+            "amount_minor": 2500
+          },
+          {
+            "number": 13,
+            "amount_minor": 25000
+          },
+          {
+            "number": 40,
+            "amount_minor": 25000
+          },
+          {
+            "number": 4,
+            "amount_minor": 10000
+          },
+          {
+            "number": 21,
+            "amount_minor": 25000
+          }
+        ]
+      },
+      "claim_minor": 2500
+    },
+    {
+      "input": {
+        "ticket_id": "EX-5000-2",
+        "ticket_price_minor": 5000,
+        "locked_raw_prize_minor": 5000,
+        "display_master_seed": "g1-fixed-example",
+        "display_domain": "EX-5000-2"
+      },
+      "face": {
+        "ticket_id": "EX-5000-2",
+        "generator_version": "number-face-n1-sha256-v1",
+        "ticket_price_minor": 5000,
+        "locked_raw_prize_minor": 5000,
+        "public_number": 13,
+        "cells": [
+          {
+            "number": 13,
+            "amount_minor": 5000
+          },
+          {
+            "number": 2,
+            "amount_minor": 5000
+          },
+          {
+            "number": 12,
+            "amount_minor": 25000
+          },
+          {
+            "number": 29,
+            "amount_minor": 10000
+          },
+          {
+            "number": 1,
+            "amount_minor": 25000
+          },
+          {
+            "number": 34,
+            "amount_minor": 25000
+          }
+        ]
+      },
+      "claim_minor": 5000
+    },
+    {
+      "input": {
+        "ticket_id": "EX-5000-3",
+        "ticket_price_minor": 5000,
+        "locked_raw_prize_minor": 10000,
+        "display_master_seed": "g1-fixed-example",
+        "display_domain": "EX-5000-3"
+      },
+      "face": {
+        "ticket_id": "EX-5000-3",
+        "generator_version": "number-face-n1-sha256-v1",
+        "ticket_price_minor": 5000,
+        "locked_raw_prize_minor": 10000,
+        "public_number": 19,
+        "cells": [
+          {
+            "number": 4,
+            "amount_minor": 2500
+          },
+          {
+            "number": 2,
+            "amount_minor": 2500
+          },
+          {
+            "number": 7,
+            "amount_minor": 25000
+          },
+          {
+            "number": 32,
+            "amount_minor": 10000
+          },
+          {
+            "number": 19,
+            "amount_minor": 10000
+          },
+          {
+            "number": 18,
+            "amount_minor": 25000
+          }
+        ]
+      },
+      "claim_minor": 10000
+    },
+    {
+      "input": {
+        "ticket_id": "EX-5000-4",
+        "ticket_price_minor": 5000,
+        "locked_raw_prize_minor": 25000,
+        "display_master_seed": "g1-fixed-example",
+        "display_domain": "EX-5000-4"
+      },
+      "face": {
+        "ticket_id": "EX-5000-4",
+        "generator_version": "number-face-n1-sha256-v1",
+        "ticket_price_minor": 5000,
+        "locked_raw_prize_minor": 25000,
+        "public_number": 25,
+        "cells": [
+          {
+            "number": 29,
+            "amount_minor": 5000
+          },
+          {
+            "number": 25,
+            "amount_minor": 25000
+          },
+          {
+            "number": 11,
+            "amount_minor": 2500
+          },
+          {
+            "number": 30,
+            "amount_minor": 25000
+          },
+          {
+            "number": 28,
+            "amount_minor": 10000
+          },
+          {
+            "number": 10,
+            "amount_minor": 5000
+          }
+        ]
+      },
+      "claim_minor": 25000
+    },
+    {
+      "input": {
+        "ticket_id": "EX-5000-5",
+        "ticket_price_minor": 5000,
+        "locked_raw_prize_minor": 100000,
+        "display_master_seed": "g1-fixed-example",
+        "display_domain": "EX-5000-5"
+      },
+      "face": {
+        "ticket_id": "EX-5000-5",
+        "generator_version": "number-face-n1-sha256-v1",
+        "ticket_price_minor": 5000,
+        "locked_raw_prize_minor": 100000,
+        "public_number": 1,
+        "cells": [
+          {
+            "number": 32,
+            "amount_minor": 10000
+          },
+          {
+            "number": 25,
+            "amount_minor": 10000
+          },
+          {
+            "number": 31,
+            "amount_minor": 5000
+          },
+          {
+            "number": 1,
+            "amount_minor": 100000
+          },
+          {
+            "number": 21,
+            "amount_minor": 5000
+          },
+          {
+            "number": 29,
+            "amount_minor": 2500
+          }
+        ]
+      },
+      "claim_minor": 100000
+    },
+    {
+      "input": {
+        "ticket_id": "EX-5000-6",
+        "ticket_price_minor": 5000,
+        "locked_raw_prize_minor": 500000,
+        "display_master_seed": "g1-fixed-example",
+        "display_domain": "EX-5000-6"
+      },
+      "face": {
+        "ticket_id": "EX-5000-6",
+        "generator_version": "number-face-n1-sha256-v1",
+        "ticket_price_minor": 5000,
+        "locked_raw_prize_minor": 500000,
+        "public_number": 47,
+        "cells": [
+          {
+            "number": 19,
+            "amount_minor": 10000
+          },
+          {
+            "number": 25,
+            "amount_minor": 5000
+          },
+          {
+            "number": 4,
+            "amount_minor": 5000
+          },
+          {
+            "number": 46,
+            "amount_minor": 5000
+          },
+          {
+            "number": 47,
+            "amount_minor": 500000
+          },
+          {
+            "number": 31,
+            "amount_minor": 25000
+          }
+        ]
+      },
+      "claim_minor": 500000
+    },
+    {
+      "input": {
+        "ticket_id": "EX-5000-7",
+        "ticket_price_minor": 5000,
+        "locked_raw_prize_minor": 5000000,
+        "display_master_seed": "g1-fixed-example",
+        "display_domain": "EX-5000-7"
+      },
+      "face": {
+        "ticket_id": "EX-5000-7",
+        "generator_version": "number-face-n1-sha256-v1",
+        "ticket_price_minor": 5000,
+        "locked_raw_prize_minor": 5000000,
+        "public_number": 17,
+        "cells": [
+          {
+            "number": 3,
+            "amount_minor": 5000
+          },
+          {
+            "number": 49,
+            "amount_minor": 5000
+          },
+          {
+            "number": 41,
+            "amount_minor": 5000
+          },
+          {
+            "number": 47,
+            "amount_minor": 2500
+          },
+          {
+            "number": 17,
+            "amount_minor": 5000000
+          },
+          {
+            "number": 5,
+            "amount_minor": 25000
+          }
+        ]
+      },
+      "claim_minor": 5000000
+    }
+  ],
+  "scope": "G1_DETERMINISTIC_REFERENCE_VECTORS_NOT_DEVICE_EVIDENCE"
+}

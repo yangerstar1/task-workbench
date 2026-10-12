@@ -1,0 +1,249 @@
+name: Lottery G2 isolated technical slice
+on:
+  push:
+    branches: [lottery-shop-g0-20261011]
+    paths: [tasks/lottery-shop/ci/g2-request.json]
+permissions:
+  contents: read
+concurrency:
+  group: unity-personal-proof
+  cancel-in-progress: false
+jobs:
+  tests:
+    name: Exact EditMode then graphical PlayMode
+    if: >-
+      github.event_name == 'push' && github.repository == 'yangerstar1/task-workbench' &&
+      github.repository_owner == 'yangerstar1' && github.actor == 'yangerstar1' &&
+      github.triggering_actor == 'yangerstar1' && github.ref == 'refs/heads/lottery-shop-g0-20261011' &&
+      github.event.repository.private == false && github.event.repository.fork == false && github.event.deleted == false
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    outputs:
+      edit_passed: ${{ steps.editverify.outputs.edit_passed }}
+      play_passed: ${{ steps.playverify.outputs.play_passed }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+          lfs: false
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /tasks/lottery-shop/
+            /.github/workflows/lottery-g2.yml
+      - name: Verify exact request, rules, lock and test contract
+        id: guard
+        run: python3 tasks/lottery-shop/scripts/g2_ci.py guard
+      - name: Local validators with synthetic fixtures only
+        run: PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tasks/lottery-shop/scripts -p 'test_*.py' -v
+      - name: Kill and restart the same pure Core in a Linux .NET process
+        run: python3 tasks/lottery-shop/scripts/run_g2_process_probe.py
+      - name: Prepare disposable runner after the .NET probe
+        run: bash tasks/lottery-shop/scripts/prepare_g2_runner.sh
+      - name: Restore licensed font and record EditMode source baseline
+        run: |
+          python3 tasks/lottery-shop/scripts/g2_ci.py restore-font
+          python3 tasks/lottery-shop/scripts/g2_ci.py snapshot --stage edit
+      - name: Native G0 regression plus exact G2 EditMode cases
+        id: edit
+        uses: game-ci/unity-test-runner@0ff419b913a3630032cbe0de48a0099b5a9f0ed9
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+        with:
+          unityVersion: 6000.3.19f1
+          projectPath: tasks/lottery-shop/unity
+          testMode: editmode
+          artifactsPath: tasks/lottery-shop/artifacts/g2-edit
+          customParameters: >-
+            -assemblyNames Lottery.Probe.Tests;Lottery.G2.EditMode.Tests
+            -job-worker-count 2 -probeCommit ${{ github.sha }} -probeRunId ${{ github.run_id }}
+          dockerCpuLimit: 2
+          dockerMemoryLimit: 12g
+      - name: Validate exact separate assembly identities and safe original XML
+        id: editverify
+        if: ${{ always() && steps.guard.outcome == 'success' && steps.edit.outcome != 'skipped' }}
+        run: python3 tasks/lottery-shop/scripts/g2_ci.py tests --stage edit
+      - name: Audit EditMode source against restored baseline
+        id: editaudit
+        if: ${{ always() && steps.guard.outcome == 'success' && steps.edit.outcome != 'skipped' }}
+        run: python3 tasks/lottery-shop/scripts/g2_ci.py audit --stage edit
+      - name: Record PlayMode baseline after successful EditMode gate
+        run: python3 tasks/lottery-shop/scripts/g2_ci.py snapshot --stage play
+      # Same workspace keeps this job's Library import; no external cache is restored.
+      # testMode=all is deliberately not used: that pinned action runs Play before Edit.
+      - name: Native PlayMode with an actual graphics device
+        id: play
+        uses: game-ci/unity-test-runner@0ff419b913a3630032cbe0de48a0099b5a9f0ed9
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+        with:
+          unityVersion: 6000.3.19f1
+          projectPath: tasks/lottery-shop/unity
+          testMode: playmode
+          artifactsPath: tasks/lottery-shop/artifacts/g2-play
+          customParameters: >-
+            -assemblyNames Lottery.G2.PlayMode.Tests -force-glcore
+            -screen-width 1280 -screen-height 720 -job-worker-count 2
+            -probeCommit ${{ github.sha }} -probeRunId ${{ github.run_id }}
+          dockerCpuLimit: 2
+          dockerMemoryLimit: 12g
+      - name: Validate exact PlayMode cases and safe original XML
+        id: playverify
+        if: ${{ always() && steps.guard.outcome == 'success' && steps.play.outcome != 'skipped' }}
+        run: python3 tasks/lottery-shop/scripts/g2_ci.py tests --stage play
+      - name: Validate four original camera frames and state-bound receipt
+        id: captures
+        if: ${{ always() && steps.playverify.outcome == 'success' }}
+        run: python3 tasks/lottery-shop/scripts/g2_ci.py captures --stage play
+      - name: Audit PlayMode source
+        id: playaudit
+        if: ${{ always() && steps.guard.outcome == 'success' && steps.play.outcome != 'skipped' }}
+        run: python3 tasks/lottery-shop/scripts/g2_ci.py audit --stage play
+      - name: Export only bounded non-APK evidence
+        if: ${{ always() && steps.guard.outcome == 'success' }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: lottery-g2-tests-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            tasks/lottery-shop/evidence/g2/process/process-receipt.json
+            tasks/lottery-shop/evidence/g2/edit/guard-receipt.json
+            tasks/lottery-shop/evidence/g2/edit/font-receipt.json
+            tasks/lottery-shop/evidence/g2/edit/raw-test-results.xml
+            tasks/lottery-shop/evidence/g2/edit/raw-test-report-receipt.json
+            tasks/lottery-shop/evidence/g2/edit/test-results.xml
+            tasks/lottery-shop/evidence/g2/edit/test-receipt.json
+            tasks/lottery-shop/evidence/g2/edit/source-mutations.json
+            tasks/lottery-shop/evidence/g2/edit/manifest-before.json
+            tasks/lottery-shop/evidence/g2/edit/manifest-after.json
+            tasks/lottery-shop/evidence/g2/edit/manifest-diagnostic.json
+            tasks/lottery-shop/evidence/g2/edit/generated-manifest.json
+            tasks/lottery-shop/evidence/g2/edit/generated-assets.zip
+            tasks/lottery-shop/evidence/g2/edit/packages-lock.json
+            tasks/lottery-shop/evidence/g2/play/guard-receipt.json
+            tasks/lottery-shop/evidence/g2/play/font-receipt.json
+            tasks/lottery-shop/evidence/g2/play/raw-test-results.xml
+            tasks/lottery-shop/evidence/g2/play/raw-test-report-receipt.json
+            tasks/lottery-shop/evidence/g2/play/test-results.xml
+            tasks/lottery-shop/evidence/g2/play/test-receipt.json
+            tasks/lottery-shop/evidence/g2/play/source-mutations.json
+            tasks/lottery-shop/evidence/g2/play/manifest-before.json
+            tasks/lottery-shop/evidence/g2/play/manifest-after.json
+            tasks/lottery-shop/evidence/g2/play/manifest-diagnostic.json
+            tasks/lottery-shop/evidence/g2/play/generated-manifest.json
+            tasks/lottery-shop/evidence/g2/play/generated-assets.zip
+            tasks/lottery-shop/evidence/g2/play/packages-lock.json
+            tasks/lottery-shop/evidence/g2/play/initial.png
+            tasks/lottery-shop/evidence/g2/play/half.png
+            tasks/lottery-shop/evidence/g2/play/revealed.png
+            tasks/lottery-shop/evidence/g2/play/settled.png
+            tasks/lottery-shop/evidence/g2/play/render-receipt.json
+          if-no-files-found: ignore
+          retention-days: 7
+  android:
+    name: Independent cold ARM64 IL2CPP build
+    needs: tests
+    if: >-
+      needs.tests.result == 'success' && needs.tests.outputs.edit_passed == 'true' && needs.tests.outputs.play_passed == 'true' &&
+      github.event_name == 'push' && github.repository == 'yangerstar1/task-workbench' &&
+      github.repository_owner == 'yangerstar1' && github.actor == 'yangerstar1' &&
+      github.triggering_actor == 'yangerstar1' && github.ref == 'refs/heads/lottery-shop-g0-20261011' &&
+      github.event.repository.private == false && github.event.repository.fork == false && github.event.deleted == false
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+          lfs: false
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /tasks/lottery-shop/
+            /.github/workflows/lottery-g2.yml
+      - name: Verify request, rules, lock and contract
+        id: guard
+        run: python3 tasks/lottery-shop/scripts/g2_ci.py guard --stage android
+      - name: Prepare disposable runner
+        run: bash tasks/lottery-shop/scripts/prepare_g2_runner.sh
+      - name: Restore licensed font and record independent source baseline
+        run: |
+          python3 tasks/lottery-shop/scripts/g2_ci.py restore-font --stage android
+          python3 tasks/lottery-shop/scripts/g2_ci.py snapshot --stage android
+      - name: Build the G2 development slice
+        id: unity
+        uses: game-ci/unity-builder@d829bfc901f2347c8fe18898f06712b66916ef42
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+        with:
+          unityVersion: 6000.3.19f1
+          projectPath: tasks/lottery-shop/unity
+          targetPlatform: Android
+          buildMethod: Lottery.G2.Editor.G2Build.BuildAndroid
+          buildName: LotteryG2
+          buildsPath: tasks/lottery-shop/build/G2
+          androidTargetSdkVersion: 35
+          androidExportType: androidPackage
+          versioning: Custom
+          version: 0.0.2
+          androidVersionCode: 2
+          dockerCpuLimit: 2
+          dockerMemoryLimit: 12g
+          allowDirtyBuild: true
+          customParameters: >-
+            -job-worker-count 2 -probeCommit ${{ github.sha }} -probeRunId ${{ github.run_id }}
+      - name: Verify native APK, source identity and frozen rules
+        id: verify
+        if: ${{ always() && steps.guard.outcome == 'success' && steps.unity.outcome == 'success' }}
+        run: python3 tasks/lottery-shop/scripts/g2_ci.py apk --stage android
+      - name: Audit Android source changes
+        id: audit
+        if: ${{ always() && steps.guard.outcome == 'success' && steps.unity.outcome != 'skipped' }}
+        run: python3 tasks/lottery-shop/scripts/g2_ci.py audit --stage android
+      - name: Upload only verified APK candidate and bounded evidence
+        if: ${{ always() && steps.guard.outcome == 'success' && steps.verify.outcome == 'success' && steps.audit.outcome == 'success' }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: lottery-g2-android-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            tasks/lottery-shop/build/G2/Android/LotteryG2.apk
+            tasks/lottery-shop/build/G2/Android/build-receipt.json
+            tasks/lottery-shop/build/G2/Android/resolved-packages.txt
+            tasks/lottery-shop/evidence/g2/android/guard-receipt.json
+            tasks/lottery-shop/evidence/g2/android/font-receipt.json
+            tasks/lottery-shop/evidence/g2/android/apk-receipt.json
+            tasks/lottery-shop/evidence/g2/android/source-mutations.json
+            tasks/lottery-shop/evidence/g2/android/manifest-before.json
+            tasks/lottery-shop/evidence/g2/android/manifest-after.json
+            tasks/lottery-shop/evidence/g2/android/manifest-diagnostic.json
+            tasks/lottery-shop/evidence/g2/android/generated-manifest.json
+            tasks/lottery-shop/evidence/g2/android/generated-assets.zip
+            tasks/lottery-shop/evidence/g2/android/packages-lock.json
+          if-no-files-found: error
+          retention-days: 7
+      - name: Create bounded non-candidate failure diagnosis
+        id: diagnostics
+        if: ${{ always() && steps.guard.outcome == 'success' && (steps.verify.outcome != 'success' || steps.audit.outcome != 'success') }}
+        run: >-
+          python3 tasks/lottery-shop/scripts/g2_ci.py diagnostics --stage android
+          --unity-outcome '${{ steps.unity.outcome }}' --verify-outcome '${{ steps.verify.outcome }}' --audit-outcome '${{ steps.audit.outcome }}'
+      - name: Export fixed small Android failure diagnosis
+        if: ${{ always() && steps.diagnostics.outcome == 'success' }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: lottery-g2-android-diagnostics-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            tasks/lottery-shop/evidence/g2/android/diagnostic-receipt.json
+            tasks/lottery-shop/evidence/g2/android/guard-receipt.json
+            tasks/lottery-shop/evidence/g2/android/font-receipt.json
+            tasks/lottery-shop/evidence/g2/android/source-mutations.json
+            tasks/lottery-shop/evidence/g2/android/manifest-before.json
+            tasks/lottery-shop/evidence/g2/android/manifest-after.json
+            tasks/lottery-shop/evidence/g2/android/manifest-diagnostic.json
+          if-no-files-found: error
+          retention-days: 7

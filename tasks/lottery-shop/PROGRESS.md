@@ -1,18 +1,11 @@
-# Progress checkpoint
+# Lottery project progress
 
-Updated: 2026-10-12 10:17 UTC
+Updated: 2026-10-12 10:41 UTC
 
-Current stage: G2 one-ticket technical slice implementation.
-
-G1 PASSED independent rule specification and calibration. The accepted candidate is bound to private source commit 230c90aedf6363435a39c55ad1c3531df8f5cec3, with all 301 candidate files plus manifest verified. Three earlier findings were repaired and independently retested; no game/device acceptance is implied.
-
-Parallel implementation now active:
-1. Actual ticket rules, wallet commands, atomic persistence/recovery and development-only FakeAd transactions.
-2. Real 3D six-cell scratch surface, committed bitset mask, Chinese HUD and unified mouse/touch input.
-3. Native Edit/Play test orchestration, actual rendered frames, process-recovery checks and Android build.
-
-G2 is not yet built or accepted. Full-day debt/shop/second ticket and full-round systems remain later gates.
-
-G0 technical proof: [run 38226292711](https://github.com/yangerstar1/task-workbench/actions/runs/38226292711) succeeded with six actual Unity tests, source audits and ARM64 IL2CPP APK. Its APK is a technical probe, not the lottery game; persistent recovery and binary/font/license checks are verified.
-
-Rendered game frames, device touch/install/performance, final art, real ad SDK and release remain unverified.
+- G0: real Unity 6000.3.19f1 technical probe, six native EditMode tests and ARM64 Android build passed in run 38226292711. This is not the finished game.
+- G1: rule specification and independent calibrated review passed. Accepted private candidate and bounded evidence are backed up in the authorized private repository.
+- G2: one-ticket 3D scratch scene, transactional persistence, same-request FakeAd recovery, 38 Core EditMode cases and 8 graphical PlayMode cases are implemented as source candidates. Six G0 regression cases are retained.
+- This checkpoint is WIP, uncompiled, and does not trigger CI. Independent source preflight is underway. No G2 native tests, rendered frames, APK, device checks or final-art acceptance are claimed.
+- Source publication safety: an unused generated PlayStation credential field was detected before upload. Publication requires an empty field and fail-closed export screening. No credential value belongs in source or evidence exports.
+- Normal first-day advertising remains disabled; ad eligibility tests use explicit synthetic fixtures. Cross-process first-launch elapsed timing is not yet implemented.
+- Next: freeze reviewed sanitized source, start exact native EditMode/PlayMode and process-recovery checks, inspect actual rendered frames, then build the G2 Android technical slice.

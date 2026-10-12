@@ -1,0 +1,1 @@
+{"name":"Lottery.G2.EditMode.Tests","rootNamespace":"Lottery.G2.EditMode.Tests","references":["Lottery.G2.Core"],"includePlatforms":["Editor"],"optionalUnityReferences":["TestAssemblies"],"autoReferenced":false}

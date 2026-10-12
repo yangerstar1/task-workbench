@@ -1,0 +1,113 @@
+# G2 CI implementation scope and first-run limits
+
+This is a candidate implementation, not a Unity or APK success report.
+The coordinator must freeze/review it and separately commit the single actual
+`tasks/lottery-shop/ci/g2-request.json` trigger. Only its review fixture is present
+in this working candidate. No external cache is used in this first iteration.
+
+## Native test and build sequence
+
+1. Run local CI-validator regression and compile the same pure-Core C# sources
+   with an already installed .NET 8 SDK on the existing Ubuntu runner. No NuGet
+   feed or new SDK installation is allowed. A real child process is SIGKILLed
+   and restarted for Buy/Scratch/Claim/AdCommit at six explicit commit windows.
+   The 24 cases use synthetic state and are Linux/.NET process evidence only.
+   They do not prove Unity-process, Android force-stop or power-loss behavior.
+2. Run native EditMode with the preserved six G0 case identities and 38 new G2
+   cases, each under its own expected assembly. Preserve screened original XML.
+   Validate exact identities, counts, ownership and zero failed/skipped cases.
+3. After EditMode validation and source audit succeed, run eight exact PlayMode
+   cases in the same job/workspace. A new container mounts the same workspace,
+   so this job's imported Library is reused without restoring an external cache.
+4. Require four state-bound, actual URP camera renders. Then audit source again.
+5. Only the whole successful tests job permits the independent cold Android
+   checkout/build. APK export still requires native APK verification AND source
+   audit. Failed build diagnostics cannot become a candidate APK.
+
+The exact case contract is `ci/g2-test-contract.json`; changes require review.
+The G0 helper's default test contract is unchanged. Its only shared audit API
+addition is an optional set of explicitly named generated classifications.
+The G2 adapter allows exactly `Assets/G2/Scenes/G2Slice.unity`, its metadata and
+`Assets/G2/Scenes.meta`; neighboring unknown assets are not exempted.
+Recovered G0 generated assets/settings remain accounted separately. Every
+stage snapshots its actual pre-Unity baseline and archives permitted outputs.
+
+## Official graphics-path evidence
+
+At pinned [GameCI test-runner source](https://github.com/game-ci/unity-test-runner/blob/0ff419b913a3630032cbe0de48a0099b5a9f0ed9/dist/platforms/ubuntu/run_tests.sh),
+EditMode and PlayMode launch the Editor with `-batchmode`, without `-nographics`.
+The standalone branch instead adds `-nographics` and copies extra scripts, so
+it is not used. The [pinned Docker orchestration](https://github.com/game-ci/unity-test-runner/blob/0ff419b913a3630032cbe0de48a0099b5a9f0ed9/src/model/docker.ts)
+orders `testMode: all` as PlayMode, EditMode, then combined results. We therefore
+use two ordered action invocations rather than assuming `all` means Edit first.
+The official [Editor-image wrapper](https://github.com/game-ci/docker/blob/75891f03fd6c243db6198f285313118cef0fc806/images/ubuntu/editor/Dockerfile#L51-L66)
+uses Xvfb. That source supports the route; actual renderer identity and frames
+must still be established in this run, not inferred from the Dockerfile.
+
+Unity 6000.3 documents that [WaitForEndOfFrame](https://docs.unity3d.com/6000.3/Documentation/ScriptReference/WaitForEndOfFrame.html)
+does not execute in Editor batch mode. The Play fixture instead uses
+[RenderPipeline.SubmitRenderRequest](https://docs.unity3d.com/6000.3/Documentation/ScriptReference/Rendering.RenderPipeline.SubmitRenderRequest.html)
+with a `StandardRequest` destination. Unity documents sequential processing and
+support for a complete URP base-camera stack. This is also implemented in the
+[fixed URP source](https://github.com/Unity-Technologies/Graphics/blob/2d2e78cc9d6254bc6e7c9c5552cea053508e86cb/Packages/com.unity.render-pipelines.universal/Runtime/UniversalRenderPipeline.cs#L533-L599).
+A small number of [ReadPixels](https://docs.unity3d.com/6000.3/Documentation/ScriptReference/Texture2D.ReadPixels.html)
+calls copy those completed targets for PNG export; this is not a per-frame
+scratch-progress readback technique.
+
+No null graphics device, unsupported render request or flat image may pass.
+The camera includes actual scene/HUD geometry; the export is not a screenshot
+of a code-generated imitation or of an IMGUI overlay omitted from the camera.
+The four 1280x720 PNGs are `initial`, `half`, `revealed`, `settled`. The receipt
+records actual source viewport dimensions separately; command-line dimensions
+are not assumed to prove the Editor Game view size. Input events are simulated
+through the actual Input System and labeled accordingly. Independent visual
+inspection is still PENDING after byte/CRC/hash and test assertions succeed.
+
+## Explicit one-module dependency delta
+
+G0 source and original evidence are immutable. This G2 candidate adds only
+`com.unity.modules.imageconversion: 1.0.0` to the project manifest, and only its
+`version=1.0.0, depth=0, source=builtin, dependencies={}` entry to the restored
+lock. Existing dependency records remain byte-value equivalent. This is a
+reviewed candidate lock, not a claim that the new module already imported.
+
+Unity's [6000.3 Image Conversion manual](https://docs.unity3d.com/6000.3/Documentation/Manual/com.unity.modules.imageconversion.html)
+identifies it as an Editor-matched built-in package. The exact Editor reference
+[source](https://github.com/Unity-Technologies/UnityCsReference/blob/79f16640303119112ca5caed4d71c607d0dff6fb/Modules/ImageConversion/ScriptBindings/ImageConversion.bindings.cs#L39-L40)
+places the `Texture2D.EncodeToPNG` extension in this module. It is needed for
+actual PNG export, not an external paid graphics or screenshot dependency.
+The lock shape is the same bounded built-in-module schema as the restored
+modules; its actual resolution must be verified by Unity. Any different resolved
+lock fails closed for explicit review, rather than accepting other package drift.
+
+- Previous G0 lock SHA-256: `3380b8f602b673a86b9fa317cf364a6479ed2a6c50b9bf94793a9584646dc9ae`
+- Candidate G2 lock SHA-256: `950e703b31453d45443719e88b1a37025d40d388df07c9c3bed31b507fd2f132`
+- Frozen runtime rules SHA-256: `e959108cb2a4ef080862565de5b87814ccdfae14026204227e767d049bbdf668`
+- Frozen 16-face vector SHA-256: `22af609400604776d2801955946dacd35a057edb0563d3a6069848f6be8adcd9`
+
+## Local verification and remaining work
+
+On 2026-10-12 the local Python suite passed 79 methods (63 preserved plus 16 G2
+validator fixtures). The PNG/XML fixtures are synthetic, not native evidence.
+One test actually SIGKILLed only its own simple Python child to verify supervisor
+behavior; that is not the C# process fixture. Shell syntax/Python parsing and
+exact C# method-name/contract comparison were checked. No local Unity or .NET
+compiler was available, so native compilation and all actual G2 cases remain
+NOT_RUN until the authorized CI candidate executes.
+
+The approved runner's [official Ubuntu 24.04 software inventory](https://github.com/actions/runner-images/blob/bdac7c6000c3501174076ad6d6a06ce46871fa71/images/ubuntu/Ubuntu2404-Readme.md)
+lists .NET 8 SDKs. The supervisor still detects the actual installed SDK and
+records its exact version; missing SDK/reference packs fail without downloading
+new software. It compiles the same Core/Persistence/Ads files with the explicit
+`LOTTERY_G2_TEST_FIXTURE` flag and binds their hashes and the worker binary hash.
+Only the bounded result receipt is an artifact input; raw worker/compile logs,
+CLI home, intermediates and synthetic save directories are not uploaded.
+
+The existing security limits in `VALIDATION.md` still apply: fixed action SHAs,
+owner/non-fork/public hosted-Linux guard, contents:read, no cache or release
+write-token, secrets only on GameCI steps, and explicitly enumerated artifact
+paths. The pinned actions print some native logs before later screening; no
+absolute leak-prevention promise is made. Durable evidence storage/readback is
+coordinator-owned and remains EVIDENCE_PERSISTENCE_PENDING until verified.
+Android installation, real touch, Unity/Android process kill, device performance,
+full-day gameplay and product T/V/P acceptance are not implied by these gates.
