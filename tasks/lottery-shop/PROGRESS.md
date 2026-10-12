@@ -1,8 +1,12 @@
 # Lottery project progress
 
-Updated: 2026-10-12 14:35 UTC
+Updated: 2026-10-12 22:39 UTC
 
 ## Current status
+
+G3 native tests and the cold Android APK passed independent build verification in run38312982947. APK SHA256: c2be0b3bbaf11fe6f28a3f45246591b6d694d0d5d2e6ff40faa8217c4ad98d93. Physical-device acceptance is NOT_RUN; G3/G4 gates remain unpassed. See the latest dated entry below.
+
+## Previously accepted G2 technical stage
 
 G2 technical stage has passed independent review and durable evidence verification. This is a one-ticket graybox capability stage, not final game or visual-quality acceptance.
 
@@ -14,7 +18,7 @@ G2 technical stage has passed independent review and durable evidence verificati
 - APK saved durably and downloaded again with the same byte hash. Original tests, build/source evidence and independent reports are saved separately. Unity-regenerated settings explicitly retain NORMALIZED_NOT_RAW provenance.
 - Physical Android touch, install/upgrade/force-stop/performance, real ad SDK and final T/V/P have not passed. G2 does not waive any of these later requirements.
 
-## G3 active implementation
+## G3 implementation starting point (historical 14:35 UTC)
 
 G3 is the complete first-day functional slice: both tickets, initially offerable tools and upgrades, consumables, current/next configuration, shared physical/quick shopping, phone borrowing/repayment, closing and first-night interest. The core, shop/ticket presentation and verification pipeline are being implemented in parallel in an isolated worktree.
 
@@ -75,3 +79,9 @@ Prepared at 2026-10-12 15:07 UTC for independent source preflight. First-day ser
 ## G3 candidate011 rejected; candidate012 first-observation repair
 
 2026-10-12 21:34 UTC. Independent preflight rejected011 before request08: registration of the second cold-cache root overwrote the initial stamp for shared ancestors. A deterministic temporary-Git reproduction replaced the Unity parent between registrations and was incorrectly accepted, including a source-drift variant. Candidate012 retains the first observation and rejects any later mismatch, in addition to the final directory check. No frozen011 file or previous evidence is changed; request08 remains untriggered and review09 is pending. The exact cold .utmp scope is otherwise unchanged. Native/Android execution for012 and all physical-device/G3/G4 acceptance remain pending.
+
+## G3 request09 actual build verified; physical gate still blocked
+
+2026-10-12 22:39 UTC. Run38312982947 at51f535247689f43d5470848a54f5abcf1062b609 completed SUCCESS. Independent actual audit confirms baseline45 Edit/8 Play, G3 242 Edit/24 Play,25+37 actual Linux process kills,241 helper tests with no skips, and18 original frames. The cold Android package, AXML versionCode3, six ARM64 ELF libraries, both approved original ticket imports, source mutation audit and APK v2 signature were independently verified. APK size59,126,454 bytes; SHA256 c2be0b3bbaf11fe6f28a3f45246591b6d694d0d5d2e6ff40faa8217c4ad98d93. Its certificate differs from the archived G2 package, so upgrade compatibility is not assumed and existing data must not be cleared to work around a conflict.
+
+The APK is durably saved in the owner's Library and a separate materialized copy matched its hash. Chat attachment delivery was rejected by the size limit; only instructions/checklists were sent as attachments, and the owner was directed to Library. No APK chat-delivery claim is made. All six same-build physical Android actions and independent normal-input device acceptance remain NOT_RUN. G3 is not passed; G4 remains blocked. Store/UI whitebox presentation is not final art quality. This progress-only commit does not change the reviewed build source or trigger another run.
