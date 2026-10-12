@@ -25,7 +25,7 @@ TASK, RULES_SHA = g2.TASK, g2.RULES_SHA
 BASE = '06814f520041676a50601f4e70d5ee09eae10078'
 SCOPE = 'G3_ONE_DAY_WHITEBOX_NOT_DEVICE_TESTED'
 STANDARDS_DIGEST = '1984cc8f225db73485a052942d30637127679a56b0492edf36497911373f30b1'
-REQUEST = dict(schemaVersion=1, requestId='lottery-g3-20261012-01', baseCommit=BASE, purpose='G3_ONE_DAY_WHITEBOX')
+REQUEST = dict(schemaVersion=1, requestId='lottery-g3-20261012-02', baseCommit=BASE, purpose='G3_ONE_DAY_WHITEBOX')
 REQUEST_PATH = TASK + '/ci/g3-request.json'
 SCENE = 'Assets/G3/Scenes/G3Day.unity'
 GENERATED = {SCENE, SCENE + '.meta', 'Assets/G3/Scenes.meta'}

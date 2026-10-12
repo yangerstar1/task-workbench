@@ -100,10 +100,28 @@ class G3ValidatorTests(unittest.TestCase):
         for replacement in (dict(rows[-1],childExitCode=0),dict(rows[0]),dict(rows[-1],recoveredHash='2'*64)):
             data=rows[:-1]+[replacement]
             with self.assertRaises(ValueError):process.validate_suite(data)
+    def assertIsolatedAuthoringManifest(self):
+        # Authoring input has no generated output. Never scan the live CI root:
+        # the earlier real guard legitimately wrote evidence there already.
+        with tempfile.TemporaryDirectory() as d:
+            root=Path(d)
+            inputs={ci.TASK+'/scripts/process-g3/Program.cs':b'SYNTHETIC_SOURCE',
+                    '.github/workflows/lottery-g3.yml':b'SYNTHETIC_WORKFLOW',
+                    ci.TASK+'/Directory.Build.props':b'SYNTHETIC_REVIEWED_INPUT',
+                    ci.TASK+'/fonts/OFL.txt':b'SYNTHETIC_LICENSE_MARKER_NOT_LICENSE_PROOF',
+                    ci.TASK+'/ci/g2-request.review.json':b'{"syntheticOldRequest":true}\n',
+                    ci.REVIEW_PATH:b'{}',ci.REQUEST_PATH:b'{}'}
+            for name,raw in inputs.items():
+                path=root/name;path.parent.mkdir(parents=True,exist_ok=True);path.write_bytes(raw)
+            files=ci.reviewed_files(root)
+            expected={name:hashlib.sha256(raw).hexdigest() for name,raw in inputs.items() if name not in ci.REVIEW_EXCEPTIONS}
+            expected[ci.TASK+'/fonts/NotoSansCJKsc-Regular.otf.xz']=ci.legacy.FONT_COMPRESSED_SHA
+            expected[ci.TASK+'/ci/g2-request.json']=hashlib.sha256(inputs[ci.TASK+'/ci/g2-request.review.json']).hexdigest()
+            self.assertEqual(files,expected)
+            generated=root/ci.TASK/'evidence/guard-receipt.json';generated.parent.mkdir();generated.write_text('{}')
+            with self.assertRaisesRegex(ValueError,'Generated output in authoring source'):ci.reviewed_files(root)
     def testReviewManifestExcludesOnlyRequestAndReview(self):
-        files=ci.reviewed_files(ROOT);self.assertNotIn(ci.REQUEST_PATH,files);self.assertNotIn(ci.TASK+'/ci/g3-preflight.review.json',files)
-        self.assertIn(ci.TASK+'/scripts/process-g3/Program.cs',files);self.assertIn('.github/workflows/lottery-g3.yml',files)
-        self.assertEqual(files[ci.TASK+'/fonts/NotoSansCJKsc-Regular.otf.xz'],ci.legacy.FONT_COMPRESSED_SHA)
+        self.assertIsolatedAuthoringManifest()
     def testProcessCompileInputsMatchReceipt(self):
         import glob
         import xml.etree.ElementTree as ET
@@ -291,6 +309,24 @@ class G3ValidatorTests(unittest.TestCase):
                 path=root/name/'nested/file.txt';path.parent.mkdir(parents=True);path.write_text('regular generated output')
             with self.assertRaisesRegex(ValueError,'Initial Unity runtime'):ci.verify_preflight(root)
             ci.verify_preflight(root,allow_generated_unity=True)
+    def testManifestHelperAfterActualGuardOutputUsesIsolatedAuthoringFixture(self):
+        with tempfile.TemporaryDirectory() as d,tempfile.TemporaryDirectory() as metadata:
+            root=Path(d);git,commit,trigger,review,source=self.makeReviewedGit(root);trigger();head=git('rev-parse','HEAD')
+            event=dict(after=head,ref='refs/heads/'+ci.legacy.BRANCH,deleted=False,
+                       repository=dict(full_name=ci.legacy.REPOSITORY,private=False,fork=False,owner=dict(login=ci.legacy.OWNER)),sender=dict(login=ci.legacy.OWNER))
+            event_path=Path(metadata)/'synthetic-event.json';event_path.write_text(json.dumps(event))
+            env=dict(GITHUB_ACTIONS='true',GITHUB_EVENT_NAME='push',GITHUB_REPOSITORY=ci.legacy.REPOSITORY,GITHUB_REPOSITORY_OWNER=ci.legacy.OWNER,
+                     GITHUB_ACTOR=ci.legacy.OWNER,GITHUB_TRIGGERING_ACTOR=ci.legacy.OWNER,GITHUB_REF='refs/heads/'+ci.legacy.BRANCH,
+                     RUNNER_ENVIRONMENT='github-hosted',RUNNER_OS='Linux',GITHUB_SHA=head,GITHUB_RUN_ID='12345',GITHUB_RUN_ATTEMPT='1',GITHUB_EVENT_PATH=str(event_path))
+            # Synthetic runner metadata only; execute the real guard and actual
+            # Git ancestry check against this disposable repository's base.
+            with ci.configured(),patch.dict(os.environ,env),patch.object(ci.legacy,'BASE',review['reviewedSourceCommit']):identity=ci.guard(root)
+            receipt=root/ci.TASK/'evidence/guard-receipt.json';self.assertTrue(receipt.is_file())
+            self.assertEqual(json.loads(receipt.read_text())['sourceCommit'],head);self.assertEqual(identity['requestId'],ci.REQUEST['requestId'])
+            ci.verify_preflight(root)  # Valid runtime output still satisfies strict source closure.
+            with self.assertRaisesRegex(ValueError,'Generated output in authoring source'):ci.reviewed_files(root)
+            # The formerly failing helper must not inspect this runtime tree.
+            with patch.dict(globals(),ROOT=root):self.assertIsolatedAuthoringManifest()
     def testFreshReviewRejectsOmittedTaskRootInputFromSourceMap(self):
         with tempfile.TemporaryDirectory() as d:
             root=Path(d);git,commit,trigger,review,source=self.makeReviewedGit(root)
