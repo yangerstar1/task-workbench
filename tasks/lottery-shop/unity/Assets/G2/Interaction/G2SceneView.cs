@@ -28,6 +28,11 @@ namespace Lottery.G2.Interaction
         public bool PanelVisible { get; private set; }
         public string VisibleSummary => summary.Text;
         public Rect ButtonRect(SliceAction action) => buttons[action].Rect;
+        // A bound render target owns its presentation pixels. The Editor window
+        // can have a different size; it must not supply layout or input geometry.
+        public int PresentationWidth => SceneCamera!=null && SceneCamera.targetTexture!=null ? SceneCamera.targetTexture.width : Mathf.Max(1,Screen.width);
+        public int PresentationHeight => SceneCamera!=null && SceneCamera.targetTexture!=null ? SceneCamera.targetTexture.height : Mathf.Max(1,Screen.height);
+        Rect PresentationSafeArea => SceneCamera!=null && SceneCamera.targetTexture!=null ? new Rect(0,0,PresentationWidth,PresentationHeight) : EffectiveSafeArea;
         public static Rect EffectiveSafeArea
         {
             get
@@ -36,7 +41,17 @@ namespace Lottery.G2.Interaction
                 return safe.width>0 && safe.height>0 ? safe : new Rect(0,0,Mathf.Max(1,Screen.width),Mathf.Max(1,Screen.height));
             }
         }
-        public bool LayoutChanged => lastWidth != Screen.width || lastHeight != Screen.height || lastSafe != EffectiveSafeArea;
+        public bool LayoutChanged => lastWidth != PresentationWidth || lastHeight != PresentationHeight || lastSafe != PresentationSafeArea;
+        public Vector2 WorldToPresentationPoint(Vector3 world)
+        {
+            var point=SceneCamera.WorldToViewportPoint(world);
+            return new Vector2(point.x*PresentationWidth,point.y*PresentationHeight);
+        }
+        public bool TryScratchUv(Vector2 pixel,out Vector2 uv)
+        {
+            if(pixel.x<0 || pixel.y<0 || pixel.x>PresentationWidth || pixel.y>PresentationHeight) { uv=default; return false; }
+            return Surface.TryViewportUv(SceneCamera,new Vector2(pixel.x/PresentationWidth,pixel.y/PresentationHeight),out uv);
+        }
         public void Initialize(Font source, Shader flat, Shader glyph, Shader scratch, Shader lit)
         {
             font=source; flatShader=flat;
@@ -54,7 +69,6 @@ namespace Lottery.G2.Interaction
             MakeBox("Left wall",new Vector3(-4,.9f,0),new Vector3(.15f,2.5f,4.5f),new Color(.22f,.32f,.31f),lit);
             MakeBox("Counter",new Vector3(2.95f,.16f,.9f),new Vector3(.7f,.35f,1.1f),new Color(.48f,.38f,.24f),lit);
             for(int i=0;i<3;i++) MakeBox("Empty tool stand "+i,new Vector3(-3.1f,.10f,-.85f+i*.65f),new Vector3(.5f,.18f,.5f),new Color(.42f,.38f,.29f),lit);
-            var shopSign=Label("Shop sign",transform,.26f,new Color(.88f,.88f,.71f),TextAnchor.MiddleCenter); shopSign.transform.position=new Vector3(0,1.2f,2.14f); shopSign.SetText("刮奖小店");
             ticketRoot=new GameObject("Current locked number ticket"); ticketRoot.transform.SetParent(transform,false);
             MakeBox("Paper",new Vector3(0,.065f,.02f),new Vector3(4.7f,.10f,3.35f),new Color(.94f,.90f,.75f),flat,ticketRoot.transform);
             publicNumber=Label("Public winning number",ticketRoot.transform,.24f,new Color(.12f,.25f,.23f),TextAnchor.MiddleCenter); publicNumber.transform.localPosition=new Vector3(0,.126f,1.43f); publicNumber.transform.localRotation=Quaternion.Euler(90,0,0);
@@ -105,8 +119,8 @@ namespace Lottery.G2.Interaction
             var label=Label("Button label",root.transform,.11f,Color.white,TextAnchor.MiddleCenter); label.SetText(text);
             buttons.Add(action,new ButtonVisual {Action=action,Root=root,Plate=plate,Label=label});
         }
-        Vector3 ScreenLocal(float x,float y,float depth) => new Vector3((x/Screen.width-.5f)*SceneCamera.orthographicSize*2*SceneCamera.aspect,(y/Screen.height-.5f)*SceneCamera.orthographicSize*2,depth);
-        float WorldPixels(float pixels) => pixels/Screen.height*SceneCamera.orthographicSize*2;
+        Vector3 ScreenLocal(float x,float y,float depth) => new Vector3((x/PresentationWidth-.5f)*SceneCamera.orthographicSize*2*SceneCamera.aspect,(y/PresentationHeight-.5f)*SceneCamera.orthographicSize*2,depth);
+        float WorldPixels(float pixels) => pixels/PresentationHeight*SceneCamera.orthographicSize*2;
         void PlacePlate(Transform item,Rect rect,float depth) { item.localPosition=ScreenLocal(rect.center.x,rect.center.y,depth); item.localScale=new Vector3(WorldPixels(rect.width),WorldPixels(rect.height),1); }
         void PlaceLabel(WorldLabel label,float x,float y,float pixels,float depth=.42f) { label.transform.localPosition=ScreenLocal(x,y,depth); label.SetText(label.Text,WorldPixels(pixels)); }
         void PlaceButton(SliceAction action,Rect rect,float depth=.5f)
@@ -115,7 +129,7 @@ namespace Lottery.G2.Interaction
         }
         public void Layout()
         {
-            lastWidth=Mathf.Max(1,Screen.width); lastHeight=Mathf.Max(1,Screen.height); lastSafe=EffectiveSafeArea;
+            lastWidth=PresentationWidth; lastHeight=PresentationHeight; lastSafe=PresentationSafeArea;
             SceneCamera.aspect=(float)lastWidth/lastHeight;
             float s=lastSafe.height/720f,m=16*s,bw=184*s;
             topRect=new Rect(lastSafe.x+m,lastSafe.yMax-94*s,lastSafe.width-2*m,78*s);

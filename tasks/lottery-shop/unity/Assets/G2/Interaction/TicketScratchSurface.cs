@@ -29,9 +29,9 @@ namespace Lottery.G2.Interaction
             for (int i = 0; i < pixels.Length; i++) { byte v = mask.IsRevealed(i) ? (byte)255 : (byte)0; pixels[i] = new Color32(v,v,v,255); }
             maskTexture.SetPixels32(pixels); maskTexture.Apply(false,false);
         }
-        public bool TryScreenUv(Camera camera, Vector2 screen, out Vector2 uv)
+        public bool TryViewportUv(Camera camera, Vector2 viewport, out Vector2 uv)
         {
-            if (hitCollider.Raycast(camera.ScreenPointToRay(screen), out RaycastHit hit, 100f)) { uv=hit.textureCoord; return true; }
+            if (hitCollider.Raycast(camera.ViewportPointToRay(viewport), out RaycastHit hit, 100f)) { uv=hit.textureCoord; return true; }
             uv=default; return false;
         }
         public Vector3 UvToWorld(Vector2 uv) => transform.TransformPoint(new Vector3((uv.x-.5f)*Width,0,(uv.y-.5f)*Depth));

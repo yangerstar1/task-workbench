@@ -43,6 +43,7 @@ namespace Lottery.G2.Editor
                 throw new InvalidOperationException("Invalid source/run identity");
             PlayerSettings.companyName = "BuYuQi"; PlayerSettings.productName = "Lottery G2 Technical Slice";
             PlayerSettings.bundleVersion = "0.0.2";
+            PlayerSettings.Android.bundleVersionCode = 2;
             PlayerSettings.SetApplicationIdentifier(UnityEditor.Build.NamedBuildTarget.Android, "com.buyuqi.lotteryprobe");
             PlayerSettings.SetScriptingBackend(UnityEditor.Build.NamedBuildTarget.Android, ScriptingImplementation.IL2CPP);
             PlayerSettings.Android.targetArchitectures = AndroidArchitecture.ARM64;

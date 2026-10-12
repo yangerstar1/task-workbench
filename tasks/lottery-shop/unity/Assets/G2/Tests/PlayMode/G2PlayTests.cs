@@ -40,6 +40,7 @@ namespace Lottery.G2.PlayMode.Tests
 #endif
         RenderPipelineAsset previousPipeline,previousQuality;
         UniversalRenderPipelineAsset pipeline;
+        RenderTexture presentationTarget,previousCameraTarget;
         FileStateStore testStore;
         ToggleFault faults;
         sealed class ToggleFault : IStoreFaultInjector
@@ -117,6 +118,7 @@ namespace Lottery.G2.PlayMode.Tests
         {
             try
             {
+                ReleasePresentationTarget();
                 if(app!=null) Object.Destroy(app.gameObject);
                 testStore?.Dispose();
                 if(mouse!=null && mouse.added) InputSystem.RemoveDevice(mouse);
@@ -185,7 +187,57 @@ namespace Lottery.G2.PlayMode.Tests
             Assert.That(keyboard.escapeKey.wasPressedThisFrame,Is.False,"Neutral Escape press edge. "+InputDiagnostic);
             Assert.That(keyboard.escapeKey.wasReleasedThisFrame,Is.False,"Neutral Escape release edge. "+InputDiagnostic);
         }
-        Vector2 ScreenUv(float u,float v) => app.SceneCamera.WorldToScreenPoint(P.View.Surface.UvToWorld(new Vector2(u,v)));
+        Vector2 ScreenUv(float u,float v) => P.View.WorldToPresentationPoint(P.View.Surface.UvToWorld(new Vector2(u,v)));
+        void BindPresentationTarget()
+        {
+            Assert.That(presentationTarget,Is.Null);
+            Assert.That(Router.CapturedPointerId,Is.EqualTo(-1),"Change the owned viewport only between gestures");
+            Assert.That(mouse.leftButton.isPressed,Is.False);
+            previousCameraTarget=app.SceneCamera.targetTexture;
+            presentationTarget=new RenderTexture(1280,720,24,RenderTextureFormat.ARGB32) { antiAliasing=1 };
+            Assert.That(presentationTarget.Create(),Is.True,"A real 1280x720 presentation target is required");
+            app.SceneCamera.targetTexture=presentationTarget; P.View.Layout(); Physics.SyncTransforms();
+            AssertPresentationProjection();
+            foreach(var uv in new[] {new Vector2(.05f,.05f),new Vector2(.95f,.05f),new Vector2(.05f,.95f),new Vector2(.95f,.95f),new Vector2(.5f,.5f)})
+            {
+                var pixel=ScreenUv(uv.x,uv.y);
+                Assert.That(pixel.x,Is.InRange(0f,(float)presentationTarget.width));
+                Assert.That(pixel.y,Is.InRange(0f,(float)presentationTarget.height));
+                Assert.That(P.View.TryScratchUv(pixel,out Vector2 hit),Is.True,"Presentation pixels must hit the real ticket collider");
+                Assert.That(Vector2.Distance(hit,uv),Is.LessThan(.002f),"Projection and input ray must share the owned viewport");
+            }
+            Assert.That(P.View.TryScratchUv(new Vector2(-1,-1),out _),Is.False);
+            TestContext.Out.WriteLine("SIMULATED_INPUT_SYSTEM owned target: sourceViewport="+Screen.width+"x"+Screen.height+
+                ",presentationViewport="+P.View.PresentationWidth+"x"+P.View.PresentationHeight+
+                ",renderTarget="+presentationTarget.width+"x"+presentationTarget.height+",cameraAspect="+app.SceneCamera.aspect.ToString("R",System.Globalization.CultureInfo.InvariantCulture)+
+                "; source environment is unchanged; no device adaptation claim");
+        }
+        void AssertPresentationProjection()
+        {
+            Assert.That(presentationTarget,Is.Not.Null);
+            Assert.That(presentationTarget.IsCreated(),Is.True);
+            Assert.That(presentationTarget.width,Is.EqualTo(1280));
+            Assert.That(presentationTarget.height,Is.EqualTo(720));
+            Assert.That(app.SceneCamera.targetTexture,Is.SameAs(presentationTarget));
+            Assert.That(P.View.PresentationWidth,Is.EqualTo(presentationTarget.width));
+            Assert.That(P.View.PresentationHeight,Is.EqualTo(presentationTarget.height));
+            Assert.That(P.View.LayoutChanged,Is.False,"Camera, HUD and input must use the same current viewport");
+            Assert.That(app.SceneCamera.aspect,Is.EqualTo((float)presentationTarget.width/presentationTarget.height).Within(.00001f));
+            var camera=app.SceneCamera; var center=camera.transform.position+camera.transform.forward*5;
+            var a=P.View.WorldToPresentationPoint(center);
+            var b=P.View.WorldToPresentationPoint(center+camera.transform.right);
+            var c=P.View.WorldToPresentationPoint(center+camera.transform.up);
+            float horizontal=Mathf.Abs(b.x-a.x),vertical=Mathf.Abs(c.y-a.y);
+            Assert.That(horizontal,Is.GreaterThan(1));
+            Assert.That(horizontal,Is.EqualTo(vertical).Within(.02f),"Equal camera-plane world lengths must occupy equal output pixels; reject stretched captures");
+        }
+        void ReleasePresentationTarget()
+        {
+            if(presentationTarget==null) return;
+            if(app!=null) { app.SceneCamera.targetTexture=previousCameraTarget; P.View.Layout(); }
+            if(RenderTexture.active==presentationTarget) RenderTexture.active=null;
+            presentationTarget.Release(); Object.Destroy(presentationTarget); presentationTarget=null;
+        }
         void MouseEvent(Vector2 position,bool down)
         {
             bool wasDown=mouse.leftButton.isPressed;
@@ -288,6 +340,9 @@ namespace Lottery.G2.PlayMode.Tests
         [UnityTest]
         public IEnumerator SecondTouchCannotTakeOverAndTouchUsesSameUvProjection()
         {
+            // Buy uses the mouse and scratch uses EnhancedTouch at the same actual
+            // 16:9 presentation size, independently of the Editor window size.
+            BindPresentationTarget();
             BuyReady();
             TouchEvent(11,IPhase.Began,ScreenUv(.10f,.15f)); TouchEvent(22,IPhase.Began,ScreenUv(.90f,.85f));
             TouchEvent(11,IPhase.Moved,ScreenUv(.25f,.15f)); TouchEvent(11,IPhase.Ended,ScreenUv(.25f,.15f));
@@ -374,6 +429,9 @@ namespace Lottery.G2.PlayMode.Tests
             var records=new List<FrameReceipt>(); var textures=new List<Texture2D>();
             try
             {
+                // Bind before any purchase/input. All four frames, HUD hit areas
+                // and rays now share 1280x720 geometry, not a stretched 4:3 image.
+                BindPresentationTarget();
                 BuyReady(); yield return null; textures.Add(Capture("initial",output,records));
                 Serpentine(.47f); yield return null; textures.Add(Capture("half",output,records));
                 Assert.That(State.CurrentTicket.Scratch.IsRevealed(45,32),Is.True); Assert.That(State.CurrentTicket.Scratch.IsRevealed(215,32),Is.False);
@@ -388,12 +446,13 @@ namespace Lottery.G2.PlayMode.Tests
                 Assert.That(receipt.sourceCommit,Does.Match("^[0-9a-f]{40}$")); Assert.That(receipt.runId,Does.Match("^[1-9][0-9]*$"));
                 File.WriteAllText(receiptPath,JsonUtility.ToJson(receipt,true));
             }
-            finally { foreach(var texture in textures) Object.Destroy(texture); }
+            finally { foreach(var texture in textures) Object.Destroy(texture); ReleasePresentationTarget(); }
         }
         Texture2D Capture(string stage,string output,List<FrameReceipt> records)
         {
+            AssertPresentationProjection();
             P.View.RefreshGlyphGeometry();
-            var target=new RenderTexture(1280,720,24,RenderTextureFormat.ARGB32) { antiAliasing=1 }; target.Create();
+            var target=presentationTarget;
             var request=new RenderPipeline.StandardRequest { destination=target };
             Assert.That(RenderPipeline.SupportsRenderRequest(app.SceneCamera,request),Is.True,"URP must support actual render requests");
             var old=RenderTexture.active; var texture=new Texture2D(1280,720,TextureFormat.RGB24,false);
@@ -408,13 +467,13 @@ namespace Lottery.G2.PlayMode.Tests
                 records.Add(new FrameReceipt { stage=stage,file=stage+".png",sha256=StateCodec.HashBytes(png),bytes=png.Length,stateSha256=StateCodec.ComputeHash(State) });
                 return texture;
             }
-            finally { RenderTexture.active=old; target.Release(); Object.Destroy(target); }
+            finally { RenderTexture.active=old; }
         }
         int ChangedPixels(Texture2D before,Texture2D after,float u0,float u1)
         {
             var a=ScreenUv(u0,.14f); var b=ScreenUv(u1,.40f);
-            int left=Mathf.RoundToInt(Mathf.Min(a.x,b.x)/Screen.width*1280),right=Mathf.RoundToInt(Mathf.Max(a.x,b.x)/Screen.width*1280);
-            int bottom=Mathf.RoundToInt(Mathf.Min(a.y,b.y)/Screen.height*720),top=Mathf.RoundToInt(Mathf.Max(a.y,b.y)/Screen.height*720),changed=0;
+            int left=Mathf.RoundToInt(Mathf.Min(a.x,b.x)/P.View.PresentationWidth*before.width),right=Mathf.RoundToInt(Mathf.Max(a.x,b.x)/P.View.PresentationWidth*before.width);
+            int bottom=Mathf.RoundToInt(Mathf.Min(a.y,b.y)/P.View.PresentationHeight*before.height),top=Mathf.RoundToInt(Mathf.Max(a.y,b.y)/P.View.PresentationHeight*before.height),changed=0;
             for(int y=bottom;y<top;y++) for(int x=left;x<right;x++) if(((Vector4)(before.GetPixel(x,y)-after.GetPixel(x,y))).sqrMagnitude>.02f) changed++;
             return changed;
         }

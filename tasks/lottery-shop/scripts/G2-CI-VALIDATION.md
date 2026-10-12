@@ -11,7 +11,11 @@ in this working candidate. No external cache is used in this first iteration.
    with an already installed .NET 8 SDK on the existing Ubuntu runner. No NuGet
    feed or new SDK installation is allowed. A real child process is SIGKILLed
    and restarted for Buy/Scratch/Claim/AdCommit at six explicit commit windows.
-   The 24 cases use synthetic state and are Linux/.NET process evidence only.
+   Those original 24 cases remain unchanged. Request 08 adds a 25th case,
+   ad_waiting/ClosedAwaitingReward, which actually kills a process holding the
+   persisted waiting state before a reward exists, reopens its reserved state,
+   delivers a late reward and verifies exact-once commit and duplicate safety.
+   All 25 cases use synthetic state and are Linux/.NET process evidence only.
    They do not prove Unity-process, Android force-stop or power-loss behavior.
 2. Run native EditMode with the preserved six G0 case identities and 39 new G2
    cases, each under its own expected assembly. Preserve screened original XML.
@@ -192,3 +196,32 @@ absolute leak-prevention promise is made. Durable evidence storage/readback is
 coordinator-owned and remains EVIDENCE_PERSISTENCE_PENDING until verified.
 Android installation, real touch, Unity/Android process kill, device performance,
 full-day gameplay and product T/V/P acceptance are not implied by these gates.
+
+## Request 08 verification scope
+
+Request 07 actually passed 45 EditMode, 8 PlayMode, 24 process SIGKILL cases
+and the independent ARM64 IL2CPP build (run 38248877036). This is not overall
+G2 acceptance: the waiting-state real-process case was missing and the rendered
+view was stretched. Request 08 retains the old cases and adds the waiting case.
+Local Python helpers now pass 107 tests; two supervisor tests kill Python
+children, not the production C# fixture. The new C# case remains unexecuted
+until native CI.
+
+The camera, HUD and simulated input now share an actual 1280x720 render target
+in the two relevant Play tests. Existing schema-1 sourceViewport fields still
+report the actual Screen environment dimensions, while width/height report the
+render target. Added assertions compare equal world lengths along camera right
+and up in pixel space. No environment resize or device-adaptation claim is made.
+The clipped decorative sign was removed from this technical graybox. Four new
+actual frames and an independent visual check are required before closing the
+render defect; static arithmetic alone cannot close it.
+
+## Request 09 APK metadata correction
+
+Independent parsing of request 07 actual AndroidManifest found versionName
+0.0.2 but versionCode 1, despite workflow androidVersionCode 2. The custom
+BuildAndroid method now explicitly sets bundleVersionCode=2 after Prepare and
+before BuildPlayer. A source regression asserts the workflow/custom-method
+agreement and ordering. Request 08 remains an immutable unrun source snapshot.
+This change does not claim that the old APK failed installation or that upgrade
+behavior has been tested. The next real APK manifest must be inspected again.

@@ -16,7 +16,7 @@ namespace Lottery.G2.Interaction
         public int CapturedPointerId => captured;
         public bool IsFocused => focused && !paused;
         public bool AwaitingRelease => requireRelease;
-        public string DiagnosticState => "focus="+focused+",paused="+paused+",release="+requireRelease+",capture="+captured+",touches="+ETouch.activeTouches.Count+",layoutChanged="+(view!=null && view.LayoutChanged)+",viewport="+Screen.width+"x"+Screen.height+",rawSafe="+Screen.safeArea;
+        public string DiagnosticState => "focus="+focused+",paused="+paused+",release="+requireRelease+",capture="+captured+",touches="+ETouch.activeTouches.Count+",layoutChanged="+(view!=null && view.LayoutChanged)+",sourceViewport="+Screen.width+"x"+Screen.height+",presentationViewport="+(view!=null ? view.PresentationWidth+"x"+view.PresentationHeight : "none")+",rawSafe="+Screen.safeArea;
         public SliceMode Mode => presenter==null?SliceMode.TABLE:presenter.IsCommitting?SliceMode.COMMITTING:presenter.PanelOpen?SliceMode.PANEL:presenter.CanScratch?SliceMode.SCRATCH:SliceMode.TABLE;
         public void Initialize(SlicePresenter owner,G2SceneView scene) { presenter=owner; view=scene; }
         void OnEnable() { EnhancedTouchSupport.Enable(); }
@@ -75,7 +75,7 @@ namespace Lottery.G2.Interaction
         {
             if(uiCapture || Mode!=SliceMode.SCRATCH) { hasPrevious=false; return; }
             // HUD takes priority on every sample, even when a scratch starts elsewhere.
-            if(view.ConsumeUi(screen,out _) || !view.Surface.TryScreenUv(view.SceneCamera,screen,out Vector2 uv)) { hasPrevious=false; return; }
+            if(view.ConsumeUi(screen,out _) || !view.TryScratchUv(screen,out Vector2 uv)) { hasPrevious=false; return; }
             presenter.QueueBrush(previous,uv,hasPrevious); previous=uv; hasPrevious=true;
         }
         void End() { captured=-1; uiCapture=false; hasPrevious=false; if(presenter!=null) presenter.FlushScratch(); }

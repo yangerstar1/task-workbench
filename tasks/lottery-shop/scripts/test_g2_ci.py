@@ -34,7 +34,33 @@ def png(seed=0,flat=False):
     return b'\x89PNG\r\n\x1a\n'+chunk(b'IHDR',struct.pack('>IIBBBBB',1280,720,8,2,0,0,0))+chunk(b'IDAT',zlib.compress((b'\0'+row)*720))+chunk(b'IEND',b'')
 
 
+def synthetic_process_case(scenario,point):
+    published=point in {'AfterPublish','BeforeResponse'}
+    case=dict(status='PASS',scenario=scenario,point=point,recoveryStatus='COMMITTED' if published else 'PROVEN_NOT_COMMITTED',
+              beforeHash='a'*64,expectedHash='b'*64,recoveredHash=('b' if published else 'a')*64,finalHash='b'*64,
+              finalCashMinor=29000,finalCommands=1,attemptCommandOccurrences=1,staleRevisionReplayUnchanged=True)
+    if (scenario,point)==('ad_waiting','ClosedAwaitingReward'):
+        case.update(recoveryStatus='COMMITTED',finalCashMinor=29600,finalCommands=10,requestId='fake-request',runId='synthetic-process-ad_waiting',
+                    waiting=dict(phase='CLOSED_AWAITING_REWARD',cashMinor=30000,stockAvailable=True,drawerCount=0,adSuccessesToday=0,
+                                 lastAdSettlementCount=-1,rewardRecorded=False,rewardEventCount=0,shownRequestCount=1,commandCount=6,revision=6),
+                    final=dict(phase='COMMITTED',cashMinor=29600,stockAvailable=False,drawerCount=1,adSuccessesToday=1,
+                               lastAdSettlementCount=12,rewardRecorded=True,rewardEventCount=1,shownRequestCount=1,commandCount=10,revision=10),
+                    waitingPollUnchanged=True,reservedPurchaseBlocked=True,duplicateRewardReplayUnchanged=True,originalReservationUnchanged=True)
+    return case
+
+
 class G2SyntheticTests(unittest.TestCase):
+    def test_android_version_code_explicitly_matches_workflow(self):
+        root = Path(ci.__file__).resolve().parents[3]
+        build = (root / ci.TASK / 'unity/Assets/G2/Editor/G2Build.cs').read_text()
+        workflow = (root / '.github/workflows/lottery-g2.yml').read_text()
+        declared = re.findall(r'^          androidVersionCode: (\d+)$', workflow, re.M)
+        assigned = re.findall(r'PlayerSettings\.Android\.bundleVersionCode\s*=\s*(\d+)\s*;', build)
+        self.assertEqual(declared, ['2'])
+        self.assertEqual(assigned, declared)
+        self.assertLess(build.index('Prepare();'), build.index('PlayerSettings.Android.bundleVersionCode'))
+        self.assertLess(build.index('PlayerSettings.Android.bundleVersionCode'), build.index('BuildPipeline.BuildPlayer('))
+
     def setUp(self):
         self.temp=tempfile.TemporaryDirectory();self.addCleanup(self.temp.cleanup);self.path=Path(self.temp.name)
         (self.path/ci.TASK/'unity/ProjectSettings').mkdir(parents=True)
@@ -316,11 +342,75 @@ class G2SyntheticTests(unittest.TestCase):
         for key,value in [('recoveredHash','a'*64),('attemptCommandOccurrences',2),('staleRevisionReplayUnchanged',False),('recoveryStatus','PROVEN_NOT_COMMITTED')]:
             bad=dict(d);bad[key]=value
             with self.assertRaises(ValueError):process.validate_case(bad,'buy','AfterPublish')
+    def test_process_contract_preserves_all_24_identities_and_adds_only_waiting_checkpoint(self):
+        original=tuple((scenario,point) for scenario in ('buy','scratch','claim','ad') for point in
+                       ('BeforeWrite','TempHalfWritten','TempFlushed','BeforePublish','AfterPublish','BeforeResponse'))
+        self.assertEqual(process.CASES,original+(('ad_waiting','ClosedAwaitingReward'),))
+        self.assertEqual(len(set(process.CASES)),25)
+        for scenario,point in process.CASES:process.validate_case(synthetic_process_case(scenario,point),scenario,point)
+        for scenario,point in (('ad_waiting','AfterPublish'),('ad','ClosedAwaitingReward'),('other','BeforeWrite')):
+            with self.assertRaises(ValueError):process.validate_case(synthetic_process_case(scenario,point),scenario,point)
+    def test_waiting_receipt_rejects_confirmed_reward_premature_consumption_and_missing_reservation_proof(self):
+        good=synthetic_process_case('ad_waiting','ClosedAwaitingReward')
+        process.validate_case(good,*process.WAITING_CASE)
+        for field in ('waiting','final'):
+            for key,value in good[field].items():
+                with self.subTest(field=field,key=key):
+                    bad=copy.deepcopy(good)
+                    bad[field][key]=not value if type(value) is bool else value+1 if type(value) is int else 'SHOWING'
+                    with self.assertRaises(ValueError):process.validate_case(bad,*process.WAITING_CASE)
+        for key,value in [('scenario','ad'),('point','AfterPublish'),('requestId','replacement'),('runId','other-run'),
+                          ('recoveredHash','b'*64),('finalHash','a'*64),('beforeHash','b'*64),('recoveryStatus','PROVEN_NOT_COMMITTED'),
+                          ('finalCashMinor',30000),('finalCommands',11),('attemptCommandOccurrences',2),('status','SKIPPED')]:
+            with self.subTest(key=key):
+                bad=copy.deepcopy(good);bad[key]=value
+                with self.assertRaises(ValueError):process.validate_case(bad,*process.WAITING_CASE)
+        for key in ('staleRevisionReplayUnchanged','waitingPollUnchanged','reservedPurchaseBlocked','duplicateRewardReplayUnchanged','originalReservationUnchanged'):
+            for value in (False,1):
+                bad=copy.deepcopy(good);bad[key]=value
+                with self.assertRaises(ValueError):process.validate_case(bad,*process.WAITING_CASE)
+    def test_waiting_receipt_rejects_extra_missing_fields_and_boolean_counter_coercion(self):
+        good=synthetic_process_case(*process.WAITING_CASE)
+        for field in (None,'waiting','final'):
+            target=good if field is None else good[field]
+            for key in target:
+                bad=copy.deepcopy(good);(bad if field is None else bad[field]).pop(key)
+                with self.assertRaises(ValueError):process.validate_case(bad,*process.WAITING_CASE)
+            bad=copy.deepcopy(good);(bad if field is None else bad[field])['unapproved']='SYNTHETIC_SECRET_VALUE'
+            with self.assertRaises(ValueError):process.validate_case(bad,*process.WAITING_CASE)
+        for field,key in ((None,'attemptCommandOccurrences'),('waiting','rewardEventCount'),('final','drawerCount')):
+            bad=copy.deepcopy(good);(bad if field is None else bad[field])[key]=bool((bad if field is None else bad[field])[key])
+            with self.assertRaises(ValueError):process.validate_case(bad,*process.WAITING_CASE)
+    def test_process_suite_rejects_omitted_duplicated_replaced_or_extra_waiting_case(self):
+        cases=[dict(synthetic_process_case(*case),exitSignal='SIGKILL',childExitCode=-9) for case in process.CASES]
+        process.validate_suite(cases)
+        variants=[cases[:-1],cases+[cases[-1]],cases[:-1]+[cases[0]],cases[1:]+[cases[-1]],list(reversed(cases))]
+        for values in variants:
+            with self.assertRaises(ValueError):process.validate_suite(values)
+        for key,value in [('exitSignal','SIGTERM'),('childExitCode',0),('childExitCode',True),('extra','unapproved')]:
+            bad=copy.deepcopy(cases);bad[-1][key]=value
+            with self.assertRaises(ValueError):process.validate_suite(bad)
+        for key in ('exitSignal','childExitCode'):
+            bad=copy.deepcopy(cases);bad[-1].pop(key)
+            with self.assertRaises(ValueError):process.validate_suite(bad)
+    def test_waiting_failure_exports_only_fixed_new_case_and_assertion_ids(self):
+        task=self.path/ci.TASK;work=task/'artifacts/g2-process';work.mkdir(parents=True)
+        (work/'worker.log').write_bytes(b'G2_PROBE_ERROR WAITING_EXACTLY_ONCE InvalidOperationException\nSYNTHETIC_SECRET_VALUE\n')
+        process.write_failure(task,{'sourceCommit':'a'*40},{'stage':'verify','scenario':'ad_waiting','point':'ClosedAwaitingReward'},ValueError('private'))
+        raw=(task/'evidence/g2/process/process-diagnostic.json').read_text();receipt=json.loads(raw)
+        self.assertEqual((receipt['scenario'],receipt['point']),process.WAITING_CASE)
+        self.assertEqual(receipt['workerError'],{'assertId':'WAITING_EXACTLY_ONCE','exceptionType':'InvalidOperationException'})
+        self.assertNotIn('SYNTHETIC_SECRET_VALUE',raw);self.assertNotIn('private',raw)
     @unittest.skipUnless(sys.platform=='linux','SIGKILL fixture requires Linux')
     def test_supervisor_actually_kills_owned_python_fixture_not_core_or_unity(self):
         marker=self.path/'ready'
         child=subprocess.Popen([sys.executable,'-c','import pathlib,sys,time;pathlib.Path(sys.argv[1]).write_text("BeforePublish");time.sleep(60)',str(marker)],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
         process.kill_at_marker(child,marker,'BeforePublish',timeout=5);self.assertEqual(child.returncode,-9)
+    @unittest.skipUnless(sys.platform=='linux','SIGKILL fixture requires Linux')
+    def test_supervisor_waiting_checkpoint_really_kills_owned_python_child_only(self):
+        marker=self.path/'waiting-ready'
+        child=subprocess.Popen([sys.executable,'-c','import pathlib,sys,time;pathlib.Path(sys.argv[1]).write_text("ClosedAwaitingReward");time.sleep(60)',str(marker)],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
+        process.kill_at_marker(child,marker,'ClosedAwaitingReward',timeout=5);self.assertEqual(child.returncode,-9)
     def test_supervisor_rejects_child_exit_without_marker(self):
         child=subprocess.Popen([sys.executable,'-c','pass'],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
         with self.assertRaises(ValueError):process.kill_at_marker(child,self.path/'absent','BeforeWrite',timeout=5)
