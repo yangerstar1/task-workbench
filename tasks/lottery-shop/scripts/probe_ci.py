@@ -22,7 +22,7 @@ BRANCH = "lottery-shop-g0-20261011"
 BASE = "22525198f7865d055af937f5e828243023d6ad31"
 TASK = "tasks/lottery-shop"
 REQUEST_PATH = TASK + "/ci/g0-request.json"
-REQUEST = {"schemaVersion": 1, "requestId": "lottery-g0-20261012-02",
+REQUEST = {"schemaVersion": 1, "requestId": "lottery-g0-20261012-03",
            "baseCommit": BASE, "purpose": "G0_TECHNICAL_PROBE"}
 VERSION = "6000.3.19f1"
 SCOPE = "G0_TECHNICAL_PROBE_NOT_GAME_NOT_DEVICE_TESTED"
@@ -34,7 +34,9 @@ EXPECTED_CASES = {"Lottery.Probe.Tests.ProbeTests." + name for name in (
     "EditorPatchPinned", "RequiredPackagesResolved", "UrpAssetsSurviveReimport",
     "ChineseFontContainsRequiredGlyphs", "InputBackendAndLifecycle", "SceneReferencesFontAndUrpMaterial")}
 PACKAGES = {"com.unity.render-pipelines.universal": "17.3.0",
-            "com.unity.inputsystem": "1.20.1", "com.unity.test-framework": "1.6.0"}
+            "com.unity.inputsystem": "1.20.1", "com.unity.test-framework": "1.6.0",
+            "com.unity.sdk.linux-arm64": "1.1.0", "com.unity.sdk.linux-x86_64": "1.1.0",
+            "com.unity.toolchain.linux-x86_64-linux": "1.1.0"}
 # Exact URP 17.3 initialization outputs, not a general Assets/*.asset exemption.
 # Unity-Technologies/Graphics@2d2e78cc9d6254bc6e7c9c5552cea053508e86cb
 # Runtime/UniversalRenderPipelineGlobalSettings.cs defines both asset paths.

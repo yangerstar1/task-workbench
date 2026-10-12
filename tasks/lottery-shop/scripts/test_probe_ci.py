@@ -351,6 +351,33 @@ class FontSyntheticTests(unittest.TestCase):
 
 
 class SourceMutationSyntheticTests(unittest.TestCase):
+    def test_each_pinned_linux_toolchain_dependency_is_required_in_resolved_lock(self):
+        names = ("com.unity.sdk.linux-arm64", "com.unity.sdk.linux-x86_64", "com.unity.toolchain.linux-x86_64-linux")
+        for name in names:
+            for mode in ("missing", "wrong-version"):
+                with self.subTest(name=name, mode=mode):
+                    lock = {"dependencies": {key: {"version": version} for key, version in ci.PACKAGES.items()}}
+                    if mode == "missing":
+                        del lock["dependencies"][name]
+                    else:
+                        lock["dependencies"][name]["version"] = "1.1.1"
+                    with self.assertRaises(ValueError):
+                        ci.validate_resolved_lock(lock)
+
+    def test_unreviewed_toolchain_dependency_mutation_still_fails(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            task = root / ci.TASK
+            manifest = task / "unity/Packages/manifest.json"
+            ci.write_json(manifest, {"dependencies": ci.PACKAGES})
+            ci.snapshot_project(root)
+            altered = dict(ci.PACKAGES)
+            altered["com.unity.toolchain.linux-x86_64-linux"] = "1.1.1"
+            ci.write_json(manifest, {"dependencies": altered})
+            with self.assertRaises(ValueError):
+                ci.audit(root, {"sourceCommit": "a" * 40})
+            self.assertEqual(json.loads((task / "evidence/source-mutations.json").read_text())["status"], "FAIL")
+
     def test_lock_arrays_produce_fail_receipt_instead_of_attribute_error(self):
         bad_locks = [[], {"dependencies": []}, {"dependencies": {name: [] for name in ci.PACKAGES}},
                      {"dependencies": {name: {"version": version, "dependencies": []} for name, version in ci.PACKAGES.items()}}]

@@ -1,6 +1,6 @@
 # G0 CI validator scope
 
-The local Python suite uses synthetic fixtures. Its 61 passing test methods
+The local Python suite uses synthetic fixtures. Its 63 passing test methods
 on 2026-10-12 validate guard, XML, font-restoration, source-mutation and APK
 inspection code. They do not execute Unity, import a real font, build an app,
 render a frame, or test a physical device.
@@ -71,8 +71,8 @@ response; helpers must not echo a suspected value during diagnosis.
   not prove the real font bytes or glyph coverage.
 - Pre-Unity hashes are compared against the actual post-Unity tree. Only named
   generated assets, allowed ProjectSettings files, package lock and font importer
-  metadata are accepted. Runtime/editor/test code, manifests and editor version
-  semantic manifest changes fail. Generated assets/settings are archived with a separate hash
+  metadata are accepted. Runtime/editor/test code, editor version and semantic
+  manifest changes fail. Generated assets/settings are archived with a separate hash
   inventory, not described as an unchanged source checkout.
   On failure, source audit writes a `FAIL` receipt before returning an error.
   It contains fixed stage/status fields and bounded canonical relative paths,
@@ -95,6 +95,13 @@ response; helpers must not echo a suspected value during diagnosis.
 - Resolved-lock root, dependencies, package entries and transitive dependency
   maps are type-checked before lookup. Array-shaped malformed locks produce a
   bounded `FAIL` source-audit receipt instead of escaping through AttributeError.
+- The reviewed manifest also pins `com.unity.sdk.linux-arm64`,
+  `com.unity.sdk.linux-x86_64` and `com.unity.toolchain.linux-x86_64-linux` to
+  `1.1.0`. Unity added exactly these three build-environment packages during the
+  first observed Linux Editor imports. They are declared before import rather
+  than exempted from source audit. Resolved-lock, native package and APK receipt
+  checks require their exact versions. Any later manifest dependency mutation
+  remains a failure. See [the provenance and repair record](REPAIR-TOOLCHAIN-03.md).
 - URP initialization has an additional exact four-path allowance, classified
   separately as `URP_GENERATED_GLOBAL_SETTING`: `Assets/UniversalRenderPipelineGlobalSettings.asset`,
   `Assets/UniversalRenderPipelineGlobalSettings.asset.meta`, `Assets/DefaultVolumeProfile.asset`,

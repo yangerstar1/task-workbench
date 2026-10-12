@@ -18,6 +18,9 @@ namespace Lottery.Probe.Tests
             Assert.That(packages["com.unity.render-pipelines.universal"], Is.EqualTo("17.3.0"));
             Assert.That(packages["com.unity.inputsystem"], Is.EqualTo("1.20.1"));
             Assert.That(packages["com.unity.test-framework"], Is.EqualTo("1.6.0"));
+            Assert.That(packages["com.unity.sdk.linux-arm64"], Is.EqualTo("1.1.0"));
+            Assert.That(packages["com.unity.sdk.linux-x86_64"], Is.EqualTo("1.1.0"));
+            Assert.That(packages["com.unity.toolchain.linux-x86_64-linux"], Is.EqualTo("1.1.0"));
         }
         [Test] public void UrpAssetsSurviveReimport()
         {
