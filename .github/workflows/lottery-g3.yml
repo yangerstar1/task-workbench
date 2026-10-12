@@ -407,7 +407,59 @@ jobs:
         if: ${{ always() && steps.guard.outcome == 'success' && steps.unity.outcome != 'skipped' && (steps.verify.outcome != 'success' || steps.audit.outcome != 'success') }}
         run: |
           set -euo pipefail
-          git show "$GITHUB_SHA:tasks/lottery-shop/scripts/g3_path_diagnostics.py" 2>/dev/null | timeout --signal=TERM --kill-after=5s 40s python3 -I -B -
+          /usr/bin/timeout --signal=TERM --kill-after=5s 40s /usr/bin/python3 -I -B - <<'G3_REVIEWED_LOADER'
+          # Reviewed inline loader: no checkout imports before fixed blob/hash verification.
+          import hashlib, os, re, selectors, signal, stat, subprocess, sys, time
+          from pathlib import Path
+          SOURCE_PATH = 'tasks/lottery-shop/scripts/g3_path_diagnostics.py'
+          BLOB_ID = 'd1897f2c9d137579b05efe43933e7312c1915d72'
+          SOURCE_SHA256 = '53b7bac0901133f6da557c6e4af15e6ea055fcf62025aea08ea001a479b25a99'
+          def terminated(signum, frame):
+              raise TimeoutError('FIXED_TIMEOUT')
+          signal.signal(signal.SIGTERM, terminated)
+          def require(ok):
+              if not ok: raise ValueError('FIXED_SOURCE_CHECK')
+          def fetch(root, args, limit):
+              env = {'PATH':'/usr/bin:/bin', 'LC_ALL':'C', 'GIT_CONFIG_NOSYSTEM':'1',
+                     'GIT_CONFIG_SYSTEM':'/dev/null', 'GIT_CONFIG_GLOBAL':'/dev/null', 'GIT_NO_REPLACE_OBJECTS':'1'}
+              child = subprocess.Popen(['/usr/bin/git', '--no-replace-objects', '--git-dir='+str(root/'.git'),
+                  '--work-tree='+str(root), *args], env=env, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+              data = bytearray(); deadline = time.monotonic()+5
+              try:
+                  with selectors.DefaultSelector() as selector:
+                      selector.register(child.stdout, selectors.EVENT_READ)
+                      while True:
+                          remaining = deadline-time.monotonic()
+                          if remaining <= 0 or not selector.select(remaining): raise TimeoutError('FIXED_TIMEOUT')
+                          chunk = os.read(child.stdout.fileno(), min(16384,limit+1-len(data)))
+                          if not chunk: break
+                          data.extend(chunk); require(len(data) <= limit)
+                  require(child.wait(timeout=max(.01,deadline-time.monotonic())) == 0)
+                  if time.monotonic()>deadline: raise TimeoutError('FIXED_TIMEOUT')
+                  return bytes(data)
+              finally:
+                  if child.poll() is None: child.kill()
+                  child.wait(timeout=2); child.stdout.close()
+          try:
+              root = Path(os.environ.get('GITHUB_WORKSPACE',''))
+              require(root.is_absolute() and '..' not in root.parts and len(str(root)) <= 8192)
+              for parent in (root, *root.parents): require(stat.S_ISDIR(parent.lstat().st_mode))
+              require(stat.S_ISDIR((root/'.git').lstat().st_mode))
+              source = os.environ.get('GITHUB_SHA',''); require(re.fullmatch('[0-9a-f]{40}',source))
+              entry = fetch(root, ['ls-tree','--full-tree','-z',source,'--',SOURCE_PATH], 1024)
+              require(entry == ('100644 blob '+BLOB_ID+'\t'+SOURCE_PATH+'\0').encode('ascii'))
+              raw = fetch(root, ['cat-file','blob',BLOB_ID], 128*1024)
+              require(hashlib.sha1(b'blob '+str(len(raw)).encode('ascii')+b'\0'+raw).hexdigest() == BLOB_ID)
+              require(hashlib.sha256(raw).hexdigest() == SOURCE_SHA256)
+          except Exception:
+              print('G3_DIAGNOSTIC_SOURCE_ERROR code=SOURCE_OR_TIMEOUT_REJECTED',file=sys.stderr)
+              sys.exit(1)
+          try:
+              exec(compile(raw,'<reviewed-g3-diagnostic>','exec'), {'__name__':'__main__'})
+          except Exception:
+              print('G3_DIAGNOSTIC_SOURCE_ERROR code=REVIEWED_MODULE_START_REJECTED',file=sys.stderr)
+              sys.exit(1)
+          G3_REVIEWED_LOADER
       - name: Preserve diagnostic-only filesystem metadata
         if: ${{ always() && steps.pathdiagnostics.outcome == 'success' && steps.pathdiagnostics.outputs.diagnostic_relative_path != '' }}
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02

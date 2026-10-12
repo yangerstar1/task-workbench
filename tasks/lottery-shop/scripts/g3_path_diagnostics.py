@@ -82,6 +82,11 @@ def stamp(info):
     return (info.st_dev,info.st_ino,info.st_mode,info.st_nlink)
 
 
+def authority_stamp(info):
+    # Directory nlink legitimately changes when our exclusive child is created.
+    return (info.st_dev,info.st_ino,info.st_mode,info.st_uid,info.st_gid)
+
+
 def content_stamp(info):
     return stamp(info)+(info.st_size,info.st_mtime_ns,info.st_ctime_ns)
 
@@ -93,23 +98,31 @@ def absolute_parts(path):
     text=os.fspath(path)
     if not text.startswith('/') or '\x00' in text or any(p in ('.','..','') for p in text.split('/')[1:]):
         raise DiagnosticError('ROOT_MISMATCH')
-    return text.split('/')[1:]
+    parts=text.split('/')[1:]
+    if len(parts)>64 or len(text.encode('utf-8','surrogateescape'))>8192:raise DiagnosticError('ROOT_MISMATCH')
+    return parts
 
 
-def open_directory(path):
-    """No-follow traversal from /; no realpath resolution or target inspection."""
+def directory_anchor(path):
+    """Retain initial ancestor identities/permissions for later re-anchoring."""
     fd=os.open('/',os.O_RDONLY|os.O_DIRECTORY|os.O_NOFOLLOW)
+    chain=[authority_stamp(os.fstat(fd))]
     try:
         for part in absolute_parts(path):
             info=os.stat(part,dir_fd=fd,follow_symlinks=False)
             if not stat.S_ISDIR(info.st_mode):raise DiagnosticError('UNSAFE')
             child=os.open(part,os.O_RDONLY|os.O_DIRECTORY|os.O_NOFOLLOW,dir_fd=fd)
-            if stamp(os.fstat(child))!=stamp(info):
+            observed=os.fstat(child)
+            if stamp(observed)!=stamp(info) or authority_stamp(observed)!=authority_stamp(info):
                 os.close(child);raise DiagnosticError('CHANGED')
-            os.close(fd);fd=child
-        return fd
+            chain.append(authority_stamp(observed));os.close(fd);fd=child
+        return fd,tuple(chain)
     except BaseException:
         os.close(fd);raise
+
+
+def open_directory(path):
+    return directory_anchor(path)[0]
 
 
 def scan_pass(root_fd, deadline, max_nodes=MAX_NODES, max_depth=MAX_DEPTH):
@@ -138,7 +151,9 @@ def scan_pass(root_fd, deadline, max_nodes=MAX_NODES, max_depth=MAX_DEPTH):
                         walk(child,relative,depth+1)
                         if stamp(os.fstat(child))!=stamp(info):raise DiagnosticError('CHANGED')
                     finally:os.close(child)
-    try:walk(root_fd,'',0)
+    try:
+        walk(root_fd,'',0)
+        if time.monotonic()>deadline:raise DiagnosticError('TIME_LIMIT')
     except DiagnosticError as error:errors.append(error.code)
     except OSError:errors.append('IO_ERROR')
     return nodes,errors
@@ -153,7 +168,9 @@ def collect(root_fd, max_nodes=MAX_NODES, max_depth=MAX_DEPTH, seconds=MAX_SECON
     start=time.monotonic();deadline=start+seconds;root_before=stamp(os.fstat(root_fd))
     before,errors1=scan_pass(root_fd,deadline,max_nodes,max_depth)
     after,errors2=scan_pass(root_fd,deadline,max_nodes,max_depth)
-    stable=not errors1 and not errors2 and before==after and root_before==stamp(os.fstat(root_fd))
+    root_after=stamp(os.fstat(root_fd))
+    if time.monotonic()>deadline:errors2.append('TIME_LIMIT')
+    stable=not errors1 and not errors2 and before==after and root_before==root_after
     inode_groups={};special=[]
     for name,entry in after.items():
         if stat.S_ISREG(entry[2]):inode_groups.setdefault(entry[:2],[]).append((name,entry))
@@ -240,9 +257,15 @@ def identity(root_fd,head,env):
         authority='CONSISTENCY_OBSERVATIONS_ONLY_NOT_SOURCE_APPROVAL')
 
 
+def git_environment():
+    # No inherited Git repository/object/config/trace variables or HOME/XDG.
+    return {'PATH':'/usr/bin:/bin','LC_ALL':'C','GIT_CONFIG_NOSYSTEM':'1',
+            'GIT_CONFIG_SYSTEM':'/dev/null','GIT_CONFIG_GLOBAL':'/dev/null','GIT_NO_REPLACE_OBJECTS':'1'}
+
+
 def git_value(root,argument):
     # Fixed read-only Git commands; cap pipe bytes while reading, not afterward.
-    child=subprocess.Popen(['/usr/bin/git','-C',str(root),'rev-parse',argument],stdout=subprocess.PIPE,stderr=subprocess.DEVNULL)
+    child=subprocess.Popen(['/usr/bin/git','--no-replace-objects','--git-dir='+str(root/'.git'),'--work-tree='+str(root),'rev-parse',argument],env=git_environment(),stdout=subprocess.PIPE,stderr=subprocess.DEVNULL)
     raw=bytearray();deadline=time.monotonic()+5
     try:
         with selectors.DefaultSelector() as selector:
@@ -255,6 +278,7 @@ def git_value(root,argument):
                 raw.extend(chunk)
                 if len(raw)>8192:raise DiagnosticError('NAME_LIMIT')
         if child.wait(timeout=max(0.01,deadline-time.monotonic()))!=0:raise DiagnosticError('ROOT_MISMATCH')
+        if time.monotonic()>deadline:raise DiagnosticError('TIME_LIMIT')
         return bytes(raw)
     finally:
         if child.poll() is None:child.kill()
@@ -283,7 +307,7 @@ def checked_root(env):
 def output_handles(root,env):
     temp=Path(env.get('RUNNER_TEMP',''));parts=absolute_parts(temp);root_parts=absolute_parts(root)
     if parts[:len(root_parts)]==root_parts or root_parts[:len(parts)]==parts:raise DiagnosticError('OUTPUT_UNSAFE')
-    temp_fd=open_directory(temp);output_fd=None;parent=None
+    temp_fd,temp_chain=directory_anchor(temp);output_fd=None;parent=None;parent_chain=[]
     try:
         info=os.fstat(temp_fd)
         if info.st_uid!=os.geteuid() or not info.st_mode&stat.S_IWUSR or not info.st_mode&stat.S_IXUSR or info.st_mode&0o022:raise DiagnosticError('OUTPUT_UNSAFE')
@@ -295,16 +319,49 @@ def output_handles(root,env):
             if not stat.S_ISDIR(info.st_mode) or info.st_uid!=os.geteuid() or info.st_mode&0o022:raise DiagnosticError('OUTPUT_UNSAFE')
             child=os.open(part,os.O_RDONLY|os.O_DIRECTORY|os.O_NOFOLLOW,dir_fd=parent)
             if stamp(os.fstat(child))!=stamp(info):os.close(child);raise DiagnosticError('OUTPUT_CHANGED')
+            parent_chain.append((part,authority_stamp(info)))
             os.close(parent);parent=child
         before=os.stat(output.name,dir_fd=parent,follow_symlinks=False)
         if not stat.S_ISREG(before.st_mode) or before.st_nlink!=1 or before.st_uid!=os.geteuid() or before.st_mode&0o022 or not before.st_mode&stat.S_IWUSR or before.st_size>65536:raise DiagnosticError('OUTPUT_UNSAFE')
         output_fd=os.open(output.name,os.O_WRONLY|os.O_APPEND|os.O_NONBLOCK|os.O_NOFOLLOW,dir_fd=parent)
         if stamp(os.fstat(output_fd))!=stamp(before):raise DiagnosticError('OUTPUT_CHANGED')
-        return temp,temp_fd,(output_fd,parent,output.name)
+        authority=dict(tempPath=temp,tempChain=temp_chain,tempStamp=authority_stamp(os.fstat(temp_fd)),parents=tuple(parent_chain),
+            leafAuthority=authority_stamp(before),leafStamp=stamp(before),leafContent=content_stamp(before),leafSize=before.st_size)
+        channel=(output_fd,parent,output.name,authority)
+        recheck_output(temp_fd,channel)
+        return temp,temp_fd,channel
     except BaseException:
         if output_fd is not None:os.close(output_fd)
         if parent is not None:os.close(parent)
         os.close(temp_fd);raise
+
+
+def recheck_output(temp_fd,channel,appended_bytes=0):
+    """Rewalk every named ancestor against the original admission, before writes."""
+    output_fd,parent_fd,output_name,initial=channel
+    fresh=None
+    try:
+        fresh,chain=directory_anchor(initial['tempPath'])
+        if chain!=initial['tempChain'] or authority_stamp(os.fstat(temp_fd))!=initial['tempStamp'] or authority_stamp(os.fstat(fresh))!=initial['tempStamp']:
+            raise DiagnosticError('OUTPUT_CHANGED')
+        for name,expected in initial['parents']:
+            info=os.stat(name,dir_fd=fresh,follow_symlinks=False)
+            if authority_stamp(info)!=expected or not stat.S_ISDIR(info.st_mode) or info.st_uid!=os.geteuid() or info.st_mode&0o022:
+                raise DiagnosticError('OUTPUT_CHANGED')
+            child=os.open(name,os.O_RDONLY|os.O_DIRECTORY|os.O_NOFOLLOW,dir_fd=fresh)
+            if authority_stamp(os.fstat(child))!=expected:
+                os.close(child);raise DiagnosticError('OUTPUT_CHANGED')
+            os.close(fresh);fresh=child
+        if authority_stamp(os.fstat(fresh))!=authority_stamp(os.fstat(parent_fd)):
+            raise DiagnosticError('OUTPUT_CHANGED')
+        named=os.stat(output_name,dir_fd=fresh,follow_symlinks=False);opened=os.fstat(output_fd)
+        for info in (named,opened):
+            if authority_stamp(info)!=initial['leafAuthority'] or stamp(info)!=initial['leafStamp'] or info.st_nlink!=1 or not stat.S_ISREG(info.st_mode) or info.st_size!=initial['leafSize']+appended_bytes:
+                raise DiagnosticError('OUTPUT_CHANGED')
+            if appended_bytes==0 and content_stamp(info)!=initial['leafContent']:raise DiagnosticError('OUTPUT_CHANGED')
+    except OSError:raise DiagnosticError('OUTPUT_CHANGED') from None
+    finally:
+        if fresh is not None:os.close(fresh)
 
 
 def encode_report(report):
@@ -314,9 +371,10 @@ def encode_report(report):
 
 
 def publish(temp_fd,channel,raw):
-    output_fd,parent_fd,output_name=channel
+    output_fd,parent_fd,output_name=channel[:3]
     if len(raw)>MAX_BYTES:raise DiagnosticError('OUTPUT_UNSAFE')
-    # Preflight both output handles before the first create/write.
+    # Compare to the original admission, not two current views of changed fds.
+    recheck_output(temp_fd,channel)
     before=os.fstat(output_fd)
     if not stat.S_ISREG(before.st_mode) or before.st_nlink!=1 or before.st_uid!=os.geteuid() or before.st_mode&0o022 or not before.st_mode&stat.S_IWUSR:raise DiagnosticError('OUTPUT_UNSAFE')
     if stamp(os.stat(output_name,dir_fd=parent_fd,follow_symlinks=False))!=stamp(before):raise DiagnosticError('OUTPUT_CHANGED')
@@ -328,11 +386,13 @@ def publish(temp_fd,channel,raw):
     try:
         info=os.fstat(directory_fd)
         if stamp(info)!=stamp(created) or info.st_uid!=os.geteuid() or stat.S_IMODE(info.st_mode)!=0o700:raise DiagnosticError('OUTPUT_UNSAFE')
+        recheck_output(temp_fd,channel)
         try:file_fd=os.open(FILE_NAME,os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o600,dir_fd=directory_fd)
         except FileExistsError:raise DiagnosticError('OUTPUT_EXISTS')
         try:
             file_info=os.fstat(file_fd)
             if not stat.S_ISREG(file_info.st_mode) or file_info.st_nlink!=1:raise DiagnosticError('OUTPUT_UNSAFE')
+            recheck_output(temp_fd,channel)
             view=memoryview(raw)
             while view:view=view[os.write(file_fd,view):]
             os.fsync(file_fd)
@@ -343,9 +403,11 @@ def publish(temp_fd,channel,raw):
         if stamp(os.fstat(output_fd))!=stamp(before) or stamp(os.stat(output_name,dir_fd=parent_fd,follow_symlinks=False))!=stamp(before):raise DiagnosticError('OUTPUT_CHANGED')
         if stamp(os.stat(dirname,dir_fd=temp_fd,follow_symlinks=False))!=stamp(info) or stamp(os.stat(FILE_NAME,dir_fd=directory_fd,follow_symlinks=False))!=stamp(file_info):raise DiagnosticError('OUTPUT_CHANGED')
         os.fchmod(directory_fd,0o500);info=os.fstat(directory_fd)
+        recheck_output(temp_fd,channel)
         line=('diagnostic_relative_path='+dirname+'/'+FILE_NAME+'\n').encode('ascii')
         if os.write(output_fd,line)!=len(line):raise DiagnosticError('OUTPUT_CHANGED')
         os.fsync(output_fd)
+        recheck_output(temp_fd,channel,appended_bytes=len(line))
         if stamp(os.fstat(output_fd))!=stamp(before) or stamp(os.stat(output_name,dir_fd=parent_fd,follow_symlinks=False))!=stamp(before):raise DiagnosticError('OUTPUT_CHANGED')
         if stamp(os.stat(dirname,dir_fd=temp_fd,follow_symlinks=False))!=stamp(info) or stamp(os.stat(FILE_NAME,dir_fd=directory_fd,follow_symlinks=False))!=stamp(file_info):raise DiagnosticError('OUTPUT_CHANGED')
     finally:os.close(directory_fd)
@@ -355,6 +417,7 @@ def publish(temp_fd,channel,raw):
 def main():
     deadline=time.monotonic()+MAX_TOTAL_SECONDS
     root,root_fd,head=checked_root(os.environ)
+    root_initial=authority_stamp(os.fstat(root_fd))
     try:
         temp,temp_fd,channel=output_handles(root,os.environ)
         try:
@@ -368,6 +431,8 @@ def main():
                 try:
                     if stamp(os.fstat(current))!=stamp(os.fstat(fd)):raise DiagnosticError('CHANGED')
                 finally:os.close(current)
+            if authority_stamp(os.fstat(root_fd))!=root_initial:raise DiagnosticError('CHANGED')
+            recheck_output(temp_fd,channel)
             raw=encode_report(report)
             if time.monotonic()>deadline:raise DiagnosticError('TIME_LIMIT')
             publish(temp_fd,channel,raw)

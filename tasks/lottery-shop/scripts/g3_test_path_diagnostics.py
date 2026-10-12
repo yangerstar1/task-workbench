@@ -4,6 +4,7 @@ import sys
 sys.dont_write_bytecode = True
 import contextlib
 import hashlib
+import io
 import json
 import os
 from pathlib import Path
@@ -190,6 +191,87 @@ class EnumerationTests(DiagnosticFixture):
         self.assertIn('TIME_LIMIT', result['errors'])
         self.assertFalse(result['stable'])
 
+    def assert_scan_deadline_exceeded(self, result):
+        self.assertIn('TIME_LIMIT', result['errors'])
+        self.assertFalse(result['enumerationComplete'])
+        self.assertFalse(result['complete'])
+        self.assertFalse(result['stable'])
+        self.assertTrue(all(not group['membershipEqualsNlink']
+                            for group in result['hardlinkGroups']))
+
+    def test_final_second_pass_stat_over_deadline_is_incomplete(self):
+        first = self.root / 'first'
+        first.write_bytes(b'synthetic metadata fixture')
+        os.link(first, self.root / 'second')
+        actual_stat = os.stat
+        elapsed = 0.0
+        calls = 0
+        with self.root_handle() as fd:
+            def late_final_stat(path, *args, **kwargs):
+                nonlocal elapsed, calls
+                info = actual_stat(path, *args, **kwargs)
+                if kwargs.get('dir_fd') == fd and path in ('first', 'second'):
+                    calls += 1
+                    if calls == 4:
+                        elapsed = 21.0
+                return info
+
+            with mock.patch.object(diag.os, 'stat', side_effect=late_final_stat), \
+                    mock.patch.object(diag.time, 'monotonic', side_effect=lambda: elapsed):
+                result = diag.collect(fd)
+        self.assertEqual(calls, 4)
+        self.assertGreater(elapsed, result['limits']['seconds'])
+        self.assert_scan_deadline_exceeded(result)
+        self.assertEqual(len(result['hardlinkGroups']), 1)
+
+    def test_final_empty_iterator_over_deadline_is_incomplete(self):
+        elapsed = 0.0
+        calls = 0
+
+        @contextlib.contextmanager
+        def late_empty_iterator(fd):
+            nonlocal calls
+            calls += 1
+            pass_number = calls
+
+            def entries():
+                nonlocal elapsed
+                if pass_number == 2:
+                    elapsed = 21.0
+                yield from ()
+
+            yield entries()
+
+        with self.root_handle() as fd, \
+                mock.patch.object(diag.os, 'scandir', side_effect=late_empty_iterator), \
+                mock.patch.object(diag.time, 'monotonic', side_effect=lambda: elapsed):
+            result = diag.collect(fd)
+        self.assertEqual(calls, 2)
+        self.assertEqual(result['secondPassEntries'], 0)
+        self.assertGreater(elapsed, result['limits']['seconds'])
+        self.assert_scan_deadline_exceeded(result)
+
+    def test_final_root_stat_over_deadline_is_incomplete(self):
+        actual_fstat = os.fstat
+        elapsed = 0.0
+        with self.root_handle() as fd:
+            calls = 0
+
+            def late_root_stat(other_fd):
+                nonlocal calls, elapsed
+                info = actual_fstat(other_fd)
+                if other_fd == fd:
+                    calls += 1
+                    if calls == 2:
+                        elapsed = 21.0
+                return info
+
+            with mock.patch.object(diag.os, 'fstat', side_effect=late_root_stat), \
+                    mock.patch.object(diag.time, 'monotonic', side_effect=lambda: elapsed):
+                result = diag.collect(fd)
+        self.assertEqual(calls, 2)
+        self.assert_scan_deadline_exceeded(result)
+
     def test_aggregate_path_byte_limit_marks_incomplete(self):
         for name in ('first-name', 'second-name', 'third-name'):
             (self.root / name).write_bytes(b'')
@@ -318,6 +400,143 @@ class EnumerationTests(DiagnosticFixture):
 
 
 class OutputTests(DiagnosticFixture):
+    def assert_main_refuses_output_drift(self, mutate):
+        """Exercise real main/collection/publication with identity checks isolated."""
+        sentinel = b'existing=SENTINEL_UNCHANGED\n'
+        self.output.write_bytes(sentinel)
+        actual_collect = diag.collect
+        actual_mkdir = os.mkdir
+        changed_outputs = []
+        diagnostic_creates = []
+        root_fd = diag.open_directory(self.root)
+
+        def change_during_collect(fd):
+            changed_outputs.extend(mutate() or [self.output])
+            return actual_collect(fd)
+
+        def observed_mkdir(path, *args, **kwargs):
+            if os.fsdecode(path).startswith('lottery-g3-pathdiag-'):
+                diagnostic_creates.append(path)
+            return actual_mkdir(path, *args, **kwargs)
+
+        with mock.patch.dict(os.environ, self.env, clear=True), \
+                mock.patch.object(diag, 'checked_root', return_value=(self.root, root_fd, 'a' * 40)), \
+                mock.patch.object(diag, 'identity', return_value={'authority': 'SYNTHETIC_TEST_ONLY'}), \
+                mock.patch.object(diag, 'collect', side_effect=change_during_collect) as collect, \
+                mock.patch.object(diag.os, 'mkdir', side_effect=observed_mkdir), \
+                mock.patch.object(diag.os, 'write', wraps=os.write) as write, \
+                contextlib.redirect_stdout(io.StringIO()):
+            self.assert_refused(diag.main)
+        collect.assert_called_once()
+        self.assertEqual(diagnostic_creates, [], 'output drift must be rejected before creating diagnostics')
+        write.assert_not_called()
+        self.assertTrue(changed_outputs)
+        for output in changed_outputs:
+            self.assertEqual(output.read_bytes(), sentinel)
+        self.assertFalse(list(self.base.rglob('lottery-g3-pathdiag-*')))
+
+    def nest_runner(self):
+        anchor = self.base / 'runner-ancestor'
+        anchor.mkdir(mode=0o700)
+        self.temp.rename(anchor / 'runner')
+        self.temp = anchor / 'runner'
+        self.commands = self.temp / '_runner_file_commands'
+        self.output = self.commands / 'set_output_synthetic'
+        self.env.update(RUNNER_TEMP=str(self.temp), GITHUB_OUTPUT=str(self.output))
+        return anchor
+
+    def test_main_runner_becoming_world_writable_is_refused_before_creation(self):
+        self.assert_main_refuses_output_drift(lambda: self.temp.chmod(0o777))
+
+    def test_main_output_parent_moved_outside_runner_is_refused_before_creation(self):
+        moved = self.base / 'moved-output-parent'
+
+        def mutate():
+            self.commands.rename(moved)
+            return [moved / self.output.name]
+
+        self.assert_main_refuses_output_drift(mutate)
+
+    def test_main_runner_moved_and_same_path_recreated_is_refused_before_creation(self):
+        moved = self.base / 'moved-runner'
+
+        def mutate():
+            self.temp.rename(moved)
+            self.temp.mkdir(mode=0o700)
+            return [moved / '_runner_file_commands' / self.output.name]
+
+        self.assert_main_refuses_output_drift(mutate)
+
+    def test_main_output_parent_swapped_for_same_mode_directory_is_refused(self):
+        moved = self.temp / 'old-output-parent'
+
+        def mutate():
+            self.commands.rename(moved)
+            self.commands.mkdir(mode=0o700)
+            self.output.write_bytes(b'existing=SENTINEL_UNCHANGED\n')
+            self.output.chmod(0o600)
+            return [moved / self.output.name, self.output]
+
+        self.assert_main_refuses_output_drift(mutate)
+
+    def test_main_runner_ancestor_identity_swap_is_refused_before_creation(self):
+        anchor = self.nest_runner()
+        moved = self.base / 'old-runner-ancestor'
+
+        def mutate():
+            anchor.rename(moved)
+            anchor.mkdir(mode=0o700)
+            (moved / 'runner').rename(self.temp)
+
+        self.assert_main_refuses_output_drift(mutate)
+
+    def test_main_initial_safe_runner_mode_is_preserved(self):
+        self.assert_main_refuses_output_drift(lambda: self.temp.chmod(0o750))
+
+    def test_main_initial_safe_output_parent_mode_is_preserved(self):
+        self.assert_main_refuses_output_drift(lambda: self.commands.chmod(0o750))
+
+    def test_main_initial_safe_output_leaf_mode_is_preserved(self):
+        self.assert_main_refuses_output_drift(lambda: self.output.chmod(0o640))
+
+    def test_main_initial_runner_ancestor_mode_is_preserved(self):
+        anchor = self.nest_runner()
+        self.assert_main_refuses_output_drift(lambda: anchor.chmod(0o750))
+
+    def test_main_output_leaf_identity_swap_is_refused_before_creation(self):
+        moved = self.commands / 'old-output'
+
+        def mutate():
+            self.output.rename(moved)
+            self.output.write_bytes(b'existing=SENTINEL_UNCHANGED\n')
+            self.output.chmod(0o600)
+            return [moved, self.output]
+
+        self.assert_main_refuses_output_drift(mutate)
+
+    def test_main_initial_output_anchor_owners_are_preserved(self):
+        anchor = self.nest_runner()
+        actual_stat, actual_fstat = os.stat, os.fstat
+        for target in (anchor, self.temp, self.commands, self.output):
+            with self.subTest(target=target.name):
+                original = actual_stat(target)
+                changed = False
+
+                def altered_owner(info):
+                    if changed and (info.st_dev, info.st_ino) == (original.st_dev, original.st_ino):
+                        fields = {key: getattr(info, key) for key in dir(info) if key.startswith('st_')}
+                        fields['st_uid'] = original.st_uid + 1
+                        return types.SimpleNamespace(**fields)
+                    return info
+
+                def mutate():
+                    nonlocal changed
+                    changed = True
+
+                with mock.patch.object(diag.os, 'stat', side_effect=lambda *a, **kw: altered_owner(actual_stat(*a, **kw))), \
+                        mock.patch.object(diag.os, 'fstat', side_effect=lambda *a, **kw: altered_owner(actual_fstat(*a, **kw))):
+                    self.assert_main_refuses_output_drift(mutate)
+
     def test_exact_new_file_readonly_and_append_only_output(self):
         self.output.write_bytes(b'existing=unchanged\n')
         raw = b'{"status":"DIAGNOSTIC_ONLY"}\n'
@@ -475,6 +694,90 @@ class OutputTests(DiagnosticFixture):
 
 
 class IdentityAndCliTests(DiagnosticFixture):
+    def initialize_foreign_git(self):
+        foreign = self.base / 'foreign-checkout'
+        foreign.mkdir()
+        env = dict(PATH='/usr/bin:/bin', HOME=str(self.base), LC_ALL='C',
+                   GIT_CONFIG_NOSYSTEM='1', GIT_CONFIG_GLOBAL=os.devnull)
+        commands = [
+            ['/usr/bin/git', 'init', '--quiet', str(foreign)],
+            ['/usr/bin/git', '-C', str(foreign), 'add', '.'],
+            ['/usr/bin/git', '-C', str(foreign), '-c', 'user.name=Synthetic Test',
+             '-c', 'user.email=synthetic@example.invalid', 'commit', '--quiet', '-m', 'foreign fixture'],
+        ]
+        (foreign / 'foreign-source').write_bytes(b'foreign synthetic checkout only\n')
+        for command in commands:
+            subprocess.run(command, env=env, check=True,
+                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        head = subprocess.check_output(['/usr/bin/git', '-C', str(foreign), 'rev-parse', 'HEAD'],
+                                       env=env).decode('ascii').strip()
+        return foreign, head
+
+    def test_real_git_identity_ignores_inherited_git_home_and_xdg_environment(self):
+        self.initialize_git()
+        foreign, foreign_head = self.initialize_foreign_git()
+        self.assertNotEqual(foreign_head, self.env['GITHUB_SHA'])
+        poison_home = self.base / 'poison-home'
+        poison_home.mkdir()
+        (poison_home / '.gitconfig').write_text('INVALID SYNTHETIC CONFIG [\n')
+        poison_xdg = self.base / 'poison-xdg'
+        (poison_xdg / 'git').mkdir(parents=True)
+        (poison_xdg / 'git/config').write_text('INVALID SYNTHETIC CONFIG [\n')
+        inherited = dict(
+            PATH='/synthetic-no-git-on-path', HOME=str(poison_home), XDG_CONFIG_HOME=str(poison_xdg),
+            GIT_DIR=str(foreign / '.git'), GIT_WORK_TREE=str(self.root),
+            GIT_COMMON_DIR=str(foreign / '.git'), GIT_OBJECT_DIRECTORY=str(foreign / '.git/objects'),
+            GIT_ALTERNATE_OBJECT_DIRECTORIES=str(foreign / '.git/objects'),
+            GIT_CONFIG_SYSTEM=str(poison_home / '.gitconfig'),
+            GIT_CONFIG_GLOBAL=str(poison_home / '.gitconfig'), GIT_CONFIG_NOSYSTEM='0',
+            GIT_CONFIG_COUNT='not-an-integer', GIT_CONFIG_KEY_0='core.worktree',
+            GIT_CONFIG_VALUE_0=str(foreign), GIT_CONFIG_PARAMETERS="'core.worktree=foreign'",
+            GIT_NAMESPACE='synthetic-poison', GIT_REPLACE_REF_BASE='refs/synthetic-poison/',
+            GIT_DIAGNOSTIC_TEST_SENTINEL='MUST_NOT_INHERIT',
+        )
+        actual_popen = subprocess.Popen
+        with mock.patch.dict(os.environ, inherited, clear=True), \
+                mock.patch.object(diag.subprocess, 'Popen', wraps=actual_popen) as popen:
+            root, fd, head = diag.checked_root(self.env)
+            try:
+                self.assertEqual(root, self.root)
+                self.assertEqual(head, self.env['GITHUB_SHA'])
+            finally:
+                os.close(fd)
+        self.assertEqual(popen.call_count, 2)
+
+        def option_value(argv, option):
+            if option in argv:
+                return argv[argv.index(option) + 1]
+            return next((arg.split('=', 1)[1] for arg in argv if arg.startswith(option + '=')), None)
+
+        for call in popen.call_args_list:
+            argv = call.args[0]
+            self.assertEqual(argv[0], '/usr/bin/git')
+            self.assertIn('--no-replace-objects', argv)
+            self.assertEqual(option_value(argv, '--git-dir'), str(self.root / '.git'))
+            self.assertEqual(option_value(argv, '--work-tree'), str(self.root))
+            child_environment = call.kwargs.get('env')
+            self.assertIsInstance(child_environment, dict, 'Git requires an explicit clean environment')
+            for key, value in inherited.items():
+                with self.subTest(inherited_variable=key):
+                    self.assertNotEqual(child_environment.get(key), value)
+        self.assertEqual(self.output.read_bytes(), b'')
+
+    def test_inherited_git_dir_cannot_supply_foreign_checkout_identity(self):
+        self.initialize_git()
+        foreign, foreign_head = self.initialize_foreign_git()
+        env = dict(self.env, GITHUB_SHA=foreign_head)
+
+        def check_foreign_identity():
+            _, fd, _ = diag.checked_root(env)
+            os.close(fd)
+
+        with mock.patch.dict(os.environ, dict(GIT_DIR=str(foreign / '.git'),
+                                             GIT_WORK_TREE=str(self.root)), clear=False):
+            self.assert_refused(check_foreign_identity)
+        self.assertEqual(self.output.read_bytes(), b'')
+
     def write_record(self, relative, value):
         path = self.root / relative
         path.parent.mkdir(parents=True, exist_ok=True)

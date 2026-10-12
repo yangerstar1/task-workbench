@@ -8,6 +8,8 @@ import struct
 import subprocess
 import os
 import tempfile
+import time
+import zlib
 import shutil
 import sys
 sys.dont_write_bytecode = True  # Project imports must never write checkout inputs.
@@ -17,6 +19,13 @@ import g3_ci as ci
 import g3_process as process
 
 ROOT=Path(__file__).resolve().parents[3]
+
+
+def diagnostic_shell(root):
+    text=(root/'.github/workflows/lottery-g3.yml').read_text()
+    start=text.index('        run: |\n',text.index('      - name: Collect independent metadata-only path diagnosis'))+len('        run: |\n')
+    end=text.index('      - name: Preserve diagnostic-only filesystem metadata',start)
+    return ''.join(line[10:]+'\n' for line in text[start:end].splitlines())
 
 
 def axml(version=3,package='com.buyuqi.lotteryprobe',namespace='http://schemas.android.com/apk/res/android',duplicate=False):
@@ -449,7 +458,7 @@ class G3ValidatorTests(unittest.TestCase):
             env.update(GITHUB_WORKSPACE=str(root),RUNNER_TEMP=str(runner),GITHUB_OUTPUT=str(channel))
             committed=git('show','HEAD:'+ci.TASK+'/scripts/g3_path_diagnostics.py')
             (task/'scripts/g3_path_diagnostics.py').write_text('raise RuntimeError("DIRTY_MODULE_MUST_NOT_EXECUTE")\n')
-            result=subprocess.run(['bash','-c','set -euo pipefail; git show "$GITHUB_SHA:tasks/lottery-shop/scripts/g3_path_diagnostics.py" 2>/dev/null | timeout --signal=TERM --kill-after=5s 40s python3 -I -B -'],cwd=root,env=env,stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True,timeout=50)
+            result=subprocess.run(['bash','-c',diagnostic_shell(ROOT)],cwd=root,env=env,stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True,timeout=50)
             self.assertEqual(result.returncode,0,result.stderr);self.assertIn('status=DIAGNOSTIC_ONLY',result.stdout)
             entry=channel.read_text().strip();self.assertRegex(entry,r'^diagnostic_relative_path=lottery-g3-pathdiag-[0-9a-f]{24}/diagnostic.json$')
             path=runner/entry.split('=',1)[1];raw=path.read_text();report=json.loads(raw)
@@ -617,9 +626,66 @@ class G3ValidatorTests(unittest.TestCase):
                     with self.assertRaises(ValueError):ci.main()
                     self.assertEqual(gate.call_args.kwargs['android_cache'],stage=='android' and command in ('apk','audit','diagnostics'))
 
+    def runProvenanceFixture(self, attack):
+        with tempfile.TemporaryDirectory() as directory:
+            base=Path(directory);root=base/'checkout';root.mkdir();runner=base/'runner';runner.mkdir(mode=0o700)
+            output=runner/'output';output.touch();relative=ci.TASK+'/scripts/g3_path_diagnostics.py'
+            path=root/relative;path.parent.mkdir(parents=True);raw=(ROOT/relative).read_bytes();path.write_bytes(raw)
+            git_env=dict(PATH='/usr/bin:/bin',LC_ALL='C',GIT_CONFIG_NOSYSTEM='1',GIT_CONFIG_SYSTEM='/dev/null',GIT_CONFIG_GLOBAL='/dev/null')
+            def git(*args,input=None):return subprocess.check_output(['/usr/bin/git','-C',str(root),*args],input=input,env=git_env,stderr=subprocess.DEVNULL).decode().strip()
+            git('init','-q');git('add','.');git('-c','user.name=Synthetic Provenance','-c','user.email=fixture@example.invalid','commit','-qm','source')
+            head=git('rev-parse','HEAD');blob=git('rev-parse','HEAD:'+relative)
+            env=dict(os.environ,GITHUB_WORKSPACE=str(root),GITHUB_SHA=head,GITHUB_RUN_ID='123',GITHUB_RUN_ATTEMPT='1',GITHUB_JOB='android',RUNNER_TEMP=str(runner),GITHUB_OUTPUT=str(output))
+            marker=b'print("UNREVIEWED_BLOB_MUST_NOT_EXECUTE")\n';shell=diagnostic_shell(ROOT);expected_success=True
+            if attack=='replace_blob':
+                replacement=git('hash-object','-w','--stdin',input=marker);git('replace',blob,replacement)
+            elif attack=='replace_commit':
+                path.write_bytes(marker);git('add','.');git('-c','user.name=Synthetic Provenance','-c','user.email=fixture@example.invalid','commit','-qm','alternate')
+                alternate=git('rev-parse','HEAD');git('reset','--hard',head);git('replace',head,alternate)
+            elif attack=='git_environment':
+                foreign=base/'foreign';foreign.mkdir();fake_config=base/'config-fifo';os.mkfifo(fake_config)
+                trace=base/'trace-sentinel';trace.write_bytes(b'UNCHANGED')
+                env.update(GIT_DIR=str(foreign),GIT_WORK_TREE=str(foreign),GIT_COMMON_DIR=str(foreign),GIT_OBJECT_DIRECTORY=str(foreign),GIT_ALTERNATE_OBJECT_DIRECTORIES=str(foreign),GIT_INDEX_FILE=str(foreign/'index'),GIT_CONFIG_COUNT='1',GIT_CONFIG_KEY_0='include.path',GIT_CONFIG_VALUE_0=str(fake_config),GIT_CONFIG_SYSTEM=str(fake_config),GIT_CONFIG_GLOBAL=str(fake_config),GIT_TRACE=str(trace),GIT_REPLACE_REF_BASE='refs/other/',HOME=str(foreign),XDG_CONFIG_HOME=str(foreign))
+            elif attack=='corrupt_named_blob':
+                stored=root/'.git/objects'/blob[:2]/blob[2:];stored.chmod(0o600)
+                stored.write_bytes(zlib.compress(b'blob '+str(len(marker)).encode()+b'\0'+marker));expected_success=False
+            elif attack=='blocked_git_config':
+                config=root/'.git/config';config.rename(root/'.git/config.original');os.mkfifo(config)
+                shell=shell.replace('--kill-after=5s 40s','--kill-after=1s 1s',1);expected_success=False
+            elif attack=='wrong_hash_pin':
+                shell=shell.replace(hashlib.sha256(raw).hexdigest(),'0'*64);expected_success=False
+            else:raise AssertionError('Unknown synthetic attack')
+            started=time.monotonic();result=subprocess.run(['bash','-c',shell],cwd=root,env=env,stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True,timeout=10)
+            elapsed=time.monotonic()-started
+            self.assertNotIn('UNREVIEWED_BLOB_MUST_NOT_EXECUTE',result.stdout+result.stderr)
+            for secret in (str(root),str(base),'config-fifo','trace-sentinel'):self.assertNotIn(secret,result.stdout+result.stderr)
+            self.assertEqual(path.read_bytes(),raw)
+            if expected_success:
+                self.assertEqual(result.returncode,0,result.stderr);self.assertIn('status=DIAGNOSTIC_ONLY',result.stdout)
+                self.assertRegex(output.read_text(),r'^diagnostic_relative_path=lottery-g3-pathdiag-[0-9a-f]{24}/diagnostic.json\n$')
+                report=json.loads((runner/output.read_text().strip().split('=',1)[1]).read_text())
+                self.assertEqual(report['acceptance'],'NONE');self.assertEqual(report['identity']['observed']['gitHead'],head)
+                if attack=='git_environment':self.assertEqual(trace.read_bytes(),b'UNCHANGED')
+            else:
+                self.assertNotEqual(result.returncode,0);self.assertEqual(output.read_bytes(),b'');self.assertFalse(list(runner.glob('lottery-g3-pathdiag-*')))
+            if attack=='blocked_git_config':
+                self.assertLess(elapsed,5);self.assertIn('SOURCE_OR_TIMEOUT_REJECTED',result.stderr)
+
+    def testCommittedDiagnosticLoaderIgnoresBlobReplacement(self):self.runProvenanceFixture('replace_blob')
+    def testCommittedDiagnosticLoaderIgnoresCommitReplacement(self):self.runProvenanceFixture('replace_commit')
+    def testCommittedDiagnosticLoaderIgnoresGitRepositoryObjectAndConfigEnvironment(self):self.runProvenanceFixture('git_environment')
+    def testCommittedDiagnosticLoaderRejectsCorruptedObjectBytesAndWrongDigest(self):
+        for attack in ('corrupt_named_blob','wrong_hash_pin'):
+            with self.subTest(attack=attack):self.runProvenanceFixture(attack)
+    def testWholeDiagnosticLoaderTimeoutIncludesBlockedGit(self):self.runProvenanceFixture('blocked_git_config')
+
     def testWorkflowMaintainsLockedActionsAndNoCache(self):
         text=(ROOT/'.github/workflows/lottery-g3.yml').read_text()
-        self.assertIn('git show "$GITHUB_SHA:tasks/lottery-shop/scripts/g3_path_diagnostics.py" 2>/dev/null | timeout --signal=TERM --kill-after=5s 40s python3 -I -B -',text)
+        self.assertIn('/usr/bin/timeout --signal=TERM --kill-after=5s 40s /usr/bin/python3 -I -B -',text)
+        self.assertIn("'/usr/bin/git', '--no-replace-objects'",text)
+        raw=(ROOT/ci.TASK/'scripts/g3_path_diagnostics.py').read_bytes()
+        self.assertIn("SOURCE_SHA256 = '"+hashlib.sha256(raw).hexdigest()+"'",text)
+        self.assertIn("BLOB_ID = '"+hashlib.sha1(b'blob '+str(len(raw)).encode()+b'\0'+raw).hexdigest()+"'",text)
         self.assertIn("steps.pathdiagnostics.outputs.diagnostic_relative_path != ''",text)
         self.assertIn('path: ${{ runner.temp }}/${{ steps.pathdiagnostics.outputs.diagnostic_relative_path }}',text)
         self.assertIn('group: unity-personal-proof',text);self.assertIn('androidVersionCode: 3',text);self.assertNotIn('actions/cache',text);self.assertNotIn('workflow_dispatch',text)
