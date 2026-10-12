@@ -1,6 +1,6 @@
 # Lottery project progress
 
-Updated: 2026-10-12 11:59 UTC
+Updated: 2026-10-12 12:19 UTC
 
 ## Current verified status
 
@@ -25,3 +25,5 @@ Run38244728404/source731e97ad8ffabb398ff37bf3a6d806ce331791bc: 45/45 Edit and24 
 Post-Play source screening blocked a nonempty credential setting before any Play settings/archive content was exported. The next candidate introduces explicit, narrowly scoped unused-platform-setting normalization, with baseline/operation/hash provenance and NORMALIZED_NOT_RAW labeling. Other credentials still block export; the identity of the previous nonempty field has not been established from the withheld output.
 
 Run05 actual evidence is safely backed up in the private repository at6bd018ae7121ab45f2f31590751000a745bee57d. Native retry remains pending independent review and source checkpoint.
+
+Run06 38246742337/source181a574d685cb8c39383d9f16777ab770d263cc8:45/45 Edit and24 process cases passed; all8 Play cases failed at a newly strengthened mouse press-edge prerequisite (pressed state true, edge false). Both source audits passed. Play settings normalization actually identified ps4Passcode, recorded changed=true, restored the exact empty baseline and exported NORMALIZED_NOT_RAW with receipts. Actual evidence22files saved privately at87b542873557baee081632e457bd56814b480eed. An official Input System1.20.1 Editor-background input-buffer fixture correction is being reviewed; no Play gate success yet.

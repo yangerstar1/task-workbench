@@ -30,7 +30,14 @@ namespace Lottery.G2.PlayMode.Tests
         { "Probe Camera", "Probe Key Light", "Render capability sample", "Probe Overlay" };
         G2SliceBootstrap app;
         Mouse mouse; Touchscreen touch; Keyboard keyboard;
+        InputSettings capturedInputSettings;
+        bool inputSettingsCaptured,hasManualUpdate;
+        uint lastManualUpdate;
         InputSettings.UpdateMode oldUpdate;
+        InputSettings.BackgroundBehavior oldBackground;
+#if UNITY_EDITOR
+        InputSettings.EditorInputBehaviorInPlayMode oldEditorInput;
+#endif
         RenderPipelineAsset previousPipeline,previousQuality;
         UniversalRenderPipelineAsset pipeline;
         FileStateStore testStore;
@@ -52,49 +59,71 @@ namespace Lottery.G2.PlayMode.Tests
         [UnitySetUp]
         public IEnumerator SetUp()
         {
-            prior=SceneManager.GetActiveScene();
-            foreach(var root in prior.GetRootGameObjects()) if(root.activeSelf && LegacyProbeRootNames.Contains(root.name)) { hiddenRoots.Add(root); root.SetActive(false); }
-            scene=SceneManager.CreateScene("G2 isolated input and camera test"); SceneManager.SetActiveScene(scene);
-            previousPipeline=GraphicsSettings.defaultRenderPipeline; previousQuality=QualitySettings.renderPipeline;
-            Assert.That(Application.isPlaying,Is.True,"This assembly must run in PlayMode");
+            bool setupComplete=false;
+            try
+            {
+                prior=SceneManager.GetActiveScene();
+                foreach(var root in prior.GetRootGameObjects()) if(root.activeSelf && LegacyProbeRootNames.Contains(root.name)) { hiddenRoots.Add(root); root.SetActive(false); }
+                scene=SceneManager.CreateScene("G2 isolated input and camera test"); SceneManager.SetActiveScene(scene);
+                previousPipeline=GraphicsSettings.defaultRenderPipeline; previousQuality=QualitySettings.renderPipeline;
+                Assert.That(Application.isPlaying,Is.True,"This assembly must run in PlayMode");
 #if UNITY_EDITOR
-            pipeline=UnityEditor.AssetDatabase.LoadAssetAtPath<UniversalRenderPipelineAsset>("Assets/GeneratedProbe/Pipeline.asset");
+                pipeline=UnityEditor.AssetDatabase.LoadAssetAtPath<UniversalRenderPipelineAsset>("Assets/GeneratedProbe/Pipeline.asset");
 #else
-            Assert.Fail("This simulated-input CI fixture requires the restored Editor pipeline asset");
+                Assert.Fail("This simulated-input CI fixture requires the restored Editor pipeline asset");
 #endif
-            Assert.That(pipeline,Is.Not.Null);
-            GraphicsSettings.defaultRenderPipeline=pipeline; QualitySettings.renderPipeline=pipeline;
-            oldUpdate=InputSystem.settings.updateMode; InputSystem.settings.updateMode=InputSettings.UpdateMode.ProcessEventsManually;
-            mouse=InputSystem.AddDevice<Mouse>(); touch=InputSystem.AddDevice<Touchscreen>(); keyboard=InputSystem.AddDevice<Keyboard>();
-            directory=Path.Combine(Path.GetTempPath(),"lottery-g2-play-"+Guid.NewGuid().ToString("N"));
-            faults=new ToggleFault();
-            testStore=new FileStateStore(directory,RunState.CreateNew("g2-play-fixed-run","g2-play-fixed-seed"),faults);
-            var core=new TicketService(testStore);
-            app=new GameObject("Real G2 scene bootstrap").AddComponent<G2SliceBootstrap>(); app.Initialize(core,null,testStore); Router.PollAutomatically=false;
-            Physics.SyncTransforms();
-            yield return null;
-            Assert.That(app.SceneCamera.orthographic,Is.True);
-            TestContext.Out.WriteLine("SIMULATED_INPUT_SYSTEM startup: "+Router.DiagnosticState);
-            // Headless Editor focus is not device focus evidence. Establish the
-            // simulated foreground state explicitly, then observe a neutral input
-            // frame before the first player press, exactly through the real router.
-            Router.NotifyPause(false); Router.NotifyFocus(true);
-            MouseEvent(Vector2.zero,false);
-            Assert.That(Router.IsFocused,Is.True,Router.DiagnosticState);
-            Assert.That(Router.AwaitingRelease,Is.False,Router.DiagnosticState);
-            Assert.That(P.View.LayoutChanged,Is.False,Router.DiagnosticState);
-            Assert.That(P.View.ConsumeUi(P.View.ButtonRect(SliceAction.Buy).center,out SliceAction firstAction),Is.True);
-            Assert.That(firstAction,Is.EqualTo(SliceAction.Buy),"The visible buy control must be the routed UI action");
+                Assert.That(pipeline,Is.Not.Null);
+                GraphicsSettings.defaultRenderPipeline=pipeline; QualitySettings.renderPipeline=pipeline;
+                CaptureSimulatedInputSettings();
+                mouse=InputSystem.AddDevice<Mouse>(); touch=InputSystem.AddDevice<Touchscreen>(); keyboard=InputSystem.AddDevice<Keyboard>();
+                directory=Path.Combine(Path.GetTempPath(),"lottery-g2-play-"+Guid.NewGuid().ToString("N"));
+                faults=new ToggleFault();
+                testStore=new FileStateStore(directory,RunState.CreateNew("g2-play-fixed-run","g2-play-fixed-seed"),faults);
+                var core=new TicketService(testStore);
+                app=new GameObject("Real G2 scene bootstrap").AddComponent<G2SliceBootstrap>(); app.Initialize(core,null,testStore); Router.PollAutomatically=false;
+                Physics.SyncTransforms();
+                yield return null;
+                Assert.That(app.SceneCamera.orthographic,Is.True);
+                TestContext.Out.WriteLine("SIMULATED_INPUT_SYSTEM startup: "+InputDiagnostic);
+                // Headless Editor focus is not device focus evidence. Establish the
+                // simulated foreground state explicitly, then observe a neutral input
+                // frame before the first player press, exactly through the real router.
+                Router.NotifyPause(false); Router.NotifyFocus(true);
+                MouseEvent(Vector2.zero,false);
+                // Input System 1.20.1 lazily registers per-frame button tracking.
+                // Subscribe while both buttons are neutral, then process another
+                // genuine manual update before the first down event.
+                AssertNeutralEdges();
+                InputSystem.QueueStateEvent(keyboard,new KeyboardState());
+                MouseEvent(Vector2.zero,false);
+                AssertNeutralEdges();
+                Assert.That(Router.IsFocused,Is.True,Router.DiagnosticState);
+                Assert.That(Router.AwaitingRelease,Is.False,Router.DiagnosticState);
+                Assert.That(P.View.LayoutChanged,Is.False,Router.DiagnosticState);
+                Assert.That(P.View.ConsumeUi(P.View.ButtonRect(SliceAction.Buy).center,out SliceAction firstAction),Is.True);
+                Assert.That(firstAction,Is.EqualTo(SliceAction.Buy),"The visible buy control must be the routed UI action");
+                TestContext.Out.WriteLine("SIMULATED_INPUT_SYSTEM ready, mouse/Escape edges primed: "+InputDiagnostic);
+                setupComplete=true;
+            }
+            finally
+            {
+                // Iterator exceptions in SetUp must not leave process-wide
+                // focus-routing settings changed for the next test.
+                if(!setupComplete) RestoreInputSettings();
+            }
         }
         [UnityTearDown]
         public IEnumerator TearDown()
         {
-            if(app!=null) Object.Destroy(app.gameObject);
-            testStore?.Dispose();
-            if(mouse!=null && mouse.added) InputSystem.RemoveDevice(mouse);
-            if(touch!=null && touch.added) InputSystem.RemoveDevice(touch);
-            if(keyboard!=null && keyboard.added) InputSystem.RemoveDevice(keyboard);
-            InputSystem.settings.updateMode=oldUpdate;
+            try
+            {
+                if(app!=null) Object.Destroy(app.gameObject);
+                testStore?.Dispose();
+                if(mouse!=null && mouse.added) InputSystem.RemoveDevice(mouse);
+                if(touch!=null && touch.added) InputSystem.RemoveDevice(touch);
+                if(keyboard!=null && keyboard.added) InputSystem.RemoveDevice(keyboard);
+            }
+            finally { RestoreInputSettings(); }
             GraphicsSettings.defaultRenderPipeline=previousPipeline; QualitySettings.renderPipeline=previousQuality;
             if(prior.IsValid()) SceneManager.SetActiveScene(prior);
             foreach(var root in hiddenRoots) if(root!=null) root.SetActive(true); hiddenRoots.Clear();
@@ -109,16 +138,63 @@ namespace Lottery.G2.PlayMode.Tests
             if(directory!=null && Directory.Exists(directory)) Directory.Delete(directory,true);
             yield return null;
         }
+        void CaptureSimulatedInputSettings()
+        {
+            capturedInputSettings=InputSystem.settings;
+            oldUpdate=capturedInputSettings.updateMode;
+            oldBackground=capturedInputSettings.backgroundBehavior;
+#if UNITY_EDITOR
+            oldEditorInput=capturedInputSettings.editorInputBehaviorInPlayMode;
+#endif
+            inputSettingsCaptured=true; hasManualUpdate=false;
+            // Fixture-only, explicitly SIMULATED_INPUT_SYSTEM. Public settings
+            // keep queued events in player/Manual buffers even when batchmode
+            // has no native Game View focus. Runtime focus handling is unchanged.
+            capturedInputSettings.backgroundBehavior=InputSettings.BackgroundBehavior.IgnoreFocus;
+#if UNITY_EDITOR
+            capturedInputSettings.editorInputBehaviorInPlayMode=InputSettings.EditorInputBehaviorInPlayMode.AllDeviceInputAlwaysGoesToGameView;
+#endif
+            capturedInputSettings.updateMode=InputSettings.UpdateMode.ProcessEventsManually;
+        }
+        void RestoreInputSettings()
+        {
+            if(!inputSettingsCaptured) return;
+            capturedInputSettings.updateMode=oldUpdate;
+            capturedInputSettings.backgroundBehavior=oldBackground;
+#if UNITY_EDITOR
+            capturedInputSettings.editorInputBehaviorInPlayMode=oldEditorInput;
+#endif
+            inputSettingsCaptured=false;
+        }
+        string InputDiagnostic => "nativeFocus="+Application.isFocused+",inputUpdate="+InputState.currentUpdateType+
+            ",inputCount="+InputState.updateCount+","+Router.DiagnosticState;
+        void PumpInput()
+        {
+            InputSystem.Update();
+            Assert.That(InputState.currentUpdateType,Is.EqualTo(InputUpdateType.Manual),
+                "Simulated events must be processed in player Manual buffers. "+InputDiagnostic);
+            uint count=InputState.updateCount;
+            if(hasManualUpdate) Assert.That(count,Is.GreaterThan(lastManualUpdate),
+                "Each simulated player input update must advance its step count. "+InputDiagnostic);
+            lastManualUpdate=count; hasManualUpdate=true;
+        }
+        void AssertNeutralEdges()
+        {
+            Assert.That(mouse.leftButton.wasPressedThisFrame,Is.False,"Neutral mouse press edge. "+InputDiagnostic);
+            Assert.That(mouse.leftButton.wasReleasedThisFrame,Is.False,"Neutral mouse release edge. "+InputDiagnostic);
+            Assert.That(keyboard.escapeKey.wasPressedThisFrame,Is.False,"Neutral Escape press edge. "+InputDiagnostic);
+            Assert.That(keyboard.escapeKey.wasReleasedThisFrame,Is.False,"Neutral Escape release edge. "+InputDiagnostic);
+        }
         Vector2 ScreenUv(float u,float v) => app.SceneCamera.WorldToScreenPoint(P.View.Surface.UvToWorld(new Vector2(u,v)));
         void MouseEvent(Vector2 position,bool down)
         {
             bool wasDown=mouse.leftButton.isPressed;
             var state=new MouseState { position=position,buttons=(ushort)(down?1:0) };
-            InputSystem.QueueStateEvent(mouse,state); InputSystem.Update();
+            InputSystem.QueueStateEvent(mouse,state); PumpInput();
             Assert.That(Mouse.current,Is.SameAs(mouse),"Queued simulated mouse must be the router's current device");
             Assert.That(mouse.leftButton.isPressed,Is.EqualTo(down),"Input System must consume the queued button state");
-            if(down && !wasDown) Assert.That(mouse.leftButton.wasPressedThisFrame,Is.True,"Queued down must produce a press edge");
-            if(!down && wasDown) Assert.That(mouse.leftButton.wasReleasedThisFrame,Is.True,"Queued up must produce a release edge");
+            if(down && !wasDown) Assert.That(mouse.leftButton.wasPressedThisFrame,Is.True,"Queued down must produce a press edge. "+InputDiagnostic);
+            if(!down && wasDown) Assert.That(mouse.leftButton.wasReleasedThisFrame,Is.True,"Queued up must produce a release edge. "+InputDiagnostic);
             Router.PollInput();
         }
         void Click(SliceAction action)
@@ -138,7 +214,16 @@ namespace Lottery.G2.PlayMode.Tests
         void TouchEvent(int id,IPhase phase,Vector2 position)
         {
             InputSystem.QueueStateEvent(touch,new TouchState { touchId=id,phase=phase,position=position,pressure=phase==IPhase.Ended?0:1 });
-            InputSystem.Update(); Router.PollInput();
+            PumpInput(); Router.PollInput();
+        }
+        void EscapeEvent(bool down)
+        {
+            InputSystem.QueueStateEvent(keyboard,down?new KeyboardState(Key.Escape):new KeyboardState());
+            PumpInput();
+            Assert.That(keyboard.escapeKey.isPressed,Is.EqualTo(down),InputDiagnostic);
+            Assert.That(down?keyboard.escapeKey.wasPressedThisFrame:keyboard.escapeKey.wasReleasedThisFrame,
+                Is.True,"Queued Escape transition must produce its corresponding edge. "+InputDiagnostic);
+            Router.PollInput();
         }
         void Serpentine(float right)
         {
@@ -209,7 +294,7 @@ namespace Lottery.G2.PlayMode.Tests
             TouchEvent(22,IPhase.Moved,ScreenUv(.75f,.85f)); TouchEvent(22,IPhase.Ended,ScreenUv(.75f,.85f));
             Assert.That(State.CurrentTicket.Scratch.IsRevealed(45,19),Is.True);
             Assert.That(State.CurrentTicket.Scratch.IsRevealed(230,108),Is.False,"Secondary finger must neither scratch nor take over");
-            InputSystem.Update(); Router.PollInput();
+            PumpInput(); Router.PollInput();
             TouchEvent(33,IPhase.Began,ScreenUv(.90f,.85f)); TouchEvent(33,IPhase.Canceled,ScreenUv(.90f,.85f));
             Assert.That(State.CurrentTicket.Scratch.IsRevealed(230,108),Is.True);
             Assert.That(Router.CapturedPointerId,Is.EqualTo(-1));
@@ -238,9 +323,9 @@ namespace Lottery.G2.PlayMode.Tests
         {
             BuyReady(); string id=State.CurrentTicket.Id;
             MouseEvent(ScreenUv(.1f,.3f),true);
-            InputSystem.QueueStateEvent(keyboard,new KeyboardState(Key.Escape)); InputSystem.Update(); Router.PollInput();
+            EscapeEvent(true);
             Assert.That(Router.Mode,Is.EqualTo(SliceMode.PANEL)); Assert.That(Router.CapturedPointerId,Is.EqualTo(-1));
-            InputSystem.QueueStateEvent(keyboard,new KeyboardState()); InputSystem.Update(); Router.PollInput(); MouseEvent(ScreenUv(.9f,.3f),false);
+            EscapeEvent(false); MouseEvent(ScreenUv(.9f,.3f),false);
             Click(SliceAction.ClosePanel); Assert.That(State.CurrentTicket.Id,Is.EqualTo(id)); Assert.That(State.CurrentTicket.Scratch.IsRevealed(128,38),Is.False);
             Assert.That(P.View.ButtonRect(SliceAction.OpenPanel).xMin,Is.GreaterThanOrEqualTo(Screen.safeArea.xMin));
             Assert.That(P.View.ButtonRect(SliceAction.Buy).yMin,Is.GreaterThanOrEqualTo(Screen.safeArea.yMin));
