@@ -740,6 +740,56 @@ class G3ValidatorTests(unittest.TestCase):
                         return original_lstat(path,*args,**kwargs)
                     with patch.object(ci.os,'walk',side_effect=walking),patch.object(Path,'lstat',lstat):
                         with self.assertRaises(ValueError):ci.verify_preflight(root,allow_generated_unity=True,android_cache=True)
+    def testSharedCacheAncestorFirstObservationCannotBeOverwrittenBeforeGuardWrite(self):
+        for level in ('unity_parent','task_parent'):
+            for source_drift in (False,True):
+                with self.subTest(level=level,source_drift=source_drift),tempfile.TemporaryDirectory() as d,patch.dict(os.environ,GITHUB_JOB='android',GITHUB_RUN_ID='12345',GITHUB_RUN_ATTEMPT='1'):
+                    root=Path(d);git,commit,trigger,review,source=self.makeReviewedGit(root)
+                    reviewed_source=root/ci.TASK/'unity/Assets/SYNTHETIC_REVIEWED.cs';reviewed_source.parent.mkdir(parents=True);reviewed_source.write_bytes(b'SYNTHETIC_REVIEWED_UNITY_SOURCE')
+                    commit('reviewed Unity fixture');review['reviewedSourceCommit']=git('rev-parse','HEAD');review['sourceFiles']=ci.reviewed_files(root,committed=True)
+                    (root/ci.REVIEW_PATH).write_text(json.dumps(review));commit('updated synthetic review');trigger();self.makeSyntheticColdProof(root,git,review)
+                    library=root/ci.CACHE_ROOT/'one.bin';library.parent.mkdir(parents=True);library.write_bytes(b'SYNTHETIC_LIBRARY_CACHE');library_alias=library.with_name('two.bin');os.link(library,library_alias)
+                    utmp,utmp_alias=self.makeSyntheticUtmpPair(root)
+                    for relative in ('evidence/g3/android/existing-sentinel.json','artifacts/existing-sentinel.bin'):
+                        path=root/ci.TASK/relative;path.parent.mkdir(parents=True,exist_ok=True);path.write_bytes(b'SYNTHETIC_EXISTING_OUTPUT_MUST_REMAIN_UNCHANGED')
+                    # Stable repeated registration is a positive control using
+                    # the same real reviewed repository and both cache groups.
+                    ci.verify_preflight(root,allow_generated_unity=True,android_cache=True)
+                    def file_identity(path):
+                        info=path.lstat();return (info.st_dev,info.st_ino,info.st_mode,info.st_nlink,hashlib.sha256(path.read_bytes()).hexdigest())
+                    def output_state():
+                        return {path.relative_to(root).as_posix():file_identity(path) for name in ('evidence','artifacts','build') for path in (root/ci.TASK/name).rglob('*') if path.is_file()}
+                    caches=(library,library_alias,utmp,utmp_alias);cache_before={path:file_identity(path) for path in caches};outputs_before=output_state()
+                    target=reviewed_source.parents[1] if level=='unity_parent' else root/ci.TASK
+                    ancestor_before=target.lstat();source_before=reviewed_source.read_bytes();source_identity=file_identity(reviewed_source)
+                    original_check=ci.check_ancestors;original_digest=ci.digest;original_walk=os.walk;registrations=[];source_hashes=[];changed=[False]
+                    def observed_digest(path):
+                        result=original_digest(path)
+                        if path==reviewed_source:source_hashes.append(result)
+                        return result
+                    def registration_gap(checkout,path):
+                        original_check(checkout,path)
+                        if path in (root/ci.CACHE_ROOT,root/ci.UTMP_ROOT):registrations.append(path)
+                        if path!=root/ci.UTMP_ROOT:return
+                        self.assertEqual(registrations,[root/ci.CACHE_ROOT,root/ci.UTMP_ROOT]);self.assertFalse(changed[0])
+                        self.assertIn(hashlib.sha256(source_before).hexdigest(),source_hashes,'Reviewed source was not checked before the mutation gap')
+                        # The first cache has stored shared ancestor stamps. Move
+                        # real children back into a new real parent before the
+                        # second cache registers those same ancestor paths.
+                        displaced=target.with_name(target.name+'-SYNTHETIC_DISPLACED');target.rename(displaced);target.mkdir(mode=ancestor_before.st_mode&0o777)
+                        for child in displaced.iterdir():child.rename(target/child.name)
+                        displaced.rmdir()
+                        if source_drift:reviewed_source.write_bytes(b'SYNTHETIC_REVIEWED_SOURCE_CHANGED_AFTER_HASH')
+                        changed[0]=True
+                    with patch.object(ci,'check_ancestors',side_effect=registration_gap),patch.object(ci,'digest',side_effect=observed_digest),patch.object(ci.os,'walk',wraps=original_walk) as walker,patch.object(ci.legacy,'guard',return_value={}) as writer:
+                        with self.assertRaises(ci.UnsafePathError) as caught:ci.guard(root,allow_generated_unity=True,android_cache=True)
+                        writer.assert_not_called();walker.assert_not_called()
+                    self.assertTrue(changed[0]);self.assertNotEqual(target.lstat().st_ino,ancestor_before.st_ino)
+                    self.assertIn('code=UNSAFE_DIRECTORY_CHANGE',ci.failure_line('CI','CI_APK',caught.exception))
+                    self.assertEqual({path:file_identity(path) for path in caches},cache_before)
+                    self.assertEqual(output_state(),outputs_before)
+                    self.assertEqual(file_identity(reviewed_source)[:4],source_identity[:4])
+                    self.assertEqual(reviewed_source.read_bytes(),b'SYNTHETIC_REVIEWED_SOURCE_CHANGED_AFTER_HASH' if source_drift else source_before)
     def testColdCacheDirectoryPermissionIdentityOrLateMembershipChangeRefused(self):
         for cache_root in ci.CACHE_ROOTS:
             for level in ('cache_root','nested','empty_nested','unity_parent','task_parent'):

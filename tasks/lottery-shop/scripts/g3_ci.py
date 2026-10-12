@@ -26,7 +26,7 @@ TASK, RULES_SHA = g2.TASK, g2.RULES_SHA
 BASE = '06814f520041676a50601f4e70d5ee09eae10078'
 SCOPE = 'G3_ONE_DAY_WHITEBOX_NOT_DEVICE_TESTED'
 STANDARDS_DIGEST = '1984cc8f225db73485a052942d30637127679a56b0492edf36497911373f30b1'
-REQUEST = dict(schemaVersion=1, requestId='lottery-g3-20261012-08', baseCommit=BASE, purpose='G3_ONE_DAY_WHITEBOX')
+REQUEST = dict(schemaVersion=1, requestId='lottery-g3-20261012-09', baseCommit=BASE, purpose='G3_ONE_DAY_WHITEBOX')
 REQUEST_PATH = TASK + '/ci/g3-request.json'
 SCENE = 'Assets/G3/Scenes/G3Day.unity'
 GENERATED = {SCENE, SCENE + '.meta', 'Assets/G3/Scenes.meta'}
@@ -220,6 +220,16 @@ def cache_directory_stamp(info):
     return (info.st_dev,info.st_ino,info.st_mode,info.st_nlink,info.st_uid,info.st_gid,info.st_mtime_ns,info.st_ctime_ns)
 
 
+def register_cache_directory(observations,path,info,root):
+    # Shared ancestors occur once per cache root. Preserve the first observation
+    # rather than letting a later root silently establish a replacement anchor.
+    current=cache_directory_stamp(info)
+    if path in observations:
+        if observations[path]!=current:
+            raise UnsafePathError('Changed Android cache directory refused',path,info,root)
+    else:observations[path]=current
+
+
 def cold_absence_observation(root):
     result={}
     for field,relative in (('libraryAbsent',CACHE_ROOT),('utmpAbsent',UTMP_ROOT),('buildAbsent',TASK+'/build/G3')):
@@ -263,7 +273,7 @@ def check_working_inputs(root, expected, tree=None, allow_generated_unity=False,
                 if parent==root.parent:break
                 info=parent.lstat()
                 if not stat.S_ISDIR(info.st_mode):raise UnsafePathError('Checkout directory link/type refused',parent,info,root)
-                cache_directories[parent]=cache_directory_stamp(info)
+                register_cache_directory(cache_directories,parent,info,root)
     def walk_error(error):raise ValueError('Checkout directory enumeration failed')
     for directory,dirs,files in os.walk(root,followlinks=False,onerror=walk_error):
         visited+=len(dirs)+len(files);require(visited<=100000,'Checkout/output entry bound exceeded')
@@ -273,7 +283,7 @@ def check_working_inputs(root, expected, tree=None, allow_generated_unity=False,
             if not stat.S_ISDIR(info.st_mode):raise UnsafePathError('Checkout directory link/type refused',path,info,root)
             relative=path.relative_to(root).as_posix()
             if android_cache and any(relative==name or relative.startswith(name+'/') for name in CACHE_ROOTS):
-                cache_directories[path]=cache_directory_stamp(info)
+                register_cache_directory(cache_directories,path,info,root)
         dirs[:]=[d for d in dirs if not (rel=='.' and d=='.git')]
         for name in files:
             path=Path(directory)/name;relative=path.relative_to(root).as_posix()
