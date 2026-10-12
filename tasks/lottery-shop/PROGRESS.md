@@ -1,65 +1,33 @@
 # Lottery project progress
 
-Updated: 2026-10-12 13:07 UTC.
+Updated: 2026-10-12 14:35 UTC
 
-## Current verified status
+## Current status
 
-Current source: `93b88d2d81824d35abc4bdb14fcd0b82ccf5c7ef`.
-Current execution: [run 38248877036](https://github.com/yangerstar1/task-workbench/actions/runs/38248877036), request 07, attempt 1.
+G2 technical stage has passed independent review and durable evidence verification. This is a one-ticket graybox capability stage, not final game or visual-quality acceptance.
 
-- G0 capability work completed: Unity 6000.3.19f1, six native EditMode checks, source audits and an ARM64 IL2CPP Android probe APK passed in run 38226292711.
-- G1 rule specification and independent test calibration passed. Later implementation still requires its own actual execution and review.
-- G2 candidate 007 implements the minimum one-ticket 3D scratch scene, transactional persistence and same-request FakeAd recovery. Overall G2 acceptance remains pending.
-- The current tests job completed **45/45 native EditMode tests, 8/8 native PlayMode tests and 24/24 Linux/.NET process-kill recovery cases**, with zero failed or skipped native cases. The process cases use real child-process termination with synthetic transaction fixtures; they do not establish Android force-stop behavior.
-- Both source audits passed. Edit settings were unchanged by normalization. Play exported settings are explicitly **NORMALIZED_NOT_RAW**, with normalization-receipt hashes bound by the source-audit and generated-asset manifests. No original credential value is exported.
-- The tests artifact contains exactly **28 files**. Its SHA-256 is `ea9fc853e25039223a5ada27cb9bad85ca5b66ad1403ede9e2f2e31b3f5b333b`. Original XML, process receipts, generated archives, normalization records and frame bindings are retained.
-- Four actual URP frames show the initial ticket, partial scratch, full reveal and settlement. Independent review passed the narrow technical tests and P3 observation scope: spatial masking, retained untouched covering, a stable locked ticket and zero-prize settlement. Frame byte lengths and hashes are bound by the render receipt to this source, run and recorded state hashes.
-- Android job `114813204465` completed successfully. The 49,630,478-byte ARM64 IL2CPP technical APK has SHA-256 `289f6f091f4c39b8773a5024451f64011a31b47b362bae4a6856c3a859498a68`. It was saved durably and independently downloaded again with identical bytes/hash. This does not establish device behavior or overall G2 acceptance.
+- Accepted source: `06814f520041676a50601f4e70d5ee09eae10078`.
+- Actual run: [38256015857](https://github.com/yangerstar1/task-workbench/actions/runs/38256015857).
+- Native results: 45 EditMode, 8 PlayMode, 25 actual Linux/.NET SIGKILL cases; zero failed/skipped native cases.
+- Four original state-bound URP frames independently inspected. Output uses an actual 1280 x 720 presentation target. The 640 x 480 Editor environment remains separately recorded. Aspect distortion and clipped decorative sign were corrected.
+- Independent cold ARM64 IL2CPP development APK: 49,628,694 bytes; SHA-256 `6e7e8cee8e465ed7ca19d9c35586ca2cc9193d2fc3dc24ff2809be75e007d128`; binary Android versionCode 2 verified.
+- APK saved durably and downloaded again with the same byte hash. Original tests, build/source evidence and independent reports are saved separately. Unity-regenerated settings explicitly retain NORMALIZED_NOT_RAW provenance.
+- Physical Android touch, install/upgrade/force-stop/performance, real ad SDK and final T/V/P have not passed. G2 does not waive any of these later requirements.
 
-## Render findings and next candidate
+## G3 active implementation
 
-The four images are actual Unity camera renders using URP StandardRequest/ReadPixels, OpenGLCore and llvmpipe software rendering. Input tests use the simulated Input System fixture.
+G3 is the complete first-day functional slice: both tickets, initially offerable tools and upgrades, consumables, current/next configuration, shared physical/quick shopping, phone borrowing/repayment, closing and first-night interest. The core, shop/ticket presentation and verification pipeline are being implemented in parallel in an isolated worktree.
 
-The source viewport was **640 x 480**, while the output images are **1280 x 720**. This introduces visible horizontal stretch. The top decorative background sign is also clipped. The technical graybox assets do not meet final visual-quality requirements.
+Two original generated flat ticket artworks are approved and saved in this source branch, with matching importer metadata. They are printed background assets only: numbers, awards, scratch layers and state labels must be driven by confirmed runtime data. The previous whole-scene visual concepts were rejected and are not used. Approved art does not establish successful Unity integration or final visual quality.
 
-A follow-up candidate is being prepared to correct the aspect/layout and sign framing. Corrections must produce new actual frames and fresh verification; the existing frames are not relabeled as fixed. The first scene target images were explicitly rejected; new flat ticket-art candidates are being reviewed and are not approved or integrated. Technical P3 success does not approve final art or later visual gates.
+G3 has not been compiled, built, device-tested or accepted yet. Its legal diagnostic day scenario is preparation material, not a claim of normal player execution. G4 remains blocked until the same-build G3 six-action physical-device gate passes. No whole-game or release candidate is claimed.
 
-## Scope limits and next checks
+## Preserved repair history
 
-- Independent review identified a missing actual process kill in the ad waiting state. Request 08 adds it without removing the original 24 cases, alongside the render-aspect correction; native execution and fresh recheck remain pending.
-- Normal first-day advertising is disabled. Eligibility and delayed-callback tests use explicit synthetic fixtures; recovery querying is manual. Persistent first-launch elapsed timing remains unimplemented.
-- Generated-asset archives are job-specific. Preserve source, lock, manifest and normalization bindings when restoring them; do not mix test and Android overlays or describe normalized settings as raw Unity output.
-- Android installation, physical touch, force-stop, device performance, real advertising SDK, full-game progression and final visual/gameplay acceptance remain unverified.
-- The narrow technical and P3 review does not establish final image quality, aspect-safe device UI, positive-prize visual settlement or complete-game acceptance.
-- Export checks continue to block unsafe credential settings. No raw credential values or unrestricted job logs are included in this progress summary.
-
-## Historical failures and repairs
-
-These are retained as past outcomes and must not be read as the current run's status.
-
-- **Run 38239514579**, source `331f0cc94d2b65e646a8374351f287f3dacc0d19`: 24 process cases passed; EditMode passed 42/45 with three corrupt/unknown-schema recovery failures. Explicit invalid-data classification repaired the defect without removing tests. Android was skipped.
-- **Run 38241168487**, source `2b62b4769a02ca00d528b27b3ffcf7e227b6b7c1`: EditMode 45/45 and process 24/24 passed. PlayMode reached the 30-minute job timeout, producing no Play XML or frames. The Play source audit reported leftover test-initialization scene paths after cancellation. Android was skipped.
-- **Run 38244728404**, source `731e97ad8ffabb398ff37bf3a6d806ce331791bc`: EditMode 45/45 and process 24/24 passed. PlayMode completed with one pass and seven failures because the input fixture did not create the expected ticket. The post-Play guard withheld unsafe settings/archive content and exported bounded audit metadata only. Android was skipped.
-- **Run 38246742337**, source `181a574d685cb8c39383d9f16777ab770d263cc8`: EditMode 45/45 and process 24/24 passed; all eight Play cases failed at the strengthened press-edge prerequisite. Both source audits passed with explicit, hash-bound normalization. The Editor-background input-buffer fixture was subsequently corrected; request 07 provides the actual successful retry evidence.
-- Earlier sparse-checkout and C# project-extension startup defects were fixed. Bounded diagnostics preserve error identities without exporting raw logs or credentials.
-
-## Current unexecuted repair candidate
-
-Request 09 also fixes an actual APK metadata discrepancy: run07 binary manifest
-reported versionCode 1 while the workflow declared 2. The custom builder now
-sets 2 explicitly; binary verification and device upgrade remain pending.
-The two flat ticket artwork candidates have since been explicitly approved;
-the rejected whole-scene images remain excluded. Artwork approval is not a
-full visual, device or G5 acceptance.
-
-## Actual request 09 and request 10 repair
-
-Run38254407558/sourcec3d9195681ff6139c4e6e62cec004240ff0465a2
-passed 45 EditMode and all25 actual .NET SIGKILL cases. PlayMode passed6/8.
-Both failures were the new fixture attempting to raycast the intentionally
-inactive ticket collider before buying a ticket. No new frames were produced,
-and Android was skipped. The previously verified request07 APK is preserved.
-Request10 keeps the target/projection checks before buying, explicitly checks
-that there is no active ticket/hit, and performs the original five-point collider
-roundtrip after actual BuyReady input. It does not weaken assertions or change
-production state. Native rerun remains pending; overall G2 is not accepted.
+- Runs 38238410614 and 38238794780: sparse-checkout and C# project-extension startup defects; corrected with bounded diagnostics.
+- Run 38239514579: 42/45 EditMode; corrupt/unknown-schema exception classification repaired without removing cases.
+- Run 38241168487: Edit/process passed, Play timed out; no Play frames claimed.
+- Runs 38244728404 and 38246742337: actual input-fixture failures; corrected against Input System player/manual buffers. Unsafe generated settings were withheld until explicit narrow normalization and source audit existed.
+- Run 38248877036: 45/8/24 plus Android passed; independent review still found viewport distortion, missing ad-waiting SIGKILL and binary versionCode mismatch. It was not promoted as overall G2.
+- Run 38254407558: 45 Edit and 25 SIGKILL passed; Play 6/8 failed because the new fixture raycast before the ticket existed. Android skipped. The assertions were retained and moved after actual purchase, with added pre-purchase negative checks.
+- Run 38256015857: corrected native run and APK, independent review and durable closeout completed. Earlier candidates/evidence remain immutable.
