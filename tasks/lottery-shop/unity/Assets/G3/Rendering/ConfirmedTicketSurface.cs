@@ -13,12 +13,13 @@ namespace Lottery.G3.Rendering
         readonly List<UnityEngine.Object> owned=new List<UnityEngine.Object>();
         readonly DisplaySession session=new DisplaySession();
         readonly Dictionary<string,BoundedGlyphLabel> legends=new Dictionary<string,BoundedGlyphLabel>();
-        GameObject body; MeshCollider collider; Texture2D[] masks; BoundedGlyphLabel[] cellText;
+        GameObject body; MeshCollider collider; Texture2D[] masks; BoundedGlyphLabel[] cellText,cellNumbers;
         float width,depth; Guid token; string activeTicket;
         public TicketLayout Layout {get;private set;}
         public bool IsVisible => body!=null&&body.activeInHierarchy&&session.Visible;
         public long DisplayedRevision => session.Revision;
         public IReadOnlyList<BoundedGlyphLabel> CellLabels => cellText;
+        public IReadOnlyList<BoundedGlyphLabel> CellNumberLabels=>cellNumbers;
         public float PaperWidth => width;
         public void Build(ApprovedArtworkBinding binding,Font font,Shader paper,Shader silver,Shader maskedFont,Shader ordinaryFont,float paperWidth=4.8f)
         {
@@ -29,7 +30,8 @@ namespace Lottery.G3.Rendering
             var paperMat=Own(new Material(paper));paperMat.SetTexture("_BaseMap",binding.Albedo);
             var paperObject=Quad("Approved printed paper",new PixelRect(0,0,Layout.Width,Layout.Height),PaperY,paperMat);
             collider=paperObject.AddComponent<MeshCollider>();collider.sharedMesh=paperObject.GetComponent<MeshFilter>().sharedMesh;
-            masks=new Texture2D[Layout.Cells.Count];cellText=new BoundedGlyphLabel[Layout.Cells.Count];
+            masks=new Texture2D[Layout.Cells.Count];cellText=new BoundedGlyphLabel[Layout.Cells.Count];cellNumbers=new BoundedGlyphLabel[Layout.Id=="challenge"?8:0];
+            var publicFont=Own(new Material(ordinaryFont));
             for(int i=0;i<Layout.Cells.Count;i++)
             {
                 var cell=Layout.Cells[i];int cols=Layout.Cells.Count/2;int ci=cell.CoreIndex;
@@ -38,9 +40,18 @@ namespace Lottery.G3.Rendering
                 WriteMask(i,new byte[cw*64]);
                 var silverMat=Own(new Material(silver));silverMat.SetTexture("_RevealTex",masks[i]);Quad("Opaque silver "+cell.Id,cell.Silver,SilverY,silverMat);
                 var glyphMat=Own(new Material(maskedFont));glyphMat.SetTexture("_RevealTex",masks[i]);
-                var label=Label("Masked result "+cell.Id,cell.Text,glyphMat,font,68);cellText[i]=label;
+                var resultBox=cell.Text;
+                if(Layout.Id=="challenge")
+                {
+                    // Public positional ID only: independent of all hidden outcomes.
+                    // Stay inside the reviewed text-safe box, above masked results.
+                    var ordinal=Label("Public cell number "+(i+1),new PixelRect(cell.Text.X,cell.Text.Y,cell.Text.Width,64),publicFont,font,60);
+                    var pos=ordinal.transform.localPosition;pos.y=SilverY+.002f;ordinal.transform.localPosition=pos;ordinal.SetText((i+1).ToString());cellNumbers[i]=ordinal;
+                    resultBox=new PixelRect(cell.Text.X,cell.Text.Y+68,cell.Text.Width,cell.Text.Height-68);
+                }
+                var label=Label("Masked result "+cell.Id,resultBox,glyphMat,font,Layout.Id=="number"?76:68);cellText[i]=label;
                 float sw=cell.Silver.Width*width/Layout.Width,sh=cell.Silver.Height*depth/Layout.Height;
-                var tc=cell.Text.Center(Layout.Width,Layout.Height);var sc=cell.Silver.Center(Layout.Width,Layout.Height);
+                var tc=resultBox.Center(Layout.Width,Layout.Height);var sc=cell.Silver.Center(Layout.Width,Layout.Height);
                 label.SetMaskMapping(new Vector4(1/sw,1/sh,.5f+(float)(tc.U-sc.U)*width/sw,.5f+(float)(tc.V-sc.V)*depth/sh));
             }
             var headerMat=Own(new Material(ordinaryFont));

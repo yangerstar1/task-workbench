@@ -25,7 +25,7 @@ namespace Lottery.G3.Core
         public static RunState Create(string runId,string seed)
         {
             if(string.IsNullOrWhiteSpace(runId)||runId.Length>128||runId.Any(char.IsControl)||string.IsNullOrWhiteSpace(seed)||seed.Length>256||seed.Any(char.IsControl))throw new ArgumentException("Invalid run identity");
-            var s=new RunState{RunId=runId,Seed=seed};
+            var s=new RunState{RunId=runId,Seed=seed};s.UsedRunIds.Add(runId);
             s.Contacts.Add(new ContactState{ContactId="mother"});s.Contacts.Add(new ContactState{ContactId="girlfriend"});
             foreach(var t in DayRules.Tools)s.ToolCounters.Add(new ToolCounter{ItemId=t.Id});
             var random=new DeterministicStream(seed,"shop-supply-v1");

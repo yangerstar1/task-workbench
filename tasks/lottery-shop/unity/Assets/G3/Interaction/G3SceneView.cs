@@ -21,6 +21,8 @@ namespace Lottery.G3.Interaction
         public ConfirmedTicketSurface Surface=>current?.Snapshot.CurrentTicket?.TicketType=="challenge"?challenge:number;
         public bool PanelVisible=>current!=null&&current.Panel!=G3Panel.None;
         public string VisibleSummary=>resultText.Text;
+        public string VisibleToolSlot(int slot)=>toolLabels[slot].Text;
+        public Color VisibleToolColor(int slot)=>toolObjects[slot].sharedMaterial.color;
         public int PresentationWidth=>SceneCamera!=null&&SceneCamera.targetTexture!=null?SceneCamera.targetTexture.width:Mathf.Max(1,Screen.width);
         public int PresentationHeight=>SceneCamera!=null&&SceneCamera.targetTexture!=null?SceneCamera.targetTexture.height:Mathf.Max(1,Screen.height);
         public Rect? SimulatedSafeArea {get;set;}
@@ -69,8 +71,8 @@ namespace Lottery.G3.Interaction
             var phone=Box("Phone on side table",new Vector3(-.77f,.90f,-.55f),new Vector3(.14f,.05f,.23f),new Color(.06f,.075f,.08f),lit);Target(phone,G3Panel.Phone);
             for(int i=0;i<3;i++)
             {
-                var tool=Box("Enabled tool stand "+(i+1),new Vector3((i-1)*.45f,.90f,.0f),new Vector3(.25f,.10f,.18f),new Color(.60f,.52f,.31f),lit,false);toolObjects.Add(tool.GetComponent<Renderer>());Target(tool,G3Panel.Inventory);
-                var label=Label("Current tool name "+i,transform,new Color(.08f,.15f,.10f));label.transform.position=new Vector3((i-1)*.45f,.96f,0);label.transform.rotation=Quaternion.Euler(90,0,0);label.SetBox(.40f,.09f,.038f);toolLabels.Add(label);
+                var tool=Box("Enabled tool stand "+(i+1),new Vector3((i-1)*.45f,.90f,-.105f),new Vector3(.38f,.06f,.085f),new Color(.60f,.52f,.31f),lit,false);toolObjects.Add(tool.GetComponent<Renderer>());Target(tool,G3Panel.Inventory);
+                var label=Label("Current tool name "+i,transform,new Color(.08f,.15f,.10f));label.transform.position=new Vector3((i-1)*.45f,.96f,-.105f);label.transform.rotation=Quaternion.Euler(90,0,0);label.SetBox(.42f,.07f,.036f,true);toolLabels.Add(label);
             }
         }
         void Target(GameObject go,G3Panel panel,bool table=false){var t=go.AddComponent<G3WorldTarget>();t.Panel=panel;t.IsTable=table;}
@@ -87,14 +89,14 @@ namespace Lottery.G3.Interaction
         public void SetWalking(bool value)
         {
             walking=value;SceneCamera.orthographic=!value;
-            if(value)Walk.ApplyCamera();else{SceneCamera.orthographicSize=.58f;SceneCamera.transform.position=new Vector3(0,2.3f,-.56f);SceneCamera.transform.rotation=Quaternion.Euler(90,0,0);}
+            if(value)Walk.ApplyCamera();else{SceneCamera.orthographicSize=.63f;SceneCamera.transform.position=new Vector3(0,2.3f,-.56f);SceneCamera.transform.rotation=Quaternion.Euler(90,0,0);}
             if(current!=null)Layout();
         }
         public void Layout()
         {
             lastWidth=PresentationWidth;lastHeight=PresentationHeight;lastSafe=Safe;SceneCamera.aspect=(float)lastWidth/lastHeight;
             // Framing depends on the actual render target + safe area, never the Editor window.
-            if(!walking){SceneCamera.orthographicSize=.58f*PresentationHeight/Mathf.Max(1,lastSafe.height);SceneCamera.transform.position=new Vector3(-(lastSafe.center.x/PresentationWidth-.5f)*SceneCamera.orthographicSize*2*SceneCamera.aspect,2.3f,-.56f-(lastSafe.center.y/PresentationHeight-.5f)*SceneCamera.orthographicSize*2);}
+            if(!walking){SceneCamera.orthographicSize=.63f*PresentationHeight/Mathf.Max(1,lastSafe.height);SceneCamera.transform.position=new Vector3(-(lastSafe.center.x/PresentationWidth-.5f)*SceneCamera.orthographicSize*2*SceneCamera.aspect,2.3f,-.56f-(lastSafe.center.y/PresentationHeight-.5f)*SceneCamera.orthographicSize*2);}
             if(current!=null)Show(current,panelModel);
         }
         public void InvalidateTicket(){number?.Invalidate();challenge?.Invalidate();}
@@ -104,7 +106,7 @@ namespace Lottery.G3.Interaction
             headerRect=new Rect(lastSafe.x+margin,lastSafe.yMax-78*s,lastSafe.width-2*margin,66*s);footerRect=new Rect(lastSafe.x+margin,lastSafe.y+margin,lastSafe.width-2*margin,98*s);
             PlacePlate(header,headerRect,.55f);PlacePlate(footer,footerRect,.55f);
             var state=presenter.Snapshot;var t=state.CurrentTicket;var bill=presenter.Service.PreviewNightBill();
-            headerText.SetText("现金 "+G3Text.Money(state.CashMinor)+"    今晚 "+G3Text.Money(bill.TotalDueMinor)+"    已购 "+state.TicketsPurchasedToday+" / 12    已结算 "+state.SettledTicketCount+"    G3 首日功能切片");
+            headerText.SetText(state.RecoveryRequired?"存档恢复受阻 · 请保留原件 · 现金暂不可确认":"现金 "+G3Text.Money(state.CashMinor)+"    今晚 "+G3Text.Money(bill.TotalDueMinor)+"    已购 "+state.TicketsPurchasedToday+" / 12    已结算 "+state.SettledTicketCount+(string.IsNullOrEmpty(state.FixtureLabel)?"    G3 首日":"    QA 固定新局"));
             PlaceLabel(headerText,Inset(headerRect,14*s,11*s),27*s,.48f,false);
             string summary;
             if(state.RecoveryRequired)summary="存档待恢复，票面已隐藏";
@@ -115,7 +117,16 @@ namespace Lottery.G3.Interaction
             statusText.SetText(presenter.Status);PlaceLabel(statusText,new Rect(footerRect.x+14*s,footerRect.y+10*s,footerRect.width-28*s,34*s),24*s,.47f,false);
             bool empty=t==null&&!state.RecoveryRequired;emptyText.gameObject.SetActive(empty);
             if(!presenter.IsCommitting&&!state.RecoveryRequired){number.Show(state);challenge.Show(state);}else InvalidateTicket();
-            for(int i=0;i<3;i++){string id=t!=null&&t.Phase!=TicketPhase.SETTLED&&i<t.ConfigurationSnapshot.Length?t.ConfigurationSnapshot[i].ItemId:state.NextToolIds[i];toolLabels[i].SetText(string.IsNullOrEmpty(id)?"空座 "+(i+1):G3Text.Tool(id));toolObjects[i].sharedMaterial.color=string.IsNullOrEmpty(id)?new Color(.48f,.48f,.38f):new Color(.78f,.65f,.30f);}
+            for(int i=0;i<3;i++)
+            {
+                // Current and next are different authorities. Preserve the original slot,
+                // including holes. A purchased ticket never borrows a future tool or level.
+                var live=t?.ConfigurationSnapshot.SingleOrDefault(x=>x.TableSlot==i);
+                string id=t==null?state.NextToolIds[i]:live?.ItemId??"";
+                int level=t==null?(string.IsNullOrEmpty(id)?0:state.Tools.Single(x=>x.ItemId==id).Level):live?.Level??0;
+                toolLabels[i].SetText(state.RecoveryRequired?"存档待恢复":(t==null?"下张":"本张")+(i+1)+" "+(string.IsNullOrEmpty(id)?"空位":G3Text.Tool(id)+" "+level));
+                toolObjects[i].sharedMaterial.color=state.RecoveryRequired||string.IsNullOrEmpty(id)?new Color(.48f,.48f,.38f):new Color(.78f,.65f,.30f);
+            }
             if(!PanelVisible)
             {
                 float w=184*s,h=96*s,x=lastSafe.x+16*s,y=lastSafe.yMax-178*s;

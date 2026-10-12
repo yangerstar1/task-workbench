@@ -21,6 +21,8 @@ namespace Lottery.G3.Core
         {
             Need(s!=null,"missing root");Need(s.SchemaVersion==RunState.CurrentSchema&&s.RulesHash==NumberTicketRules.RulesSha256,"schema/rules binding");
             Need(Id(s.RunId)&&Id(s.Seed)&&s.DayNumber==1&&Enum.IsDefined(typeof(DayPhase),s.Phase),"identity/day/phase");
+            Need(s.UsedRunIds!=null&&s.UsedRunIds.Count>=1&&s.UsedRunIds.All(Id)&&s.UsedRunIds.Distinct().Count()==s.UsedRunIds.Count&&s.UsedRunIds[s.UsedRunIds.Count-1]==s.RunId,"all run identities retained uniquely");
+            Need(s.UsedRunIds.Skip(1).SequenceEqual(s.Commands.Where(c=>c.Kind=="RESTART_DAY").Select(c=>c.TicketId)),"used run identities match restart journal");
             Need(s.FixtureLabel==""||s.FixtureLabel==RunFactory.DiagnosticLabel||s.FixtureLabel=="SYNTHETIC_INVENTORY_BOUNDARY_FIXTURE"||s.FixtureLabel=="SYNTHETIC_AD_FIXTURE"||s.FixtureLabel=="SYNTHETIC_CONSUMABLE_BOUNDARY_FIXTURE","unknown fixture");
             Need(s.FixtureLabel==""||FixtureAccess.Enabled,"fixture disabled outside development/test");
             Need(s.CashMinor>=0&&s.InitialCashMinor==30000&&s.Revision>=0,"wallet/revision");
@@ -105,7 +107,7 @@ namespace Lottery.G3.Core
                 var purchase=s.Commands.SingleOrDefault(c=>c.CommandId==t.PurchaseCommandId);Need(purchase!=null&&purchase.Kind=="BUY_TICKET"&&purchase.TicketId==t.Id&&purchase.CashDeltaMinor==-t.PriceMinor,"ticket purchase receipt binding");
                 Need(t.TicketType=="number"||t.TicketType=="challenge","ticket type");Need(Enum.IsDefined(typeof(TicketPhase),t.Phase),"ticket phase");
                 Need(i==s.Tickets.Count-1||t.Phase==TicketPhase.SETTLED,"one unsettled current ticket");Need(t.PreviousSettledTicketType==(i==0?"":s.Tickets[i-1].TicketType),"previous settled snapshot");
-                Need(t.ConfigurationSnapshot.Length<=3&&t.ConfigurationSnapshot.Select(x=>x.ItemId).Distinct().Count()==t.ConfigurationSnapshot.Length,"three snapshotted tools");
+                Need(t.ConfigurationSnapshot.Length<=3&&t.ConfigurationSnapshot.Select(x=>x.ItemId).Distinct().Count()==t.ConfigurationSnapshot.Length&&t.ConfigurationSnapshot.All(x=>x.TableSlot>=0&&x.TableSlot<3)&&t.ConfigurationSnapshot.Select(x=>x.TableSlot).Distinct().Count()==t.ConfigurationSnapshot.Length,"three unique physical snapshot slots");
                 foreach(var snap in t.ConfigurationSnapshot){var rule=DayRules.Tool(snap.ItemId);Need(snap.Level>=1&&snap.Level<=rule.LevelCap,"snapshot level");if(t.Phase!=TicketPhase.SETTLED)Need(s.Tools.Any(x=>x.ItemId==snap.ItemId),"current snapshot sale lock");}
                 Need(t.UsedConsumableTypes.Count<=2&&t.UsedConsumableTypes.Distinct().Count()==t.UsedConsumableTypes.Count&&t.ConsumableUses.Count==t.UsedConsumableTypes.Count&&t.ConsumableUses.Select(x=>x.ItemId).SequenceEqual(t.UsedConsumableTypes),"consumable type limits");
                 Need(t.ConsumableCostMinor==t.ConsumableUses.Sum(x=>x.PurchasePriceMinor),"consumed paid cost");

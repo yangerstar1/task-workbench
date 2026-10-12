@@ -16,7 +16,8 @@ namespace Lottery.G3.Interaction
         Func<CommandResult> retry;string pendingId;bool unknown;float lastFlush;
         G3Action confirmation,customAction;long confirmationRevision;G3Panel confirmationReturn;
         string selectedStock="",selectedTool="",selectedContact="mother",customAmount="",confirmText="";
-        int boostSlot=-1,informationDrawer=-1,informationCount;bool informationLamp;
+        int boostSlot=-1,informationDrawer=-1,informationCount;bool informationLamp,ticketRulesReturn;string boostStockId="",boostRunId="";
+        public int SelectedBoostSlot=>boostSlot;
         readonly HashSet<int> informationCells=new HashSet<int>();
         Action afterCommit;
         public G3InputRouter Router {get;set;}
@@ -57,6 +58,7 @@ namespace Lottery.G3.Interaction
         }
         public void OpenPanel(G3Panel panel)
         {
+            ticketRulesReturn=Panel==G3Panel.Tickets&&panel==G3Panel.Rules;
             FlushScratch();if(IsCommitting)return;Router?.ReleaseCapture();
             var t=Snapshot.CurrentTicket;
             if(t!=null&&t.TicketType=="challenge"&&t.SelectedCell>=0)
@@ -70,8 +72,9 @@ namespace Lottery.G3.Interaction
         public void Execute(G3Action a)
         {
             if(a.Kind==G3ActionKind.Retry){RetryOrRecover();return;}
-            if(a.Kind==G3ActionKind.Close||a.Kind==G3ActionKind.Cancel){if(IsCommitting)return;Panel=a.Kind==G3ActionKind.Cancel?confirmationReturn:G3Panel.None;informationCells.Clear();Router?.ReleaseCapture();Refresh();return;}
+            if(a.Kind==G3ActionKind.Close||a.Kind==G3ActionKind.Cancel){ClosePanel();return;}
             if(IsCommitting)return;
+            if(a.Kind==G3ActionKind.CancelBoost){ClearBoost();Status="已取消冲奖预选，耗材未消耗。";Refresh();return;}
             if(a.Kind==G3ActionKind.Open){OpenPanel((G3Panel)a.Slot);return;}
             if(a.Kind==G3ActionKind.Stand){OpenStable(()=>{Walking=true;view.SetWalking(true);Panel=G3Panel.None;Refresh();});return;}
             if(a.Kind==G3ActionKind.Sit){Walking=false;view.SetWalking(false);Panel=G3Panel.None;Router?.ReleaseCapture();Refresh();return;}
@@ -90,6 +93,8 @@ namespace Lottery.G3.Interaction
             if(a.Kind==G3ActionKind.ToggleFlash){ReduceFlash=!ReduceFlash;Refresh();return;}
             if(a.Kind==G3ActionKind.ToggleVibration){Vibration=!Vibration;Refresh();return;}
             if(a.Kind==G3ActionKind.Confirm){var c=confirmation;var rev=confirmationRevision;Panel=confirmationReturn;Perform(c,rev);return;}
+            if(a.Kind==G3ActionKind.Claim&&Snapshot.CurrentTicket?.TicketType=="challenge"&&!Snapshot.CurrentTicket.Busted)
+            {var award=service.PreviewSettlement();if(award==null){Status="请先完成已选格，再决定收手。";Refresh();return;}Ask(a,"现在收手，确认领取 "+G3Text.Money(award.TotalMinor)+" 金币？收手后本票不能再选格。");return;}
             if(a.Kind==G3ActionKind.QuickReveal||a.Kind==G3ActionKind.Claim||a.Kind==G3ActionKind.Equip||a.Kind==G3ActionKind.Remove){Perform(a);return;}
             switch(a.Kind)
             {
@@ -140,7 +145,7 @@ namespace Lottery.G3.Interaction
             {
                 case G3ActionKind.ResumeNext:Run((id,r)=>service.ResumeClaimThenBuy(a.Key),revision,()=>Panel=G3Panel.None);break;
                 case G3ActionKind.CancelNext:Run((id,r)=>service.CancelNextPurchase(a.Key,id,r),revision);break;
-                case G3ActionKind.BuyTicket:Run((id,r)=>service.BuyTicket(a.Key,a.Slot,id,r),revision,()=>{boostSlot=-1;Panel=G3Panel.None;});break;
+                case G3ActionKind.BuyTicket:Run((id,r)=>service.BuyTicket(a.Key,a.Slot,id,r),revision,()=>{ClearBoost();Panel=G3Panel.None;});break;
                 case G3ActionKind.QuickReveal:if(ticket!=null)Run((id,r)=>service.QuickReveal(ticket,id,r),revision);break;
                 case G3ActionKind.Claim:if(ticket!=null)Run((id,r)=>service.Claim(ticket,id,r),revision);break;
                 case G3ActionKind.ClaimThenBuy:if(ticket!=null)Run((id,r)=>service.ClaimThenBuy(ticket,a.Key,-1,id,r),revision,()=>Panel=G3Panel.None);break;
@@ -158,13 +163,13 @@ namespace Lottery.G3.Interaction
                 case G3ActionKind.EnterNight:Run((id,r)=>service.EnterNightBill(id,r),revision,()=>Panel=G3Panel.Bill);break;
                 case G3ActionKind.PayNight:Run((id,r)=>service.PayNightBill(a.Slot==1,id,r),revision,()=>Panel=G3Panel.Bill);break;
                 case G3ActionKind.Restart:
-                    string run=Guid.NewGuid().ToString("N"),seed=Guid.NewGuid().ToString("N");Run((id,r)=>service.RestartDay(run,seed,id,r),revision,()=>{Panel=G3Panel.None;Walking=false;view.SetWalking(false);});break;
+                    string run=Guid.NewGuid().ToString("N"),seed=Guid.NewGuid().ToString("N");Run((id,r)=>service.RestartDay(run,seed,id,r),revision,()=>{ClearBoost();Panel=G3Panel.None;Walking=false;view.SetWalking(false);});break;
             }
         }
         void UseDrawer(int slot)
         {
             var d=slot>=0&&slot<2?Snapshot.Drawers[slot]:null;if(d==null)return;
-            if(d.ItemId=="boost_coupon"){boostSlot=slot;Panel=G3Panel.Tickets;Status="已预选冲奖券。返回取消不扣物，确认买号码票才消耗。";Refresh();return;}
+            if(d.ItemId=="boost_coupon"){boostSlot=slot;boostStockId=d.StockId;boostRunId=Snapshot.RunId;Panel=G3Panel.Tickets;Status="已预选冲奖券。返回取消不扣物，确认买号码票才消耗。";Refresh();return;}
             if(d.ItemId=="reveal_film"){BeginInformation(false,slot);return;}
             Ask(new G3Action(G3ActionKind.UseDrawer,slot:slot),"使用 "+G3Text.Quality(d.Quality)+DayRules.ConsumableName(d.ItemId)+"？"+G3Text.ConsumableHint(d.ItemId,d.Quality)+"。按确认时状态扣除，同票同类限一次。");
         }
@@ -189,13 +194,14 @@ namespace Lottery.G3.Interaction
         }
         void Handle(CommandResult result)
         {
+            bool repeated=result.Success&&(unknown||(result.Receipt!=null&&Snapshot.Commands.Any(c=>c.CommandId==result.Receipt.CommandId)));
             confirmed=result.State??service.Snapshot;
             if(result.CommitStatus==CommitStatus.COMMIT_UNKNOWN){unknown=true;if(!string.IsNullOrEmpty(result.State?.PendingCommandId))pendingId=result.State.PendingCommandId;Status="正在确认上笔保存。请点「确认交易」，不会重复扣款或展示未确认结果。";view.InvalidateTicket();}
             else if(result.Code=="SAVE_NOT_COMMITTED"){unknown=false;Status="保存失败，已证实未提交。可原样重试。";}
             else
             {
                 retry=null;pendingId=null;unknown=false;var continuation=afterCommit;afterCommit=null;
-                Status=result.Success?ReadyMessage():Describe(result.Code);
+                Status=result.Success?(repeated?"上笔交易已确认，没有重复扣款或重复奖励。":ReadyMessage()):Describe(result.Code);
                 if(result.Success){if(result.Receipt?.Kind=="CLAIM"){view.SettlementFeedback(ReduceFlash);if(Vibration)Handheld.Vibrate();}continuation?.Invoke();}
                 if(PendingIntent()!=null){Panel=G3Panel.Tickets;Status="原票已收下，下张购买未完成。请继续原购买，或取消下张购买。";}
             }
@@ -242,15 +248,44 @@ namespace Lottery.G3.Interaction
                 case "NEXT_PURCHASE_INTENT_PENDING":return "原票已收下，先处理尚未完成的下一张购买。";
                 case "SCRATCH_JOURNAL_CAPACITY_USE_QUICK_REVEAL":return "本日刮擦记录接近容量，请用快揭完成当前票；交易和存档未丢失。";
                 case "SAVE_CAPACITY_REACHED":return "存档容量已达上限，本次未提交。请保留存档，不要清除数据。";
-                case "NO_CHANGE":return "这片银层已经擦开，没有新增刮痕。";
+                case "NO_CHANGE":return "状态没有变化，未产生新交易。";
                 case "DRAWERS_FULL":case "DRAWER_FULL":return "两格抽屉已满，未扣款；可以先合法使用已有耗材。";
                 case "INFORMATION_SOURCE_USED":return "本票已经使用过信息来源，检票灯与显影片不能叠用。";
+                case "COPY_REQUIRES_POSITIVE_PRIZE":return "原始奖为零，不能使用中奖复写纸；耗材没有消耗。";
+                case "COPY_REQUIRES_REVEALED_NUMBER":return "复写纸只可用于号码票全揭后、领取前；耗材没有消耗。";
+                case "NEED_SAFE_CELL":return "至少先完整揭出一格安全，再贴封存；耗材没有消耗。";
+                case "LAMP_DAILY_LIMIT":return "检票灯今天的可用次数已用完，换位不会恢复。";
+                case "CONSUMABLE_TYPE_ALREADY_USED":return "本票已经用过同类耗材，不能叠用。";
+                case "CONSUMABLE_TYPE_LIMIT":return "本票已用两种耗材，不能再添加第三种。";
+                case "RESERVE_FULL":return "备用三格已满，请交换一个桌面位置或先出售允许出售的工具。";
+                case "DRAWER_EMPTY":return "该抽屉已经空了，请重新选择现有耗材。";
+                case "REVEAL_PENDING":return "请先完成已经承诺的当前格，再进行这项操作。";
+                case "NOT_READY_TO_CLAIM":return "当前票尚不能结算，请先完成必要揭晓。";
+                case "SHOP_CLOSED":return "已进入夜间，采购与换位结束；仍可借还款或出售允许出售的工具。";
+                case "REPAY_EXCEEDS_DEBT":return "归还金额超过目前欠款，未扣款。请按尚欠金额重新输入。";
+                case "BOOST_REQUIRES_NEXT_PURCHASE":return "冲奖券需要先预选，再确认购买下一张号码票；本张不消耗。";
+                case "ALREADY_SETTLED":return "本票已经入账，这次未重复发奖。";
+                case "ALREADY_REVEALED":return "这张票已经完成揭晓，本次没有新增刮痕或交易。";
                 case "LOAN_LIMIT":case "BORROW_LIMIT":return "本局累计可借额度不足；还款不会恢复已用额度。";
                 default:return "本次未执行："+code+"。现金与物品以已保存状态为准。";
             }
         }
-        public void Back(){if(IsCommitting)return;FlushScratch();if(IsCommitting)return;if(Panel!=G3Panel.None){Panel=G3Panel.None;informationCells.Clear();Refresh();}else OpenPanel(G3Panel.Settings);}
-        public void Refresh(){if(service!=null&&view!=null)view.Show(this,BuildPanel());}
+        void ClearBoost(){boostSlot=-1;boostStockId="";boostRunId="";}
+        void ClosePanel()
+        {
+            if(IsCommitting)return;
+            if(Panel==G3Panel.Rules&&ticketRulesReturn){Panel=G3Panel.Tickets;ticketRulesReturn=false;}
+            else if(Panel==G3Panel.Confirm){if(confirmation.Kind==G3ActionKind.BuyTicket)ClearBoost();Panel=confirmationReturn;}
+            else{if(Panel==G3Panel.Tickets)ClearBoost();Panel=G3Panel.None;ticketRulesReturn=false;}
+            informationCells.Clear();Router?.ReleaseCapture();Refresh();
+        }
+        public void Back(){if(IsCommitting)return;FlushScratch();if(IsCommitting)return;if(Panel!=G3Panel.None)ClosePanel();else OpenPanel(G3Panel.Settings);}
+        public void Refresh()
+        {
+            if(service==null||view==null)return;
+            if(boostSlot>=0&&(boostRunId!=Snapshot.RunId||boostSlot>=Snapshot.Drawers.Length||Snapshot.Drawers[boostSlot]?.StockId!=boostStockId))ClearBoost();
+            view.Show(this,BuildPanel());
+        }
         static string ItemName(StockItem s)=>s.IsConsumable?DayRules.ConsumableName(s.ItemId):DayRules.Tool(s.ItemId).Name;
         public G3PanelModel BuildPanel()
         {
@@ -264,11 +299,12 @@ namespace Lottery.G3.Interaction
                     if(details==null){m.Body="请完成当前揭晓后查看。";break;}
                     m.Body=string.Join("\n",details.Entries.Select(x=>(x.Source=="raw_prize"?"原始票奖":x.Source=="copy_paper"?"中奖复写纸":x.Source=="seal_sticker"?"封存赔付":G3Text.Tool(x.Source))+"："+G3Text.Money(x.AmountMinor)))+"\n合计 "+G3Text.Money(details.TotalMinor)+"；票款 "+G3Text.Money(details.TicketPriceMinor)+"；本票耗材成本 "+G3Text.Money(details.ConsumableCostMinor)+"\n净收支 "+G3Text.Signed(details.NetMinor)+(t?.Phase==TicketPhase.SETTLED?"，已唯一入账。":"，尚未入账。");break;
                 case G3Panel.Tickets:
-                    m.Title="购票 · 两种均为 100 金币";m.Body="今天已购 "+s.TicketsPurchasedToday+" / 12；现金 "+G3Text.Money(s.AvailableCashMinor)+"\n号码票：六格全揭后兑奖。\n挑战票：选一格先保存承诺，再擦开；安全后可收手。\n"+(boostSlot>=0?"已预选冲奖券，仅下方号码票确认后消耗。":"不使用耗材。概率与完整说明见规则。");
+                    m.Grid=true;m.Title="购票 · 两种均为 100 金币";m.Body="今天已购 "+s.TicketsPurchasedToday+" / 12；现金 "+G3Text.Money(s.AvailableCashMinor)+"\n号码票：六格全揭后兑奖。\n挑战票：选一格先保存承诺，再擦开；安全后可收手。\n"+(boostSlot>=0?"已预选冲奖券，仅下方号码票确认后消耗。":"不使用耗材。概率与完整说明见规则。");
                     var intent=PendingIntent();if(intent!=null){m.Body+="\n上张已收下：待完成 "+G3Text.Ticket(intent.NextTicketType)+"，售价 100。";m.Add("resume-next","继续原购买",new G3Action(G3ActionKind.ResumeNext,intent.IntentId));m.Add("cancel-next","取消下张购买",new G3Action(G3ActionKind.CancelNext,intent.IntentId));break;}
                     m.Add("buy-number","号码票\n100 金币",new G3Action(G3ActionKind.BuyTicket,"number",boostSlot),!s.HasUnsettledTicket&&s.Phase==DayPhase.DAY_OPEN&&s.TicketsPurchasedToday<12);
                     m.Add("buy-challenge","挑战票\n100 金币",new G3Action(G3ActionKind.BuyTicket,"challenge"),!s.HasUnsettledTicket&&s.Phase==DayPhase.DAY_OPEN&&s.TicketsPurchasedToday<12);
-                    m.Add("ticket-rules","完整规则与概率",new G3Action(G3ActionKind.Open,slot:(int)G3Panel.Rules));break;
+                    if(boostSlot>=0)m.Add("cancel-boost","取消冲奖预选（不消耗）",new G3Action(G3ActionKind.CancelBoost));
+                    m.Add("ticket-rules",boostSlot>=0?"查看规则 · 保留预选":"完整规则与概率",new G3Action(G3ActionKind.Open,slot:(int)G3Panel.Rules));break;
                 case G3Panel.Shop:
                     m.Title="今日货架 · 三道具与一耗材";m.Body="现金 "+G3Text.Money(s.AvailableCashMinor)+"；持有工具 "+s.Tools.Count+" / 6；抽屉 "+s.Drawers.Count(x=>x!=null)+" / 2\n查看、起身与返回都不换货。购买工具仅下一张起生效。";m.Grid=true;
                     foreach(var stock in s.Stock)m.Add("stock-"+stock.StockId,ItemName(stock)+" · "+G3Text.Quality(stock.Quality)+"\n"+G3Text.Money(stock.PriceMinor)+" 金币 · 库存 "+stock.Quantity,new G3Action(G3ActionKind.InspectStock,stock.StockId));break;
@@ -301,7 +337,7 @@ namespace Lottery.G3.Interaction
                     m.Title="耗材抽屉 · 两个位置";m.Body="每张最多两种，同种限一次。购买与使用分别确认。\n新工具只作用下一张；合法耗材可以用于当前票。";
                     for(int i=0;i<2;i++){var d=s.Drawers[i];m.Add("drawer-"+i,d==null?"抽屉 "+(i+1)+" · 空位":G3Text.Quality(d.Quality)+DayRules.ConsumableName(d.ItemId)+"\n"+(d.ItemId=="boost_coupon"?"预选下一号码票使用":"查看并确认本票使用"),new G3Action(G3ActionKind.UseDrawer,slot:i),d!=null&&!terminal);}
                     bool hasLamp=t!=null&&t.ConfigurationSnapshot.Any(x=>x.ItemId=="inspection_lamp");
-                    m.Add("lamp","使用本张检票灯",new G3Action(G3ActionKind.UseLamp),hasLamp&&t.TicketType=="challenge"&&!t.LampUsed&&t.SelectedCell<0&&t.Phase==TicketPhase.ACTIVE);break;
+                    m.Add("lamp",!hasLamp?"本张无灯 · 下张才生效":t.LampUsed?"本票已用检票灯":"使用本张检票灯",new G3Action(G3ActionKind.UseLamp),hasLamp&&t.TicketType=="challenge"&&!t.LampUsed&&t.SelectedCell<0&&t.Phase==TicketPhase.ACTIVE);break;
                 case G3Panel.Phone:
                     m.Title="手机 · 游戏中的虚构联系人";m.Body="今晚主债 "+G3Text.Money(bill.TotalDueMinor)+"；可用现金 "+G3Text.Money(s.AvailableCashMinor)+"\n亲友欠款无息。到期当晚可处理，次日逾期才冻结该人新增借款。";
                     foreach(var contact in s.Contacts){long debt=s.Loans.Where(x=>x.ContactId==contact.ContactId).Sum(x=>x.RemainingMinor),cap=contact.ContactId=="mother"?50000:30000;m.Add("contact-"+contact.ContactId,G3Text.Contact(contact.ContactId)+" · 尚欠 "+G3Text.Money(debt)+"\n未用累计额度 "+G3Text.Money(cap-contact.BorrowedLifetimeMinor),new G3Action(G3ActionKind.InspectContact,contact.ContactId));}
@@ -324,10 +360,10 @@ namespace Lottery.G3.Interaction
                     else m.Add("pay-night",bill.ShortfallMinor>0?"不足款 · 核对后结束":"支付今晚主债",new G3Action(G3ActionKind.PayNight));}break;
                 case G3Panel.InformationTargets:
                     m.Title=(informationLamp?"检票灯":"显影片")+" · 选择信息格";m.Body="本次查看 "+informationCount+" 格，已选 "+informationCells.Count+"。\n查看只给安全/危险信息，不计揭格、不增加可收奖。确认前可以取消。";m.Grid=true;m.LargeGrid=true;
-                    if(t!=null)for(int visual=0;visual<8;visual++){int i=(visual+4)%8;m.Add("info-target-"+i,(informationCells.Contains(i)?"已选 ":"格 ")+(visual+1),new G3Action(G3ActionKind.TargetCell,slot:i),!t.RevealedCells[i]&&!t.PeekedCells[i]);}
+                    if(t!=null)for(int visual=0;visual<8;visual++){int i=(visual+4)%8;m.Add("info-target-"+i,(informationCells.Contains(i)?"已选格 ":"格 ")+(visual+1)+" · "+(visual<4?"上排":"下排")+(visual%4+1),new G3Action(G3ActionKind.TargetCell,slot:i),!t.RevealedCells[i]&&!t.PeekedCells[i]);}
                     m.Add("information-confirm","确认查看 "+informationCount+" 格",new G3Action(G3ActionKind.ConfirmTargets),informationCount>0&&informationCells.Count==informationCount);break;
                 case G3Panel.Rules:
-                    m.Title="规则 · 虚构金币，不能兑换现金";m.Body="号码票先锁一个原始奖，六格只有一格匹配或全部不匹配。\n奖额：0 / 50 / 100 / 200 / 500 / 2000 / 10000 / 100000\n概率：40% / 20% / 22% / 13% / 4.7% / 0.28% / 0.018% / 0.002%\n挑战票：8 格、6 安全 2 危险，无放回。安全 1～6 格可收 100 / 200 / 300 / 500 / 900 / 1800。\n危险原奖为 0；封存只按之前锁定金额赔付。每次继续都须主动选格。\n首日利息 150，白天还本不退当日利息。所有花费、选择和刮痕确认保存后显示。";break;
+                    m.Title=string.IsNullOrEmpty(s.FixtureLabel)?"规则 · 虚构金币，不能兑换现金":"QA 固定诊断局 · 不代表自然中奖概率";m.Body="号码票先锁一个原始奖，六格只有一格匹配或全部不匹配。\n奖额：0 / 50 / 100 / 200 / 500 / 2000 / 10000 / 100000\n概率：40% / 20% / 22% / 13% / 4.7% / 0.28% / 0.018% / 0.002%\n挑战票：8 格、6 安全 2 危险，无放回。安全 1～6 格可收 100 / 200 / 300 / 500 / 900 / 1800。\n危险原奖为 0；封存只按之前锁定金额赔付。每次继续都须主动选格。\n首日利息 150，白天还本不退当日利息。所有花费、选择和刮痕确认保存后显示。";break;
                 case G3Panel.Settings:
                     m.Title="操作与可访问性";m.Body="可自由走动或原位采购，价格与效果相同。\n挑战快揭只完成已选格。完整品质尚未验收。";
                     m.Add("settings-rules","完整规则与概率",new G3Action(G3ActionKind.Open,slot:(int)G3Panel.Rules));
@@ -335,14 +371,14 @@ namespace Lottery.G3.Interaction
                 case G3Panel.Confirm:
                     m.Title="请核对这笔操作";m.Body=confirmText;m.Add("confirm-action","确认",new G3Action(G3ActionKind.Confirm));m.Add("cancel-action","取消",new G3Action(G3ActionKind.Cancel));break;
             }
-            m.Footnote=Status;return m;
+            m.Footnote=ticketRulesReturn&&Panel==G3Panel.Rules?"返回将继续这次购票，冲奖预选保留。":Panel==G3Panel.Rules&&!string.IsNullOrEmpty(s.FixtureLabel)?"诊断标记："+s.FixtureLabel:Status;return m;
         }
         static string PhoneHistory(RunState s,string contact)
         {
             var events=s.PhoneEvents.Where(x=>x.ContactId==contact).Reverse().Take(2).Reverse();
             return string.Join("\n",events.Select(x=>(x.Kind=="REPAID"?"已归还 ":"借款到账 ")+G3Text.Money(x.AmountMinor)+(x.DueNight>0?" · 第 "+x.DueNight+" 晚到期":"")));
         }
-        public static string CurrentConfiguration(RunState s)=>s.CurrentTicket==null?"尚未购票":string.Join(" / ",s.CurrentTicket.ConfigurationSnapshot.Select(x=>G3Text.Tool(x.ItemId)+" "+x.Level));
-        public static string NextConfiguration(RunState s)=>string.Join(" / ",s.NextToolIds.Select(id=>string.IsNullOrEmpty(id)?"空位":G3Text.Tool(id)+" "+s.Tools.First(x=>x.ItemId==id).Level));
+        public static string CurrentConfiguration(RunState s)=>s.CurrentTicket==null?"尚未购票":string.Join(" / ",Enumerable.Range(0,3).Select(i=>{var t=s.CurrentTicket.ConfigurationSnapshot.SingleOrDefault(x=>x.TableSlot==i);return (i+1)+":"+(t==null?"空":G3Text.Tool(t.ItemId)+t.Level);}));
+        public static string NextConfiguration(RunState s)=>string.Join(" / ",s.NextToolIds.Select((id,i)=>(i+1)+":"+(string.IsNullOrEmpty(id)?"空":G3Text.Tool(id)+s.Tools.First(x=>x.ItemId==id).Level)));
     }
 }

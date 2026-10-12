@@ -5,6 +5,7 @@ using System.Linq;
 using System.Text.Json;
 using System.Threading;
 using Lottery.G3.Core;
+using Lottery.G3.Ads;
 using Lottery.G3.Persistence;
 static class Program
 {
@@ -14,8 +15,13 @@ static class Program
     static int Main(string[] args)
     {
         try {
-            if(args.Length!=4 || !Scenarios.Contains(args[1])) throw new InvalidOperationException();
+            if(args.Length!=4 || (!Scenarios.Contains(args[1]) && args[1]!="ad_waiting")) throw new InvalidOperationException();
             string mode=args[0],scenario=args[1],point=args[2],directory=args[3];
+            if(scenario=="ad_waiting") {
+                if(point!="ClosedAwaitingReward")throw new InvalidOperationException();
+                if(mode=="prepare")PrepareWaiting(directory);else if(mode=="crash")CrashWaiting(directory);else if(mode=="verify")VerifyWaiting(directory);else throw new InvalidOperationException();
+                return 0;
+            }
             if(mode=="prepare") Prepare(scenario,directory);
             else if(mode=="crash") {
                 check="CRASH_APPLY";
@@ -108,6 +114,89 @@ static class Program
             check="EXACTLY_ONCE";if(Hash(state)!=finalHash || finalHash!=expected || state.Commands.Count(c=>c.CommandId==Attempt)!=1) throw new InvalidOperationException();
             AssertIndependent(scenario,state);check="RESULT_WRITE";
             File.WriteAllText(Path.Combine(directory,"result.json"),JsonSerializer.Serialize(new {status="PASS",scenario,point,recoveryStatus=recovered.CommitStatus.ToString(),beforeHash=before,expectedHash=expected,recoveredHash,finalHash,finalCashMinor=state.CashMinor,finalCommands=state.Commands.Count,attemptCommandOccurrences=1,staleRevisionReplayUnchanged=true,observation=Observe(state)}));
+        }
+    }
+    const string WaitingRun="g3-process-ad-waiting", WaitingRequest="g3-waiting-request", WaitingStock=WaitingRun+":day1:copy_paper";
+    static RunState WaitingInitial() => SyntheticAdFixture.Create(WaitingRun);
+    static AdPurchaseService WaitingAds(FileStateStore store) => new AdPurchaseService(store,new FakeRewardedAdService(store));
+    static void BeginWaiting(FileStateStore store)
+    {
+        check="WAITING_BEGIN";
+        var stock=store.Read().Stock.Single(x=>x.IsConsumable);
+        // Independent fixed vector: default fixture seed draws common copy paper, price 3000.
+        if(stock.StockId!=WaitingStock || stock.ItemId!="copy_paper" || stock.Quality!="common" || stock.PriceMinor!=3000)throw new InvalidOperationException();
+        MustCommit(WaitingAds(store).BeginAd(WaitingRequest,WaitingStock,60,"waiting-create",store.Read().Revision));
+    }
+    static void CloseWaiting(FileStateStore store)
+    {
+        check="WAITING_CLOSE";MustCommit(new FakeRewardedAdService(store).QueueEvent(WaitingRequest,WaitingRun,AdEventKind.Closed));
+        MustCommit(WaitingAds(store).PollAd(WaitingRequest,"waiting-poll-close",store.Read().Revision));AssertWaiting(store.Read(),false);
+    }
+    static void RewardWaiting(FileStateStore store)
+    {
+        check="WAITING_REWARD";MustCommit(new FakeRewardedAdService(store).QueueEvent(WaitingRequest,WaitingRun,AdEventKind.Reward));
+        MustCommit(WaitingAds(store).PollAd(WaitingRequest,"waiting-poll-reward",store.Read().Revision));AssertWaiting(store.Read(),true);
+    }
+    static void AssertWaiting(RunState s,bool committed)
+    {
+        check="WAITING_INVARIANTS";StateInvariants.Validate(s);var ad=s.Ad;var stock=s.Stock.Single(x=>x.StockId==WaitingStock);
+        if(s.RunId!=WaitingRun || s.FixtureLabel!="SYNTHETIC_AD_FIXTURE" || s.DayNumber!=1 || s.Phase!=DayPhase.DAY_OPEN || s.PrincipalMinor!=300000 || s.InterestDueMinor!=1500 || s.InterestPaidMinor!=0 || s.Tools.Count!=0 || s.Loans.Count!=0 || s.CurrentTicket!=null)throw new InvalidOperationException();
+        if(ad==null || ad.RequestId!=WaitingRequest || ad.RunId!=WaitingRun || ad.StockId!=WaitingStock || ad.ItemId!="copy_paper" || ad.Quality!="common" || ad.Version!="g3-fake-ad-v1" || ad.ReservedPriceMinor!=1500 || ad.ReservedDrawerSlot!=0 || ad.DayNumber!=1 || ad.Conflict!="" || ad.CommitCommandId!=WaitingRequest+":commit")throw new InvalidOperationException();
+        if(s.CashMinor!=(committed?28500:30000) || s.AvailableCashMinor!=28500 || stock.Quantity!=(committed?0:1) || stock.PriceMinor!=3000 || stock.ItemId!="copy_paper" || stock.Quality!="common" || !stock.IsConsumable || s.Drawers.Length!=2 || s.Drawers[1]!=null)throw new InvalidOperationException();
+        if(ad.Phase!=(committed?AdPhase.COMMITTED:AdPhase.CLOSED_AWAITING_REWARD) || ad.RewardRecorded!=committed || s.AdSuccessesToday!=(committed?1:0) || s.SettledCountAtLastAdSuccess!=(committed?12:-1) || s.SettledTicketCount!=12 || s.FixtureBaseSettlements!=12 || s.Commands.Count!=(committed?10:6))throw new InvalidOperationException();
+        if(AdReservations.StockReserved(s,WaitingStock)==committed || AdReservations.DrawerReserved(s,0)==committed || AdReservations.DrawerReserved(s,1))throw new InvalidOperationException();
+        if(s.FakeShownRequests.Count!=1 || s.FakeShownRequests[0]!=WaitingRequest || s.AdEvents.Count!=(committed?2:1) || s.AdEvents[0].Kind!="Closed" || s.AdEvents[0].RequestId!=WaitingRequest || s.AdEvents[0].RunId!=WaitingRun)throw new InvalidOperationException();
+        if(committed) {
+            var drawer=s.Drawers[0];
+            if(drawer==null || drawer.StockId!=WaitingStock || drawer.ItemId!="copy_paper" || drawer.Quality!="common" || drawer.PurchasePriceMinor!=1500 || s.AdEvents[1].Kind!="Reward")throw new InvalidOperationException();
+            if(s.Ledger.Count!=1 || s.Ledger[0].Kind!="AD_PURCHASE" || s.Ledger[0].ReferenceId!=WaitingStock || s.Ledger[0].CommandId!=WaitingRequest+":commit" || s.Ledger[0].DeltaMinor!=-1500 || s.Ledger[0].BalanceMinor!=28500)throw new InvalidOperationException();
+        } else if(s.Drawers[0]!=null || s.Ledger.Count!=0)throw new InvalidOperationException();
+    }
+    static object ObserveWaiting(RunState s) => new {
+        runId=s.RunId,fixtureLabel=s.FixtureLabel,phase=s.Ad.Phase.ToString(),requestId=s.Ad.RequestId,stockId=s.Ad.StockId,itemId=s.Ad.ItemId,quality=s.Ad.Quality,
+        reservedPriceMinor=s.Ad.ReservedPriceMinor,reservedDrawerSlot=s.Ad.ReservedDrawerSlot,cashMinor=s.CashMinor,availableCashMinor=s.AvailableCashMinor,
+        stockQuantity=s.Stock.Single(x=>x.StockId==WaitingStock).Quantity,drawerCount=s.Drawers.Count(x=>x!=null),drawerStockId=s.Drawers[0]==null?"":s.Drawers[0].StockId,
+        drawerPriceMinor=s.Drawers[0]==null?0:s.Drawers[0].PurchasePriceMinor,drawerItemId=s.Drawers[0]==null?"":s.Drawers[0].ItemId,drawerQuality=s.Drawers[0]==null?"":s.Drawers[0].Quality,
+        stockReserved=AdReservations.StockReserved(s,WaitingStock),drawerReserved=AdReservations.DrawerReserved(s,0),rewardRecorded=s.Ad.RewardRecorded,adSuccesses=s.AdSuccessesToday,
+        lastAdSettlement=s.SettledCountAtLastAdSuccess,commandCount=s.Commands.Count,ledgerCount=s.Ledger.Count,providerEventCount=s.AdEvents.Count
+    };
+    static void PrepareWaiting(string directory)
+    {
+        check="PREPARE_DIRECTORY";if(Directory.Exists(directory))throw new InvalidOperationException();Directory.CreateDirectory(directory);
+        string seeded,before,expected;
+        using(var store=new FileStateStore(Path.Combine(directory,"actual"),WaitingInitial())) {BeginWaiting(store);seeded=Hash(store.Read());}
+        using(var store=new FileStateStore(Path.Combine(directory,"expected"),WaitingInitial())) {
+            BeginWaiting(store);if(Hash(store.Read())!=seeded)throw new InvalidOperationException();CloseWaiting(store);before=Hash(store.Read());RewardWaiting(store);expected=Hash(store.Read());
+        }
+        File.WriteAllText(Path.Combine(directory,"expected.json"),JsonSerializer.Serialize(new {seeded,before,expected}));
+    }
+    static void CrashWaiting(string directory)
+    {
+        using(var doc=JsonDocument.Parse(File.ReadAllText(Path.Combine(directory,"expected.json"))))
+        using(var store=new FileStateStore(Path.Combine(directory,"actual"),WaitingInitial())) {
+            check="WAITING_SEEDED";if(Hash(store.Read())!=doc.RootElement.GetProperty("seeded").GetString())throw new InvalidOperationException();
+            CloseWaiting(store);if(Hash(store.Read())!=doc.RootElement.GetProperty("before").GetString())throw new InvalidOperationException();
+            // The process stays alive with its writer lease held. Only the parent sends SIGKILL.
+            File.WriteAllText(Path.Combine(directory,"ready"),"ClosedAwaitingReward");while(true)Thread.Sleep(100);
+        }
+    }
+    static void VerifyWaiting(string directory)
+    {
+        using(var doc=JsonDocument.Parse(File.ReadAllText(Path.Combine(directory,"expected.json"))))
+        using(var store=new FileStateStore(Path.Combine(directory,"actual"),WaitingInitial())) {
+            check="WAITING_RECOVERY";string before=doc.RootElement.GetProperty("before").GetString(),expected=doc.RootElement.GetProperty("expected").GetString();
+            var recovered=store.Recover("ad-event:"+WaitingRequest+":Closed");string recoveredHash=Hash(store.Read());
+            if(recovered.CommitStatus!=CommitStatus.COMMITTED || recoveredHash!=before || !store.CanMutate)throw new InvalidOperationException();AssertWaiting(store.Read(),false);var waiting=ObserveWaiting(store.Read());
+            check="WAITING_RESERVATIONS";var ads=WaitingAds(store);var svc=new DayGameService(store);
+            var poll=ads.PollAd(WaitingRequest,"waiting-no-reward",store.Read().Revision);
+            var stock=svc.BuyStock(WaitingStock,"","waiting-reserved-stock",store.Read().Revision);
+            var cash=svc.RepayPrincipal(30000,"waiting-reserved-cash",store.Read().Revision);
+            if(poll.Success || poll.Code!="AD_AWAITING_REWARD" || stock.Success || stock.Code!="STOCK_RESERVED" || cash.Success || cash.Code!="INSUFFICIENT_CASH" || Hash(store.Read())!=before)throw new InvalidOperationException();
+            RewardWaiting(store);string finalHash=Hash(store.Read());
+            check="WAITING_DUPLICATES";MustCommit(new FakeRewardedAdService(store).QueueEvent(WaitingRequest,WaitingRun,AdEventKind.Reward));
+            MustCommit(ads.PollAd(WaitingRequest,"waiting-duplicate-poll",store.Read().Revision));MustCommit(ads.CommitAd(WaitingRequest,WaitingRequest+":commit",-999));
+            var s=store.Read();if(Hash(s)!=finalHash || finalHash!=expected || s.Commands.Count(x=>x.CommandId==WaitingRequest+":commit")!=1)throw new InvalidOperationException();AssertWaiting(s,true);
+            File.WriteAllText(Path.Combine(directory,"result.json"),JsonSerializer.Serialize(new {status="PASS",scenario="ad_waiting",point="ClosedAwaitingReward",recoveryStatus="COMMITTED",beforeHash=before,expectedHash=expected,recoveredHash,finalHash,finalCashMinor=s.CashMinor,finalCommands=s.Commands.Count,attemptCommandOccurrences=1,staleRevisionReplayUnchanged=true,waitingPollUnchanged=true,reservedStockRejected=true,reservedCashRejected=true,duplicateRewardUnchanged=true,waitingObservation=waiting,observation=ObserveWaiting(s)}));
         }
     }
     sealed class PauseAt:IStoreFaultInjector {

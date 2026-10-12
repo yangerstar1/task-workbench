@@ -189,6 +189,48 @@ namespace Lottery.G3.EditMode.Tests
             var store = Open(); Committed(new DayGameService(store).BuyNumberTicket("buy", 0)); store.Dispose(); File.Delete(PathFor(filename));
             var reload = Open(); Assert.That(reload.CanMutate, Is.False); Assert.That(reload.Read().RecoveryRequired, Is.True); Assert.That(File.Exists(PathFor(filename)), Is.False);
         }
+        [Test] public void SchemaOneIsRejectedWithoutRewritingStateOrMarker()
+        {
+            var store = Open(); var state = store.Read(); store.Dispose(); Assert.That(RunState.CurrentSchema, Is.EqualTo(2));
+            byte[] marker = File.ReadAllBytes(PathFor("commit.record")); state.SchemaVersion = 1;
+            byte[] oldSchema = StateCodec.SerializeCanonical(state);
+            Assert.Throws<InvalidDataException>(() => StateCodec.DeserializeCanonical(oldSchema));
+            AssertBlockedPreserved("state.bin", Envelope(oldSchema)); Assert.That(File.ReadAllBytes(PathFor("commit.record")), Is.EqualTo(marker));
+        }
+        FileStateStore OpenWithSlottedTicket()
+        {
+            var store = new FileStateStore(Path.Combine(root, "normal"), RunFactory.CreateDiagnostic("test-run")); stores.Add(store);
+            var service = new DayGameService(store);
+            Committed(service.BuyStock(service.Snapshot.Stock.Single(x => x.ItemId == "small_prize_box").StockId, "", "buy-small", service.Snapshot.Revision));
+            Committed(service.BuyStock(service.Snapshot.Stock.Single(x => x.ItemId == "inspection_lamp").StockId, "", "buy-lamp", service.Snapshot.Revision));
+            Committed(service.EquipTool("small_prize_box", 2, "equip-small", service.Snapshot.Revision));
+            Committed(service.EquipTool("inspection_lamp", 0, "equip-lamp", service.Snapshot.Revision));
+            Committed(service.BuyNumberTicket("slotted-ticket", service.Snapshot.Revision)); return store;
+        }
+        [Test] public void ValidSlottedRootAndUsedRunIdentitiesRoundTripAndReload()
+        {
+            var store = OpenWithSlottedTicket(); var state = store.Read(); StateInvariants.Validate(state);
+            Assert.That(state.CurrentTicket.ConfigurationSnapshot.Single(x => x.ItemId == "small_prize_box").TableSlot, Is.EqualTo(2));
+            Assert.That(state.CurrentTicket.ConfigurationSnapshot.Single(x => x.ItemId == "inspection_lamp").TableSlot, Is.EqualTo(0));
+            Assert.That(state.UsedRunIds, Is.EqualTo(new[] { "test-run" }));
+            byte[] bytes = StateCodec.SerializeCanonical(state); var copy = state.Copy(); StateInvariants.Validate(copy);
+            Assert.That(StateCodec.SerializeCanonical(copy), Is.EqualTo(bytes));
+            copy.UsedRunIds[0] = "mutated-copy"; copy.CurrentTicket.ConfigurationSnapshot[0].TableSlot = 1;
+            Assert.That(StateCodec.SerializeCanonical(state), Is.EqualTo(bytes));
+            store.Dispose(); var reload = Open(); Assert.That(reload.CanMutate, Is.True); StateInvariants.Validate(reload.Read());
+            Assert.That(StateCodec.SerializeCanonical(reload.Read()), Is.EqualTo(bytes));
+        }
+        [Test] public void ChecksummedDuplicateSnapshotTableSlotsFailClosed()
+        {
+            var store = OpenWithSlottedTicket(); var state = store.Read(); store.Dispose();
+            state.CurrentTicket.ConfigurationSnapshot[1].TableSlot = state.CurrentTicket.ConfigurationSnapshot[0].TableSlot;
+            AssertChecksummedStateFailsInvariants(state);
+        }
+        [Test] public void ChecksummedOutOfRangeSnapshotTableSlotFailsClosed()
+        {
+            var store = OpenWithSlottedTicket(); var state = store.Read(); store.Dispose(); state.CurrentTicket.ConfigurationSnapshot[0].TableSlot = 3;
+            AssertChecksummedStateFailsInvariants(state);
+        }
         [Test] public void UnknownSchemaAndEnvelopeVersionArePreserved()
         {
             var store = Open("schema"); var state = store.Read(); store.Dispose(); state.SchemaVersion = 99;
@@ -302,12 +344,12 @@ namespace Lottery.G3.EditMode.Tests
         [Test] public void DiagnosticAndCompleteNestedStateRoundTripWithoutAliasing()
         {
             // Deliberately non-admissible values exercise field fidelity only. No store or StateInvariants admits this object.
-            var s = RunFactory.CreateDiagnostic("codec-run"); s.Revision = 9; s.InitialCashMinor = 32000; s.CashMinor = 23456; s.DayNumber = 2; s.Phase = DayPhase.NIGHT_BILL;
+            var s = RunFactory.CreateDiagnostic("codec-run"); s.Revision = 9; s.InitialCashMinor = 32000; s.CashMinor = 23456; s.DayNumber = 2; s.Phase = DayPhase.NIGHT_BILL; s.UsedRunIds = new List<string> { "codec-run-before", "codec-run" };
             s.PrincipalMinor = 290000; s.PrincipalAtOpenMinor = 299000; s.PrincipalRepaidMinor = 9000; s.InterestDueMinor = 1450; s.InterestPaidMinor = 450;
             s.TicketsPurchasedToday = 1; s.SettledTicketCount = 3; s.LifetimeEffectiveTickets = 9; s.LifetimeEffectiveAtOpen = 6;
             s.EconomicCounter = 11; s.ChallengeCounter = 12; s.ShopCounter = 13;
             var t = new TicketState { Id = "ticket", PurchaseCommandId = "buy", TicketType = "challenge", Phase = TicketPhase.REVEALED_UNCLAIMED, PriceMinor = 1000, RawPrizeMinor = 2000,
-                CashAfterPurchaseMinor = 31000, PurchasedPosition = 1, EconomicDrawCount = 5, PreviousSettledTicketType = "number", ConfigurationSnapshot = new[] { new ToolSnapshot { ItemId = "lamp", Level = 2 } },
+                CashAfterPurchaseMinor = 31000, PurchasedPosition = 1, EconomicDrawCount = 5, PreviousSettledTicketType = "number", ConfigurationSnapshot = new[] { new ToolSnapshot { ItemId = "lamp", Level = 2, TableSlot = 2 } },
                 Scratch = new TicketMask(8), ChallengeSafe = new[] { true, false, true, true, false, true, true, true }, RevealedCells = new[] { true, false, false, false, false, false, false, false }, PeekedCells = new[] { false, true, false, false, false, false, false, false },
                 SelectedCell = 3, SelectionId = "selection", SafeCount = 1, Busted = false, LampUsed = true, InformationSource = "lamp", CopyMinor = 44, ProtectionMinor = 55, ConsumableCostMinor = 66,
                 EconomicCounterBefore = 7, EconomicCounterAfter = 8, ChallengeCounterBefore = 9, ChallengeCounterAfter = 10 };
@@ -327,9 +369,9 @@ namespace Lottery.G3.EditMode.Tests
             s.AdEvents.Add(new AdEventRecord { EventId = "event", RequestId = "request", RunId = "codec-run", Kind = "reward" }); s.FakeShownRequests.Add("request");
             byte[] bytes = StateCodec.SerializeCanonical(s); var copy = StateCodec.DeserializeCanonical(bytes);
             Assert.That(StateCodec.SerializeCanonical(copy), Is.EqualTo(bytes)); Assert.That(copy.Ad.Conflict, Is.EqualTo("test-conflict")); Assert.That(copy.ClaimBuyIntents.Single().NextTicketType, Is.EqualTo("challenge")); Assert.That(copy.Loans[0].RemainingMinor, Is.EqualTo(2000));
-            Assert.That(copy.Tickets[0].InformationSource, Is.EqualTo("lamp")); Assert.That(copy.Tickets[0].EconomicDrawCount, Is.EqualTo(5)); Assert.That(copy.Tickets[0].ConsumableUses.Single().TargetCells, Is.EqualTo(new[] { 1, 3 })); Assert.That(copy.ClaimBuyIntents.Single().Cancelled, Is.True); Assert.That(copy.Tickets[0].Scratch.CellCount, Is.EqualTo(8)); Assert.That(copy.Tickets[0].Face, Is.Null);
+            Assert.That(copy.UsedRunIds, Is.EqualTo(new[] { "codec-run-before", "codec-run" })); Assert.That(copy.Tickets[0].ConfigurationSnapshot[0].TableSlot, Is.EqualTo(2)); Assert.That(copy.Tickets[0].InformationSource, Is.EqualTo("lamp")); Assert.That(copy.Tickets[0].EconomicDrawCount, Is.EqualTo(5)); Assert.That(copy.Tickets[0].ConsumableUses.Single().TargetCells, Is.EqualTo(new[] { 1, 3 })); Assert.That(copy.ClaimBuyIntents.Single().Cancelled, Is.True); Assert.That(copy.Tickets[0].Scratch.CellCount, Is.EqualTo(8)); Assert.That(copy.Tickets[0].Face, Is.Null);
             Assert.That(copy.DiagnosticChallengeArrangements.Count, Is.EqualTo(s.DiagnosticChallengeArrangements.Count));
-            copy.Tickets[0].ConsumableUses[0].TargetCells[0] = 7; copy.Tickets[0].ChallengeSafe[0] = false; copy.Tickets[0].ConfigurationSnapshot[0].Level = 99; copy.Drawers[0].PurchasePriceMinor = 0; copy.Ad.RewardRecorded = false;
+            copy.UsedRunIds[0] = "mutated"; copy.Tickets[0].ConfigurationSnapshot[0].TableSlot = 0; copy.Tickets[0].ConsumableUses[0].TargetCells[0] = 7; copy.Tickets[0].ChallengeSafe[0] = false; copy.Tickets[0].ConfigurationSnapshot[0].Level = 99; copy.Drawers[0].PurchasePriceMinor = 0; copy.Ad.RewardRecorded = false;
             Assert.That(StateCodec.SerializeCanonical(s), Is.EqualTo(bytes));
         }
     }

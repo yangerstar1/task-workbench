@@ -7,7 +7,7 @@ using NumberCell = Lottery.G2.Core.NumberCell;
 
 namespace Lottery.G3.Core
 {
-    // Ordered, little-endian G3 wire format. Collection order is meaningful; no reflection or Unity serializer.
+    // Ordered, little-endian G3 schema 2 wire format. Collection order is meaningful; no reflection or Unity serializer.
     // Checksums detect accidental corruption, not tampering. G2 payloads are never migrated implicitly.
     public static class StateCodec
     {
@@ -67,12 +67,13 @@ namespace Lottery.G3.Core
                 w.Write(s.PrincipalMinor); w.Write(s.PrincipalAtOpenMinor); w.Write(s.PrincipalRepaidMinor); w.Write(s.InterestDueMinor); w.Write(s.InterestPaidMinor);
                 w.Write(s.TicketsPurchasedToday); w.Write(s.SettledTicketCount); w.Write(s.LifetimeEffectiveTickets); w.Write(s.LifetimeEffectiveAtOpen);
                 w.Write(s.EconomicCounter); w.Write(s.ChallengeCounter); w.Write(s.ShopCounter);
+                Size(w, s.UsedRunIds.Count); foreach (string id in s.UsedRunIds) Text(w, id);
                 Size(w, s.Tickets.Count, 12);
                 foreach (var t in s.Tickets)
                 {
                     Text(w, t.Id); Text(w, t.PurchaseCommandId); Text(w, t.TicketType); w.Write((int)t.Phase);
                     w.Write(t.PriceMinor); w.Write(t.RawPrizeMinor); w.Write(t.CashAfterPurchaseMinor); w.Write(t.PurchasedPosition); w.Write(t.EconomicDrawCount); Text(w, t.PreviousSettledTicketType);
-                    Size(w, t.ConfigurationSnapshot.Length, 3); foreach (var x in t.ConfigurationSnapshot) { Text(w, x.ItemId); w.Write(x.Level); }
+                    Size(w, t.ConfigurationSnapshot.Length, 3); foreach (var x in t.ConfigurationSnapshot) { Text(w, x.ItemId); w.Write(x.Level); w.Write(x.TableSlot); }
                     w.Write(t.Face != null);
                     if (t.Face != null)
                     {
@@ -145,13 +146,14 @@ namespace Lottery.G3.Core
                     PrincipalMinor = r.ReadInt64(), PrincipalAtOpenMinor = r.ReadInt64(), PrincipalRepaidMinor = r.ReadInt64(), InterestDueMinor = r.ReadInt64(), InterestPaidMinor = r.ReadInt64(),
                     TicketsPurchasedToday = r.ReadInt32(), SettledTicketCount = r.ReadInt32(), LifetimeEffectiveTickets = r.ReadInt32(), LifetimeEffectiveAtOpen = r.ReadInt32(),
                     EconomicCounter = r.ReadUInt64(), ChallengeCounter = r.ReadUInt64(), ShopCounter = r.ReadUInt64() };
+                int identities = Count(r); for (int i = 0; i < identities; i++) s.UsedRunIds.Add(Text(r));
                 int count = Count(r, 12);
                 for (int i = 0; i < count; i++)
                 {
                     var t = new TicketState { Id = Text(r), PurchaseCommandId = Text(r), TicketType = Text(r), Phase = (TicketPhase)Choice(r, 2),
                         PriceMinor = r.ReadInt64(), RawPrizeMinor = r.ReadInt64(), CashAfterPurchaseMinor = r.ReadInt64(), PurchasedPosition = r.ReadInt32(), EconomicDrawCount = r.ReadInt32(), PreviousSettledTicketType = Text(r) };
                     t.ConfigurationSnapshot = new ToolSnapshot[Count(r, 3)];
-                    for (int j = 0; j < t.ConfigurationSnapshot.Length; j++) t.ConfigurationSnapshot[j] = new ToolSnapshot { ItemId = Text(r), Level = r.ReadInt32() };
+                    for (int j = 0; j < t.ConfigurationSnapshot.Length; j++) t.ConfigurationSnapshot[j] = new ToolSnapshot { ItemId = Text(r), Level = r.ReadInt32(), TableSlot = r.ReadInt32() };
                     if (Flag(r))
                     {
                         t.Face = new NumberFace { GeneratorVersion = Text(r), WinningNumber = r.ReadInt32(), Cells = new NumberCell[Count(r, 6)] };

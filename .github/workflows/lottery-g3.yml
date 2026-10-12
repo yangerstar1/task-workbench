@@ -42,7 +42,7 @@ jobs:
           PYTHONDONTWRITEBYTECODE=1 python3 tasks/lottery-shop/scripts/g3_test_ci.py -v
       - name: Preserve existing 25 real G2 process kills
         run: python3 tasks/lottery-shop/scripts/g3_process.py regression
-      - name: Six G3 transaction families times six real process kills
+      - name: 36 G3 commit-window kills plus closed-waiting late-reward kill
         run: python3 tasks/lottery-shop/scripts/g3_process.py new
       - name: Prepare guarded disposable runner after both process suites
         run: bash tasks/lottery-shop/scripts/g3_prepare_runner.sh

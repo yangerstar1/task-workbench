@@ -27,7 +27,7 @@ namespace Lottery.G3.Core
         public CommitStatus CommitStatus; public string Code = ""; public CommandReceipt Receipt; public RunState State;
         public bool Success => CommitStatus == CommitStatus.COMMITTED;
     }
-    public sealed class ToolSnapshot { public string ItemId = ""; public int Level; }
+    public sealed class ToolSnapshot { public string ItemId = ""; public int Level, TableSlot; }
     public sealed class OwnedTool { public string ItemId = ""; public int Level; public long InitialPaymentMinor; }
     public sealed class ToolCounter { public string ItemId = ""; public int UsedToday, ClipTicks; }
     public sealed class StockItem
@@ -76,8 +76,9 @@ namespace Lottery.G3.Core
     }
     public sealed class RunState
     {
-        public const int CurrentSchema = 1;
+        public const int CurrentSchema = 2;
         public int SchemaVersion = CurrentSchema; public string RulesHash = NumberTicketRules.RulesSha256, RunId = "", Seed = "", FixtureLabel = "";
+        public List<string> UsedRunIds = new List<string>();
         public long Revision, InitialCashMinor = 30000, CashMinor = 30000, PrincipalMinor = 300000, PrincipalAtOpenMinor = 300000, PrincipalRepaidMinor, InterestDueMinor = 1500, InterestPaidMinor;
         public int DayNumber = 1, TicketsPurchasedToday, SettledTicketCount, LifetimeEffectiveTickets, LifetimeEffectiveAtOpen;
         public DayPhase Phase; public ulong EconomicCounter, ChallengeCounter, ShopCounter;

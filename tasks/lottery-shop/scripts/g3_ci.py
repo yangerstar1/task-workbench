@@ -15,6 +15,7 @@ import subprocess
 import sys
 import xml.etree.ElementTree as ET
 import zipfile
+sys.dont_write_bytecode = True
 import g2_ci as g2
 
 legacy = g2.legacy
@@ -85,37 +86,96 @@ def load_contract(task):
     return data
 
 
-def reviewed_files(root, committed=False):
-    task=root/TASK
-    if committed:
-        names=legacy.git(root,"ls-tree","-r","--name-only","HEAD").splitlines()
-        prefixes=tuple(TASK+"/"+part+"/" for part in ("unity/Assets","unity/Packages","unity/ProjectSettings","scripts","ci","data","fonts"))
-        selected=[n for n in names if (n.startswith(prefixes) or n in {".github/workflows/lottery-"+x+".yml" for x in ("g0","g2","g3")}) and n not in {REQUEST_PATH,TASK+"/ci/g3-preflight.review.json"}]
-        require(0<len(selected)<=1024,"Committed review source bounds")
-        return {name:hashlib.sha256(subprocess.check_output(["git","-C",str(root),"show","HEAD:"+name])).hexdigest() for name in sorted(selected)}
-    selected=[]
-    for part in ('unity/Assets','unity/Packages','unity/ProjectSettings','scripts','ci','data','fonts'):
-        for path in (task/part).rglob('*'):
-            relative=path.relative_to(root).as_posix()
-            require(not path.is_symlink(), 'Review source symlink refused')
-            if not path.is_file() or '__pycache__' in path.parts or path.suffix=='.pyc': continue
-            if relative in {REQUEST_PATH,TASK+'/ci/g3-preflight.review.json'}: continue
-            if '/obj/' in relative or '/bin/' in relative: raise ValueError('Compiled output in review source')
-            selected.append(path)
-    selected += [root/'.github/workflows'/('lottery-'+x+'.yml') for x in ('g0','g2','g3')]
-    require(0 < len(selected) <= 1024, 'Review source set out of bounds')
-    result={p.relative_to(root).as_posix():digest(p) for p in sorted(selected)}
-    # Text workspaces omit this large accepted-baseline binary. Its pinned digest
-    # is subsequently verified from actual committed bytes by the runner guard.
-    result.setdefault(TASK+'/fonts/NotoSansCJKsc-Regular.otf.xz',legacy.FONT_COMPRESSED_SHA)
-    # Accepted baseline request may be intentionally omitted from an authoring
-    # workspace to avoid accidental retriggering. Its reviewed bytes are expected,
-    # not claimed read locally; CI checks the actual committed request bytes.
-    result.setdefault(TASK+'/ci/g2-request.json',digest(task/'ci/g2-request.review.json'))
+REVIEW_PATH = TASK+'/ci/g3-preflight.review.json'
+REVIEW_EXCEPTIONS = {REQUEST_PATH, REVIEW_PATH}
+WORKFLOWS = {'.github/workflows/lottery-'+x+'.yml' for x in ('g0','g2','g3')}
+# These are outputs, not implicit source/import search directories. Exact paths only.
+OUTPUT_ROOTS = {TASK+'/'+x for x in ('artifacts','evidence','build','unity/Library','unity/Temp','unity/Obj','unity/Logs','unity/UserSettings')}
+
+
+def source_path(name):
+    # Bind every file in the task, including parent-level MSBuild/NuGet configuration,
+    # README and ignore files. No source-extension or child-directory whitelist.
+    return name.startswith(TASK+'/') or name in WORKFLOWS
+
+
+def git_tree(root, ref):
+    require(ref=='HEAD' or re.fullmatch(r'[0-9a-f]{40}',ref), 'Invalid tree reference')
+    raw=subprocess.check_output(['git','-C',str(root),'ls-tree','-rz',ref])
+    require(len(raw)<=8*1024*1024, 'Repository tree exceeds reviewed bound')
+    result={}
+    for record in raw.split(b'\0'):
+        if not record:continue
+        meta,name=record.split(b'\t',1);mode,kind,oid=meta.decode('ascii').split(' ');name=name.decode('utf-8')
+        require(name not in result and not name.startswith('/') and all(x not in ('','.','..') for x in name.split('/')), 'Invalid Git tree path')
+        result[name]=(mode,kind,oid)
+    require(0<len(result)<=50000,'Repository tree file bound')
     return result
 
 
-def verify_preflight(root):
+def verify_review_tree(root, reviewed_commit):
+    before=git_tree(root,reviewed_commit);after=git_tree(root,'HEAD')
+    # Entire repository equality catches automatic imports, modes, links, deletions
+    # and arbitrary new paths, even outside the materialized sparse checkout.
+    require({k:v for k,v in before.items() if k not in REVIEW_EXCEPTIONS}==
+            {k:v for k,v in after.items() if k not in REVIEW_EXCEPTIONS},
+            'Unreviewed repository tree change')
+    return after
+
+
+def reviewed_files(root, committed=False, ref='HEAD'):
+    if committed:
+        tree=git_tree(root,ref);names=[n for n in tree if source_path(n) and n not in REVIEW_EXCEPTIONS]
+        require(0<len(names)<=4096,'Committed input set bound')
+        require(all(tree[n][0] in ('100644','100755') and tree[n][1]=='blob' for n in names),'Non-regular execution input refused')
+        return {n:hashlib.sha256(subprocess.check_output(['git','-C',str(root),'show',ref+':'+n])).hexdigest() for n in sorted(names)}
+    selected=[]
+    for path in (root/TASK).rglob('*'):
+        relative=path.relative_to(root).as_posix()
+        require(not path.is_symlink(),'Review input symlink refused')
+        if not path.is_file():continue
+        # Authoring output must not silently become an executable source exception.
+        require(not any(relative==x or relative.startswith(x+'/') for x in OUTPUT_ROOTS) and '__pycache__' not in path.parts,'Generated output in authoring source')
+        if relative not in REVIEW_EXCEPTIONS:selected.append(path)
+    selected += [root/n for n in WORKFLOWS if (root/n).is_file()]
+    result={p.relative_to(root).as_posix():digest(p) for p in sorted(selected)}
+    task=root/TASK
+    if (task/'fonts/OFL.txt').is_file():result.setdefault(TASK+'/fonts/NotoSansCJKsc-Regular.otf.xz',legacy.FONT_COMPRESSED_SHA)
+    if (task/'ci/g2-request.review.json').is_file():result.setdefault(TASK+'/ci/g2-request.json',digest(task/'ci/g2-request.review.json'))
+    return result
+
+
+def check_working_inputs(root, expected, tree=None, allow_generated_unity=False, allow_restored_font=False):
+    tree=tree or git_tree(root,'HEAD')
+    for name,sha in expected.items():
+        path=root/name
+        require(path.is_file() and not path.is_symlink() and all(not p.is_symlink() for p in path.parents if p!=root.parent),'Missing or symlinked execution input')
+        require(tree[name][0] in ('100644','100755') and tree[name][1]=='blob' and bool(path.stat().st_mode&0o111)==(tree[name][0]=='100755'),'Execution input mode/type drift')
+        if allow_generated_unity and name.startswith(TASK+'/unity/'):
+            relative=name[len(TASK+'/unity/'):]
+            if legacy.mutation_kind(relative)!='UNEXPECTED_SOURCE_CHANGE':continue
+        require(digest(path)==sha,'Working execution input bytes drifted')
+    # Enumerate actual checkout files, ignoring only explicit runtime-output roots.
+    # Thus untracked/ignored Directory.Build.*, sitecustomize.py and arbitrary
+    # source additions are refused; this does not depend on Git ignore patterns.
+    for directory,dirs,files in os.walk(root,followlinks=False):
+        rel=Path(directory).relative_to(root).as_posix()
+        dirs[:]=[d for d in dirs if not (rel=='.' and d=='.git') and (Path(directory)/d).relative_to(root).as_posix() not in OUTPUT_ROOTS]
+        require(all(not (Path(directory)/d).is_symlink() for d in dirs),'Checkout directory symlink refused')
+        for name in files:
+            path=Path(directory)/name;relative=path.relative_to(root).as_posix()
+            if relative in REVIEW_EXCEPTIONS:continue
+            if relative in expected:continue
+            if (allow_generated_unity or allow_restored_font) and relative.startswith(TASK+'/unity/'):
+                child=relative[len(TASK+'/unity/'):]
+                if child=='Assets/Resources/ProbeChinese.otf':
+                    require(not path.is_symlink() and digest(path)==legacy.FONT_SHA,'Restored font mismatch');continue
+                if allow_generated_unity and legacy.mutation_kind(child)!='UNEXPECTED_SOURCE_CHANGE':
+                    require(not path.is_symlink(),'Generated source symlink refused');continue
+            raise ValueError('Unexpected materialized checkout input')
+
+
+def verify_preflight(root, allow_generated_unity=False):
     task=root/TASK
     review=json.loads(bounded_read(task/'ci/g3-preflight.review.json', 256*1024))
     require(set(review)=={'schemaVersion','status','requestId','reviewedSourceCommit','reviewerId','sourceFiles','deviceQa','finalQuality'}, 'Fresh preflight schema mismatch')
@@ -123,16 +183,24 @@ def verify_preflight(root):
             review['requestId']==REQUEST['requestId'] and review['deviceQa']=='NOT_RUN' and review['finalQuality']=='NOT_PASSED', 'Fresh preflight not approved')
     require(isinstance(review['reviewerId'],str) and re.fullmatch(r'[A-Za-z0-9_./:-]{5,200}',review['reviewerId']), 'Fresh reviewer identity missing')
     require(re.fullmatch(r'[0-9a-f]{40}',review.get('reviewedSourceCommit','')), 'Reviewed commit missing')
-    require(review['sourceFiles']==reviewed_files(root,committed=True), 'Reviewed source files drifted')
+    tree=verify_review_tree(root,review['reviewedSourceCommit'])
+    require(review['sourceFiles']==reviewed_files(root,committed=True), 'Reviewed execution input set drifted')
+    # Exceptions avoid circular review hashes, not working-tree authority: both
+    # metadata and request must still be regular, mode-correct committed bytes.
+    controls={}
+    for name in REVIEW_EXCEPTIONS:
+        require(name in tree and tree[name][0] in ('100644','100755') and tree[name][1]=='blob','Missing or non-regular trigger/review control')
+        controls[name]=hashlib.sha256(subprocess.check_output(['git','-C',str(root),'show','HEAD:'+name])).hexdigest()
+    check_working_inputs(root,dict(review['sourceFiles'],**controls),tree,allow_generated_unity=allow_generated_unity)
     subprocess.run(['git','-C',str(root),'merge-base','--is-ancestor',review['reviewedSourceCommit'],'HEAD'],check=True)
     return review
 
 
-def guard(root):
+def guard(root, allow_generated_unity=False):
     identity=legacy.guard(root)
     changed=legacy.git(root,'diff-tree','--no-commit-id','--name-only','-r','HEAD').splitlines()
     require(changed==[REQUEST_PATH], 'G3 trigger commit must change only its unique request')
-    verify_preflight(root)
+    verify_preflight(root,allow_generated_unity=allow_generated_unity)
     identity.update(rulesSha256=RULES_SHA,g2SourceBase=BASE,standardsDigest=STANDARDS_DIGEST,contractVersion='1.0.1',qualityBarVersion='QB-2',finalQuality='NOT_PASSED')
     return identity
 
@@ -297,11 +365,12 @@ def main():
     if args.command=='review-manifest':
         verify_inputs(root);print(json.dumps(reviewed_files(root),sort_keys=True,indent=2));return
     with configured():
-        identity=guard(root);out=task/'evidence/g3'/args.stage;out.mkdir(parents=True,exist_ok=True);write_json(out/'guard-receipt.json',identity);write_json(task/'evidence/guard-receipt.json',identity)
+        identity=guard(root,allow_generated_unity=args.command!='guard');out=task/'evidence/g3'/args.stage;out.mkdir(parents=True,exist_ok=True);write_json(out/'guard-receipt.json',identity);write_json(task/'evidence/guard-receipt.json',identity)
         if args.command=='guard':verify_inputs(root)
         elif args.command=='restore-font':legacy.restore(root)
         elif args.command=='snapshot':
             verify_inputs(root)
+            check_working_inputs(root,reviewed_files(root,committed=True),allow_generated_unity=args.stage not in ('regression-edit','android'),allow_restored_font=True)
             if args.stage=='android':
                 require(not (task/'unity/Library').exists() and not (task/'build/G3').exists(),'Android checkout is not cold')
                 write_json(out/'cold-build-baseline.json',dict(identity,status='VERIFIED_BEFORE_UNITY',libraryAbsent=True,buildAbsent=True,cacheRestored=False))

@@ -21,7 +21,7 @@ using IPhase = UnityEngine.InputSystem.TouchPhase;
 namespace Lottery.G3.PlayMode.Tests
 {
     // SIMULATED_INPUT_SYSTEM: real device events in the actual scene, not Android touch evidence.
-    public sealed class G3PlayTests
+    public sealed partial class G3PlayTests
     {
         Scene prior,scene;
         readonly List<GameObject> hiddenRoots=new List<GameObject>();
@@ -46,11 +46,11 @@ namespace Lottery.G3.PlayMode.Tests
         ToggleFault faults;
         sealed class ToggleFault : IStoreFaultInjector
         {
-            public bool BeforeWrite,AfterPublish,BlockRecovery;
+            public bool BeforeWrite,AfterPublish,BlockRecovery;public int SkipAfterPublish;
             public void OnPoint(StoreFaultPoint point)
             {
                 if(point==StoreFaultPoint.BeforeWrite && BeforeWrite) { BeforeWrite=false; throw new IOException("Synthetic pre-write failure"); }
-                if(point==StoreFaultPoint.AfterPublish && AfterPublish) { AfterPublish=false; throw new IOException("Synthetic post-publish failure"); }
+                if(point==StoreFaultPoint.AfterPublish && AfterPublish) { if(SkipAfterPublish>0){SkipAfterPublish--;return;}AfterPublish=false; throw new IOException("Synthetic post-publish failure"); }
                 if(point==StoreFaultPoint.BeforeRecoveryRead && BlockRecovery) throw new IOException("Synthetic unavailable recovery read");
             }
         }
@@ -172,7 +172,7 @@ namespace Lottery.G3.PlayMode.Tests
             inputSettingsCaptured=false;
         }
         string InputDiagnostic => "nativeFocus="+Application.isFocused+",inputUpdate="+InputState.currentUpdateType+
-            ",inputCount="+InputState.updateCount+","+Router.DiagnosticState;
+            ",inputCount="+InputState.updateCount+","+(app?.Presenter?.Router?.DiagnosticState??"START_CHOOSER");
         void PumpInput()
         {
             InputSystem.Update();
@@ -209,6 +209,7 @@ namespace Lottery.G3.PlayMode.Tests
         void TouchEvent(int id,IPhase phase,Vector2 p){InputSystem.QueueStateEvent(touch,new TouchState{touchId=id,phase=phase,position=p,pressure=phase==IPhase.Ended||phase==IPhase.Canceled?0:1});PumpInput();Router.PollInput();}
         void KeyboardEvent(params Key[] keys){InputSystem.QueueStateEvent(keyboard,new KeyboardState(keys));PumpInput();Router.PollInput();}
         void Click(string id){var p=P.View.ButtonRect(id).center;MouseEvent(p,true);MouseEvent(p,false);}
+        void Claim(){Click("claim");if(P.Panel==G3Panel.Confirm)Confirm();}
         void Confirm(){Assert.That(P.Panel,Is.EqualTo(G3Panel.Confirm));Click("confirm-action");}
         void Close(){if(P.Panel!=G3Panel.None)Click("close-panel");}
         void Buy(string type)
@@ -246,10 +247,10 @@ namespace Lottery.G3.PlayMode.Tests
             Click("open-phone");Close();Assert.That(StateCodec.ComputeHash(State),Is.EqualTo(half));Assert.That(State.CurrentTicket.Id,Is.EqualTo(ticket));
             Click("quick");BuyStock("copy_paper");Tool("small_prize_box");Click("upgrade-tool");Confirm();Close();
             Assert.That(State.CurrentTicket.ConfigurationSnapshot[0].Level,Is.EqualTo(1));Assert.That(State.Tools.Single().Level,Is.EqualTo(2));
-            Click("open-drawer");Click("drawer-0");Confirm();Assert.That(State.CurrentTicket.CopyMinor,Is.EqualTo(5000));long cash=State.CashMinor;Click("claim");Assert.That(State.CashMinor,Is.EqualTo(cash+10000));
-            Buy("challenge");RevealSelected(0);RevealSelected(1);Assert.That(P.Service.PreviewSettlement().RawPrizeMinor,Is.EqualTo(2000));Click("claim");
+            Click("open-drawer");Click("drawer-0");Confirm();Assert.That(State.CurrentTicket.CopyMinor,Is.EqualTo(5000));long cash=State.CashMinor;Claim();Assert.That(State.CashMinor,Is.EqualTo(cash+10000));
+            Buy("challenge");RevealSelected(0);RevealSelected(1);Assert.That(P.Service.PreviewSettlement().RawPrizeMinor,Is.EqualTo(2000));Claim();
             BorrowAndRepay();
-            while(State.TicketsPurchasedToday<12){Buy("number");Click("quick");Click("claim");}
+            while(State.TicketsPurchasedToday<12){Buy("number");Click("quick");Claim();}
             Assert.That(State.SettledTicketCount,Is.EqualTo(12));Assert.That(State.Phase,Is.EqualTo(DayPhase.CLOSING_PREP));
             Click("open-bill");Click("enter-night");Confirm();Assert.That(State.Phase,Is.EqualTo(DayPhase.NIGHT_BILL));long beforeNight=State.CashMinor;Click("pay-night");Confirm();
             Assert.That(State.Phase,Is.EqualTo(DayPhase.DAY_COMPLETE));Assert.That(State.CashMinor,Is.EqualTo(beforeNight-1500));Assert.That(State.PrincipalMinor,Is.EqualTo(300000));
@@ -288,14 +289,14 @@ namespace Lottery.G3.PlayMode.Tests
             Buy("challenge");Select(0);Assert.That(State.CurrentTicket.SafeCount,Is.Zero);Assert.That(State.CurrentTicket.RevealedCells[0],Is.False);
             string selection=State.CurrentTicket.SelectionId;Router.NotifyPause(true);Router.NotifyPause(false);MouseEvent(Vector2.zero,false);Click("open-shop");
             Assert.That(State.CurrentTicket.SelectionId,Is.EqualTo(selection));Assert.That(State.CurrentTicket.SafeCount,Is.EqualTo(1));Assert.That(State.CurrentTicket.RevealedCells.Count(x=>x),Is.EqualTo(1));Close();
-            Select(2);Click("quick");Assert.That(State.CurrentTicket.Busted,Is.True);Assert.That(State.CurrentTicket.RawPrizeMinor,Is.Zero);Click("claim");yield return null;
+            Select(2);Click("quick");Assert.That(State.CurrentTicket.Busted,Is.True);Assert.That(State.CurrentTicket.RawPrizeMinor,Is.Zero);Claim();yield return null;
         }
         [UnityTest]
         public IEnumerator SaveFailureAndUnknownBuyHideUnconfirmedPixelsAndRecoverOneTransaction()
         {
             Buy("number");var hash=StateCodec.ComputeHash(State);faults.BeforeWrite=true;MouseEvent(CellPoint(3),true);MouseEvent(CellPoint(3),false);
             Assert.That(StateCodec.ComputeHash(State),Is.EqualTo(hash));Assert.That(P.IsCommitting,Is.True);Assert.That(P.View.Surface.IsVisible,Is.False);Click("retry");Assert.That(P.IsCommitting,Is.False);Assert.That(State.CurrentTicket.Scratch.CellCoverage(3),Is.GreaterThan(0));
-            Click("quick");Click("claim");Click("open-tickets");Click("buy-number");faults.AfterPublish=true;faults.BlockRecovery=true;Confirm();Assert.That(P.IsCommitting,Is.True);Assert.That(State.TicketsPurchasedToday,Is.EqualTo(1));
+            Click("quick");Claim();Click("open-tickets");Click("buy-number");faults.AfterPublish=true;faults.BlockRecovery=true;Confirm();Assert.That(P.IsCommitting,Is.True);Assert.That(State.TicketsPurchasedToday,Is.EqualTo(1));
             faults.BlockRecovery=false;Click("retry");Assert.That(State.TicketsPurchasedToday,Is.EqualTo(2));Assert.That(State.Commands.Count(x=>x.Kind=="BUY_TICKET"),Is.EqualTo(2));yield return null;
         }
         [UnityTest]
@@ -329,7 +330,7 @@ namespace Lottery.G3.PlayMode.Tests
             var go=new GameObject("Maximum legitimate number amount typography fixture");var mat=new Material(Shader.Find("Lottery/G2/Font"));
             try
             {
-                var label=go.AddComponent<BoundedGlyphLabel>();label.Initialize(Resources.Load<Font>("ProbeChinese"),mat,Color.black);label.SetBox(304*1.2f/1536,168*1.2f/1536,68*1.2f/1536);
+                var label=go.AddComponent<BoundedGlyphLabel>();label.Initialize(Resources.Load<Font>("ProbeChinese"),mat,Color.black);label.SetBox(304*1.2f/1536,168*1.2f/1536,76*1.2f/1536);
                 foreach(long amount in new long[]{0,50,100,200,500,2000,10000,100000}){label.SetText("88\n"+amount);label.RebuildIfNeeded();Assert.That(label.Fits,Is.True,amount.ToString());Assert.That(label.MissingGlyphCount,Is.Zero);AssertBounds(label);}
             }
             finally{Object.Destroy(go);Object.Destroy(mat);}
@@ -382,16 +383,16 @@ namespace Lottery.G3.PlayMode.Tests
             BuyStock("small_prize_box");Equip("small_prize_box",0);Buy("number");ScratchCell(3);ScratchCell(4);ScratchCell(5);yield return null;Capture("number-half",output,records);
             Click("quick");yield return null;Capture("number-revealed",output,records);
             BuyStock("copy_paper");Click("open-drawer");Click("drawer-0");Confirm();yield return null;Capture("number-copy",output,records);
-            Click("claim");yield return null;Capture("number-settled",output,records);
+            Claim();yield return null;Capture("number-settled",output,records);
             Tool("small_prize_box");Click("upgrade-tool");Confirm();Close();BuyStock("inspection_lamp");Equip("inspection_lamp",1);BuyStock("large_prize_stamp");Equip("large_prize_stamp",2);
             Click("open-inventory");yield return null;Capture("configuration",output,records);Close();
             BorrowAndRepay();Click("open-phone");yield return null;Capture("phone",output,records);Close();
             Buy("challenge");RevealSelected(0);RevealSelected(1);yield return null;Capture("challenge-two-safe",output,records);
-            Select(2);yield return null;Capture("challenge-selected",output,records);Click("quick");Click("claim");
+            Select(2);yield return null;Capture("challenge-selected",output,records);Click("quick");Claim();
             Click("open-shop");yield return null;Capture("shop-shortcut",output,records);string shopHash=StateCodec.ComputeHash(State);Close();
             Click("stand");var rack=GameObject.Find("Tool shelf");yield return FaceTargetWithKeyboard(rack.transform.position+Vector3.up*.6f);
             var point=P.View.WorldToPresentationPoint(rack.transform.position+Vector3.up*.6f);Assert.That(P.View.ConsumeUi(point,out _),Is.False,"Physical shelf must be visible outside the overlay controls");Assert.That(P.View.WorldTarget(point),Is.Not.Null);MouseEvent(point,true);MouseEvent(point,false);Assert.That(P.Panel,Is.EqualTo(G3Panel.Shop));Assert.That(StateCodec.ComputeHash(State),Is.EqualTo(shopHash));yield return null;Capture("shop-physical",output,records);Close();Click("stand");
-            while(State.TicketsPurchasedToday<12){Buy("number");Click("quick");Click("claim");}
+            while(State.TicketsPurchasedToday<12){Buy("number");Click("quick");Claim();}
             Click("open-bill");Click("enter-night");Confirm();yield return null;Capture("night",output,records);Click("pay-night");Confirm();Assert.That(State.Phase,Is.EqualTo(DayPhase.DAY_COMPLETE));yield return null;Capture("day-end",output,records);
             // Separate disclosed run, never mixed into the normal one-day ledger.
             yield return ReplaceRun(RunFactory.CreateConsumableFixture("g3-protected-render-fixture","seal_sticker","common"));
@@ -411,7 +412,7 @@ namespace Lottery.G3.PlayMode.Tests
         }
         IEnumerator ReplaceRun(RunState state)
         {
-            ReleasePresentationTarget();Object.Destroy(app.gameObject);yield return null;testStore.Dispose();Directory.Delete(directory,true);
+            ReleasePresentationTarget();Object.Destroy(app.gameObject);yield return null;testStore?.Dispose();Directory.Delete(directory,true);
             directory=Path.Combine(Path.GetTempPath(),"lottery-g3-play-"+Guid.NewGuid().ToString("N"));faults=new ToggleFault();testStore=new FileStateStore(directory,state,faults);app=new GameObject("Explicit separate G3 fixture").AddComponent<G3SliceBootstrap>();app.Initialize(new DayGameService(testStore),null,testStore);Router.PollAutomatically=false;BindPresentationTarget();Physics.SyncTransforms();yield return null;Router.NotifyPause(false);Router.NotifyFocus(true);MouseEvent(Vector2.zero,false);MouseEvent(Vector2.zero,false);
         }
         void Capture(string stage,string output,List<FrameReceipt> records)

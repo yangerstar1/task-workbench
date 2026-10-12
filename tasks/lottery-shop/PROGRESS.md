@@ -39,3 +39,7 @@ Saved at 2026-10-12 14:45 UTC. Partial uncompiled source only, no CI request or 
 ## G3 source candidate 001
 
 Prepared at 2026-10-12 15:07 UTC for independent source preflight. First-day service/store, all initially offerable tools and consumables, shop/input/paper rendering, 225 authored EditMode cases, 12 authored PlayMode cases and 14 planned original captures are now present. Counts describe source identities, not passing execution. The captures use disclosed diagnostic fixtures; they are not physical-device or exact 75-step UI evidence. Native C# compilation, Unity execution, G3 process kills, APK and six-action physical-device acceptance remain NOT_RUN. No actual G3 request has been created.
+
+## G3 source candidate 002 repair checkpoint
+
+2026-10-12 15:42 UTC. Independent candidate001 source preflight rejected six major gaps before CI: current/next tool presentation, supported diagnostic entry and exact UI trace, cancellable boost preselection, ordinary uninjected startup coverage, unreviewed executable build inputs, and G3 ad-waiting process-kill coverage. Candidate001 remains failed and preserved. Repairs add persisted slot/run identity, schema2 fail-closed recovery, explicit first-save normal/QA entry, exact scenario input trace, visible cell numbering, cancellation/resume coverage, complete reviewed-tree locking and a G3 waiting-state kill probe. Authored identities now236 Edit and18 Play; native discovery and all G3 native/device results remain NOT_RUN. Candidate002 requires independent re-review before any request.

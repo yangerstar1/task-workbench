@@ -44,7 +44,7 @@ namespace Lottery.G3.Core
                 string ticketId=s.RunId+":ticket-"+(s.TicketsPurchasedToday+1);
                 var t=new TicketState{Id=ticketId,PurchaseCommandId=commandId,TicketType=ticketType,Phase=TicketPhase.ACTIVE,PriceMinor=DayRules.TicketPriceMinor,
                     PurchasedPosition=s.TicketsPurchasedToday+1,CashAfterPurchaseMinor=s.CashMinor-DayRules.TicketPriceMinor,PreviousSettledTicketType=s.CurrentTicket==null?"":s.CurrentTicket.TicketType,
-                    ConfigurationSnapshot=s.NextToolIds.Where(x=>x!="").Select(x=>{var owned=s.Tools.Single(z=>z.ItemId==x);return new ToolSnapshot{ItemId=x,Level=owned.Level};}).ToArray(),
+                    ConfigurationSnapshot=s.NextToolIds.Select((itemId,slot)=>new{ItemId=itemId,Slot=slot}).Where(x=>x.ItemId!="").Select(x=>{var owned=s.Tools.Single(z=>z.ItemId==x.ItemId);return new ToolSnapshot{ItemId=x.ItemId,Level=owned.Level,TableSlot=x.Slot};}).ToArray(),
                     Scratch=new TicketMask(ticketType=="number"?6:8),EconomicCounterBefore=s.EconomicCounter,EconomicCounterAfter=s.EconomicCounter,ChallengeCounterBefore=s.ChallengeCounter,ChallengeCounterAfter=s.ChallengeCounter};
                 if(ticketType=="number")
                 {

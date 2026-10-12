@@ -5,6 +5,8 @@ import hashlib
 import json
 from pathlib import Path
 import struct
+import subprocess
+import os
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -29,6 +31,8 @@ def axml(version=3,package='com.buyuqi.lotteryprobe',namespace='http://schemas.a
 
 def case(s,p):
     before='a'*64;after='b'*64
+    if (s,p)==process.WAITING_CASE:
+        return dict(status='PASS',scenario=s,point=p,recoveryStatus='COMMITTED',beforeHash=before,expectedHash=after,recoveredHash=before,finalHash=after,finalCashMinor=28500,finalCommands=10,attemptCommandOccurrences=1,staleRevisionReplayUnchanged=True,waitingPollUnchanged=True,reservedStockRejected=True,reservedCashRejected=True,duplicateRewardUnchanged=True,waitingObservation=process.waiting_observation(False),observation=process.waiting_observation(True))
     return dict(status='PASS',scenario=s,point=p,recoveryStatus='COMMITTED' if p in ('AfterPublish','BeforeResponse') else 'PROVEN_NOT_COMMITTED',beforeHash=before,expectedHash=after,recoveredHash=after if p in ('AfterPublish','BeforeResponse') else before,finalHash=after,finalCashMinor=process.CASH[s],finalCommands=process.COMMANDS[s],attemptCommandOccurrences=1,staleRevisionReplayUnchanged=True,observation=process.expected_observation(s))
 
 class G3ValidatorTests(unittest.TestCase):
@@ -59,9 +63,9 @@ class G3ValidatorTests(unittest.TestCase):
     def testMalformedStringPoolRejected(self):
         raw=bytearray(axml());struct.pack_into('<I',raw,16,99999)
         with self.assertRaises(ValueError):ci.parse_binary_manifest(raw)
-    def testEverySixBySixBoundaryValidated(self):
+    def testEverySixBySixAndWaitingBoundaryValidated(self):
         rows=[dict(case(s,p),exitSignal='SIGKILL',childExitCode=-9) for s,p in process.CASES]
-        self.assertEqual(len(process.validate_suite(rows)),36)
+        self.assertEqual(len(process.validate_suite(rows)),37)
     def testMissingOrReorderedCaseRejected(self):
         rows=[dict(case(s,p),exitSignal='SIGKILL',childExitCode=-9) for s,p in process.CASES]
         for data in (rows[:-1],list(reversed(rows))):
@@ -70,7 +74,7 @@ class G3ValidatorTests(unittest.TestCase):
         rows=[dict(case(s,p),exitSignal='SIGKILL',childExitCode=-9) for s,p in process.CASES];rows[0]['childExitCode']=0
         with self.assertRaises(ValueError):process.validate_suite(rows)
     def testIndependentMoneyAndLoanAndPhaseRejected(self):
-        for s,p in process.CASES:
+        for s,p in process.COMMIT_CASES:
             row=case(s,p);row['observation']['cashMinor']+=1
             with self.assertRaises(ValueError):process.validate_case(row,s,p)
         row=case('repay','AfterPublish');row['observation']['motherBorrowedMinor']=5000
@@ -82,6 +86,20 @@ class G3ValidatorTests(unittest.TestCase):
         with self.assertRaises(ValueError):process.validate_case(row,'challenge','BeforeWrite')
         row=case('consumable','AfterPublish');row['attemptCommandOccurrences']=2
         with self.assertRaises(ValueError):process.validate_case(row,'consumable','AfterPublish')
+    def testWaitingKillRequiresOriginalResourcesAndLateReward(self):
+        original=case(*process.WAITING_CASE)
+        process.validate_waiting(original)
+        for group,key,value in [('waitingObservation','rewardRecorded',True),('waitingObservation','stockQuantity',0),('waitingObservation','cashMinor',28500),('observation','stockId','another-stock'),('observation','quality','rare'),('observation','drawerQuality','rare'),('waitingObservation','drawerReserved',False),('observation','adSuccesses',2),('observation','ledgerCount',2),('observation','drawerPriceMinor',3000)]:
+            row=copy.deepcopy(original);row[group][key]=value
+            with self.assertRaises(ValueError):process.validate_waiting(row)
+        for key in ('waitingPollUnchanged','reservedStockRejected','reservedCashRejected','duplicateRewardUnchanged'):
+            row=copy.deepcopy(original);row[key]=False
+            with self.assertRaises(ValueError):process.validate_waiting(row)
+    def testWaitingKillCannotBeReplacedByCommitOrFakeExit(self):
+        rows=[dict(case(s,p),exitSignal='SIGKILL',childExitCode=-9) for s,p in process.CASES]
+        for replacement in (dict(rows[-1],childExitCode=0),dict(rows[0]),dict(rows[-1],recoveredHash='2'*64)):
+            data=rows[:-1]+[replacement]
+            with self.assertRaises(ValueError):process.validate_suite(data)
     def testReviewManifestExcludesOnlyRequestAndReview(self):
         files=ci.reviewed_files(ROOT);self.assertNotIn(ci.REQUEST_PATH,files);self.assertNotIn(ci.TASK+'/ci/g3-preflight.review.json',files)
         self.assertIn(ci.TASK+'/scripts/process-g3/Program.cs',files);self.assertIn('.github/workflows/lottery-g3.yml',files)
@@ -98,16 +116,81 @@ class G3ValidatorTests(unittest.TestCase):
         self.assertEqual(xml.find('.//EnableDefaultCompileItems').text,'false')
         self.assertIn('LOTTERY_G3_TEST_FIXTURE',xml.find('.//DefineConstants').text)
         self.assertNotIn(ROOT/ci.TASK/'unity/Assets/G2/Core/RunState.cs',paths)
-    def testFreshReviewMustApproveExactSourceMap(self):
+    def makeReviewedGit(self,root):
+        def git(*args):return subprocess.check_output(['git','-C',str(root),*args],stderr=subprocess.DEVNULL,text=True).strip()
+        git('init','-q');source=root/ci.TASK/'scripts/source.cs';source.parent.mkdir(parents=True);source.write_text('reviewed source\n')
+        def commit(message):
+            git('add','-A');git('-c','user.name=Synthetic Fixture','-c','user.email=fixture@example.invalid','commit','-q','-m',message)
+        commit('reviewed source');reviewed=git('rev-parse','HEAD')
+        review=dict(schemaVersion=1,status='APPROVED_FOR_TRIGGER',requestId=ci.REQUEST['requestId'],reviewedSourceCommit=reviewed,reviewerId='synthetic-fresh-001',sourceFiles=ci.reviewed_files(root,committed=True),deviceQa='NOT_RUN',finalQuality='NOT_PASSED')
+        target=root/ci.REVIEW_PATH;target.parent.mkdir(parents=True);target.write_text(json.dumps(review));commit('review metadata')
+        def trigger():
+            (root/ci.REQUEST_PATH).write_text(json.dumps(ci.REQUEST));commit('unique request')
+        return git,commit,trigger,review,source
+    def testFreshReviewAcceptsRealGitMetadataThenRequestOnly(self):
         with tempfile.TemporaryDirectory() as d:
-            root=Path(d);target=root/ci.TASK/'ci/g3-preflight.review.json';target.parent.mkdir(parents=True)
-            review=dict(schemaVersion=1,status='APPROVED_FOR_TRIGGER',requestId=ci.REQUEST['requestId'],reviewedSourceCommit='a'*40,reviewerId='fresh-reviewer-001',sourceFiles={'source.cs':'b'*64},deviceQa='NOT_RUN',finalQuality='NOT_PASSED')
-            target.write_text(json.dumps(review))
-            with patch.object(ci,'reviewed_files',return_value=review['sourceFiles']),patch.object(ci.subprocess,'run'):
-                self.assertEqual(ci.verify_preflight(root)['status'],'APPROVED_FOR_TRIGGER')
-                for key,value in [('status','DRAFT_NOT_APPROVED'),('deviceQa','PASS'),('finalQuality','PASS'),('sourceFiles',{'source.cs':'c'*64})]:
-                    changed=copy.deepcopy(review);changed[key]=value;target.write_text(json.dumps(changed))
-                    with self.assertRaises(ValueError):ci.verify_preflight(root)
+            root=Path(d);git,commit,trigger,review,source=self.makeReviewedGit(root);trigger()
+            self.assertEqual(ci.verify_preflight(root)['reviewedSourceCommit'],review['reviewedSourceCommit'])
+            ci.check_working_inputs(root,review['sourceFiles'],allow_generated_unity=False)
+    def testFreshReviewRejectsAutomaticInputsAndArbitraryTreeDriftInRealGit(self):
+        names=[ci.TASK+'/Directory.Build.targets',ci.TASK+'/Directory.Build.props',ci.TASK+'/NuGet.Config',ci.TASK+'/scripts/Directory.Build.targets',ci.TASK+'/global.json',ci.TASK+'/arbitrary-input.bin','Directory.Build.targets','tasks/NuGet.Config','outside-unrelated-source.py']
+        for name in names:
+            with self.subTest(name=name),tempfile.TemporaryDirectory() as d:
+                root=Path(d);git,commit,trigger,review,source=self.makeReviewedGit(root)
+                injected=root/name;injected.parent.mkdir(parents=True,exist_ok=True);injected.write_text('SYNTHETIC_UNREVIEWED_INPUT');commit('unreviewed input');trigger()
+                with self.assertRaises(ValueError):ci.verify_preflight(root)
+    def testFreshReviewRejectsWorkingBytesModesLinksAndIgnoredNewInput(self):
+        for attack in ('bytes','mode','symlink','untracked','ignored'):
+            with self.subTest(attack=attack),tempfile.TemporaryDirectory() as d:
+                root=Path(d);git,commit,trigger,review,source=self.makeReviewedGit(root);trigger()
+                if attack=='bytes':source.write_text('unreviewed working bytes')
+                elif attack=='mode':source.chmod(0o755)
+                elif attack=='symlink':source.unlink();source.symlink_to('/dev/null')
+                else:
+                    extra=root/ci.TASK/'Directory.Build.props';extra.write_text('SYNTHETIC_UNREVIEWED_IMPORT')
+                    if attack=='ignored':(root/'.git/info/exclude').write_text('Directory.Build.props\n')
+                with self.assertRaises(ValueError):ci.verify_preflight(root)
+    def testFreshReviewRequiresCommittedMetadataAndRequestBytes(self):
+        for name in ci.REVIEW_EXCEPTIONS:
+            with self.subTest(name=name),tempfile.TemporaryDirectory() as d:
+                root=Path(d);git,commit,trigger,review,source=self.makeReviewedGit(root);trigger()
+                path=root/name;path.write_text(path.read_text()+'\n')
+                with self.assertRaises(ValueError):ci.verify_preflight(root)
+    def testFreshReviewRejectsCommittedModeLinkAndDeletionDrift(self):
+        for attack in ('mode','symlink','deletion'):
+            with self.subTest(attack=attack),tempfile.TemporaryDirectory() as d:
+                root=Path(d);git,commit,trigger,review,source=self.makeReviewedGit(root)
+                if attack=='mode':source.chmod(0o755)
+                else:
+                    source.unlink()
+                    if attack=='symlink':source.symlink_to('/dev/null')
+                commit('unreviewed tree type drift');trigger()
+                with self.assertRaises(ValueError):ci.verify_preflight(root)
+    def testInitialPreflightDoesNotExemptDirtyUnitySettings(self):
+        with tempfile.TemporaryDirectory() as d:
+            root=Path(d);git,commit,trigger,review,source=self.makeReviewedGit(root)
+            settings=root/ci.TASK/'unity/ProjectSettings/ProjectSettings.asset';settings.parent.mkdir(parents=True);settings.write_text('reviewed settings')
+            commit('reviewed settings addition');review['reviewedSourceCommit']=git('rev-parse','HEAD');review['sourceFiles']=ci.reviewed_files(root,committed=True)
+            (root/ci.REVIEW_PATH).write_text(json.dumps(review));commit('updated review metadata');trigger();ci.verify_preflight(root)
+            settings.write_text('unreviewed pre-build settings')
+            with self.assertRaises(ValueError):ci.verify_preflight(root)
+            with self.assertRaises(ValueError):ci.check_working_inputs(root,review['sourceFiles'],allow_restored_font=True)
+    def testOnlyExactRestoredFontAllowedBeforeFirstSnapshot(self):
+        with tempfile.TemporaryDirectory() as d:
+            root=Path(d);git,commit,trigger,review,source=self.makeReviewedGit(root);trigger()
+            font=root/ci.TASK/'unity/Assets/Resources/ProbeChinese.otf';font.parent.mkdir(parents=True);font.write_bytes(b'synthetic font')
+            with self.assertRaises(ValueError):ci.check_working_inputs(root,review['sourceFiles'])
+            with patch.object(ci.legacy,'FONT_SHA',hashlib.sha256(b'synthetic font').hexdigest()):ci.check_working_inputs(root,review['sourceFiles'],allow_restored_font=True)
+            font.write_bytes(b'wrong font')
+            with self.assertRaises(ValueError):ci.check_working_inputs(root,review['sourceFiles'],allow_restored_font=True)
+    def testFreshReviewRejectsOmittedTaskRootInputFromSourceMap(self):
+        with tempfile.TemporaryDirectory() as d:
+            root=Path(d);git,commit,trigger,review,source=self.makeReviewedGit(root)
+            # The full repository anchor catches review-time additions too unless
+            # the exact new commit is reviewed and all executed bytes are bound.
+            source.write_text('changed reviewed input');commit('changed source');review['reviewedSourceCommit']=git('rev-parse','HEAD')
+            (root/ci.REVIEW_PATH).write_text(json.dumps(review));commit('stale source map');trigger()
+            with self.assertRaises(ValueError):ci.verify_preflight(root)
     def testMixedTriggerCommitRefused(self):
         with patch.object(ci.legacy,'guard',return_value={}),patch.object(ci.legacy,'git',return_value=ci.REQUEST_PATH+'\nother.cs'),patch.object(ci,'verify_preflight'):
             with self.assertRaises(ValueError):ci.guard(ROOT)

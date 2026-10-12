@@ -6,7 +6,7 @@ namespace Lottery.G3.Interaction
 {
     public enum G3Mode { WALK,TABLE_SCRATCH,CELL_REVEAL,PANEL,COMMITTING,NIGHT_BILL }
     public enum G3Panel { None,Settlement,Tickets,Shop,StockDetail,Inventory,ToolDetail,Drawer,Phone,Contact,CustomAmount,Bill,Rules,Settings,Confirm,InformationTargets }
-    public enum G3ActionKind { None,ResumeNext,CancelNext,Open,Close,Stand,Sit,InspectStock,InspectTool,InspectContact,BuyTicket,Claim,ClaimThenBuy,QuickReveal,BuyStock,Upgrade,Sell,Equip,Remove,UseDrawer,UseLamp,TargetCell,ConfirmTargets,Borrow,RepayLoan,RepayPrincipal,BeginClosing,EnterNight,PayNight,Restart,Retry,Confirm,Cancel,Digit,Backspace,AmountAccept,ToggleQuick,ToggleFlash,ToggleVibration,MoveForward,MoveBack,MoveLeft,MoveRight,TurnLeft,TurnRight }
+    public enum G3ActionKind { None,CancelBoost,ResumeNext,CancelNext,Open,Close,Stand,Sit,InspectStock,InspectTool,InspectContact,BuyTicket,Claim,ClaimThenBuy,QuickReveal,BuyStock,Upgrade,Sell,Equip,Remove,UseDrawer,UseLamp,TargetCell,ConfirmTargets,Borrow,RepayLoan,RepayPrincipal,BeginClosing,EnterNight,PayNight,Restart,Retry,Confirm,Cancel,Digit,Backspace,AmountAccept,ToggleQuick,ToggleFlash,ToggleVibration,MoveForward,MoveBack,MoveLeft,MoveRight,TurnLeft,TurnRight }
     public readonly struct G3Action
     {
         public readonly G3ActionKind Kind;public readonly string Key;public readonly int Slot;public readonly long Amount;
