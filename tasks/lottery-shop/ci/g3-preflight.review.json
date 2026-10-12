@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
-  "status": "DRAFT_NOT_APPROVED",
+  "status": "APPROVED_FOR_TRIGGER",
   "requestId": "lottery-g3-20261012-09",
-  "reviewedSourceCommit": "",
-  "reviewerId": "",
+  "reviewedSourceCommit": "6df3c767a8bcc377839876dd12099a1c161313ff",
+  "reviewerId": "independent-review/review_g3_source_candidate/g3-source-audit-012",
   "sourceFiles": {
     ".github/workflows/lottery-g0.yml": "f758b4ec85d3a600f3f62c17c91b1e9856e16ca5645ff59a07205fcdfc833c65",
     ".github/workflows/lottery-g2.yml": "5349be85564dc119688ab0a376f221a39a2f1c3619831a7ea8e47df6c9743d08",
