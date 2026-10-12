@@ -217,9 +217,25 @@ class G2SyntheticTests(unittest.TestCase):
             with self.assertRaises(FileNotFoundError):process.main(self.path)
         raw=(task/'evidence/g2/process/process-diagnostic.json').read_text();data=json.loads(raw)
         self.assertEqual(data['stage'],'sdk_inventory');self.assertEqual(data['exceptionType'],'FileNotFoundError');self.assertNotIn('SYNTHETIC_SECRET_VALUE',raw)
+    def test_edit_checkpoint_precedes_play_and_uses_subset_of_final_safe_paths(self):
+        root=Path(ci.__file__).resolve().parents[3];workflow=(root/'.github/workflows/lottery-g2.yml').read_text()
+        start=workflow.index('      - name: Preserve successful EditMode and process evidence before PlayMode')
+        end=workflow.index('      - name: Record PlayMode baseline after successful EditMode gate')
+        block=workflow[start:end]
+        self.assertLess(workflow.index('        id: editaudit'),start)
+        self.assertLess(end,workflow.index('        id: play'))
+        self.assertIn("success() && steps.editverify.outputs.edit_passed == 'true' && steps.editaudit.outcome == 'success'",block)
+        self.assertIn('actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02',block)
+        checkpoint=[line.strip() for line in block.splitlines() if line.startswith('            tasks/')]
+        final=workflow[workflow.index('      - name: Export only bounded non-APK evidence'):workflow.index('  android:')]
+        finalpaths=[line.strip() for line in final.splitlines() if line.startswith('            tasks/')]
+        self.assertEqual(len(checkpoint),14);self.assertTrue(set(checkpoint) <= set(finalpaths))
+        self.assertTrue(all('/edit/' in path or path.endswith('/process/process-receipt.json') for path in checkpoint))
+        self.assertIn('if-no-files-found: error',block)
     def test_workflow_exports_only_bounded_process_receipts_on_failure(self):
         root=Path(ci.__file__).resolve().parents[3];workflow=(root/'.github/workflows/lottery-g2.yml').read_text()
-        paths=[line.strip() for line in workflow.splitlines() if line.startswith('            tasks/') and 'process/' in line]
+        final=workflow[workflow.index('      - name: Export only bounded non-APK evidence'):workflow.index('  android:')]
+        paths=[line.strip() for line in final.splitlines() if line.startswith('            tasks/') and 'process/' in line]
         self.assertEqual(paths,['tasks/lottery-shop/evidence/g2/process/process-receipt.json','tasks/lottery-shop/evidence/g2/process/process-diagnostic.json'])
         self.assertNotIn('compile.log',workflow);self.assertNotIn('worker.log',workflow)
     def test_process_receipt_recovery_boundary_not_just_pass_label(self):

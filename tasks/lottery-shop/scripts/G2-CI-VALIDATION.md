@@ -24,6 +24,14 @@ in this working candidate. No external cache is used in this first iteration.
    checkout/build. APK export still requires native APK verification AND source
    audit. Failed build diagnostics cannot become a candidate APK.
 
+After successful exact EditMode validation AND its source audit, a separate
+`lottery-g2-edit-checkpoint-<run>-<attempt>` artifact preserves the same 14
+already-screened EditMode/process files before PlayMode begins. This checkpoint
+uses the pinned upload action and a subset of the existing final export list;
+it contains no Play result, raw log or unverified APK. Final combined export
+remains in place. This protects completed evidence from a later job timeout;
+it does not bypass any PlayMode/Android gate or extend execution timeouts.
+
 The exact case contract is `ci/g2-test-contract.json`; changes require review.
 The G0 helper's default test contract is unchanged. Its only shared audit API
 addition is an optional set of explicitly named generated classifications.
@@ -107,7 +115,7 @@ lock fails closed for explicit review, rather than accepting other package drift
 
 ## Local verification and remaining work
 
-On 2026-10-12 the local Python suite passed 92 methods (63 preserved plus 29 G2
+On 2026-10-12 the local Python suite passed 93 methods (63 preserved plus 30 G2
 validator fixtures). The PNG/XML fixtures are synthetic, not native evidence.
 One test actually SIGKILLed only its own simple Python child to verify supervisor
 behavior; that is not the C# process fixture. Shell syntax/Python parsing and

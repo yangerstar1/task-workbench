@@ -70,6 +70,28 @@ jobs:
         id: editaudit
         if: ${{ always() && steps.guard.outcome == 'success' && steps.edit.outcome != 'skipped' }}
         run: python3 tasks/lottery-shop/scripts/g2_ci.py audit --stage edit
+      - name: Preserve successful EditMode and process evidence before PlayMode
+        if: ${{ success() && steps.editverify.outputs.edit_passed == 'true' && steps.editaudit.outcome == 'success' }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: lottery-g2-edit-checkpoint-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            tasks/lottery-shop/evidence/g2/process/process-receipt.json
+            tasks/lottery-shop/evidence/g2/edit/guard-receipt.json
+            tasks/lottery-shop/evidence/g2/edit/font-receipt.json
+            tasks/lottery-shop/evidence/g2/edit/raw-test-results.xml
+            tasks/lottery-shop/evidence/g2/edit/raw-test-report-receipt.json
+            tasks/lottery-shop/evidence/g2/edit/test-results.xml
+            tasks/lottery-shop/evidence/g2/edit/test-receipt.json
+            tasks/lottery-shop/evidence/g2/edit/source-mutations.json
+            tasks/lottery-shop/evidence/g2/edit/manifest-before.json
+            tasks/lottery-shop/evidence/g2/edit/manifest-after.json
+            tasks/lottery-shop/evidence/g2/edit/manifest-diagnostic.json
+            tasks/lottery-shop/evidence/g2/edit/generated-manifest.json
+            tasks/lottery-shop/evidence/g2/edit/generated-assets.zip
+            tasks/lottery-shop/evidence/g2/edit/packages-lock.json
+          if-no-files-found: error
+          retention-days: 7
       - name: Record PlayMode baseline after successful EditMode gate
         run: python3 tasks/lottery-shop/scripts/g2_ci.py snapshot --stage play
       # Same workspace keeps this job's Library import; no external cache is restored.
