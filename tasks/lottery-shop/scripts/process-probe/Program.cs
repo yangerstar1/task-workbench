@@ -10,6 +10,7 @@ using Lottery.G2.Persistence;
 using Lottery.G2.Ads;
 static class Program
 {
+    static string check = "ARGUMENTS";
     const string Attempt = "kill-attempt", Request = "fake-request";
     static int Main(string[] args)
     {
@@ -21,15 +22,17 @@ static class Program
             if (mode == "prepare") Prepare(scenario, directory);
             else if (mode == "crash")
             {
+                check = "CRASH_APPLY";
                 using (var store = new FileStateStore(Path.Combine(directory, "actual"), Initial(scenario), new PauseAt(point, Path.Combine(directory, "ready"))))
                     MustCommit(Apply(scenario, store, store.Read().Revision));
+                check = "KILL_POINT_NOT_REACHED";
                 throw new InvalidOperationException("Expected kill point was not hit");
             }
             else if (mode == "verify") Verify(scenario, point, directory);
             else throw new InvalidOperationException();
             return 0;
         }
-        catch { Console.Error.WriteLine("Bounded G2 process fixture failed."); return 1; }
+        catch (Exception error) { Console.Error.WriteLine("G2_PROBE_ERROR " + check + " " + error.GetType().Name); return 1; }
     }
     static RunState Initial(string scenario)
     {
@@ -40,20 +43,26 @@ static class Program
     static void Setup(string scenario, FileStateStore store)
     {
         var tickets = new TicketService(store);
-        if (scenario == "scratch" || scenario == "claim") MustCommit(tickets.BuyNumberTicket("setup-buy", store.Read().Revision));
+        if (scenario == "scratch" || scenario == "claim") { check = "SETUP_BUY"; MustCommit(tickets.BuyNumberTicket("setup-buy", store.Read().Revision)); }
         if (scenario == "claim")
         {
             var strokes = new List<ScratchStroke>();
             for (int y = 0; y <= 16; y++) strokes.Add(new ScratchStroke(0, y / 16.0, 1, y / 16.0, true, 16));
+            check = "SETUP_SCRATCH";
             MustCommit(tickets.ApplyScratch(store.Read().CurrentTicket.Id, "setup-reveal", store.Read().Revision, strokes.ToArray()));
+            check = "SETUP_REVEAL";
             if (!store.Read().CurrentTicket.Scratch.IsFullyRevealed) throw new InvalidOperationException();
         }
         if (scenario == "ad")
         {
             var fake = new FakeRewardedAdService(store); var ads = new AdPurchaseService(store, fake);
+            check = "AD_BEGIN";
             MustCommit(ads.BeginAd(Request, "setup-begin", store.Read().Revision, 60));
+            check = "AD_REWARD";
             MustCommit(fake.QueueEvent(Request, store.Read().RunId, AdEventKind.Reward));
+            check = "AD_RECORD";
             MustCommit(ads.RecordEvent(fake.ReadEvents(Request)[0], "setup-reward", store.Read().Revision));
+            check = "AD_COMMITTING";
             MustCommit(ads.MarkCommitting(Request, "setup-committing", store.Read().Revision));
         }
     }
@@ -70,19 +79,22 @@ static class Program
     static string Hash(RunState state) => StateCodec.HashBytes(StateCodec.SerializeCanonical(state));
     static void Prepare(string scenario, string directory)
     {
+        check = "PREPARE_DIRECTORY";
         if (Directory.Exists(directory)) throw new InvalidOperationException("Refuse fixture reuse");
         Directory.CreateDirectory(directory);
         string before, expected;
         using (var store = new FileStateStore(Path.Combine(directory, "actual"), Initial(scenario))) { Setup(scenario, store); before = Hash(store.Read()); }
         using (var store = new FileStateStore(Path.Combine(directory, "expected"), Initial(scenario)))
         {
-            Setup(scenario, store); if (Hash(store.Read()) != before) throw new InvalidOperationException();
+            Setup(scenario, store); check = "PREPARE_EQUAL"; if (Hash(store.Read()) != before) throw new InvalidOperationException();
+            check = "PREPARE_APPLY";
             MustCommit(Apply(scenario, store, store.Read().Revision)); expected = Hash(store.Read());
         }
         File.WriteAllText(Path.Combine(directory, "expected.json"), JsonSerializer.Serialize(new { before, expected }));
     }
     static void Verify(string scenario, string point, string directory)
     {
+        check = "RECOVERY_BOUNDARY";
         using (var doc = JsonDocument.Parse(File.ReadAllText(Path.Combine(directory, "expected.json"))))
         using (var store = new FileStateStore(Path.Combine(directory, "actual"), Initial(scenario)))
         {
@@ -91,16 +103,22 @@ static class Program
             string recoveredHash = Hash(store.Read());
             if (recovered.CommitStatus != (published ? CommitStatus.COMMITTED : CommitStatus.PROVEN_NOT_COMMITTED) ||
                 recoveredHash != (published ? expected : before) || !store.CanMutate) throw new InvalidOperationException("Wrong recovery boundary");
+            check = "RECOVERY_REPLAY";
             MustCommit(Apply(scenario, store, store.Read().Revision));
             string finalHash = Hash(store.Read());
+            check = "STALE_REPLAY";
             MustCommit(Apply(scenario, store, -999)); // Committed lookup must precede stale-revision rejection.
+            check = "STATE_INVARIANTS";
             var state = store.Read(); StateInvariants.Validate(state);
+            check = "EXACTLY_ONCE";
             if (Hash(state) != finalHash || finalHash != expected || state.Commands.Count(c => c.CommandId == Attempt) != 1)
                 throw new InvalidOperationException("Replay duplicated or changed a committed result");
+            check = "WALLET_STOCK";
             long expectedCash = NumberTicketRules.InitialCashMinor - (scenario == "ad" ? NumberTicketRules.AdPriceMinor : NumberTicketRules.PriceMinor);
             if (scenario == "claim") expectedCash += state.CurrentTicket.RawPrizeMinor;
             if (state.CashMinor != expectedCash || (scenario == "ad" && (state.Ad.Phase != AdPhase.COMMITTED || state.StockAvailable || state.Drawers.Count(x => x != null) != 1)))
                 throw new InvalidOperationException("Independent wallet/stock invariant failed");
+            check = "RESULT_WRITE";
             File.WriteAllText(Path.Combine(directory, "result.json"), JsonSerializer.Serialize(new {
                 status = "PASS", scenario, point, recoveryStatus = recovered.CommitStatus.ToString(), beforeHash = before,
                 expectedHash = expected, recoveredHash, finalHash, finalCashMinor = state.CashMinor,

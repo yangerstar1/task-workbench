@@ -107,7 +107,7 @@ lock fails closed for explicit review, rather than accepting other package drift
 
 ## Local verification and remaining work
 
-On 2026-10-12 the local Python suite passed 85 methods (63 preserved plus 22 G2
+On 2026-10-12 the local Python suite passed 92 methods (63 preserved plus 29 G2
 validator fixtures). The PNG/XML fixtures are synthetic, not native evidence.
 One test actually SIGKILLed only its own simple Python child to verify supervisor
 behavior; that is not the C# process fixture. Shell syntax/Python parsing and
@@ -122,6 +122,29 @@ exact workflow. A local simulation materializes only the declared sparse input
 paths and runs all 63 preserved G0 tests; a negative fixture removes that
 workflow and reproduces the missing-file failure. The request-02 candidate still
 requires independent review and a separate coordinator-owned actual trigger.
+
+Run 02 (`38238794780`) passed all 85 helper methods, then failed in the process
+probe before Unity started. Its fixed console message did not identify the
+substage, so the exact observed cause is unknown. Source inspection identified
+an independent project defect: `.proj` does not automatically select the C#
+compiler targets in [.NET SDK 8.0.425](https://github.com/dotnet/sdk/blob/v8.0.425/src/Tasks/Microsoft.NET.Build.Tasks/sdk/Sdk.targets#L20-L31).
+The project is now `scripts/process-probe/G2.ProcessProbe.csproj`, with only that
+filename excepted from the existing `*.csproj` ignore rule; the former `.proj`
+file must be deleted in the candidate tree. Production source includes, SDK and
+all 24 recovery assertions are unchanged. This is a source-supported correction,
+not proof that it was the hidden run-02 exception or that compilation now passed.
+
+The request-03 candidate exports a small `process-diagnostic.json` on failure:
+fixed stage, selected SDK version, exception type, scenario/commit window, and
+at most 32 compiler error codes with allowlisted relative source file/line/column.
+Unknown paths become `UNMAPPED`; compiler message text is never exported.
+Worker diagnostics accept only fixed assertion IDs and exception-type enums.
+Oversized, symlinked or unavailable logs produce `REFUSED_OR_UNAVAILABLE`, not
+raw-log fallback. A failure removes any stale PASS receipt. Raw compiler/worker
+logs, environment, command lines and save contents remain outside artifact paths.
+Tests inject synthetic compiler payloads, unknown paths/IDs, oversized logs,
+missing SDK and build failures to verify bounded diagnostics and stale removal.
+Only actual request-03 CI can establish compiler/runtime results.
 
 The approved runner's [official Ubuntu 24.04 software inventory](https://github.com/actions/runner-images/blob/bdac7c6000c3501174076ad6d6a06ce46871fa71/images/ubuntu/Ubuntu2404-Readme.md)
 lists .NET 8 SDKs. The supervisor still detects the actual installed SDK and

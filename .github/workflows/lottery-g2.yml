@@ -111,6 +111,7 @@ jobs:
           name: lottery-g2-tests-${{ github.run_id }}-${{ github.run_attempt }}
           path: |
             tasks/lottery-shop/evidence/g2/process/process-receipt.json
+            tasks/lottery-shop/evidence/g2/process/process-diagnostic.json
             tasks/lottery-shop/evidence/g2/edit/guard-receipt.json
             tasks/lottery-shop/evidence/g2/edit/font-receipt.json
             tasks/lottery-shop/evidence/g2/edit/raw-test-results.xml

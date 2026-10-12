@@ -171,6 +171,57 @@ class G2SyntheticTests(unittest.TestCase):
             with self.assertRaises(ValueError):ci.inspect_captures(self.path,identity)
         bad=copy.deepcopy(receipt);bad['frames'][0]['file']='../initial.png';ci.write_json(self.path/'render-receipt.json',bad)
         with self.assertRaises(ValueError):ci.inspect_captures(self.path,identity)
+    def test_process_project_selects_csharp_pipeline_and_exact_ignore_exception(self):
+        task=Path(ci.__file__).resolve().parents[1];project=task/'scripts/process-probe/G2.ProcessProbe.csproj'
+        self.assertTrue(project.is_file());self.assertFalse(project.with_suffix('.proj').exists())
+        document=ET.fromstring(project.read_text());self.assertEqual(document.get('Sdk'),'Microsoft.NET.Sdk')
+        self.assertEqual(document.findtext('PropertyGroup/TargetFramework'),'net8.0')
+        self.assertIn('!scripts/process-probe/G2.ProcessProbe.csproj',(task/'.gitignore').read_text().splitlines())
+        worker=(project.parent/'Program.cs').read_text()
+        self.assertTrue(set(re.findall(r'check = "([A-Z_]+)"',worker)) <= process.ASSERTIONS)
+    def test_compiler_diagnostics_export_only_allowlisted_coordinates(self):
+        task=self.path/ci.TASK;source=task/'scripts/process-probe/Program.cs'
+        raw=(str(source)+'(12,3): error CS0029: SYNTHETIC_SECRET_VALUE [/unapproved/token]\n'+
+             '/unapproved/SYNTHETIC_SECRET_VALUE.cs(9,2): error CS0103: hidden\n'+
+             '/sdk/tool.targets(21,7): error NETSDK1005: hidden\n').encode()
+        values=process.compiler_errors(raw,task)
+        self.assertEqual(values[0],{'code':'CS0029','file':'scripts/process-probe/Program.cs','line':12,'column':3})
+        self.assertEqual(values[1]['file'],'UNMAPPED');self.assertEqual(values[2]['code'],'NETSDK1005')
+        self.assertNotIn('SYNTHETIC_SECRET_VALUE',json.dumps(values));self.assertNotIn('/sdk',json.dumps(values))
+    def test_worker_diagnostics_accept_only_fixed_assertion_and_exception_identities(self):
+        raw=b'SYNTHETIC_SECRET_VALUE\nG2_PROBE_ERROR WALLET_STOCK InvalidOperationException\n'
+        self.assertEqual(process.worker_error(raw),{'assertId':'WALLET_STOCK','exceptionType':'InvalidOperationException'})
+        for raw in (b'G2_PROBE_ERROR SECRET_VALUE InvalidOperationException',b'G2_PROBE_ERROR WALLET_STOCK SecretValue',b'G2_PROBE_ERROR WALLET_STOCK InvalidOperationException extra'):
+            self.assertIsNone(process.worker_error(raw))
+    def test_process_diagnostic_bounds_and_refuses_oversize_logs(self):
+        task=self.path/ci.TASK;work=task/'artifacts/g2-process';work.mkdir(parents=True)
+        (work/'compile.log').write_bytes(b'SYNTHETIC'*(300000))
+        process.write_failure(task,{'sourceCommit':'a'*40},{'stage':'build'},ValueError('SYNTHETIC_SECRET_VALUE'))
+        raw=(task/'evidence/g2/process/process-diagnostic.json').read_text()
+        self.assertEqual(json.loads(raw)['diagnosticRead'],'REFUSED_OR_UNAVAILABLE');self.assertNotIn('SYNTHETIC_SECRET_VALUE',raw)
+    def test_process_build_failure_exports_bounded_receipt_and_removes_stale_pass(self):
+        task=self.path/ci.TASK;out=task/'evidence/g2/process';out.mkdir(parents=True);(out/'process-receipt.json').write_text('SYNTHETIC_STALE_PASS')
+        def fail_build(command,**kwargs):
+            if command[1]=='restore':return subprocess.CompletedProcess(command,0)
+            kwargs['stdout'].write(b'Program.cs(42,8): error CS0103: SYNTHETIC_SECRET_VALUE\n');kwargs['stdout'].flush()
+            raise subprocess.CalledProcessError(1,command)
+        with mock.patch.object(process.ci.legacy,'guard',return_value={'sourceCommit':'a'*40}),mock.patch.object(process.ci,'verify_inputs'),mock.patch.object(process.subprocess,'check_output',return_value='8.0.425 [/SYNTHETIC]\n'),mock.patch.object(process.subprocess,'run',side_effect=fail_build):
+            with self.assertRaises(subprocess.CalledProcessError):process.main(self.path)
+        self.assertFalse((out/'process-receipt.json').exists());raw=(out/'process-diagnostic.json').read_text();receipt=json.loads(raw)
+        self.assertEqual(receipt['stage'],'build');self.assertEqual(receipt['exceptionType'],'CalledProcessError')
+        self.assertEqual(receipt['compilerErrors'][0]['code'],'CS0103');self.assertEqual(receipt['dotnetSdk'],'8.0.425')
+        self.assertNotIn('SYNTHETIC_SECRET_VALUE',raw);self.assertLess(len(raw),8192)
+    def test_process_missing_sdk_has_diagnostic_without_external_download(self):
+        task=self.path/ci.TASK
+        with mock.patch.object(process.ci.legacy,'guard',return_value={'sourceCommit':'b'*40}),mock.patch.object(process.ci,'verify_inputs'),mock.patch.object(process.subprocess,'check_output',side_effect=FileNotFoundError('SYNTHETIC_SECRET_VALUE')):
+            with self.assertRaises(FileNotFoundError):process.main(self.path)
+        raw=(task/'evidence/g2/process/process-diagnostic.json').read_text();data=json.loads(raw)
+        self.assertEqual(data['stage'],'sdk_inventory');self.assertEqual(data['exceptionType'],'FileNotFoundError');self.assertNotIn('SYNTHETIC_SECRET_VALUE',raw)
+    def test_workflow_exports_only_bounded_process_receipts_on_failure(self):
+        root=Path(ci.__file__).resolve().parents[3];workflow=(root/'.github/workflows/lottery-g2.yml').read_text()
+        paths=[line.strip() for line in workflow.splitlines() if line.startswith('            tasks/') and 'process/' in line]
+        self.assertEqual(paths,['tasks/lottery-shop/evidence/g2/process/process-receipt.json','tasks/lottery-shop/evidence/g2/process/process-diagnostic.json'])
+        self.assertNotIn('compile.log',workflow);self.assertNotIn('worker.log',workflow)
     def test_process_receipt_recovery_boundary_not_just_pass_label(self):
         d={'status':'PASS','scenario':'buy','point':'AfterPublish','recoveryStatus':'COMMITTED','beforeHash':'a'*64,'expectedHash':'b'*64,'recoveredHash':'b'*64,'finalHash':'b'*64,
            'finalCashMinor':29000,'finalCommands':1,'attemptCommandOccurrences':1,'staleRevisionReplayUnchanged':True}
