@@ -107,13 +107,21 @@ lock fails closed for explicit review, rather than accepting other package drift
 
 ## Local verification and remaining work
 
-On 2026-10-12 the local Python suite passed 83 methods (63 preserved plus 20 G2
+On 2026-10-12 the local Python suite passed 85 methods (63 preserved plus 22 G2
 validator fixtures). The PNG/XML fixtures are synthetic, not native evidence.
 One test actually SIGKILLed only its own simple Python child to verify supervisor
 behavior; that is not the C# process fixture. Shell syntax/Python parsing and
 exact C# method-name/contract comparison were checked. No local Unity or .NET
 compiler was available, so native compilation and all actual G2 cases remain
 NOT_RUN until the authorized CI candidate executes.
+
+The first G2 run `38238410614` stopped in the Python helper stage because the
+sparse checkout omitted the preserved G0 workflow read by a regression test.
+No .NET or Unity validation ran in that attempt. Both G2 jobs now include that
+exact workflow. A local simulation materializes only the declared sparse input
+paths and runs all 63 preserved G0 tests; a negative fixture removes that
+workflow and reproduces the missing-file failure. The request-02 candidate still
+requires independent review and a separate coordinator-owned actual trigger.
 
 The approved runner's [official Ubuntu 24.04 software inventory](https://github.com/actions/runner-images/blob/bdac7c6000c3501174076ad6d6a06ce46871fa71/images/ubuntu/Ubuntu2404-Readme.md)
 lists .NET 8 SDKs. The supervisor still detects the actual installed SDK and

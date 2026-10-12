@@ -2,6 +2,9 @@
 import copy
 import hashlib
 import json
+import os
+import re
+import shutil
 from pathlib import Path
 import struct
 import subprocess
@@ -72,6 +75,41 @@ class G2SyntheticTests(unittest.TestCase):
         for name in ci.GENERATED:self.assertEqual(ci.legacy.mutation_kind(name),'G2_GENERATED_SCENE')
         for name in ('Assets/G2/Scenes/Other.unity','Assets/G2/Scenes/G2Slice.cs','Assets/G2/Rendering/Unknown.asset'):
             self.assertEqual(ci.legacy.mutation_kind(name),'UNEXPECTED_SOURCE_CHANGE')
+    def sparse_patterns(self):
+        root=Path(ci.__file__).resolve().parents[3]
+        workflow=(root/'.github/workflows/lottery-g2.yml').read_text()
+        blocks=re.findall(r'^          sparse-checkout: \|\n((?:            /[^\n]+\n)+)',workflow,re.M)
+        self.assertEqual(len(blocks),2,'Both native jobs must declare explicit sparse inputs')
+        expected=['/tasks/lottery-shop/','/.github/workflows/lottery-g2.yml','/.github/workflows/lottery-g0.yml']
+        patterns=[line.strip() for line in blocks[0].splitlines()]
+        self.assertEqual(patterns,expected)
+        self.assertEqual([line.strip() for line in blocks[1].splitlines()],patterns)
+        return root,patterns
+    def materialize_sparse_fixture(self,root,patterns):
+        target=self.path/'sparse';target.mkdir()
+        for pattern in patterns:
+            source=root/pattern.strip('/');destination=target/pattern.strip('/')
+            destination.parent.mkdir(parents=True,exist_ok=True)
+            if pattern.endswith('/'):
+                shutil.copytree(source,destination,ignore=shutil.ignore_patterns('__pycache__'))
+            else:shutil.copyfile(source,destination)
+        return target
+    def run_sparse_g0_suite(self,target,case=None):
+        command=[sys.executable,'-m','unittest']
+        command += [case] if case else ['discover','-s','tasks/lottery-shop/scripts','-p','test_probe_ci.py']
+        environment=dict(os.environ,PYTHONDONTWRITEBYTECODE='1',PYTHONPATH=str(target/'tasks/lottery-shop/scripts'))
+        return subprocess.run(command,cwd=target,env=environment,stdout=subprocess.PIPE,stderr=subprocess.PIPE,timeout=30)
+    def test_exact_declared_sparse_inputs_run_preserved_g0_regressions(self):
+        root,patterns=self.sparse_patterns();target=self.materialize_sparse_fixture(root,patterns)
+        result=self.run_sparse_g0_suite(target)
+        self.assertEqual(result.returncode,0,'Preserved G0 suite failed in exact declared G2 sparse checkout')
+        self.assertIn(b'Ran 63 tests',result.stderr)
+    def test_sparse_fixture_detects_missing_preserved_workflow(self):
+        root,patterns=self.sparse_patterns();patterns.remove('/.github/workflows/lottery-g0.yml')
+        target=self.materialize_sparse_fixture(root,patterns)
+        result=self.run_sparse_g0_suite(target,'test_probe_ci.SourceMutationSyntheticTests.test_refused_before_baseline_cannot_remain_in_public_artifact_path')
+        self.assertNotEqual(result.returncode,0)
+        self.assertIn(b'FileNotFoundError',result.stderr)
     def test_settings_preflight_accepts_only_empty_credential_scalars(self):
         path=self.path/ci.TASK/'unity/ProjectSettings/ProjectSettings.asset'
         for scalar in ('', '\'\'', '""', 'null', '~'):
