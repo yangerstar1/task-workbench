@@ -39,7 +39,41 @@ SAFE_COMMON = ("guard-receipt.json", "font-receipt.json", "source-mutations.json
 SAFE_GENERATED = ("generated-manifest.json", "generated-assets.zip", "packages-lock.json")
 
 
+_SETTING_KEY = re.compile(r'^\s*(?:-\s*)?["\']?([A-Za-z_][A-Za-z0-9_.-]*)["\']?\s*:\s*(.*?)\s*$')
+_CREDENTIAL_KEY = re.compile(r'password|passwd|passcode|secret|token|private.?key|api.?key|credential|license', re.I)
+
+
+def settings_findings(root):
+    """Fail closed on nonempty credential-like fields; never return source values."""
+    directory = root / TASK / "unity/ProjectSettings"
+    require(directory.is_dir() and not directory.is_symlink(), "Missing/unsafe ProjectSettings directory")
+    findings = []
+    for path in sorted(directory.rglob("*")):
+        relative = path.relative_to(root / TASK / "unity").as_posix()
+        require(re.fullmatch(r"ProjectSettings/[A-Za-z0-9_./-]+", relative), "Unsafe settings path")
+        require(not path.is_symlink(), "Settings symlink refused")
+        if path.is_dir(): continue
+        raw = bounded_read(path, 2 * 1024 * 1024)
+        value = raw.decode("utf-8", errors="strict")
+        for line in value.splitlines():
+            field = _SETTING_KEY.fullmatch(line)
+            if not field or not _CREDENTIAL_KEY.search(field.group(1)): continue
+            # Native Unity YAML scalar fields only. A block/list/map is nonempty
+            # and refused too. An optional trailing YAML comment contains no value.
+            scalar = field.group(2).split(" #", 1)[0].strip()
+            if scalar not in {"", '""', "''", "null", "Null", "NULL", "~"}:
+                findings.append({"path": relative, "kind": "NONEMPTY_CREDENTIAL_SETTING",
+                                 "sha256": hashlib.sha256(raw).hexdigest()})
+                break
+    return findings
+
+
+def source_preflight(root):
+    require(not settings_findings(root), "Credential-bearing settings refused")
+
+
 def verify_inputs(root):
+    source_preflight(root)
     task = root / TASK
     require(digest(task / "unity/Packages/manifest.json") == MANIFEST_SHA, "Reviewed G2 dependency manifest mismatch")
     require(digest(task / "data/g1-rules.json") == RULES_SHA, "Frozen G1 runtime rules mismatch")
@@ -123,6 +157,12 @@ def audit_stage(root, stage, identity):
     (common / "source-mutations.json").unlink(missing_ok=True)
     success = False
     try:
+        findings = settings_findings(root)
+        if findings:
+            write_json(common / "source-mutations.json", dict(identity, status="FAIL",
+                       failedStage="SETTINGS_CREDENTIAL_PREFLIGHT", metadataStatus="NO_SOURCE_CONTENT_EXPORTED",
+                       changes=findings))
+            raise ValueError("Credential-bearing generated settings refused")
         legacy.audit(root, identity, additional_generated_kinds=("G2_GENERATED_SCENE",))
         # Exact restored lock is immutable in G2, not merely six matching package versions.
         if digest(task / "unity/Packages/packages-lock.json") != LOCK_SHA:
@@ -226,13 +266,17 @@ def inspect_captures(source, identity):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("command", choices=("guard", "restore-font", "snapshot", "audit", "tests", "captures", "apk", "diagnostics"))
+    parser.add_argument("command", choices=("source-preflight", "guard", "restore-font", "snapshot", "audit", "tests", "captures", "apk", "diagnostics"))
     parser.add_argument("--root", type=Path, default=Path(__file__).resolve().parents[3])
     parser.add_argument("--stage", choices=("edit", "play", "android"), default="edit")
     parser.add_argument("--unity-outcome", default="unknown"); parser.add_argument("--verify-outcome", default="unknown"); parser.add_argument("--audit-outcome", default="unknown")
     args = parser.parse_args(); root = args.root.resolve(); task = root / TASK
+    if args.command == "source-preflight":
+        source_preflight(root)
+        print("G2 source settings preflight PASS; no source values exported.")
+        return
     (task / "evidence").mkdir(parents=True, exist_ok=True)
-    # Every invocation checks event identity. There is no dispatch or write token.
+    # Every CI invocation checks event identity. There is no dispatch or write token.
     identity = legacy.guard(root)
     identity.update(rulesSha256=RULES_SHA, g0SourceBase=BASE)
     out = task / "evidence/g2" / args.stage; out.mkdir(parents=True, exist_ok=True)

@@ -13,7 +13,7 @@ in this working candidate. No external cache is used in this first iteration.
    and restarted for Buy/Scratch/Claim/AdCommit at six explicit commit windows.
    The 24 cases use synthetic state and are Linux/.NET process evidence only.
    They do not prove Unity-process, Android force-stop or power-loss behavior.
-2. Run native EditMode with the preserved six G0 case identities and 38 new G2
+2. Run native EditMode with the preserved six G0 case identities and 39 new G2
    cases, each under its own expected assembly. Preserve screened original XML.
    Validate exact identities, counts, ownership and zero failed/skipped cases.
 3. After EditMode validation and source audit succeed, run eight exact PlayMode
@@ -31,6 +31,26 @@ The G2 adapter allows exactly `Assets/G2/Scenes/G2Slice.unity`, its metadata and
 `Assets/G2/Scenes.meta`; neighboring unknown assets are not exempted.
 Recovered G0 generated assets/settings remain accounted separately. Every
 stage snapshots its actual pre-Unity baseline and archives permitted outputs.
+
+## Settings publication and generated-evidence preflight
+
+Before any source publication, run `python3 tasks/lottery-shop/scripts/g2_ci.py
+source-preflight --root .` from the repository root. This read-only local command
+needs neither a request file nor GitHub credentials. It rejects nonempty
+credential-like YAML settings fields, unsupported/symlink paths and oversized or
+non-UTF-8 files, without printing any settings values. Empty unused credential
+fields are retained as empty. This is a bounded structural screen, not a promise
+that arbitrary obfuscated secrets are discoverable.
+
+The same screen runs at CI source guard/snapshot and immediately before every
+generated-assets archive. If Unity regenerates a nonempty credential field,
+the stage fails and its generated archive/lock are withheld; source bytes are
+not silently sanitized after execution. The failure receipt contains only
+canonical relative path, classification and SHA-256 for the unsafe file, plus
+fixed status/identity metadata. The artifact whitelist never includes raw
+ProjectSettings files independently of this gated archive. Synthetic tests
+cover empty scalars, nonempty keys, block values, symlinks and stale-export
+removal. Original G0 sources and historical evidence are not changed.
 
 ## Official graphics-path evidence
 
@@ -87,7 +107,7 @@ lock fails closed for explicit review, rather than accepting other package drift
 
 ## Local verification and remaining work
 
-On 2026-10-12 the local Python suite passed 79 methods (63 preserved plus 16 G2
+On 2026-10-12 the local Python suite passed 83 methods (63 preserved plus 20 G2
 validator fixtures). The PNG/XML fixtures are synthetic, not native evidence.
 One test actually SIGKILLed only its own simple Python child to verify supervisor
 behavior; that is not the C# process fixture. Shell syntax/Python parsing and

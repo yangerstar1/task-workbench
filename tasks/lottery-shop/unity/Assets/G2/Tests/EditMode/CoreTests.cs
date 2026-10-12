@@ -195,6 +195,22 @@ namespace Lottery.G2.EditMode.Tests
             string path = Path.Combine(root, "normal", "state.bin"); File.WriteAllBytes(path, new byte[] { 1, 2, 3 });
             var reload = Open(); Assert.That(reload.CanMutate, Is.False); Assert.That(reload.Read().RecoveryRequired, Is.True); Assert.That(File.ReadAllBytes(path), Is.EqualTo(new byte[] { 1, 2, 3 })); Assert.That(File.Exists(Path.Combine(root, "normal", "previous.bin")), Is.True);
         }
+        [Test] public void MalformedLengthPrefixesBlockStateCommitAndIntentWithoutChangingFiles()
+        {
+            byte[][] malformedInputs = { new byte[] { 0x80, 0x80, 0x80, 0x80, 0x80 }, new byte[] { 0xff, 0xff, 0xff, 0xff, 0x0f }, new byte[] { 0x80 }, Array.Empty<byte>() };
+            for (int i = 0; i < malformedInputs.Length; i++)
+            {
+                byte[] malformed = malformedInputs[i]; Assert.Throws<InvalidDataException>(() => StateCodec.DeserializeCanonical(malformed));
+                foreach (string filename in new[] { "state.bin", "commit.record", "intent.record" })
+                {
+                    string name = "malformed-" + i + "-" + filename; var original = Open(name); original.Dispose();
+                    string path = Path.Combine(root, name, filename); File.WriteAllBytes(path, malformed);
+                    var reload = Open(name); Assert.That(reload.CanMutate, Is.False, filename); Assert.That(reload.Read().RecoveryRequired, Is.True, filename);
+                    var result = reload.Recover("unresolved"); Assert.That(result.Code, Is.EqualTo("RECOVERY_REQUIRED"), filename); Assert.That(result.Status, Is.EqualTo(CommitStatus.COMMIT_UNKNOWN), filename);
+                    Assert.That(File.ReadAllBytes(path), Is.EqualTo(malformed), filename);
+                }
+            }
+        }
         [Test] public void UnknownSchemaIsRejectedAndOriginalBytesPreserved()
         {
             var original = Open(); var state = original.Read(); original.Dispose(); state.SchemaVersion = 99; byte[] bytes = StateCodec.SerializeCanonical(state);

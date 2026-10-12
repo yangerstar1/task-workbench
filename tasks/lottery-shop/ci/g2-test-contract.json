@@ -36,6 +36,7 @@
         "Lottery.G2.EditMode.Tests.CoreTests.UnknownCommitBlocksNewCommandUntilSameIdRecovery",
         "Lottery.G2.EditMode.Tests.CoreTests.UnknownUnpublishedCommitCanOnlyRetryAfterProof",
         "Lottery.G2.EditMode.Tests.CoreTests.CorruptConfirmedStateNeverFallsBackToOlderBackup",
+        "Lottery.G2.EditMode.Tests.CoreTests.MalformedLengthPrefixesBlockStateCommitAndIntentWithoutChangingFiles",
         "Lottery.G2.EditMode.Tests.CoreTests.UnknownSchemaIsRejectedAndOriginalBytesPreserved",
         "Lottery.G2.EditMode.Tests.CoreTests.ExclusiveWriterRejectsSecondStoreWithoutDeletingSave",
         "Lottery.G2.EditMode.Tests.CoreTests.NormalFirstDayUsesOrdinaryPurchaseWithoutAd",

@@ -47,6 +47,12 @@ namespace Lottery.G2.Core
         }
         public static RunState DeserializeCanonical(byte[] bytes)
         {
+            try { return DeserializePayload(bytes); }
+            catch (Exception e) when (!(e is InvalidDataException) && (e is FormatException || e is IOException || e is DecoderFallbackException))
+            { throw new InvalidDataException("Malformed state encoding; preserve original bytes", e); }
+        }
+        static RunState DeserializePayload(byte[] bytes)
+        {
             if (bytes == null || bytes.Length > 16 * 1024 * 1024) throw new InvalidDataException("Invalid state size");
             using (var stream = new MemoryStream(bytes, false)) using (var r = new BinaryReader(stream, Encoding.UTF8, true))
             {

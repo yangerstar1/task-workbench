@@ -168,14 +168,19 @@ namespace Lottery.G2.Persistence
         static byte[] Unwrap(byte[] bytes)
         {
             if (bytes == null || bytes.Length > 17 * 1024 * 1024) throw new InvalidDataException("Invalid envelope size");
-            using (var stream = new MemoryStream(bytes)) using (var r = new BinaryReader(stream))
+            try
             {
-                if (r.ReadString() != "LOTTERY-G2-CHECKSUM-v1") throw new InvalidDataException("Wrong envelope");
-                int length = r.ReadInt32(); if (length < 0 || length > 16 * 1024 * 1024) throw new InvalidDataException("Invalid payload length");
-                string checksum = r.ReadString(); byte[] payload = r.ReadBytes(length);
-                if (payload.Length != length || stream.Position != stream.Length || checksum != StateCodec.HashBytes(payload)) throw new InvalidDataException("Checksum mismatch");
-                return payload;
+                using (var stream = new MemoryStream(bytes)) using (var r = new BinaryReader(stream))
+                {
+                    if (r.ReadString() != "LOTTERY-G2-CHECKSUM-v1") throw new InvalidDataException("Wrong envelope");
+                    int length = r.ReadInt32(); if (length < 0 || length > 16 * 1024 * 1024) throw new InvalidDataException("Invalid payload length");
+                    string checksum = r.ReadString(); byte[] payload = r.ReadBytes(length);
+                    if (payload.Length != length || stream.Position != stream.Length || checksum != StateCodec.HashBytes(payload)) throw new InvalidDataException("Checksum mismatch");
+                    return payload;
+                }
             }
+            catch (Exception e) when (!(e is InvalidDataException) && (e is FormatException || e is IOException || e is DecoderFallbackException))
+            { throw new InvalidDataException("Malformed envelope encoding; preserve original bytes", e); }
         }
         static void WriteFlushed(string path, byte[] bytes)
         { using (var f = new FileStream(path, FileMode.Create, FileAccess.Write, FileShare.None)) { f.Write(bytes, 0, bytes.Length); f.Flush(true); } }

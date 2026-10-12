@@ -33,6 +33,7 @@ def png(seed=0,flat=False):
 class G2SyntheticTests(unittest.TestCase):
     def setUp(self):
         self.temp=tempfile.TemporaryDirectory();self.addCleanup(self.temp.cleanup);self.path=Path(self.temp.name)
+        (self.path/ci.TASK/'unity/ProjectSettings').mkdir(parents=True)
         self.assemblies={'Lottery.Probe.Tests.dll':sorted(ci.G0_CASES),'Lottery.G2.EditMode.Tests.dll':['Lottery.G2.EditMode.Tests.Fixture.One','Lottery.G2.EditMode.Tests.Fixture.Two']}
     def write_xml(self,root):
         ET.ElementTree(root).write(self.path/'results.xml',encoding='utf-8');return self.path
@@ -71,6 +72,35 @@ class G2SyntheticTests(unittest.TestCase):
         for name in ci.GENERATED:self.assertEqual(ci.legacy.mutation_kind(name),'G2_GENERATED_SCENE')
         for name in ('Assets/G2/Scenes/Other.unity','Assets/G2/Scenes/G2Slice.cs','Assets/G2/Rendering/Unknown.asset'):
             self.assertEqual(ci.legacy.mutation_kind(name),'UNEXPECTED_SOURCE_CHANGE')
+    def test_settings_preflight_accepts_only_empty_credential_scalars(self):
+        path=self.path/ci.TASK/'unity/ProjectSettings/ProjectSettings.asset'
+        for scalar in ('', '\'\'', '""', 'null', '~'):
+            path.write_text('PlayerSettings:\n  ps4Passcode: '+scalar+'\n  metroCertificatePassword: \n')
+            ci.source_preflight(self.path)
+    def test_settings_preflight_refuses_nonempty_and_block_values_without_echo(self):
+        path=self.path/ci.TASK/'unity/ProjectSettings/ProjectSettings.asset'
+        for key in ('ps4Passcode','ps4NPTitleSecret','metroCertificatePassword','apiKey','private_key','token'):
+            path.write_text('PlayerSettings:\n  '+key+': SYNTHETIC_NOT_A_CREDENTIAL\n')
+            findings=ci.settings_findings(self.path)
+            self.assertEqual(findings,[{'path':'ProjectSettings/ProjectSettings.asset','kind':'NONEMPTY_CREDENTIAL_SETTING','sha256':ci.digest(path)}])
+            with self.assertRaises(ValueError):ci.source_preflight(self.path)
+        path.write_text('PlayerSettings:\n  ps4Passcode: |\n    SYNTHETIC_NOT_A_CREDENTIAL\n')
+        with self.assertRaises(ValueError):ci.source_preflight(self.path)
+    def test_settings_preflight_refuses_symlink(self):
+        path=self.path/ci.TASK/'unity/ProjectSettings/ProjectSettings.asset'
+        path.symlink_to(self.path/'outside')
+        with self.assertRaises(ValueError):ci.source_preflight(self.path)
+    def test_regenerated_credential_blocks_archive_and_emits_hash_only_fail(self):
+        task=self.path/ci.TASK;common=task/'evidence';common.mkdir(parents=True)
+        path=task/'unity/ProjectSettings/ProjectSettings.asset'
+        path.write_text('PlayerSettings:\n  ps4Passcode: SYNTHETIC_NOT_A_CREDENTIAL\n')
+        stale=common/'g2/edit/generated-assets.zip';stale.parent.mkdir(parents=True);stale.write_bytes(b'SYNTHETIC')
+        with mock.patch.object(ci.legacy,'audit') as audit,self.assertRaises(ValueError):ci.audit_stage(self.path,'edit',{'sourceCommit':'a'*40})
+        audit.assert_not_called();self.assertFalse(stale.exists())
+        raw=(common/'g2/edit/source-mutations.json').read_text();receipt=json.loads(raw)
+        self.assertEqual(receipt['status'],'FAIL');self.assertEqual(receipt['failedStage'],'SETTINGS_CREDENTIAL_PREFLIGHT')
+        self.assertEqual(set(receipt['changes'][0]),{'path','kind','sha256'})
+        self.assertNotIn('SYNTHETIC_NOT_A_CREDENTIAL',raw);self.assertNotIn('ps4Passcode',raw)
     def test_pinned_lock_drift_emits_fail_and_withholds_generated_exports(self):
         task=self.path/ci.TASK;common=task/'evidence';common.mkdir(parents=True)
         lock=task/'unity/Packages/packages-lock.json';lock.parent.mkdir(parents=True);lock.write_text('{}')
