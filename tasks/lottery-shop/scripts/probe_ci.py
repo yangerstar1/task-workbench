@@ -22,7 +22,7 @@ BRANCH = "lottery-shop-g0-20261011"
 BASE = "22525198f7865d055af937f5e828243023d6ad31"
 TASK = "tasks/lottery-shop"
 REQUEST_PATH = TASK + "/ci/g0-request.json"
-REQUEST = {"schemaVersion": 1, "requestId": "lottery-g0-20261011-01",
+REQUEST = {"schemaVersion": 1, "requestId": "lottery-g0-20261012-02",
            "baseCommit": BASE, "purpose": "G0_TECHNICAL_PROBE"}
 VERSION = "6000.3.19f1"
 SCOPE = "G0_TECHNICAL_PROBE_NOT_GAME_NOT_DEVICE_TESTED"
