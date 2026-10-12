@@ -1,29 +1,44 @@
 # Lottery project progress
 
-Updated: 2026-10-12 12:19 UTC
+Updated: 2026-10-12 12:57 UTC. Android status below was observed at 12:56 UTC.
 
 ## Current verified status
 
-- G0: real Unity6000.3.19f1 technical probe, six native EditMode tests and ARM64 Android build passed in run38226292711. This was a capability probe, not the finished game.
-- G1: rule specification and independent calibrated review passed. Accepted private candidate and bounded evidence are backed up in the authorized private repository.
-- G2: one-ticket 3D scratch scene, transactional persistence and same-request FakeAd recovery are implemented. No G2 gate acceptance or finished-game claim yet.
-- Current actual run38241168487, source2b62b4769a02ca00d528b27b3ffcf7e227b6b7c1: Python helpers and Linux/.NET process-recovery step passed. Unity EditMode, exact45-case validation and source audit passed. That run later hit its30-minute job timeout in PlayMode; no Play XML or frames were produced.
-- The previous actual run38239514579 passed24 Linux/.NET SIGKILL cases, but Unity reported42/45 PASS and3 corrupt/unknown-schema recovery failures. An explicit InvalidDataException classification fixed that defect without removing tests. The original failure evidence is saved in the private repository at c411cfa1eb66b326feb071aa933b91261d13babf.
-- Earlier CI defects (missing sparse-checkout input, wrong C# project extension) were fixed. Bounded diagnostics now preserve error identities without raw log or credential export.
+Current source: `93b88d2d81824d35abc4bdb14fcd0b82ccf5c7ef`.
+Current execution: [run 38248877036](https://github.com/yangerstar1/task-workbench/actions/runs/38248877036), request 07, attempt 1.
 
-## Scope limits
+- G0 capability work completed: Unity 6000.3.19f1, six native EditMode checks, source audits and an ARM64 IL2CPP Android probe APK passed in run 38226292711.
+- G1 rule specification and independent test calibration passed. Later implementation still requires its own actual execution and review.
+- G2 candidate 007 implements the minimum one-ticket 3D scratch scene, transactional persistence and same-request FakeAd recovery. Overall G2 acceptance remains pending.
+- The current tests job completed **45/45 native EditMode tests, 8/8 native PlayMode tests and 24/24 Linux/.NET process-kill recovery cases**, with zero failed or skipped native cases. The process cases use real child-process termination with synthetic transaction fixtures; they do not establish Android force-stop behavior.
+- Both source audits passed. Edit settings were unchanged by normalization. Play exported settings are explicitly **NORMALIZED_NOT_RAW**, with normalization-receipt hashes bound by the source-audit and generated-asset manifests. No original credential value is exported.
+- The tests artifact contains exactly **28 files**. Its SHA-256 is `ea9fc853e25039223a5ada27cb9bad85ca5b66ad1403ede9e2f2e31b3f5b333b`. Original XML, process receipts, generated archives, normalization records and frame bindings are retained.
+- Four actual URP frames show the initial ticket, partial scratch, full reveal and settlement. Independent review passed the narrow technical tests and P3 observation scope: spatial masking, retained untouched covering, a stable locked ticket and zero-prize settlement. Frame byte lengths and hashes are bound by the render receipt to this source, run and recorded state hashes.
+- Android job `114813204465` is still building the independent cold ARM64 IL2CPP slice as of 12:56 UTC. No successful current G2 APK or overall G2 gate is claimed.
 
-- Normal first-day advertising is disabled. Eligibility and delayed callback tests use explicit synthetic fixtures; recovery querying is manual. Persistent first-launch elapsed timing remains unimplemented.
-- Android force-stop, real-device input/performance, real ad SDK, final art and full-game progression have not passed.
-- The unused PlayStation credential field is blank; pre-publication and post-Unity export checks reject nonempty credential fields.
-- Next: inspect real PlayMode results and original rendered frames, repair if necessary, then build and independently review the Android technical slice.
+## Render findings and next candidate
 
-## Latest actual run and repair candidate
+The four images are actual Unity camera renders using URP StandardRequest/ReadPixels, OpenGLCore and llvmpipe software rendering. Input tests use the simulated Input System fixture.
 
-Run38244728404/source731e97ad8ffabb398ff37bf3a6d806ce331791bc: 45/45 Edit and24 process-recovery cases passed again. After a fixture lifecycle repair, all8 Play tests completed promptly:1 passed and7 failed. Buy input did not create a ticket, causing downstream failures; a focused input/focus/layout repair and stronger non-vacuous prerequisites are being reviewed. No graphics acceptance or Android build is claimed.
+The source viewport was **640 x 480**, while the output images are **1280 x 720**. This introduces visible horizontal stretch. The top decorative background sign is also clipped. The technical graybox assets do not meet final visual-quality requirements.
 
-Post-Play source screening blocked a nonempty credential setting before any Play settings/archive content was exported. The next candidate introduces explicit, narrowly scoped unused-platform-setting normalization, with baseline/operation/hash provenance and NORMALIZED_NOT_RAW labeling. Other credentials still block export; the identity of the previous nonempty field has not been established from the withheld output.
+A follow-up candidate is being prepared to correct the aspect/layout and sign framing. Corrections must produce new actual frames and fresh verification; the existing frames are not relabeled as fixed. The target visual direction is still awaiting explicit approval. Technical P3 success does not approve final art or later visual gates.
 
-Run05 actual evidence is safely backed up in the private repository at6bd018ae7121ab45f2f31590751000a745bee57d. Native retry remains pending independent review and source checkpoint.
+## Scope limits and next checks
 
-Run06 38246742337/source181a574d685cb8c39383d9f16777ab770d263cc8:45/45 Edit and24 process cases passed; all8 Play cases failed at a newly strengthened mouse press-edge prerequisite (pressed state true, edge false). Both source audits passed. Play settings normalization actually identified ps4Passcode, recorded changed=true, restored the exact empty baseline and exported NORMALIZED_NOT_RAW with receipts. Actual evidence22files saved privately at87b542873557baee081632e457bd56814b480eed. An official Input System1.20.1 Editor-background input-buffer fixture correction is being reviewed; no Play gate success yet.
+- Complete the running Android job, preserve its actual build/APK/source receipts and independently verify the result before a combined G2 decision.
+- Normal first-day advertising is disabled. Eligibility and delayed-callback tests use explicit synthetic fixtures; recovery querying is manual. Persistent first-launch elapsed timing remains unimplemented.
+- Generated-asset archives are job-specific. Preserve source, lock, manifest and normalization bindings when restoring them; do not mix test and Android overlays or describe normalized settings as raw Unity output.
+- Android installation, physical touch, force-stop, device performance, real advertising SDK, full-game progression and final visual/gameplay acceptance remain unverified.
+- The narrow technical and P3 review does not establish final image quality, aspect-safe device UI, positive-prize visual settlement or complete-game acceptance.
+- Export checks continue to block unsafe credential settings. No raw credential values or unrestricted job logs are included in this progress summary.
+
+## Historical failures and repairs
+
+These are retained as past outcomes and must not be read as the current run's status.
+
+- **Run 38239514579**, source `331f0cc94d2b65e646a8374351f287f3dacc0d19`: 24 process cases passed; EditMode passed 42/45 with three corrupt/unknown-schema recovery failures. Explicit invalid-data classification repaired the defect without removing tests. Android was skipped.
+- **Run 38241168487**, source `2b62b4769a02ca00d528b27b3ffcf7e227b6b7c1`: EditMode 45/45 and process 24/24 passed. PlayMode reached the 30-minute job timeout, producing no Play XML or frames. The Play source audit reported leftover test-initialization scene paths after cancellation. Android was skipped.
+- **Run 38244728404**, source `731e97ad8ffabb398ff37bf3a6d806ce331791bc`: EditMode 45/45 and process 24/24 passed. PlayMode completed with one pass and seven failures because the input fixture did not create the expected ticket. The post-Play guard withheld unsafe settings/archive content and exported bounded audit metadata only. Android was skipped.
+- **Run 38246742337**, source `181a574d685cb8c39383d9f16777ab770d263cc8`: EditMode 45/45 and process 24/24 passed; all eight Play cases failed at the strengthened press-edge prerequisite. Both source audits passed with explicit, hash-bound normalization. The Editor-background input-buffer fixture was subsequently corrected; request 07 provides the actual successful retry evidence.
+- Earlier sparse-checkout and C# project-extension startup defects were fixed. Bounded diagnostics preserve error identities without exporting raw logs or credentials.
