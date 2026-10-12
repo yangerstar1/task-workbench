@@ -1,13 +1,13 @@
 # Progress checkpoint
 
-Updated: 2026-10-12 08:38 UTC
+Updated: 2026-10-12 08:53 UTC
 
-Stage: G0 technical validation. No playable APK yet.
+Stage: G0 technical validation; no playable APK yet.
 
-- Latest native run: [38223507667](https://github.com/yangerstar1/task-workbench/actions/runs/38223507667), source 99645798cf1df6b8f9daecd28c78ccb1c518c92b. Overall FAILED; Android skipped.
-- All six exact Unity EditMode tests genuinely PASSED; raw NUnit XML preserved. Compiler failure fixed.
-- Remaining failure: source audit correctly rejected three automatically added Linux SDK/toolchain packages, each 1.1.0. Before/after exact manifests now preserved and diagnosis underway; the audit has not been disabled.
-- Private rules and review backup verified: 276 files, commit 2f7c222c2c137f8acc4acfc4abfc7cad241c485e in the private project repository.
-- Full gameplay, final art, real-device acceptance: NOT_RUN.
+Current live run: [38226292711](https://github.com/yangerstar1/task-workbench/actions/runs/38226292711), IN_PROGRESS at this checkpoint, source 7211d28a277ae0d7316b293e6d8d8a00e55a9784. Follow the link for live status.
 
-Next: verify the origin of the three toolchain dependencies, pin a reproducible reviewed dependency set, then rerun the unchanged native and Android gates. CI results are technical evidence, not gameplay or device acceptance.
+Previous run 38223507667: all six real Unity EditMode tests PASSED; source audit FAILED and Android was skipped. Actual before/after manifests identified three automatically added official Linux SDK/toolchain dependencies. They are now explicitly pinned at observed version 1.1.0; arbitrary dependency mutation remains rejected.
+
+The repair received independent PASS_LIMITED_CI_RETEST after 63 synthetic tests and 13 impact scenarios. This is permission to retest, not native or game acceptance.
+
+Private rule/evidence backup verified at c3023f6dc605136828a28469677519fe5c2d9c94. Rule data has limited preparation acceptance; full gameplay, art, device and release acceptance remain NOT_RUN.
