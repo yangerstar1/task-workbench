@@ -1,0 +1,29 @@
+fileFormatVersion: 2
+guid: a1778f7b885f2846ff6b034c4117c3da
+TextureImporter:
+  internalIDToNameTable: []
+  externalObjects: {}
+  serializedVersion: 13
+  mipmaps:
+    mipMapMode: 0
+    enableMipMap: 1
+    sRGBTexture: 1
+  isReadable: 0
+  textureSettings:
+    serializedVersion: 2
+    filterMode: 1
+    aniso: 2
+    mipBias: 0
+    wrapU: 1
+    wrapV: 1
+    wrapW: 1
+  nPOTScale: 0
+  textureType: 0
+  textureShape: 1
+  maxTextureSize: 2048
+  textureCompression: 0
+  alphaSource: 0
+  alphaIsTransparency: 0
+  userData: G3_APPROVED_ARTWORK_ORIGINAL_SOURCE_BYTES
+  assetBundleName:
+  assetBundleVariant:
