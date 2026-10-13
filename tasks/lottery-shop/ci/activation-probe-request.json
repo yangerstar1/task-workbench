@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "requestId": "lottery-activation-20261013-01",
+  "sourceCommit": "28b3d5d175b64ad8852f033227247d1c179c1c27",
+  "purpose": "ACTIVATION_DIAGNOSTIC_ONLY_NOT_GAME_OR_G3_PASS",
+  "sourceReview": {
+    "sourceCommit": "28b3d5d175b64ad8852f033227247d1c179c1c27",
+    "status": "APPROVED_FOR_ACTIVATION_DIAGNOSTIC_ONLY",
+    "reviewedAtUtc": "2026-10-13T06:55:06Z",
+    "reviewId": "activation-source-20261013-01",
+    "reviewer": "independent-source-review"
+  }
+}
