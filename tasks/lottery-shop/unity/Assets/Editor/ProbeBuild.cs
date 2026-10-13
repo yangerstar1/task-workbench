@@ -18,10 +18,11 @@ namespace Lottery.Probe.Editor
         public const string PipelinePath = Generated + "/Pipeline.asset";
         public const string RendererPath = Generated + "/Renderer.asset";
         public const string ScenePath = Generated + "/Probe.unity";
-        public static void Prepare() => PrepareInternal(false);
+        public static void Prepare() => PrepareInternal(false, null);
         // Test prebuild hooks already own a runner scene. Never unload or recreate it.
-        public static void PrepareForTests() => PrepareInternal(true);
-        static void PrepareInternal(bool preserveLoadedScenes)
+        public static void PrepareForTests() => PrepareInternal(true, null);
+        public static void PrepareForTests(Action<int,bool,bool,bool,bool,bool> observe) => PrepareInternal(true, observe);
+        static void PrepareInternal(bool preserveLoadedScenes, Action<int,bool,bool,bool,bool,bool> observe)
         {
             if (Application.unityVersion != "6000.3.19f1") throw new Exception("Unexpected Unity version");
             Directory.CreateDirectory(Generated);
@@ -48,10 +49,9 @@ namespace Lottery.Probe.Editor
             var priorScene = SceneManager.GetActiveScene();
             var scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene,
                 preserveLoadedScenes ? NewSceneMode.Additive : NewSceneMode.Single);
-            try
+            Action build = () =>
             {
-            if (preserveLoadedScenes && !SceneManager.SetActiveScene(scene))
-                throw new InvalidOperationException("Could not activate isolated Probe preparation scene");
+            if (preserveLoadedScenes) RequirePreparedSceneActive(scene, 10, observe);
             var camera = new GameObject("Probe Camera").AddComponent<Camera>();
             camera.transform.position = new Vector3(0, 2.0f, -3.3f);
             camera.transform.LookAt(new Vector3(0, .6f, 0));
@@ -79,15 +79,69 @@ namespace Lottery.Probe.Editor
             AssetDatabase.SaveAssets();
             if (!preserveLoadedScenes)
                 EditorBuildSettings.scenes = new[] { new EditorBuildSettingsScene(ScenePath, true) };
-            }
+            };
+            if(preserveLoadedScenes)
+                RunPreparationWithCleanup(build,()=>RestorePreparedScene(priorScene,scene,12,observe));
+            else build();
+        }
+        // SetActiveScene's native bool alone does not establish the postcondition.
+        // A newly created Editor scene may already be active. Never create a root
+        // until validity, loading and the actual active handle all agree.
+        public static void RequirePreparedSceneActive(Scene scene, int stageCode, Action<int,bool,bool,bool,bool,bool> observe)
+        {
+            bool valid=scene.IsValid(), loaded=valid&&scene.isLoaded;
+            bool active=valid&&loaded&&SceneManager.GetActiveScene().handle==scene.handle;
+            observe?.Invoke(stageCode,valid,loaded,active,false,false);
+            if(!valid||!loaded)throw new InvalidOperationException("Isolated preparation scene is not valid and loaded");
+            bool attempted=!active, returned=false;
+            if(attempted)returned=SceneManager.SetActiveScene(scene);
+            valid=scene.IsValid();loaded=valid&&scene.isLoaded;
+            active=valid&&loaded&&SceneManager.GetActiveScene().handle==scene.handle;
+            observe?.Invoke(stageCode+1,valid,loaded,active,attempted,returned);
+            if(!active)throw new InvalidOperationException("Isolated preparation scene active-handle postcondition failed");
+        }
+        public static void RestorePreparedScene(Scene priorScene,Scene ownedScene,int stageCode,Action<int,bool,bool,bool,bool,bool> observe)
+        {
+            bool attempted=false,returned=false;
+            RunPreparationWithCleanup(
+                () => RunPreparationWithCleanup(
+                    () =>
+                    {
+                        if(priorScene.IsValid()&&priorScene.isLoaded&&SceneManager.GetActiveScene().handle!=priorScene.handle)
+                        {attempted=true;returned=SceneManager.SetActiveScene(priorScene);}
+                    },
+                    () =>
+                    {
+                        // Only this invocation's owned scene may be closed, even
+                        // when restoring the active scene throws. Keep both failures.
+                        if(ownedScene.IsValid()&&ownedScene.isLoaded)EditorSceneManager.CloseScene(ownedScene,true);
+                    }),
+                () =>
+                {
+                    // Observe the actual state after the close attempt even if
+                    // activation/close failed. Preserve a third observation failure.
+                    bool valid=priorScene.IsValid(),loaded=valid&&priorScene.isLoaded;
+                    bool active=valid&&loaded&&SceneManager.GetActiveScene().handle==priorScene.handle;
+                    observe?.Invoke(stageCode,valid,loaded,active,attempted,returned);
+                    if(!active)throw new InvalidOperationException("Original preparation scene restoration postcondition failed");
+                });
+        }
+        // A cleanup error must not replace the preparation error (or an earlier
+        // restoration error). Both original exception objects keep their stacks.
+        public static void RunPreparationWithCleanup(Action operation,Action cleanup)
+        {
+            Exception operationFailure=null,cleanupFailure=null;
+            try { operation(); }
+            catch(Exception error) { operationFailure=error; }
             finally
             {
-                if (preserveLoadedScenes)
-                {
-                    if (priorScene.IsValid() && priorScene.isLoaded) SceneManager.SetActiveScene(priorScene);
-                    if (scene.IsValid() && scene.isLoaded) EditorSceneManager.CloseScene(scene, true);
-                }
+                try { cleanup(); }
+                catch(Exception error) { cleanupFailure=error; }
             }
+            if(operationFailure!=null&&cleanupFailure!=null)
+                throw new AggregateException("Preparation and cleanup both failed",operationFailure,cleanupFailure);
+            if(operationFailure!=null)System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(operationFailure).Throw();
+            if(cleanupFailure!=null)System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(cleanupFailure).Throw();
         }
         public static void BuildAndroid()
         {

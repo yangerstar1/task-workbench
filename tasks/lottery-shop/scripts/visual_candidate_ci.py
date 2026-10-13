@@ -297,8 +297,32 @@ def export_original_g3_captures(root):
     print(SCOPE + ": preserved existing 14 original G3 frames; new 11-frame fixture verdict remains separate")
 
 
+PREBUILD_DETAIL_STAGES = {
+    'prebuild-guard-failed-active-scene',
+    'prebuild-guard-failed-build-scene-selection',
+    'prebuild-guard-failed-invalid-active-scene',
+    'prebuild-guard-failed-no-original-scene',
+    'prebuild-guard-failed-root-active-state',
+    'prebuild-guard-failed-root-count',
+    'prebuild-guard-failed-root-identity',
+    'prebuild-guard-failed-scene-count',
+    'prebuild-guard-failed-scene-dirty-state',
+    'prebuild-guard-failed-scene-identity',
+    'prebuild-guard-failed-scene-loaded-state',
+    'prebuild-guard-failed-scene-path',
+    'prebuild-guard-snapshot-begin',
+    'prebuild-guard-snapshot-end',
+    'prebuild-guard-unexpected-failed',
+    'prebuild-guard-verify-begin',
+    'prebuild-guard-verify-passed',
+    'prebuild-prepare-begin',
+    'prebuild-prepare-end',
+    'prebuild-prepare-failed',
+}
+
+
 PROGRESS_STAGES = {
-    "prebuild": {"prebuild-begin", "prebuild-end", "prebuild-failed", "prebuild-scene-guard-begin", "prebuild-scene-guard-passed"},
+    "prebuild": {"prebuild-begin", "prebuild-end", "prebuild-failed", "prebuild-scene-guard-begin", "prebuild-scene-guard-passed"} | PREBUILD_DETAIL_STAGES,
     "lifecycle": {"editor-exiting-edit-mode", "runtime-before-scene-load", "runtime-after-scene-load", "editor-entered-play-mode"},
     "runtime": {"runtime-setup-begin", "runtime-setup-end", "runtime-teardown-begin", "runtime-teardown-end",
                 "face-begin", "face-end", "walk-begin", "walk-end", "day-ticket-settled", "scenario-complete", "runtime-timeout"}
@@ -329,6 +353,27 @@ def validate_progress(value, kind, source, run, attempt):
     return value
 
 
+def validate_preparation_scenes(value, source, run, attempt):
+    require(isinstance(value, dict) and set(value) == {"schemaVersion", "scope", "sourceCommit", "runId", "runAttempt", "status", "observations"}, "Unexpected preparation-scene receipt fields")
+    require(type(value["schemaVersion"]) is int and value["schemaVersion"] == 1 and value["scope"] == SCOPE and value["status"] == "MILESTONES_ONLY_NOT_TEST_PASS", "Invalid preparation-scene scope/status")
+    require((value["sourceCommit"], value["runId"], value["runAttempt"]) == (source, run, attempt), "Preparation-scene source/run/attempt mismatch")
+    observations = value["observations"]
+    require(isinstance(observations, list) and 1 <= len(observations) <= 6, "Preparation-scene observation count exceeds bound")
+    bool_fields = {"sceneValid", "isLoaded", "activeMatches", "activationAttempted", "activationReturned"}
+    last_code, last_elapsed = 0, -1
+    for observed in observations:
+        require(isinstance(observed, dict) and set(observed) == bool_fields | {"stageCode", "elapsedMs"}, "Unexpected preparation-scene observation fields")
+        code, elapsed = observed["stageCode"], observed["elapsedMs"]
+        require(type(code) is int and code in {10, 11, 12, 20, 21, 22} and code > last_code, "Unknown, duplicate or out-of-order preparation-scene stage")
+        require(type(elapsed) is int and 0 <= elapsed <= 24 * 60 * 60 * 1000 and elapsed >= last_elapsed, "Invalid preparation-scene clock")
+        require(all(type(observed[key]) is bool for key in bool_fields), "Preparation-scene observations must be actual booleans")
+        last_code, last_elapsed = code, elapsed
+    require(observations[0]["stageCode"] == 10, "Preparation-scene trail must begin at Probe creation")
+    # Both true and false are retained observations. Neither completeness nor
+    # any boolean combination can grant a native/visual/G3 pass.
+    return value
+
+
 def export_progress(root):
     ident = identity(root)
     # Three explicitly named, fixed-schema files only. Missing files mean no observed
@@ -339,6 +384,10 @@ def export_progress(root):
             continue
         value = validate_progress(read_json(path, 65536), kind, ident["sourceCommit"], ident["runId"], ident["runAttempt"])
         write(outdir(root) / (kind + "-progress.json"), value)
+    scene_path = root / TASK / "artifacts/visual-candidate/preparation-scenes.json"
+    if scene_path.exists():
+        value = validate_preparation_scenes(read_json(scene_path, 16384), ident["sourceCommit"], ident["runId"], ident["runAttempt"])
+        write(outdir(root) / "preparation-scenes.json", value)
 
 
 def main():

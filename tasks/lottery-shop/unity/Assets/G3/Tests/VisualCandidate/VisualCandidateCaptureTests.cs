@@ -67,20 +67,148 @@ namespace Lottery.G3.VisualCandidate.Tests
                 var type = AppDomain.CurrentDomain.GetAssemblies()
                     .Select(a => a.GetType("Lottery.G3.Editor.G3Build", false)).FirstOrDefault(t => t != null);
                 if(type == null) throw new InvalidOperationException("G3Build missing: no whitebox fallback");
-                var prepare = type.GetMethod("PrepareForVisualTests", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static);
-                if(prepare == null) throw new InvalidOperationException("G3Build.PrepareForVisualTests missing");
+                var prepare = type.GetMethod("PrepareForVisualTestsObserved", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static);
+                if(prepare == null) throw new InvalidOperationException("G3Build.PrepareForVisualTestsObserved missing");
                 progress.Mark("prebuild-scene-guard-begin");
-                var preserved = new PrebuildSceneGuard();
-                try { prepare.Invoke(null, null); }
-                finally { preserved.RequireUnchanged(); }
+                progress.Mark("prebuild-guard-snapshot-begin");
+                PrebuildSceneGuard preserved;
+                try { preserved = new PrebuildSceneGuard(); }
+                catch(Exception failure)
+                {
+                    try { progress.Mark(GuardFailureStage(failure)); }
+                    catch(Exception diagnosticFailure) { throw new AggregateException(failure, diagnosticFailure); }
+                    throw;
+                }
+                progress.Mark("prebuild-guard-snapshot-end");
+                PrepareAndVerify(prepare, preserved, progress, new PreparationSceneTrail());
                 progress.Mark("prebuild-scene-guard-passed");
                 progress.Mark("prebuild-end");
             }
-            catch { progress.Mark("prebuild-failed"); throw; }
+            catch(Exception failure)
+            {
+                try { progress.Mark("prebuild-failed"); }
+                catch(Exception diagnosticFailure) { throw new AggregateException(failure, diagnosticFailure); }
+                throw;
+            }
 #endif
         }
 
 #if UNITY_EDITOR
+        enum GuardFailure
+        {
+            NoOriginalScene, InvalidOriginalActiveScene, SceneCountChanged,
+            ActiveSceneChanged, SceneIdentityChanged, SceneLoadedStateChanged,
+            ScenePathChanged, SceneDirtyStateChanged, RootCountChanged,
+            RootIdentityChanged, RootActiveStateChanged, BuildSceneSelectionChanged
+        }
+        sealed class PrebuildGuardException : InvalidOperationException
+        {
+            public readonly GuardFailure Code;
+            public PrebuildGuardException(GuardFailure code) : base("Prebuild scene preservation guard: " + code) { Code = code; }
+        }
+        static string GuardFailureStage(Exception failure)
+        {
+            var known = failure as PrebuildGuardException;
+            if(known == null) return "prebuild-guard-unexpected-failed";
+            switch(known.Code)
+            {
+                case GuardFailure.NoOriginalScene: return "prebuild-guard-failed-no-original-scene";
+                case GuardFailure.InvalidOriginalActiveScene: return "prebuild-guard-failed-invalid-active-scene";
+                case GuardFailure.SceneCountChanged: return "prebuild-guard-failed-scene-count";
+                case GuardFailure.ActiveSceneChanged: return "prebuild-guard-failed-active-scene";
+                case GuardFailure.SceneIdentityChanged: return "prebuild-guard-failed-scene-identity";
+                case GuardFailure.SceneLoadedStateChanged: return "prebuild-guard-failed-scene-loaded-state";
+                case GuardFailure.ScenePathChanged: return "prebuild-guard-failed-scene-path";
+                case GuardFailure.SceneDirtyStateChanged: return "prebuild-guard-failed-scene-dirty-state";
+                case GuardFailure.RootCountChanged: return "prebuild-guard-failed-root-count";
+                case GuardFailure.RootIdentityChanged: return "prebuild-guard-failed-root-identity";
+                case GuardFailure.RootActiveStateChanged: return "prebuild-guard-failed-root-active-state";
+                case GuardFailure.BuildSceneSelectionChanged: return "prebuild-guard-failed-build-scene-selection";
+                default: return "prebuild-guard-unexpected-failed";
+            }
+        }
+        static void DiagnosticMark(ProgressTrail progress, string stage, List<Exception> errors)
+        {
+            try { progress.Mark(stage); }
+            catch(Exception error) { errors.Add(error); }
+        }
+        static void PrepareAndVerify(System.Reflection.MethodInfo prepare, PrebuildSceneGuard guard, ProgressTrail progress, PreparationSceneTrail sceneTrail)
+        {
+            var errors = new List<Exception>();
+            DiagnosticMark(progress, "prebuild-prepare-begin", errors);
+            try
+            {
+                prepare.Invoke(null, new object[] { new Action<int,bool,bool,bool,bool,bool>(sceneTrail.Record) });
+                DiagnosticMark(progress, "prebuild-prepare-end", errors);
+            }
+            catch(Exception failure)
+            {
+                errors.Add(failure);
+                DiagnosticMark(progress, "prebuild-prepare-failed", errors);
+            }
+            finally
+            {
+                // Even a failed diagnostic write must not suppress verification.
+                DiagnosticMark(progress, "prebuild-guard-verify-begin", errors);
+                try
+                {
+                    guard.RequireUnchanged();
+                    DiagnosticMark(progress, "prebuild-guard-verify-passed", errors);
+                }
+                catch(Exception failure)
+                {
+                    errors.Add(failure);
+                    DiagnosticMark(progress, GuardFailureStage(failure), errors);
+                }
+            }
+            if(sceneTrail.WriteFailure != null)errors.Add(sceneTrail.WriteFailure);
+            // Do not let a guard or diagnostic failure replace the Prepare cause.
+            // These original exceptions stay in Unity's handling, never in artifacts.
+            if(errors.Count > 1) throw new AggregateException("Prebuild failed in multiple guarded phases", errors);
+            if(errors.Count == 1) System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(errors[0]).Throw();
+        }
+
+        sealed class PreparationSceneTrail
+        {
+            readonly Stopwatch timer = Stopwatch.StartNew();
+            readonly List<PreparationSceneObservation> observations = new List<PreparationSceneObservation>();
+            readonly string path = Path.GetFullPath(Path.Combine(Application.dataPath,"../../artifacts/visual-candidate/preparation-scenes.json"));
+            public Exception WriteFailure {get;private set;}
+            public void Record(int stageCode,bool sceneValid,bool isLoaded,bool activeMatches,bool activationAttempted,bool activationReturned)
+            {
+                try
+                {
+                    if(observations.Count>=6||!new[]{10,11,12,20,21,22}.Contains(stageCode)||observations.Any(x=>x.stageCode==stageCode))
+                        throw new InvalidOperationException("Preparation scene diagnostic bound/code mismatch");
+                    observations.Add(new PreparationSceneObservation{stageCode=stageCode,elapsedMs=timer.ElapsedMilliseconds,
+                        sceneValid=sceneValid,isLoaded=isLoaded,activeMatches=activeMatches,
+                        activationAttempted=activationAttempted,activationReturned=activationReturned});
+                    var receipt=new PreparationScenesReceipt{sourceCommit=Arg("-probeCommit"),runId=Arg("-probeRunId"),
+                        runAttempt=Arg("-probeRunAttempt"),observations=observations.ToArray()};
+                    var json=JsonUtility.ToJson(receipt,true);
+                    if(Encoding.UTF8.GetByteCount(json)>16384)throw new InvalidOperationException("Preparation scene receipt exceeds bound");
+                    Directory.CreateDirectory(Path.GetDirectoryName(path));File.WriteAllText(path,json);
+                }
+                catch(Exception failure)
+                {
+                    // Retain for final failure without interrupting Editor cleanup.
+                    if(WriteFailure==null)WriteFailure=failure;
+                }
+            }
+        }
+        [Serializable] sealed class PreparationSceneObservation
+        {
+            public int stageCode;public long elapsedMs;
+            public bool sceneValid,isLoaded,activeMatches,activationAttempted,activationReturned;
+        }
+        [Serializable] sealed class PreparationScenesReceipt
+        {
+            public int schemaVersion=1;
+            public string scope=Scope,sourceCommit,runId,runAttempt;
+            public string status="MILESTONES_ONLY_NOT_TEST_PASS";
+            public PreparationSceneObservation[] observations;
+        }
+
         // SceneSetup restoration reloads paths but cannot preserve live object identity.
         // Official UTF 1.4.6 creates its runner before IPrebuildSetup; this guard
         // verifies the actual pinned runtime instead of assuming 1.6.0 internals.
@@ -104,33 +232,37 @@ namespace Lottery.G3.VisualCandidate.Tests
                 roots = scenes.Select(s => s.isLoaded ? s.GetRootGameObjects() : new GameObject[0]).ToArray();
                 activeRoots = roots.Select(rs => rs.Select(r => r.activeSelf).ToArray()).ToArray();
                 buildScenes = UnityEditor.EditorBuildSettings.scenes;
-                if(scenes.Length == 0 || !active.IsValid() || !active.isLoaded)
-                    throw new InvalidOperationException("Prebuild needs a live original runner scene");
+                if(scenes.Length == 0) throw new PrebuildGuardException(GuardFailure.NoOriginalScene);
+                if(!active.IsValid() || !active.isLoaded) throw new PrebuildGuardException(GuardFailure.InvalidOriginalActiveScene);
             }
             public void RequireUnchanged()
             {
-                if(SceneManager.sceneCount != scenes.Length || SceneManager.GetActiveScene().handle != active.handle)
-                    throw new InvalidOperationException("Prebuild changed original scene count or active identity");
+                if(SceneManager.sceneCount != scenes.Length) throw new PrebuildGuardException(GuardFailure.SceneCountChanged);
+                if(SceneManager.GetActiveScene().handle != active.handle) throw new PrebuildGuardException(GuardFailure.ActiveSceneChanged);
                 for(int i = 0; i < scenes.Length; i++)
                 {
                     var current = SceneManager.GetSceneAt(i);
-                    if(!scenes[i].IsValid() || current.handle != scenes[i].handle || current.isLoaded != loadedScenes[i])
-                        throw new InvalidOperationException("Prebuild replaced an original scene");
+                    if(!scenes[i].IsValid() || current.handle != scenes[i].handle)
+                        throw new PrebuildGuardException(GuardFailure.SceneIdentityChanged);
+                    if(current.isLoaded != loadedScenes[i]) throw new PrebuildGuardException(GuardFailure.SceneLoadedStateChanged);
                     if(current.path != scenePaths[i])
-                        throw new InvalidOperationException("Prebuild changed an original scene path");
+                        throw new PrebuildGuardException(GuardFailure.ScenePathChanged);
                     if(current.isDirty != dirtyScenes[i])
-                        throw new InvalidOperationException("Prebuild dirtied an original scene");
+                        throw new PrebuildGuardException(GuardFailure.SceneDirtyStateChanged);
                     var currentRoots = current.isLoaded ? current.GetRootGameObjects() : new GameObject[0];
                     if(currentRoots.Length != roots[i].Length)
-                        throw new InvalidOperationException("Prebuild changed original scene roots");
+                        throw new PrebuildGuardException(GuardFailure.RootCountChanged);
                     for(int r = 0; r < roots[i].Length; r++)
-                        if(roots[i][r] == null || !currentRoots.Contains(roots[i][r]) || roots[i][r].activeSelf != activeRoots[i][r])
-                            throw new InvalidOperationException("Prebuild destroyed or disabled an original scene root");
+                    {
+                        if(roots[i][r] == null || !currentRoots.Contains(roots[i][r]))
+                            throw new PrebuildGuardException(GuardFailure.RootIdentityChanged);
+                        if(roots[i][r].activeSelf != activeRoots[i][r]) throw new PrebuildGuardException(GuardFailure.RootActiveStateChanged);
+                    }
                 }
                 var currentBuildScenes = UnityEditor.EditorBuildSettings.scenes;
                 if(currentBuildScenes.Length != buildScenes.Length ||
                     currentBuildScenes.Where((s, i) => s.path != buildScenes[i].path || s.enabled != buildScenes[i].enabled).Any())
-                    throw new InvalidOperationException("Test prebuild changed original build-scene selection");
+                    throw new PrebuildGuardException(GuardFailure.BuildSceneSelectionChanged);
             }
         }
 #endif

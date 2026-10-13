@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Synthetic validator tests, never native rendering or gameplay evidence."""
 import copy
+import re
 import unittest
 import json
 import os
@@ -42,6 +43,19 @@ class ProgressReceiptTests(unittest.TestCase):
 
     def test_runtime_and_prebuild_milestones_are_observations_only(self):
         self.validate(progress_receipt()); self.validate(progress_receipt("prebuild"), "prebuild")
+
+    def test_fixed_prebuild_substeps_and_guard_enums_are_bounded(self):
+        self.assertEqual(len(candidate.PREBUILD_DETAIL_STAGES), 20)
+        self.assertEqual(sum(s.startswith("prebuild-guard-failed-") for s in candidate.PREBUILD_DETAIL_STAGES), 12)
+        for stage in candidate.PREBUILD_DETAIL_STAGES:
+            value = progress_receipt("prebuild")
+            value["events"].append(dict(value["events"][0], stage=stage, elapsedMs=10))
+            self.validate(value, "prebuild")
+        for stage in ("prebuild-guard-failed-new-arbitrary-code", "prebuild-prepare-failed:raw exception body"):
+            value = progress_receipt("prebuild"); value["events"].append(dict(value["events"][0], stage=stage, elapsedMs=10))
+            with self.assertRaises(ValueError): self.validate(value, "prebuild")
+        value = progress_receipt("prebuild"); value["events"][0]["exception"] = "not an allowed field"
+        with self.assertRaises(ValueError): self.validate(value, "prebuild")
 
     def test_fixed_lifecycle_stages_accept_no_arbitrary_payload(self):
         value = progress_receipt(); value["kind"] = "lifecycle"; value["events"][0]["stage"] = "editor-exiting-edit-mode"
@@ -105,6 +119,151 @@ class ProgressReceiptTests(unittest.TestCase):
         workflow = (root / candidate.WORKFLOW).read_text()
         self.assertIn("id: capture\n        timeout-minutes: 30", workflow)
         self.assertIn("timeout-minutes: 60", workflow)
+
+
+class PreparationSceneReceiptTests(unittest.TestCase):
+    def receipt(self):
+        return dict(schemaVersion=1, scope=candidate.SCOPE, sourceCommit="1" * 40, runId="12345", runAttempt="1", status="MILESTONES_ONLY_NOT_TEST_PASS",
+                    observations=[dict(stageCode=code, elapsedMs=i * 10, sceneValid=True, isLoaded=True, activeMatches=i % 3 == 1,
+                                       activationAttempted=False, activationReturned=False) for i, code in enumerate((10, 11, 12, 20, 21, 22))])
+    def validate(self, value): return candidate.validate_preparation_scenes(value, "1" * 40, "12345", "1")
+
+    def test_fixed_complete_and_early_failure_observations_do_not_imply_pass(self):
+        value = self.receipt(); self.validate(value)
+        value["observations"] = [value["observations"][0], value["observations"][2]]
+        value["observations"][0]["sceneValid"] = False; self.validate(value)
+        value["status"] = "PASS"
+        with self.assertRaises(ValueError): self.validate(value)
+        value = self.receipt(); value["schemaVersion"] = True
+        with self.assertRaises(ValueError): self.validate(value)
+
+    def test_already_active_observation_is_retained_without_attempt_or_pass(self):
+        value = self.receipt(); value["observations"] = value["observations"][:2]
+        for observed in value["observations"]:
+            observed.update(activeMatches=True, activationAttempted=False, activationReturned=False)
+        self.assertEqual(self.validate(value), value)
+        value["status"] = "PASS"
+        with self.assertRaises(ValueError): self.validate(value)
+
+    def test_false_activation_return_with_true_postcondition_is_observation_only(self):
+        value = self.receipt(); value["observations"] = value["observations"][:2]
+        value["observations"][1].update(activeMatches=True, activationAttempted=True, activationReturned=False)
+        self.assertEqual(self.validate(value), value)
+        value["status"] = "PASS"
+        with self.assertRaises(ValueError): self.validate(value)
+
+    def test_true_activation_return_with_false_postcondition_is_preserved_failure_data(self):
+        value = self.receipt(); value["observations"] = value["observations"][:2]
+        value["observations"][1].update(activeMatches=False, activationAttempted=True, activationReturned=True)
+        # A failed native postcondition must remain exportable as diagnostic data.
+        # Receipt validation never executes Unity or decides the NUnit verdict.
+        self.assertEqual(self.validate(value), value)
+        value["status"] = "PASS"
+        with self.assertRaises(ValueError): self.validate(value)
+
+    def test_wrong_scene_source_run_or_attempt_rejected(self):
+        for field, wrong in (("sourceCommit", "2" * 40), ("runId", "987"), ("runAttempt", "2")):
+            value = self.receipt(); value[field] = wrong
+            with self.subTest(field=field), self.assertRaises(ValueError): self.validate(value)
+
+    def test_scene_observation_unknown_fields_codes_duplicates_and_overflow_rejected(self):
+        for field, wrong in (("sceneName", "not permitted"), ("stageCode", 99), ("sceneValid", 1), ("elapsedMs", -1)):
+            value = self.receipt(); value["observations"][0][field] = wrong
+            with self.subTest(field=field), self.assertRaises(ValueError): self.validate(value)
+        value = self.receipt(); value["observations"][1]["stageCode"] = 10
+        with self.assertRaises(ValueError): self.validate(value)
+        value = self.receipt(); value["observations"][2]["elapsedMs"] = 5
+        with self.assertRaises(ValueError): self.validate(value)
+        value = self.receipt(); value["observations"].append(value["observations"][-1])
+        with self.assertRaises(ValueError): self.validate(value)
+
+    def test_scene_export_exact_filename_and_16kib_bound(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory); folder = root / candidate.TASK / "artifacts/visual-candidate"
+            candidate.write(folder / "preparation-scenes.json", self.receipt())
+            (folder / "other-scenes.json").write_text("unrelated")
+            ident = dict(sourceCommit="1" * 40, runId="12345", runAttempt="1")
+            with patch.object(candidate, "identity", return_value=ident): candidate.export_progress(root)
+            self.assertEqual([x.name for x in candidate.outdir(root).iterdir()], ["preparation-scenes.json"])
+            (folder / "preparation-scenes.json").write_text(" " * 16385)
+            with patch.object(candidate, "identity", return_value=ident), self.assertRaises(ValueError): candidate.export_progress(root)
+
+
+class PreparationSourceContractTests(unittest.TestCase):
+    """Narrow source-shape checks with negative mutations, not C# execution."""
+    @classmethod
+    def setUpClass(cls):
+        root = Path(__file__).resolve().parents[3] / candidate.TASK / "unity/Assets"
+        cls.probe = (root / "Editor/ProbeBuild.cs").read_text()
+        cls.g3 = (root / "G3/Editor/G3Build.cs").read_text()
+        cls.fixture = (root / "G3/Tests/VisualCandidate/VisualCandidateCaptureTests.cs").read_text()
+
+    @staticmethod
+    def compact(source):
+        return re.sub(r"\s+", "", re.sub(r"//[^\n]*", "", source))
+
+    def require_active_contract(self, source):
+        body = self.compact(source.split("public static void RequirePreparedSceneActive", 1)[1].split("public static void RestorePreparedScene", 1)[0])
+        self.assertIn("boolattempted=!active,returned=false;", body)
+        self.assertEqual(body.count("SceneManager.SetActiveScene(scene)"), 1)
+        self.assertIn("if(attempted)returned=SceneManager.SetActiveScene(scene);", body)
+        after_call = body.split("SceneManager.SetActiveScene(scene);", 1)[1]
+        ordered = ("valid=scene.IsValid();loaded=valid&&scene.isLoaded;",
+                   "active=valid&&loaded&&SceneManager.GetActiveScene().handle==scene.handle;",
+                   "observe?.Invoke(stageCode+1,valid,loaded,active,attempted,returned);",
+                   "if(!active)thrownewInvalidOperationException(")
+        previous = -1
+        for token in ordered:
+            position = after_call.find(token); self.assertGreater(position, previous, token); previous = position
+        self.assertNotIn("if(!returned)", body)
+
+    def test_active_postcondition_static_contract_rejects_three_branch_regressions(self):
+        self.require_active_contract(self.probe)
+        mutations = (("attempted=!active", "attempted=true"),
+                     ("if(!active)throw", "if(!returned)throw"),
+                     ("active=valid&&loaded&&SceneManager.GetActiveScene().handle==scene.handle;\n            observe?.Invoke(stageCode+1", "active=returned;\n            observe?.Invoke(stageCode+1"))
+        for old, new in mutations:
+            changed = self.probe.replace(old, new, 1); self.assertNotEqual(changed, self.probe)
+            with self.subTest(mutation=old), self.assertRaises(AssertionError): self.require_active_contract(changed)
+
+    def require_exception_contract(self, source):
+        helper = self.compact(source.split("public static void RunPreparationWithCleanup", 1)[1].split("public static void BuildAndroid", 1)[0])
+        self.assertIn("try{operation();}catch(Exceptionerror){operationFailure=error;}", helper)
+        self.assertIn("finally{try{cleanup();}catch(Exceptionerror){cleanupFailure=error;}}", helper)
+        self.assertIn('if(operationFailure!=null&&cleanupFailure!=null)thrownewAggregateException("Preparationandcleanupbothfailed",operationFailure,cleanupFailure);', helper)
+        for failure in ("operationFailure", "cleanupFailure"):
+            self.assertIn("if(" + failure + "!=null)System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(" + failure + ").Throw();", helper)
+
+    def test_body_and_cleanup_failures_static_contract_rejects_overwrite_or_swallow(self):
+        self.require_exception_contract(self.probe)
+        for old, new in ((",operationFailure,cleanupFailure)", ",cleanupFailure)"),
+                         ("cleanupFailure=error;", "cleanupFailure=null;"),
+                         ("Capture(operationFailure).Throw();", "Capture(operationFailure);")):
+            changed = self.probe.replace(old, new, 1); self.assertNotEqual(changed, self.probe)
+            with self.subTest(mutation=old), self.assertRaises(AssertionError): self.require_exception_contract(changed)
+
+    def require_restore_contract(self, source):
+        body = self.compact(source.split("public static void RestorePreparedScene", 1)[1].split("public static void RunPreparationWithCleanup", 1)[0])
+        self.assertEqual(body.count("RunPreparationWithCleanup("), 2)
+        self.assertIn("RunPreparationWithCleanup(()=>RunPreparationWithCleanup(", body)
+        self.assertIn("if(ownedScene.IsValid()&&ownedScene.isLoaded)EditorSceneManager.CloseScene(ownedScene,true);}),()=>{", body)
+        self.assertIn("boolvalid=priorScene.IsValid(),loaded=valid&&priorScene.isLoaded;boolactive=valid&&loaded&&SceneManager.GetActiveScene().handle==priorScene.handle;", body)
+        self.assertIn('observe?.Invoke(stageCode,valid,loaded,active,attempted,returned);if(!active)thrownewInvalidOperationException(', body)
+
+    def test_restore_close_and_final_observation_static_chain_rejects_dropped_cleanup(self):
+        self.require_restore_contract(self.probe)
+        for old, new in (("() => RunPreparationWithCleanup(", "() => UnprotectedSequence("),
+                         ("EditorSceneManager.CloseScene(ownedScene,true)", "EditorSceneManager.CloseScene(priorScene,true)"),
+                         ("active=valid&&loaded&&SceneManager.GetActiveScene().handle==priorScene.handle;", "active=returned;")):
+            changed = self.probe.replace(old, new, 1); self.assertNotEqual(changed, self.probe)
+            with self.subTest(mutation=old), self.assertRaises(AssertionError): self.require_restore_contract(changed)
+
+    def test_both_preparation_bodies_and_outer_scene_guard_keep_cleanup_chain_static(self):
+        probe, g3, fixture = map(self.compact, (self.probe, self.g3, self.fixture))
+        self.assertIn("RunPreparationWithCleanup(build,()=>RestorePreparedScene(priorScene,scene,12,observe));", probe)
+        self.assertIn("RunPreparationWithCleanup(build,()=>Lottery.Probe.Editor.ProbeBuild.RestorePreparedScene(priorScene,scene,22,observe));", g3)
+        self.assertIn('finally{DiagnosticMark(progress,"prebuild-guard-verify-begin",errors);try{guard.RequireUnchanged();', fixture)
+        self.assertIn('if(errors.Count>1)thrownewAggregateException("Prebuildfailedinmultipleguardedphases",errors);', fixture)
 
 
 class VisualCandidateEvidenceTests(unittest.TestCase):

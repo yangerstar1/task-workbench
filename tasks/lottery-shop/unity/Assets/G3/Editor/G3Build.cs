@@ -24,23 +24,23 @@ namespace Lottery.G3.Editor
             binding.RequireVerifiedPair(); // Read-only; committed verification must already be correct.
         }
 
-        public static void Prepare() => PrepareInternal(false);
+        public static void Prepare() => PrepareInternal(false, null);
         // Only diagnostic prebuild hooks use this entry. The ordinary build path
         // keeps its existing Single-scene behavior and build-scene selection.
-        public static void PrepareForVisualTests() => PrepareInternal(true);
-        static void PrepareInternal(bool preserveLoadedScenes)
+        public static void PrepareForVisualTests() => PrepareInternal(true, null);
+        public static void PrepareForVisualTestsObserved(Action<int,bool,bool,bool,bool,bool> observe) => PrepareInternal(true, observe);
+        static void PrepareInternal(bool preserveLoadedScenes, Action<int,bool,bool,bool,bool,bool> observe)
         {
-            if(preserveLoadedScenes) Lottery.Probe.Editor.ProbeBuild.PrepareForTests();
+            if(preserveLoadedScenes) Lottery.Probe.Editor.ProbeBuild.PrepareForTests(observe);
             else Lottery.Probe.Editor.ProbeBuild.Prepare();
             ApprovedArtworkBinding number=null,challenge=null;
             if(!preserveLoadedScenes)PrepareShopBindings(out number,out challenge);
             var priorScene=SceneManager.GetActiveScene();
             var scene=EditorSceneManager.NewScene(NewSceneSetup.EmptyScene,
                 preserveLoadedScenes?NewSceneMode.Additive:NewSceneMode.Single);
-            try
+            Action build = () =>
             {
-            if(preserveLoadedScenes&&!SceneManager.SetActiveScene(scene))
-                throw new InvalidOperationException("Could not activate isolated G3 preparation scene");
+            if(preserveLoadedScenes)Lottery.Probe.Editor.ProbeBuild.RequirePreparedSceneActive(scene,20,observe);
             // All importer temporary GameObjects live in this owned scene, too;
             // create/destroy must not dirty the framework's saved runner scene.
             if(preserveLoadedScenes)PrepareShopBindings(out number,out challenge);
@@ -60,15 +60,11 @@ namespace Lottery.G3.Editor
             if(!EditorSceneManager.SaveScene(scene,ScenePath))throw new IOException("G3 scene save failed");
             AssetDatabase.SaveAssets();
             if(!preserveLoadedScenes)EditorBuildSettings.scenes=new[]{new EditorBuildSettingsScene(ScenePath,true)};
-            }
-            finally
-            {
-                if(preserveLoadedScenes)
-                {
-                    if(priorScene.IsValid()&&priorScene.isLoaded)SceneManager.SetActiveScene(priorScene);
-                    if(scene.IsValid()&&scene.isLoaded)EditorSceneManager.CloseScene(scene,true);
-                }
-            }
+            };
+            if(preserveLoadedScenes)
+                Lottery.Probe.Editor.ProbeBuild.RunPreparationWithCleanup(build,
+                    ()=>Lottery.Probe.Editor.ProbeBuild.RestorePreparedScene(priorScene,scene,22,observe));
+            else build();
         }
         static void PrepareShopBindings(out ApprovedArtworkBinding number,out ApprovedArtworkBinding challenge)
         {

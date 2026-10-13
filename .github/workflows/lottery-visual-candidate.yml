@@ -88,6 +88,7 @@ jobs:
             tasks/lottery-shop/evidence/visual-candidate/prebuild-progress.json
             tasks/lottery-shop/evidence/visual-candidate/runtime-progress.json
             tasks/lottery-shop/evidence/visual-candidate/lifecycle-progress.json
+            tasks/lottery-shop/evidence/visual-candidate/preparation-scenes.json
             tasks/lottery-shop/evidence/visual-candidate/capture/raw-test-results.xml
             tasks/lottery-shop/evidence/visual-candidate/capture/raw-test-report-receipt.json
             tasks/lottery-shop/evidence/visual-candidate/capture/test-receipt.json
