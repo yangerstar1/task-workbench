@@ -7,6 +7,10 @@ import os
 from pathlib import Path
 import subprocess
 import tempfile
+import hashlib
+import shutil
+import struct
+import zlib
 from unittest.mock import patch
 import xml.etree.ElementTree as ET
 import visual_candidate_ci as candidate
@@ -38,6 +42,12 @@ class ProgressReceiptTests(unittest.TestCase):
 
     def test_runtime_and_prebuild_milestones_are_observations_only(self):
         self.validate(progress_receipt()); self.validate(progress_receipt("prebuild"), "prebuild")
+
+    def test_fixed_lifecycle_stages_accept_no_arbitrary_payload(self):
+        value = progress_receipt(); value["kind"] = "lifecycle"; value["events"][0]["stage"] = "editor-exiting-edit-mode"
+        candidate.validate_progress(value, "lifecycle", "1" * 40, "12345", "1")
+        value["events"][0]["sceneName"] = "not an allowed field"
+        with self.assertRaises(ValueError): candidate.validate_progress(value, "lifecycle", "1" * 40, "12345", "1")
 
     def test_missing_progress_is_not_fabricated(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -241,6 +251,130 @@ class NativeReportShapeTests(unittest.TestCase):
             (folder / "results.xml").write_text('<test-run><output>password=synthetic</output></test-run>')
             with self.assertRaises(ValueError): candidate.export_tests(root, "capture")
             self.assertFalse((candidate.outdir(root) / "capture/raw-test-results.xml").exists())
+
+
+class OriginalG3FrameExportTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        def chunk(kind, data):
+            return struct.pack(">I", len(data)) + kind + data + struct.pack(">I", zlib.crc32(kind + data) & 0xffffffff)
+        cls.chunk = staticmethod(chunk)
+        row = bytes(value for x in range(1280) for value in (x % 256, (x // 8) % 256, (x * 3) % 256))
+        cls.pixels = b"".join(b"\x00" + row for unused in range(720))
+        cls.pngs = [cls.png(index) for index in range(14)]
+
+    @classmethod
+    def png(cls, index, width=1280):
+        pixels = bytearray(cls.pixels); pixels[1] = index
+        return b"\x89PNG\r\n\x1a\n" + cls.chunk(b"IHDR", struct.pack(">IIBBBBB", width, 720, 8, 2, 0, 0, 0)) + cls.chunk(b"IDAT", zlib.compress(pixels)) + cls.chunk(b"IEND", b"")
+
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory(); self.addCleanup(self.temp.cleanup); self.root = Path(self.temp.name)
+        self.env = patch.dict(os.environ, GITHUB_SHA="1" * 40, GITHUB_RUN_ID="12345", GITHUB_RUN_ATTEMPT="1"); self.env.start(); self.addCleanup(self.env.stop)
+        candidate.write(candidate.outdir(self.root) / "source-receipt.json", dict(scope=candidate.SCOPE, sourceCommit="1" * 40, runId="12345", runAttempt="1"))
+        original = Path(__file__).resolve().parents[3] / candidate.TASK / "ci"
+        for name in ("g2-test-contract.json", "g3-test-contract.json"):
+            target = self.root / candidate.TASK / "ci" / name; target.parent.mkdir(parents=True, exist_ok=True); shutil.copyfile(original / name, target)
+        candidate.prepare_original_g3_captures(self.root)
+        profiles = {}
+        for name in ("g2-test-contract.json", "g3-test-contract.json"):
+            profiles.update(candidate.read_json(original / name)["profiles"]["play"])
+        count = sum(len(names) for names in profiles.values())
+        self.xml = ET.Element("test-run", result="Passed", total=str(count), passed=str(count), failed="0", skipped="0", inconclusive="0")
+        for assembly, names in profiles.items():
+            suite = ET.SubElement(self.xml, "test-suite", type="Assembly", name=assembly, result="Passed")
+            for name in names: ET.SubElement(suite, "test-case", fullname=name, result="Passed")
+        self.xmlpath = self.root / candidate.TASK / "artifacts/visual-regression-play/results.xml"
+        self.xmlpath.parent.mkdir(parents=True); self.xmlpath.write_bytes(ET.tostring(self.xml))
+        self.source = candidate.original_g3_source(self.root); self.source.mkdir(parents=True)
+        frames = []
+        for index, name in enumerate(candidate.ORIGINAL_G3_FRAMES):
+            data = self.pngs[index]; (self.source / (name + ".png")).write_bytes(data)
+            frames.append(dict(stage=name, file=name + ".png", sha256=hashlib.sha256(data).hexdigest(), bytes=len(data), stateSha256="a" * 64,
+                               gameRunId="g3-protected-render-fixture" if name == "challenge-protected" else "g3-day-qafixture-001",
+                               fixtureLabel="SYNTHETIC_CONSUMABLE_BOUNDARY_FIXTURE" if name == "challenge-protected" else "G3_DIAGNOSTIC_VECTOR_NOT_NATURAL"))
+        import g3_ci
+        self.receipt = dict(schemaVersion=1, scope="G3_CAMERA_RENDER_NOT_DEVICE_TESTED", sourceCommit="1" * 40, runId="12345", unityVersion="6000.3.19f1",
+                            rulesSha256=g3_ci.RULES_SHA, captureMethod="URP_STANDARD_REQUEST_READPIXELS", graphicsDeviceType="OpenGLCore", graphicsDeviceName="Synthetic validation only",
+                            width=1280, height=720, sourceViewportWidth=1280, sourceViewportHeight=720, inputEvidence="SIMULATED_INPUT_SYSTEM", deviceQa="NOT_RUN", visualReview="PENDING", frames=frames)
+        self.save_receipt()
+
+    def save_receipt(self): candidate.write(self.source / "render-receipt.json", self.receipt)
+    def export(self): candidate.export_original_g3_captures(self.root)
+    def assert_no_frames_exported(self): self.assertFalse((candidate.outdir(self.root) / "original-g3-captures/empty.png").exists())
+
+    def test_complete_originals_export_separately_with_attempt_limitation(self):
+        self.export(); folder = candidate.outdir(self.root) / "original-g3-captures"
+        self.assertEqual(len(list(folder.glob("*.png"))), 14)
+        result = candidate.read_json(folder / "export-receipt.json")
+        self.assertEqual(result["legacyReceiptRunAttempt"], "NOT_PRESENT_IN_LEGACY_SCHEMA")
+        self.assertEqual(result["separateProtectedFixtureFrame"], "challenge-protected")
+        self.assertEqual(result["g3Gate"], "NOT_EVALUATED")
+        self.assertFalse((candidate.outdir(self.root) / "captures/capture-receipt.json").exists())
+
+    def test_old_frames_upload_requires_successful_export_and_is_separate(self):
+        root = Path(__file__).resolve().parents[3]
+        workflow = (root / candidate.WORKFLOW).read_text()
+        upload = workflow.split("      - name: Upload separately verified existing 14 original G3 frames", 1)[1].split("      - name:", 1)[0]
+        self.assertIn("steps.originalcaptures.outcome == 'success'", upload)
+        for name in candidate.ORIGINAL_G3_FILES: self.assertIn("original-g3-captures/" + name, upload)
+        regression = workflow.split("      - name: Upload bounded regression and source mutation evidence", 1)[1]
+        self.assertNotIn("original-g3-captures/", regression)
+
+    def test_wrong_source_receipt_is_rejected(self):
+        self.receipt["sourceCommit"] = "2" * 40; self.save_receipt()
+        with self.assertRaises(ValueError): self.export()
+        self.assert_no_frames_exported()
+
+    def test_old_attempt_preparation_is_rejected(self):
+        path = candidate.outdir(self.root) / "original-g3-preparation.json"; value = candidate.read_json(path); value["runAttempt"] = "2"; candidate.write(path, value)
+        with self.assertRaises(ValueError): self.export()
+        self.assert_no_frames_exported()
+
+    def test_preparation_removes_only_fixed_outputs_and_rejects_leftover_old_files(self):
+        keep = self.source / "unrelated.txt"; keep.write_text("keep")
+        candidate.prepare_original_g3_captures(self.root)
+        self.assertTrue(keep.exists()); self.assertFalse(any((self.source / name).exists() for name in candidate.ORIGINAL_G3_FILES))
+        with self.assertRaises(ValueError): self.export()
+        self.assert_no_frames_exported()
+
+    def test_stale_png_timestamp_from_before_preparation_is_rejected(self):
+        os.utime(self.source / "empty.png", ns=(1, 1))
+        with self.assertRaises(ValueError): self.export()
+        self.assert_no_frames_exported()
+
+    def test_stale_original_nunit_xml_is_rejected(self):
+        os.utime(self.xmlpath, ns=(1, 1))
+        with self.assertRaises(ValueError): self.export()
+        self.assert_no_frames_exported()
+
+    def test_missing_original_png_is_rejected(self):
+        (self.source / "night.png").unlink()
+        with self.assertRaises(ValueError): self.export()
+        self.assert_no_frames_exported()
+
+    def test_original_png_hash_corruption_is_rejected(self):
+        path = self.source / "empty.png"; data = bytearray(path.read_bytes()); data[-1] ^= 1; path.write_bytes(data)
+        with self.assertRaises(ValueError): self.export()
+        self.assert_no_frames_exported()
+
+    def test_wrong_dimensions_with_matching_hash_are_rejected(self):
+        data = self.png(0, width=1279); (self.source / "empty.png").write_bytes(data)
+        self.receipt["frames"][0].update(sha256=hashlib.sha256(data).hexdigest(), bytes=len(data)); self.save_receipt()
+        with self.assertRaises(ValueError): self.export()
+        self.assert_no_frames_exported()
+
+    def test_failed_original_nunit_case_is_rejected(self):
+        for case in self.xml.iter("test-case"):
+            if case.get("fullname") == candidate.ORIGINAL_G3_CASE: case.set("result", "Failed")
+        self.xml.set("result", "Failed"); self.xml.set("passed", "31"); self.xml.set("failed", "1"); self.xmlpath.write_bytes(ET.tostring(self.xml))
+        with self.assertRaises(ValueError): self.export()
+        self.assert_no_frames_exported()
+
+    def test_protected_fixture_cannot_be_relabelled_as_main_day(self):
+        self.receipt["frames"][-1]["gameRunId"] = "g3-day-qafixture-001"; self.save_receipt()
+        with self.assertRaises(ValueError): self.export()
+        self.assert_no_frames_exported()
 
 
 class SeparateRequestTests(unittest.TestCase):

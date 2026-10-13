@@ -7,6 +7,7 @@ using UnityEditor.Build.Reporting;
 using UnityEditor.SceneManagement;
 using UnityEngine;
 using UnityEngine.Rendering;
+using UnityEngine.SceneManagement;
 using Lottery.G3.Interaction;
 using Lottery.G3.Rendering;
 namespace Lottery.G3.Editor
@@ -23,14 +24,26 @@ namespace Lottery.G3.Editor
             binding.RequireVerifiedPair(); // Read-only; committed verification must already be correct.
         }
 
-        public static void Prepare()
+        public static void Prepare() => PrepareInternal(false);
+        // Only diagnostic prebuild hooks use this entry. The ordinary build path
+        // keeps its existing Single-scene behavior and build-scene selection.
+        public static void PrepareForVisualTests() => PrepareInternal(true);
+        static void PrepareInternal(bool preserveLoadedScenes)
         {
-            Lottery.Probe.Editor.ProbeBuild.Prepare();
-            G3ShopArtImporter.Prepare();
-            var number=AssetDatabase.LoadAssetAtPath<ApprovedArtworkBinding>("Assets/G3/Rendering/Resources/G3/number.asset");
-            var challenge=AssetDatabase.LoadAssetAtPath<ApprovedArtworkBinding>("Assets/G3/Rendering/Resources/G3/challenge.asset");
-            ValidateArtwork(number,"number");ValidateArtwork(challenge,"challenge");
-            var scene=EditorSceneManager.NewScene(NewSceneSetup.EmptyScene,NewSceneMode.Single);
+            if(preserveLoadedScenes) Lottery.Probe.Editor.ProbeBuild.PrepareForTests();
+            else Lottery.Probe.Editor.ProbeBuild.Prepare();
+            ApprovedArtworkBinding number=null,challenge=null;
+            if(!preserveLoadedScenes)PrepareShopBindings(out number,out challenge);
+            var priorScene=SceneManager.GetActiveScene();
+            var scene=EditorSceneManager.NewScene(NewSceneSetup.EmptyScene,
+                preserveLoadedScenes?NewSceneMode.Additive:NewSceneMode.Single);
+            try
+            {
+            if(preserveLoadedScenes&&!SceneManager.SetActiveScene(scene))
+                throw new InvalidOperationException("Could not activate isolated G3 preparation scene");
+            // All importer temporary GameObjects live in this owned scene, too;
+            // create/destroy must not dirty the framework's saved runner scene.
+            if(preserveLoadedScenes)PrepareShopBindings(out number,out challenge);
             var bootstrap=new GameObject("G3 Original Shop Visual Candidate").AddComponent<G3SliceBootstrap>();
             bootstrap.chineseFont=AssetDatabase.LoadAssetAtPath<Font>("Assets/Resources/ProbeChinese.otf");
             bootstrap.paperShader=AssetDatabase.LoadAssetAtPath<Shader>("Assets/G3/Rendering/TicketPaper.shader");
@@ -45,7 +58,24 @@ namespace Lottery.G3.Editor
                 throw new InvalidOperationException("G3 scene dependencies missing");
             Directory.CreateDirectory("Assets/G3/Scenes");
             if(!EditorSceneManager.SaveScene(scene,ScenePath))throw new IOException("G3 scene save failed");
-            AssetDatabase.SaveAssets();EditorBuildSettings.scenes=new[]{new EditorBuildSettingsScene(ScenePath,true)};
+            AssetDatabase.SaveAssets();
+            if(!preserveLoadedScenes)EditorBuildSettings.scenes=new[]{new EditorBuildSettingsScene(ScenePath,true)};
+            }
+            finally
+            {
+                if(preserveLoadedScenes)
+                {
+                    if(priorScene.IsValid()&&priorScene.isLoaded)SceneManager.SetActiveScene(priorScene);
+                    if(scene.IsValid()&&scene.isLoaded)EditorSceneManager.CloseScene(scene,true);
+                }
+            }
+        }
+        static void PrepareShopBindings(out ApprovedArtworkBinding number,out ApprovedArtworkBinding challenge)
+        {
+            G3ShopArtImporter.Prepare();
+            number=AssetDatabase.LoadAssetAtPath<ApprovedArtworkBinding>("Assets/G3/Rendering/Resources/G3/number.asset");
+            challenge=AssetDatabase.LoadAssetAtPath<ApprovedArtworkBinding>("Assets/G3/Rendering/Resources/G3/challenge.asset");
+            ValidateArtwork(number,"number");ValidateArtwork(challenge,"challenge");
         }
         public static void BuildAndroid()
         {

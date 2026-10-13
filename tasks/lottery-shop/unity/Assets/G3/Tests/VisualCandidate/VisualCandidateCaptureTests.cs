@@ -63,17 +63,77 @@ namespace Lottery.G3.VisualCandidate.Tests
             progress.Mark("prebuild-begin");
             try
             {
+                VisualCandidateLifecycleProbe.Arm();
                 var type = AppDomain.CurrentDomain.GetAssemblies()
                     .Select(a => a.GetType("Lottery.G3.Editor.G3Build", false)).FirstOrDefault(t => t != null);
                 if(type == null) throw new InvalidOperationException("G3Build missing: no whitebox fallback");
-                var prepare = type.GetMethod("Prepare", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static);
-                if(prepare == null) throw new InvalidOperationException("G3Build.Prepare missing");
-                prepare.Invoke(null, null);
+                var prepare = type.GetMethod("PrepareForVisualTests", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static);
+                if(prepare == null) throw new InvalidOperationException("G3Build.PrepareForVisualTests missing");
+                progress.Mark("prebuild-scene-guard-begin");
+                var preserved = new PrebuildSceneGuard();
+                try { prepare.Invoke(null, null); }
+                finally { preserved.RequireUnchanged(); }
+                progress.Mark("prebuild-scene-guard-passed");
                 progress.Mark("prebuild-end");
             }
             catch { progress.Mark("prebuild-failed"); throw; }
 #endif
         }
+
+#if UNITY_EDITOR
+        // SceneSetup restoration reloads paths but cannot preserve live object identity.
+        // Official UTF 1.4.6 creates its runner before IPrebuildSetup; this guard
+        // verifies the actual pinned runtime instead of assuming 1.6.0 internals.
+        // Both preparation levels must preserve every original object on failure too.
+        sealed class PrebuildSceneGuard
+        {
+            readonly Scene[] scenes;
+            readonly bool[] loadedScenes, dirtyScenes;
+            readonly string[] scenePaths;
+            readonly GameObject[][] roots;
+            readonly bool[][] activeRoots;
+            readonly Scene active;
+            readonly UnityEditor.EditorBuildSettingsScene[] buildScenes;
+            public PrebuildSceneGuard()
+            {
+                active = SceneManager.GetActiveScene();
+                scenes = Enumerable.Range(0, SceneManager.sceneCount).Select(SceneManager.GetSceneAt).ToArray();
+                scenePaths = scenes.Select(s => s.path).ToArray();
+                loadedScenes = scenes.Select(s => s.isLoaded).ToArray();
+                dirtyScenes = scenes.Select(s => s.isDirty).ToArray();
+                roots = scenes.Select(s => s.isLoaded ? s.GetRootGameObjects() : new GameObject[0]).ToArray();
+                activeRoots = roots.Select(rs => rs.Select(r => r.activeSelf).ToArray()).ToArray();
+                buildScenes = UnityEditor.EditorBuildSettings.scenes;
+                if(scenes.Length == 0 || !active.IsValid() || !active.isLoaded)
+                    throw new InvalidOperationException("Prebuild needs a live original runner scene");
+            }
+            public void RequireUnchanged()
+            {
+                if(SceneManager.sceneCount != scenes.Length || SceneManager.GetActiveScene().handle != active.handle)
+                    throw new InvalidOperationException("Prebuild changed original scene count or active identity");
+                for(int i = 0; i < scenes.Length; i++)
+                {
+                    var current = SceneManager.GetSceneAt(i);
+                    if(!scenes[i].IsValid() || current.handle != scenes[i].handle || current.isLoaded != loadedScenes[i])
+                        throw new InvalidOperationException("Prebuild replaced an original scene");
+                    if(current.path != scenePaths[i])
+                        throw new InvalidOperationException("Prebuild changed an original scene path");
+                    if(current.isDirty != dirtyScenes[i])
+                        throw new InvalidOperationException("Prebuild dirtied an original scene");
+                    var currentRoots = current.isLoaded ? current.GetRootGameObjects() : new GameObject[0];
+                    if(currentRoots.Length != roots[i].Length)
+                        throw new InvalidOperationException("Prebuild changed original scene roots");
+                    for(int r = 0; r < roots[i].Length; r++)
+                        if(roots[i][r] == null || !currentRoots.Contains(roots[i][r]) || roots[i][r].activeSelf != activeRoots[i][r])
+                            throw new InvalidOperationException("Prebuild destroyed or disabled an original scene root");
+                }
+                var currentBuildScenes = UnityEditor.EditorBuildSettings.scenes;
+                if(currentBuildScenes.Length != buildScenes.Length ||
+                    currentBuildScenes.Where((s, i) => s.path != buildScenes[i].path || s.enabled != buildScenes[i].enabled).Any())
+                    throw new InvalidOperationException("Test prebuild changed original build-scene selection");
+            }
+        }
+#endif
 
         [UnitySetUp]
         public IEnumerator SetUpRuntime()

@@ -17,6 +17,7 @@ import shutil
 import struct
 import subprocess
 import sys
+import time
 
 import probe_ci as bounded
 
@@ -29,6 +30,10 @@ CASE = "Lottery.G3.VisualCandidate.Tests.VisualCandidateCaptureTests.RealRuntime
 FRAMES = ["entry-whole-shop", "table-empty", "number-half", "number-half-20x9",
           "challenge-two-safe-three-tools", "shelf-before-open", "shelf-after-open",
           "challenge-returned-from-shelf", "closing-day-table", "night-table", "night-bill"]
+ORIGINAL_G3_FRAMES = ["empty", "number-half", "number-revealed", "number-copy", "number-settled", "configuration", "phone",
+                      "challenge-two-safe", "challenge-selected", "shop-shortcut", "shop-physical", "night", "day-end", "challenge-protected"]
+ORIGINAL_G3_CASE = "Lottery.G3.PlayMode.Tests.G3PlayTests.ActualUrpFramesShowOneDayAndDisclosedSeparateProtectedFixture"
+ORIGINAL_G3_FILES = [name + ".png" for name in ORIGINAL_G3_FRAMES] + ["render-receipt.json"]
 HEX40 = re.compile(r"[0-9a-f]{40}\Z")
 HEX64 = re.compile(r"[0-9a-f]{64}\Z")
 STAGES = ("capture", "regression-edit", "regression-play")
@@ -223,8 +228,78 @@ def export_captures(root, require_complete=True):
     print(SCOPE + ": preserved " + str(len(frames)) + " original Unity runtime PNGs")
 
 
+def original_g3_source(root):
+    path = root / TASK / "artifacts/g3-play/captures"
+    require(path.resolve().is_relative_to(root.resolve()), "Original frame directory escapes checkout")
+    return path
+
+
+def prepare_original_g3_captures(root):
+    ident = identity(root)
+    for key, env in (("runId", "GITHUB_RUN_ID"), ("runAttempt", "GITHUB_RUN_ATTEMPT")):
+        require(ident[key] == os.environ.get(env), "Original frame preparation run/attempt mismatch")
+    source = original_g3_source(root)
+    destination = outdir(root) / "original-g3-captures"
+    # Clear only the fixed old-test outputs and their own prior exported copies.
+    # No directories, unrelated files, logs, source, or settings are removed.
+    for directory, names in ((source, ORIGINAL_G3_FILES), (destination, ORIGINAL_G3_FILES + ["export-receipt.json"])):
+        for name in names:
+            path = directory / name
+            if path.exists() or path.is_symlink():
+                require(path.is_file() or path.is_symlink(), "Expected a fixed frame file, not a directory")
+                path.unlink()
+    write(outdir(root) / "original-g3-preparation.json", dict(schemaVersion=1, scope=SCOPE,
+          sourceCommit=ident["sourceCommit"], runId=ident["runId"], runAttempt=ident["runAttempt"],
+          preparedAtUtc=datetime.now(timezone.utc).isoformat(), preparedAtNs=time.time_ns(),
+          fixedFiles=ORIGINAL_G3_FILES, status="FIXED_OUTPUTS_CLEARED_BEFORE_PLAY_NOT_A_PASS"))
+
+
+def export_original_g3_captures(root):
+    ident = identity(root)
+    prepared = read_json(outdir(root) / "original-g3-preparation.json", 8192)
+    require(set(prepared) == {"schemaVersion", "scope", "sourceCommit", "runId", "runAttempt", "preparedAtUtc", "preparedAtNs", "fixedFiles", "status"}, "Original frame preparation schema mismatch")
+    require(prepared["schemaVersion"] == 1 and prepared["scope"] == SCOPE and prepared["status"] == "FIXED_OUTPUTS_CLEARED_BEFORE_PLAY_NOT_A_PASS" and prepared["fixedFiles"] == ORIGINAL_G3_FILES, "Original frame preparation mismatch")
+    require(all(prepared[k] == ident[k] for k in ("sourceCommit", "runId", "runAttempt")), "Original frame stale source/run/attempt preparation")
+    require(ident["runId"] == os.environ.get("GITHUB_RUN_ID") and ident["runAttempt"] == os.environ.get("GITHUB_RUN_ATTEMPT"), "Original frame execution run/attempt mismatch")
+    require(type(prepared["preparedAtNs"]) is int and 0 < prepared["preparedAtNs"] <= time.time_ns(), "Invalid original frame preparation clock")
+    require(isinstance(prepared["preparedAtUtc"], str) and len(prepared["preparedAtUtc"]) <= 40, "Invalid original frame preparation timestamp")
+    stamp = datetime.fromisoformat(prepared["preparedAtUtc"].replace("Z", "+00:00"))
+    require(stamp.tzinfo is not None and stamp.utcoffset().total_seconds() == 0 and abs(stamp.timestamp() - prepared["preparedAtNs"] / 1e9) < 1, "Original frame preparation timestamp mismatch")
+    xml_path, unused = bounded.load_test_report(root / TASK / "artifacts/visual-regression-play")
+    require(xml_path.stat().st_mtime_ns >= prepared["preparedAtNs"], "Stale original NUnit XML from an earlier attempt")
+    # Re-read and screen the actual original NUnit XML using the unchanged exact
+    # identities. A prior JSON saying Passed cannot substitute for native XML.
+    export_tests(root, "regression-play")
+    tests = read_json(outdir(root) / "regression-play/test-receipt.json")
+    require(tests["allExpectedPassed"] is True and tests["expectedCases"] == 32, "Original exact PlayMode suite did not pass")
+    case = [c for c in tests["cases"] if c["fullname"] == ORIGINAL_G3_CASE]
+    require(len(case) == 1 and case[0]["result"] == "Passed", "Original G3 frame test did not pass")
+    source = original_g3_source(root)
+    for name in ORIGINAL_G3_FILES:
+        path = source / name
+        require(path.is_file() and not path.is_symlink() and path.stat().st_mtime_ns >= prepared["preparedAtNs"], "Missing or stale original frame from an earlier attempt")
+    # Only the bounded media/receipt validator is reused, never g3_ci.guard,
+    # configured(), source approvals, or the formal G3 gate.
+    import g3_ci
+    receipt = g3_ci.inspect_captures(source, ident, ORIGINAL_G3_FRAMES)
+    destination = outdir(root) / "original-g3-captures"
+    destination.mkdir(parents=True, exist_ok=True)
+    for name in ORIGINAL_G3_FILES:
+        shutil.copyfile(source / name, destination / name)
+    write(destination / "export-receipt.json", dict(schemaVersion=1, scope=SCOPE,
+          sourceCommit=ident["sourceCommit"], runId=ident["runId"], runAttempt=ident["runAttempt"],
+          evidenceGroup="EXISTING_G3_14_FRAMES_SEPARATE_FROM_NEW_11_FRAME_FIXTURE", originalCase=ORIGINAL_G3_CASE,
+          originalCaseResult="Passed", exactPlayModeCases=32, rawXmlSha256=tests["rawXmlSha256"],
+          legacyReceiptSha256=sha(source / "render-receipt.json"), preparationReceiptSha256=sha(outdir(root) / "original-g3-preparation.json"),
+          legacyReceiptRunAttempt="NOT_PRESENT_IN_LEGACY_SCHEMA", attemptBinding="FIXED_OUTPUTS_CLEARED_BEFORE_THIS_ATTEMPT_AND_RECREATED_AFTER_PREPARATION",
+          mainDayFrames=ORIGINAL_G3_FRAMES[:-1], separateProtectedFixtureFrame="challenge-protected",
+          separateProtectedFixtureRunId="g3-protected-render-fixture", g3Gate="NOT_EVALUATED", visualReview="PENDING", deviceQa="NOT_RUN"))
+    print(SCOPE + ": preserved existing 14 original G3 frames; new 11-frame fixture verdict remains separate")
+
+
 PROGRESS_STAGES = {
-    "prebuild": {"prebuild-begin", "prebuild-end", "prebuild-failed"},
+    "prebuild": {"prebuild-begin", "prebuild-end", "prebuild-failed", "prebuild-scene-guard-begin", "prebuild-scene-guard-passed"},
+    "lifecycle": {"editor-exiting-edit-mode", "runtime-before-scene-load", "runtime-after-scene-load", "editor-entered-play-mode"},
     "runtime": {"runtime-setup-begin", "runtime-setup-end", "runtime-teardown-begin", "runtime-teardown-end",
                 "face-begin", "face-end", "walk-begin", "walk-end", "day-ticket-settled", "scenario-complete", "runtime-timeout"}
                | {prefix + name for prefix in ("capture-begin:", "capture-end:") for name in FRAMES},
@@ -250,15 +325,15 @@ def validate_progress(value, kind, source, run, attempt):
         for key, low, high in (("inputUpdates", 0, 100000), ("frameCount", 0, 11), ("purchased", -1, 12), ("settled", -1, 12)):
             require(type(event[key]) is int and low <= event[key] <= high, "Invalid bounded progress counter")
         require(event["dayPhase"] in {"UNAVAILABLE", "DAY_OPEN", "CLOSING_PREP", "NIGHT_BILL", "DAY_COMPLETE", "RUN_FAILED"}, "Invalid progress day phase")
-    require(events[0]["stage"] == ("prebuild-begin" if kind == "prebuild" else "runtime-setup-begin"), "Missing initial progress milestone")
+    require(events[0]["stage"] == {"prebuild": "prebuild-begin", "runtime": "runtime-setup-begin", "lifecycle": "editor-exiting-edit-mode"}[kind], "Missing initial progress milestone")
     return value
 
 
 def export_progress(root):
     ident = identity(root)
-    # Two explicitly named, fixed-schema files only. Missing files mean no observed
+    # Three explicitly named, fixed-schema files only. Missing files mean no observed
     # milestone, not a successful import/runtime; the real NUnit verdict stays separate.
-    for kind in ("prebuild", "runtime"):
+    for kind in ("prebuild", "runtime", "lifecycle"):
         path = root / TASK / ("artifacts/visual-candidate/" + kind + "-progress.json")
         if not path.exists():
             continue
@@ -268,7 +343,7 @@ def export_progress(root):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("command", choices=("guard", "restore-font", "snapshot", "snapshot-after", "tests", "captures", "partial-captures", "progress"))
+    parser.add_argument("command", choices=("guard", "restore-font", "snapshot", "snapshot-after", "tests", "captures", "partial-captures", "progress", "prepare-original-g3-captures", "original-g3-captures"))
     parser.add_argument("--root", type=Path, default=Path(__file__).resolve().parents[3])
     parser.add_argument("--stage", choices=STAGES, default="capture")
     args = parser.parse_args(); root = args.root.resolve()
@@ -277,6 +352,8 @@ def main():
         identity(root); bounded.restore(root)
         shutil.copyfile(root / TASK / "evidence/font-receipt.json", outdir(root) / "font-receipt.json")
     elif args.command in ("snapshot", "snapshot-after"): snapshot(root, after=args.command == "snapshot-after")
+    elif args.command == "prepare-original-g3-captures": prepare_original_g3_captures(root)
+    elif args.command == "original-g3-captures": export_original_g3_captures(root)
     elif args.command == "progress": export_progress(root)
     elif args.command == "tests": export_tests(root, args.stage)
     else: export_captures(root, require_complete=args.command == "captures")

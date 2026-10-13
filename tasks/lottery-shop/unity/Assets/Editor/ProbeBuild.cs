@@ -8,6 +8,7 @@ using UnityEditor.Build.Reporting;
 using UnityEditor.SceneManagement;
 using UnityEngine;
 using UnityEngine.Rendering;
+using UnityEngine.SceneManagement;
 using UnityEngine.Rendering.Universal;
 namespace Lottery.Probe.Editor
 {
@@ -17,7 +18,10 @@ namespace Lottery.Probe.Editor
         public const string PipelinePath = Generated + "/Pipeline.asset";
         public const string RendererPath = Generated + "/Renderer.asset";
         public const string ScenePath = Generated + "/Probe.unity";
-        public static void Prepare()
+        public static void Prepare() => PrepareInternal(false);
+        // Test prebuild hooks already own a runner scene. Never unload or recreate it.
+        public static void PrepareForTests() => PrepareInternal(true);
+        static void PrepareInternal(bool preserveLoadedScenes)
         {
             if (Application.unityVersion != "6000.3.19f1") throw new Exception("Unexpected Unity version");
             Directory.CreateDirectory(Generated);
@@ -41,7 +45,13 @@ namespace Lottery.Probe.Editor
             for (int i = 0; i < QualitySettings.names.Length; i++) { QualitySettings.SetQualityLevel(i); QualitySettings.renderPipeline = pipeline; }
             QualitySettings.SetQualityLevel(originalQuality);
             EditorUtility.SetDirty(pipeline);
-            var scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
+            var priorScene = SceneManager.GetActiveScene();
+            var scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene,
+                preserveLoadedScenes ? NewSceneMode.Additive : NewSceneMode.Single);
+            try
+            {
+            if (preserveLoadedScenes && !SceneManager.SetActiveScene(scene))
+                throw new InvalidOperationException("Could not activate isolated Probe preparation scene");
             var camera = new GameObject("Probe Camera").AddComponent<Camera>();
             camera.transform.position = new Vector3(0, 2.0f, -3.3f);
             camera.transform.LookAt(new Vector3(0, .6f, 0));
@@ -64,9 +74,20 @@ namespace Lottery.Probe.Editor
             var runtime = new GameObject("Probe Overlay").AddComponent<Lottery.Probe.ProbeRuntime>();
             runtime.chineseFont = AssetDatabase.LoadAssetAtPath<Font>("Assets/Resources/ProbeChinese.otf");
             if (runtime.chineseFont == null) throw new Exception("Missing licensed Chinese font");
-            EditorSceneManager.SaveScene(scene, ScenePath);
+            bool saved = EditorSceneManager.SaveScene(scene, ScenePath);
+            if (preserveLoadedScenes && !saved) throw new IOException("Probe scene save failed");
             AssetDatabase.SaveAssets();
-            EditorBuildSettings.scenes = new[] { new EditorBuildSettingsScene(ScenePath, true) };
+            if (!preserveLoadedScenes)
+                EditorBuildSettings.scenes = new[] { new EditorBuildSettingsScene(ScenePath, true) };
+            }
+            finally
+            {
+                if (preserveLoadedScenes)
+                {
+                    if (priorScene.IsValid() && priorScene.isLoaded) SceneManager.SetActiveScene(priorScene);
+                    if (scene.IsValid() && scene.isLoaded) EditorSceneManager.CloseScene(scene, true);
+                }
+            }
         }
         public static void BuildAndroid()
         {
