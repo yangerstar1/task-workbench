@@ -20,7 +20,15 @@ Shader "Lottery/G3/LocalSilver"
             half4 frag(Varyings i):SV_Target
             {
                 clip(0.5-SAMPLE_TEXTURE2D(_RevealTex,sampler_RevealTex,i.uv).r);
-                return half4(_Color.rgb,1);
+                // Opaque, object-UV anchored brushed foil: mask authority unchanged.
+                // Derivative attenuation suppresses subpixel grain in distant views.
+                float2 grainUV=i.uv*float2(850,530);
+                float2 cell=floor(grainUV);
+                float grain=frac(52.9829189*frac(dot(cell,float2(.06711056,.00583715))))-.5;
+                float keep=1-saturate(max(fwidth(grainUV.x),fwidth(grainUV.y))-.5);
+                float broad=saturate(1-abs(i.uv.x+i.uv.y*.20-.58)*2.6);
+                broad=broad*broad;
+                return half4(saturate(_Color.rgb*(.90+.13*broad)+grain*.035*keep+.025*broad),1);
             }
             ENDHLSL
         }

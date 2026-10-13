@@ -31,7 +31,16 @@ BASE_FRAMES = ["entry-whole-shop", "table-empty", "number-half", "number-half-20
           "challenge-two-safe-three-tools", "shelf-before-open", "shelf-after-open",
           "challenge-returned-from-shelf", "closing-day-table", "night-table", "night-bill"]
 PHONE_FRAMES = ["phone-room-standing", "phone-table-before", "phone-contacts", "phone-mom-pending", "phone-mom-claimed", "phone-table-return"]
-FRAMES = BASE_FRAMES[:4] + PHONE_FRAMES + BASE_FRAMES[4:]
+ORIGINAL_VISUAL_FRAMES = BASE_FRAMES[:4] + PHONE_FRAMES + BASE_FRAMES[4:]
+EXTERIOR_STATIONS = {
+    "far-front": ((-.405, 1.58, -1.25), (8, 0, 0)),
+    "near-window-left-oblique": ((-2.05, 1.58, 1.55), (8, 55, 0)),
+    "near-door-right-oblique": ((.55, 1.58, 1.55), (18, 315, 0)),
+}
+EXTERIOR_DAY_FRAMES = ["exterior-day-" + station for station in EXTERIOR_STATIONS]
+EXTERIOR_NIGHT_FRAMES = ["exterior-night-" + station for station in EXTERIOR_STATIONS]
+EXTERIOR_FRAMES = EXTERIOR_DAY_FRAMES + EXTERIOR_NIGHT_FRAMES
+FRAMES = ORIGINAL_VISUAL_FRAMES[:-2] + EXTERIOR_DAY_FRAMES + ["night-table"] + EXTERIOR_NIGHT_FRAMES + ["night-bill"]
 PHONE_VISIBLE_FRAMES = {"phone-room-standing", "phone-contacts", "phone-mom-pending", "phone-mom-claimed"}
 ORIGINAL_G3_FRAMES = ["empty", "number-half", "number-revealed", "number-copy", "number-settled", "configuration", "phone",
                       "challenge-two-safe", "challenge-selected", "shop-shortcut", "shop-physical", "night", "day-end", "challenge-protected"]
@@ -169,7 +178,7 @@ def export_tests(root, stage):
 
 
 def validate_capture(receipt, source, run, attempt, require_complete=True):
-    require(receipt.get("schemaVersion") == 3 and receipt.get("candidatePresentation") == "V16_SELECTED_C_PHYSICAL_PHONE_NOT_VISUAL_PASS", "V16 measured physical-phone receipt required")
+    require(receipt.get("schemaVersion") == 4 and receipt.get("candidatePresentation") == "V19_EXTERIOR_FIXTURE_VIEWS_NOT_VISUAL_PASS", "V19 measured exterior and physical-phone receipt required")
     require(receipt.get("scope") == SCOPE and receipt.get("sourceCommit") == source and receipt.get("runId") == run and receipt.get("runAttempt") == attempt, "Capture source/run/attempt mismatch")
     require(receipt.get("unityVersion") == "6000.3.19f1" and receipt.get("graphicsDeviceType") not in (None, "Null"), "Pinned native GPU capture required")
     require(receipt.get("hudVisibilityBasis") == "ENABLED_CAMERA_LAYER_AND_FRUSTUM_TEST_NOT_PIXEL_OCCLUSION", "HUD visibility observation basis missing")
@@ -179,7 +188,7 @@ def validate_capture(receipt, source, run, attempt, require_complete=True):
     require(len(names) == len(set(names)) and all(name in FRAMES for name in names), "Unexpected/duplicate capture names")
     require(len(receipt.get("actions", [])) <= 1200, "Action receipt exceeds bounded scenario")
     if require_complete:
-        require(receipt.get("complete") is True and names == FRAMES, "Original eleven and additional six phone frames are incomplete")
+        require(receipt.get("complete") is True and names == FRAMES, "Original seventeen and additional six exterior frames are incomplete")
     for f in frames:
         require(f.get("file") == f["stage"] + ".png" and HEX64.fullmatch(f.get("sha256", "")), "Invalid frame identity")
         require((f.get("width"), f.get("height")) == ((1600, 720) if f["stage"].endswith("20x9") else (1280, 720)), "Incorrect capture dimensions")
@@ -215,10 +224,35 @@ def validate_capture(receipt, source, run, attempt, require_complete=True):
         if f["stage"] in PHONE_FRAMES:
             require(HEX64.fullmatch(f.get("ticketContentSha256", "")), "Confirmed ticket content observation missing")
             require(HEX64.fullmatch(f.get("ticketMaskSha256", "")) and isinstance(f.get("ticketId"), str) and 0 < len(f["ticketId"]) <= 256 and f.get("ticketPhase") == "ACTIVE" and f.get("revealedCells") == 3, "Phone must preserve the actual half-scratched active ticket")
+        if f["stage"] in EXTERIOR_FRAMES:
+            night = f["stage"] in EXTERIOR_NIGHT_FRAMES
+            require(f.get("cameraOrigin") == "FIXTURE_VIEW_NOT_WALKED", "Exterior fixture must not claim walked arrival")
+            require(f.get("dayPhase") == ("NIGHT_BILL" if night else "CLOSING_PREP") and f.get("panel") == "None" and f.get("phoneFocused") is False, "Exterior must use real production phase without modal/focus")
+            require(f.get("fixturePoseRestored") is True and f.get("fixtureStateBefore") == f["stateSha256"] == f.get("fixtureStateAfter"), "Exterior fixture restore/state preservation not verified")
+            require(type(f.get("cameraFov")) in (int,float) and f["cameraFov"] == 64, "Exterior must retain production standing FOV")
+            station = f["stage"].removeprefix("exterior-night-" if night else "exterior-day-")
+            for key, expected in zip(("cameraPosition", "cameraEuler"), EXTERIOR_STATIONS[station]):
+                pose = f.get(key)
+                require(isinstance(pose, dict) and set(pose) == {"x", "y", "z"} and all(type(pose[a]) in (int,float) and math.isfinite(pose[a]) and abs(pose[a]-v)<.001 for a,v in zip(("x","y","z"),expected)), "Exterior diagnostic station identity mismatch")
+            m = f.get("exterior")
+            require(isinstance(m, dict) and m.get("basis") == "MATERIAL_METADATA_NOT_PIXEL_ACCEPTANCE", "Exterior material metadata basis missing")
+            require(m.get("backdropShader") == "Lottery/G3/ExteriorBackdrop" and m.get("textureName") == ("Street-night" if night else "Street-day"), "Incorrect production day/night backdrop")
+            for key, expected in (("backdropRendererCount",1),("backdropFrustumRendererCount",1),("glassRenderQueue",3000),("nearFieldTriangles",60),("nearFieldColliderCount",0)):
+                require(type(m.get(key)) is int and m[key] == expected, "Incorrect exterior/glazing topology or queue")
+            for key in ("textureWidth","textureHeight","transparentGlassMaterialCount","glassFrustumRendererCount"):
+                require(type(m.get(key)) is int and m[key] > 0, "Missing exterior texture/glazing observation")
+            for key, expected in (("exposure",.72 if night else 1),("glassSurface",1),("glassZWrite",0),("feltNormalScale",.6),("linerSmoothness",.08),("brassSmoothness",.66)):
+                require(type(m.get(key)) in (int,float) and math.isfinite(m[key]) and abs(m[key]-expected)<.0001, "Incorrect exterior/glazing/material property")
+            require(type(m.get("glassAlpha")) in (int,float) and .001 <= m["glassAlpha"] <= .999, "Glass must remain transparent")
         # These observations intentionally do not confer art/layout acceptance.
 
     if require_complete:
         by_name = {f["stage"]: f for f in frames}
+        for day, night in zip(EXTERIOR_DAY_FRAMES, EXTERIOR_NIGHT_FRAMES):
+            require(all(by_name[day][key] == by_name[night][key] for key in ("cameraPosition","cameraEuler","cameraFov")), "Exterior day/night camera pair differs")
+            require(by_name[day]["sha256"] != by_name[night]["sha256"], "Exterior day/night pixels are identical")
+            for name, original in ((day,"closing-day-table"),(night,"night-table")):
+                require(by_name[name]["stateSha256"] == by_name[original]["stateSha256"], "Exterior differs from actual production day/night state")
         require(by_name["shelf-before-open"]["stateSha256"] == by_name["shelf-after-open"]["stateSha256"] == by_name["challenge-returned-from-shelf"]["stateSha256"], "Shelf/return mutated the ticket state")
         for a, b in (("shelf-before-open", "shelf-after-open"), ("closing-day-table", "night-table")):
             require(all(by_name[a][key] == by_name[b][key] for key in ("cameraPosition", "cameraEuler", "cameraFov")), "Paired captures differ in camera position/rotation/FOV")
@@ -330,13 +364,13 @@ def export_original_g3_captures(root):
         shutil.copyfile(source / name, destination / name)
     write(destination / "export-receipt.json", dict(schemaVersion=1, scope=SCOPE,
           sourceCommit=ident["sourceCommit"], runId=ident["runId"], runAttempt=ident["runAttempt"],
-          evidenceGroup="EXISTING_G3_14_FRAMES_SEPARATE_FROM_NEW_11_FRAME_FIXTURE", originalCase=ORIGINAL_G3_CASE,
+          evidenceGroup="EXISTING_G3_14_FRAMES_SEPARATE_FROM_V19_23_FRAME_FIXTURE", originalCase=ORIGINAL_G3_CASE,
           originalCaseResult="Passed", exactPlayModeCases=tests["expectedCases"], rawXmlSha256=tests["rawXmlSha256"],
           legacyReceiptSha256=sha(source / "render-receipt.json"), preparationReceiptSha256=sha(outdir(root) / "original-g3-preparation.json"),
           legacyReceiptRunAttempt="NOT_PRESENT_IN_LEGACY_SCHEMA", attemptBinding="FIXED_OUTPUTS_CLEARED_BEFORE_THIS_ATTEMPT_AND_RECREATED_AFTER_PREPARATION",
           mainDayFrames=ORIGINAL_G3_FRAMES[:-1], separateProtectedFixtureFrame="challenge-protected",
           separateProtectedFixtureRunId="g3-protected-render-fixture", g3Gate="NOT_EVALUATED", visualReview="PENDING", deviceQa="NOT_RUN"))
-    print(SCOPE + ": preserved existing 14 original G3 frames; new 11-frame fixture verdict remains separate")
+    print(SCOPE + ": preserved existing 14 original G3 frames; V19 23-frame fixture verdict remains separate")
 
 
 PREBUILD_DETAIL_STAGES = {

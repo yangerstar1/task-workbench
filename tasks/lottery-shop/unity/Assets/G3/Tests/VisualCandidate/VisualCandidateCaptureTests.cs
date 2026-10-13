@@ -382,8 +382,8 @@ namespace Lottery.G3.VisualCandidate.Tests
         [UnityTest]
         public IEnumerator RealRuntimeSixGroupsRetainHudAndRoutePurchasesScratchShelfAndNight()
         {
-            // Only the entry framing is fixture-positioned. No claim of a walked
-            // arrival is inferred from that single establishing photograph.
+            // Entry and explicitly labelled exterior diagnostics are fixture-positioned.
+            // They never establish walked arrival or parallax acceptance.
             Click("stand");
             P.View.Walk.SetPose(P.View.Environment.EntryPosition, P.View.Environment.EntryYaw);
             P.View.Layout(); Physics.SyncTransforms(); Observe("fixture-position-entry-camera"); yield return null;
@@ -461,6 +461,7 @@ namespace Lottery.G3.VisualCandidate.Tests
             Assert.That(State.HasUnsettledTicket, Is.False);
             Assert.That(State.Phase, Is.EqualTo(DayPhase.CLOSING_PREP));
             yield return null; Capture("closing-day-table", "NORMAL_SEATED_PLAYER_VIEW");
+            yield return ExteriorFixtureViews(false);
             var dayPosition = app.SceneCamera.transform.position; var dayRotation = app.SceneCamera.transform.rotation;
             Click("open-bill"); Click("enter-night"); Confirm();
             Assert.That(State.Phase, Is.EqualTo(DayPhase.NIGHT_BILL));
@@ -469,13 +470,110 @@ namespace Lottery.G3.VisualCandidate.Tests
             Assert.That(app.SceneCamera.transform.position, Is.EqualTo(dayPosition));
             Assert.That(app.SceneCamera.transform.rotation, Is.EqualTo(dayRotation));
             Capture("night-table", "SAME_CAMERA_AS_CLOSING_DAY_WITH_BILL_CLOSED");
+            yield return ExteriorFixtureViews(true);
             Click("open-bill"); yield return null; Capture("night-bill", "NORMAL_BILL_INFORMATION_HIERARCHY");
-            Assert.That(frames.Count, Is.EqualTo(17));
+            Assert.That(frames.Count, Is.EqualTo(23));
             // Returning to the same confirmed ticket may correctly produce identical pixels.
             Assert.That(frames.Single(x => x.stage == "shelf-before-open").sha256, Is.Not.EqualTo(frames.Single(x => x.stage == "shelf-after-open").sha256));
             Assert.That(frames.Single(x => x.stage == "closing-day-table").sha256, Is.Not.EqualTo(frames.Single(x => x.stage == "night-table").sha256));
             WriteReceipt(true);
             Milestone("scenario-complete");
+        }
+
+        // Controlled diagnostic stations, NOT keyboard traversal or a claim that these
+        // poses are collision-reachable. Day/night is the existing production bill flow.
+        IEnumerator ExteriorFixtureViews(bool isNight)
+        {
+            Assert.That(State.Phase, Is.EqualTo(isNight ? DayPhase.NIGHT_BILL : DayPhase.CLOSING_PREP));
+            Assert.That(P.Panel, Is.EqualTo(G3Panel.None));
+            string hash = StateCodec.ComputeHash(State);
+            var mode = P.Mode; var panel = P.Panel; bool walking=P.Walking; bool phoneFocused=P.View.Phone.IsFocused;
+            string ticketHash=TicketContentHash(State.CurrentTicket);
+            var walkPosition = P.View.Walk.SavedPosition; var walkRotation = P.View.Walk.SavedRotation;
+            var cameraPosition = app.SceneCamera.transform.position; var cameraRotation = app.SceneCamera.transform.rotation;
+            float fov = app.SceneCamera.fieldOfView;
+            int first = frames.Count;
+            Click("stand");
+            try
+            {
+                var positions = new[] { new Vector3(-.405f,0,-1.25f), new Vector3(-2.05f,0,1.55f), new Vector3(.55f,0,1.55f) };
+                var headings = new[] { 0f, 55f, -45f }; var pitches = new[] { 8f, 8f, 18f };
+                var labels = new[] { "far-front", "near-window-left-oblique", "near-door-right-oblique" };
+                for(int i=0;i<positions.Length;i++)
+                {
+                    var overlaps=Physics.OverlapCapsule(positions[i]+Vector3.up*.205f,positions[i]+Vector3.up*1.54f,.18f,
+                        ~0,QueryTriggerInteraction.Ignore).Where(c=>c.transform.IsChildOf(P.View.Environment.transform)).ToArray();
+                    Assert.That(overlaps, Is.Empty, "Diagnostic station must not intersect production environment colliders");
+                    P.View.Walk.SetPose(positions[i],headings[i],pitches[i]); P.View.Layout(); Physics.SyncTransforms();
+                    yield return null;
+                    Assert.That(StateCodec.ComputeHash(State), Is.EqualTo(hash));
+                    Assert.That(app.SceneCamera.fieldOfView, Is.EqualTo(64f));
+                    Capture("exterior-"+(isNight?"night-":"day-")+labels[i], "FIXTURE_VIEW_NOT_WALKED");
+                    frames[frames.Count-1].exterior = ExteriorMetadata(isNight);
+                    frames[frames.Count-1].fixtureStateBefore = hash;
+                }
+            }
+            finally
+            {
+                P.View.Walk.SetPose(walkPosition,walkRotation.eulerAngles.y,walkRotation.eulerAngles.x);
+                Click("stand"); P.View.Layout(); Physics.SyncTransforms();
+                Assert.That(P.Mode, Is.EqualTo(mode)); Assert.That(P.Panel, Is.EqualTo(panel)); Assert.That(P.Walking, Is.EqualTo(walking));
+                Assert.That(P.View.Phone.IsFocused, Is.EqualTo(phoneFocused));
+                Assert.That(TicketContentHash(State.CurrentTicket), Is.EqualTo(ticketHash));
+                Assert.That(P.View.Walk.SavedPosition, Is.EqualTo(walkPosition));
+                Assert.That(Quaternion.Angle(P.View.Walk.SavedRotation,walkRotation), Is.LessThan(.001f));
+                Assert.That(app.SceneCamera.transform.position, Is.EqualTo(cameraPosition));
+                Assert.That(Quaternion.Angle(app.SceneCamera.transform.rotation,cameraRotation), Is.LessThan(.001f));
+                Assert.That(app.SceneCamera.fieldOfView, Is.EqualTo(fov));
+                Assert.That(StateCodec.ComputeHash(State), Is.EqualTo(hash));
+                foreach(var frame in frames.Skip(first))
+                { frame.fixtureStateAfter=StateCodec.ComputeHash(State); frame.fixturePoseRestored=true; }
+                WriteReceipt(false);
+            }
+        }
+        ExteriorReceipt ExteriorMetadata(bool isNight)
+        {
+            var renderers=P.View.Environment.GetComponentsInChildren<Renderer>();
+            var materials=renderers.SelectMany(r=>r.sharedMaterials).Where(m=>m!=null).Distinct().ToArray();
+            var backdrop=materials.Single(m=>m.name.StartsWith("V19 exterior day-night",StringComparison.Ordinal));
+            var glass=materials.Where(m=>m.name.StartsWith("Glass_Clear",StringComparison.Ordinal)).ToArray();
+            Assert.That(glass.Length, Is.GreaterThan(0));
+            foreach(var m in glass)
+            {
+                Assert.That(m.renderQueue, Is.EqualTo((int)RenderQueue.Transparent));
+                Assert.That(m.GetFloat("_Surface"), Is.EqualTo(1)); Assert.That(m.GetFloat("_ZWrite"), Is.Zero);
+                Assert.That(m.GetColor("_BaseColor").a, Is.InRange(.001f,.999f));
+            }
+            var frustum=GeometryUtility.CalculateFrustumPlanes(app.SceneCamera);
+            Func<Renderer,bool> visible=r=>r.enabled&&r.gameObject.activeInHierarchy&&
+                (app.SceneCamera.cullingMask&(1<<r.gameObject.layer))!=0&&GeometryUtility.TestPlanesAABB(frustum,r.bounds);
+            int glassVisible=renderers.Count(r=>r.sharedMaterials.Any(m=>glass.Contains(m))&&visible(r));
+            int backdropVisible=renderers.Count(r=>r.sharedMaterials.Contains(backdrop)&&visible(r));
+            Assert.That(glassVisible, Is.GreaterThan(0)); Assert.That(backdropVisible, Is.EqualTo(1));
+            var texture=Resources.Load<Texture2D>("G3/Shop/Exterior/Street-"+(isNight?"night":"day"));
+            Assert.That(backdrop.shader.name, Is.EqualTo("Lottery/G3/ExteriorBackdrop"));
+            Assert.That(backdrop.GetTexture("_BaseMap"), Is.SameAs(texture));
+            Assert.That(backdrop.GetFloat("_Exposure"), Is.EqualTo(isNight?.72f:1f).Within(.0001f));
+            int backdropCount=renderers.Count(r=>r.sharedMaterials.Contains(backdrop));
+            Assert.That(backdropCount, Is.EqualTo(1));
+            var near=P.View.Environment.transform.Find("Exterior near-field sidewalk and threshold");
+            Assert.That(near, Is.Not.Null); Assert.That(near.GetComponentsInChildren<Collider>(), Is.Empty);
+            int triangles=near.GetComponent<MeshFilter>().sharedMesh.triangles.Length/3;
+            Assert.That(triangles, Is.EqualTo(60));
+            var felt=materials.Single(m=>m.name.StartsWith("Dark_Green_Felt",StringComparison.Ordinal));
+            var liner=materials.Single(m=>m.name.StartsWith("Tool_Dock_Liner",StringComparison.Ordinal));
+            var brass=materials.Single(m=>m.name.StartsWith("Brass_Worn",StringComparison.Ordinal));
+            Assert.That(felt.GetFloat("_BumpScale"), Is.EqualTo(.60f).Within(.0001f));
+            Assert.That(liner.GetFloat("_Smoothness"), Is.EqualTo(.08f).Within(.0001f));
+            Assert.That(liner.GetTexture("_BumpMap"), Is.SameAs(felt.GetTexture("_BumpMap")));
+            Assert.That(brass.GetFloat("_Smoothness"), Is.EqualTo(.66f).Within(.0001f));
+            return new ExteriorReceipt { basis="MATERIAL_METADATA_NOT_PIXEL_ACCEPTANCE", backdropShader=backdrop.shader.name,
+                textureName=texture.name, textureWidth=texture.width, textureHeight=texture.height,
+                exposure=backdrop.GetFloat("_Exposure"), backdropRendererCount=backdropCount,
+                glassFrustumRendererCount=glassVisible, backdropFrustumRendererCount=backdropVisible, transparentGlassMaterialCount=glass.Length, glassAlpha=glass.Min(m=>m.GetColor("_BaseColor").a),
+                glassSurface=glass.Min(m=>m.GetFloat("_Surface")), glassZWrite=glass.Max(m=>m.GetFloat("_ZWrite")),
+                glassRenderQueue=glass.Min(m=>m.renderQueue), nearFieldTriangles=triangles, nearFieldColliderCount=near.GetComponentsInChildren<Collider>().Length,
+                feltNormalScale=felt.GetFloat("_BumpScale"), linerSmoothness=liner.GetFloat("_Smoothness"), brassSmoothness=brass.GetFloat("_Smoothness") };
         }
 
         // Six additional frames exercise one production phone flow inside the
@@ -896,9 +994,16 @@ namespace Lottery.G3.VisualCandidate.Tests
         [Serializable] sealed class ActionReceipt
         { public string action, phase, panel, stateSha256; public int inputUpdate; public long revision; public Vector3 playerPosition, cameraPosition; }
         [Serializable] sealed class ProjectionReceipt { public float x, y, width, height; }
+        [Serializable] sealed class ExteriorReceipt
+        {
+            public string basis, backdropShader, textureName;
+            public int glassFrustumRendererCount, backdropFrustumRendererCount, textureWidth, textureHeight, backdropRendererCount, transparentGlassMaterialCount, glassRenderQueue, nearFieldTriangles, nearFieldColliderCount;
+            public float exposure, glassAlpha, glassSurface, glassZWrite, feltNormalScale, linerSmoothness, brassSmoothness;
+        }
         [Serializable] sealed class FrameReceipt
         {
             public string stage, file, sha256, capturedUtc, stateSha256, seedSha256, gameRunId, fixtureLabel, ticketId, ticketPhase, ticketMaskSha256, dayPhase, panel, mode, cameraOrigin, qualityName;
+            public ExteriorReceipt exterior; public string fixtureStateBefore, fixtureStateAfter; public bool fixturePoseRestored;
             public string ticketContentSha256; public bool phoneFocused, phoneWorldObjectActive; public int phoneActiveRendererCount, phoneInstanceId; public ProjectionReceipt phoneScreenBounds;
             public float phoneScreenMinDepth, phoneScreenMaxDepth, phonePlaneCameraAbsCosine;
             public long cashMinor, motherDebtMinor, motherLifetimeMinor; public int phoneFrustumRendererCount, loanCount, ledgerCount, phoneEventCount;
@@ -908,8 +1013,8 @@ namespace Lottery.G3.VisualCandidate.Tests
         }
         [Serializable] sealed class CaptureReceipt
         {
-            public int schemaVersion = 3;
-            public string candidatePresentation = "V16_SELECTED_C_PHYSICAL_PHONE_NOT_VISUAL_PASS";
+            public int schemaVersion = 4;
+            public string candidatePresentation = "V19_EXTERIOR_FIXTURE_VIEWS_NOT_VISUAL_PASS";
             public string scope = Scope, sourceCommit, runId, runAttempt, unityVersion, graphicsDeviceType, graphicsDeviceName;
             public string inputEvidence = "SIMULATED_INPUT_SYSTEM", captureMethod = "URP_STANDARD_REQUEST_READPIXELS",
                 seedDisclosure = "FIXED_DIAGNOSTIC_SEED_HASH_ONLY", hudVisibilityBasis = "ENABLED_CAMERA_LAYER_AND_FRUSTUM_TEST_NOT_PIXEL_OCCLUSION", deviceQa = "NOT_RUN", visualReview = "PENDING", g3Gate = "NOT_EVALUATED";

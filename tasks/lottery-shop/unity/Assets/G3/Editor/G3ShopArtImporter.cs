@@ -103,6 +103,10 @@ namespace Lottery.G3.Editor
                     for(int sub=0;sub<filter.sharedMesh.subMeshCount;sub++)
                     {
                         var material=renderer.sharedMaterials[Mathf.Min(sub,renderer.sharedMaterials.Length-1)];
+                        // Dedicated dark green textile only for the three recessed tool docks.
+                        // Other rubber (doormat/feet) remains unchanged; no extra geometry.
+                        if(validateRoom&&filter.name.StartsWith("Tool_Dock_Recess",StringComparison.Ordinal))
+                            material=AssetDatabase.LoadAssetAtPath<Material>(Root+"/Materials/Tool_Dock_Liner.mat")??throw new InvalidOperationException("Missing dock liner material");
                         string key=material.name+(material.renderQueue>=(int)RenderQueue.Transparent?"_glass_"+(transparent++):"");
                         if(!groups.ContainsKey(key)){groups[key]=new List<CombineInstance>();materials[key]=material;}
                         var matrix=filter.transform.localToWorldMatrix;var mesh=filter.sharedMesh;

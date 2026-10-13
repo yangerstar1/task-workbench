@@ -37,6 +37,7 @@ jobs:
           PYTHONDONTWRITEBYTECODE=1 python3 tasks/lottery-shop/scripts/test_visual_candidate_ci.py -v
           PYTHONDONTWRITEBYTECODE=1 python3 tasks/lottery-shop/scripts/test_activation_probe.py -v
           PYTHONDONTWRITEBYTECODE=1 python3 tasks/lottery-shop/scripts/test_safe_project_ci.py -v
+          PYTHONDONTWRITEBYTECODE=1 python3 tasks/lottery-shop/scripts/test_reflection_bake_ci.py -v
       - name: Prepare existing authorized disposable runner disk layout
         run: |
           python3 tasks/lottery-shop/scripts/visual_candidate_ci.py guard
@@ -78,6 +79,9 @@ jobs:
       - name: Preserve fixed-schema bounded prebuild, lifecycle and runtime milestones
         if: ${{ always() && steps.guard.outcome == 'success' && steps.capture.outcome != 'skipped' }}
         run: python3 tasks/lottery-shop/scripts/visual_candidate_ci.py progress
+      - name: Verify source-bound offline day and night reflection originals
+        if: ${{ always() && steps.guard.outcome == 'success' && steps.capture.outcome != 'skipped' }}
+        run: PYTHONDONTWRITEBYTECODE=1 python3 tasks/lottery-shop/scripts/reflection_bake_ci.py
       - name: Preserve bounded capture NUnit XML, including real failures
         if: ${{ always() && steps.guard.outcome == 'success' && steps.capture.outcome != 'skipped' }}
         run: python3 tasks/lottery-shop/scripts/visual_candidate_ci.py tests --stage capture
@@ -96,6 +100,11 @@ jobs:
             tasks/lottery-shop/evidence/visual-candidate/source-receipt.json
             tasks/lottery-shop/evidence/visual-candidate/source-before.json
             tasks/lottery-shop/evidence/visual-candidate/font-receipt.json
+            tasks/lottery-shop/evidence/visual-candidate/reflections/Day.exr
+            tasks/lottery-shop/evidence/visual-candidate/reflections/Day.exr.meta
+            tasks/lottery-shop/evidence/visual-candidate/reflections/Night.exr
+            tasks/lottery-shop/evidence/visual-candidate/reflections/Night.exr.meta
+            tasks/lottery-shop/evidence/visual-candidate/reflections/reflection-receipt.json
             tasks/lottery-shop/evidence/visual-candidate/safe-start.json
             tasks/lottery-shop/evidence/visual-candidate/safe-capture.json
             tasks/lottery-shop/evidence/visual-candidate/prebuild-progress.json
@@ -121,7 +130,13 @@ jobs:
             tasks/lottery-shop/evidence/visual-candidate/captures/shelf-after-open.png
             tasks/lottery-shop/evidence/visual-candidate/captures/challenge-returned-from-shelf.png
             tasks/lottery-shop/evidence/visual-candidate/captures/closing-day-table.png
+            tasks/lottery-shop/evidence/visual-candidate/captures/exterior-day-far-front.png
+            tasks/lottery-shop/evidence/visual-candidate/captures/exterior-day-near-window-left-oblique.png
+            tasks/lottery-shop/evidence/visual-candidate/captures/exterior-day-near-door-right-oblique.png
             tasks/lottery-shop/evidence/visual-candidate/captures/night-table.png
+            tasks/lottery-shop/evidence/visual-candidate/captures/exterior-night-far-front.png
+            tasks/lottery-shop/evidence/visual-candidate/captures/exterior-night-near-window-left-oblique.png
+            tasks/lottery-shop/evidence/visual-candidate/captures/exterior-night-near-door-right-oblique.png
             tasks/lottery-shop/evidence/visual-candidate/captures/night-bill.png
           if-no-files-found: error
           retention-days: 7

@@ -44,6 +44,7 @@ namespace Lottery.G3.Editor
             // All importer temporary GameObjects live in this owned scene, too;
             // create/destroy must not dirty the framework's saved runner scene.
             if(preserveLoadedScenes)PrepareShopBindings(out number,out challenge);
+            G3ShopReflectionBaker.Prepare();
             var bootstrap=new GameObject("G3 Original Shop Visual Candidate").AddComponent<G3SliceBootstrap>();
             bootstrap.chineseFont=AssetDatabase.LoadAssetAtPath<Font>("Assets/Resources/ProbeChinese.otf");
             bootstrap.paperShader=AssetDatabase.LoadAssetAtPath<Shader>("Assets/G3/Rendering/TicketPaper.shader");

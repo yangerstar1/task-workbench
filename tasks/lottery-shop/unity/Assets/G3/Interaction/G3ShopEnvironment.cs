@@ -16,7 +16,21 @@ namespace Lottery.G3.Interaction
         [Serializable] public sealed class LayoutData { public Anchor[] anchors; public CollisionBox[] colliders;public float ticketWidth=.4f;public bool requiresUnityXReflection; }
         readonly List<Light> practicals=new List<Light>();readonly HashSet<Material> instantiatedMaterials=new HashSet<Material>();readonly Dictionary<Material,Color> authoredWindowColors=new Dictionary<Material,Color>();
         Light daylight; LayoutData layout; bool? night; GameObject art;
-        ReflectionProbe roomReflection;bool refreshReflection,capturedLighting;
+        Material exteriorMaterial;Texture2D exteriorDay,exteriorNight;Mesh exteriorNearMesh;
+        ReflectionProbe roomReflection;bool capturedLighting,bakingReflection;
+        Cubemap dayReflection,nightReflection;
+        public const string ReflectionRecipe="G3_SHOP_STATIC_REFLECTION_V1";
+        public const int ReflectionFaceSize=128,ReflectionMipCount=8;
+        [Serializable] public sealed class ReflectionReceipt
+        {
+            public int schemaVersion,captureRenderers,captureTriangles;public string status,recipe,sourceDigest,sourceCommit,runId,runAttempt,unityVersion,colorSpace,runtimeDependencyHash,pipelineDependencyHash;
+            public ReflectionTexture day,night;
+        }
+        [Serializable] public sealed class ReflectionTexture
+        {
+            public string file,sha256,metaSha256,metaGuid,format,shape;public long bytes,metaBytes;
+            public int sourceWidth,sourceHeight,faceSize,mipCount,pixelSampleCount;public float maxChannelRange;public bool linear,specular;
+        }
         AmbientMode previousAmbientMode;Color previousSky,previousEquator,previousGround,previousAmbient;
         SphericalHarmonicsL2 previousAmbientProbe;Light previousSun;float previousReflectionIntensity;
         const int ReflectionGeometryLayer=10;
@@ -38,8 +52,8 @@ namespace Lottery.G3.Interaction
         public float ShelfViewYaw=>AnchorRotation("shelf_view",new Vector3(8,180,0)).y;
         public Vector3 ShelfTargetPosition=>AnchorPosition("shelf_target",new Vector3(-.045f,1.04f,-1.765f));
         public bool HasImportedArt=>art!=null;
-        public int RenderedShopRendererCount=>ImportedRendererCount;
-        public int RenderedShopMaterialCount=>art==null?0:art.GetComponentsInChildren<Renderer>().SelectMany(r=>r.sharedMaterials).Where(m=>m!=null).Distinct().Count();
+        public int RenderedShopRendererCount=>GetComponentsInChildren<Renderer>().Length;
+        public int RenderedShopMaterialCount=>art==null?0:GetComponentsInChildren<Renderer>().SelectMany(r=>r.sharedMaterials).Where(m=>m!=null).Distinct().Count();
         public int ImportedRendererCount=>art==null?0:art.GetComponentsInChildren<Renderer>().Length;
         public Vector3 AnchorPosition(string name,Vector3 fallback)
         {var a=layout?.anchors?.FirstOrDefault(x=>x.name==name);return a?.position!=null&&a.position.Length==3?V(a.position):fallback;}
@@ -47,8 +61,20 @@ namespace Lottery.G3.Interaction
         Vector3 AnchorRotation(string name,Vector3 fallback)
         {var a=layout?.anchors?.FirstOrDefault(x=>x.name==name);return a?.rotation!=null&&a.rotation.Length==3?V(a.rotation):fallback;}
         static Vector3 V(float[] p)=>new Vector3(p[0],p[1],p[2]);
-        public void Build(bool configureQuality=true)
+        public void Build(bool configureQuality=true)=>BuildInternal(configureQuality,false);
+#if UNITY_EDITOR
+        // Only the offline Editor baker can construct this first-build path.
+        // Runtime never substitutes a blank probe or starts an expensive capture.
+        public ReflectionProbe BuildForReflectionBake()
         {
+            if(Application.isPlaying)throw new InvalidOperationException("Reflection baking is Editor-only");
+            BuildInternal(true,true);return roomReflection;
+        }
+#endif
+        void BuildInternal(bool configureQuality,bool forReflectionBake)
+        {
+            bakingReflection=forReflectionBake;
+            if(!bakingReflection)LoadBakedReflections();
             var source=Resources.Load<GameObject>("G3/Shop/LotteryShop_Runtime");
             var manifest=Resources.Load<TextAsset>("G3/Shop/anchors");
             if(source==null||manifest==null)throw new InvalidOperationException("G3 visual candidate requires imported LotteryShop_Interior.fbx and anchors.json; no whitebox fallback is permitted.");
@@ -59,7 +85,7 @@ namespace Lottery.G3.Interaction
             previousAmbient=RenderSettings.ambientLight;previousAmbientProbe=RenderSettings.ambientProbe;
             previousSun=RenderSettings.sun;previousReflectionIntensity=RenderSettings.reflectionIntensity;capturedLighting=true;
             art=Instantiate(source,transform);art.name="Original authored lottery shop";
-            foreach(var child in art.GetComponentsInChildren<Transform>())child.gameObject.layer=ReflectionGeometryLayer;
+            foreach(var child in art.GetComponentsInChildren<Transform>())child.gameObject.layer=bakingReflection?31:ReflectionGeometryLayer;
             foreach(var r in art.GetComponentsInChildren<Renderer>())
             {r.shadowCastingMode=r.sharedMaterials.Any(m=>m.renderQueue>=(int)RenderQueue.Transparent)?ShadowCastingMode.Off:ShadowCastingMode.On;r.receiveShadows=true;r.reflectionProbeUsage=ReflectionProbeUsage.BlendProbes;}
             foreach(var box in layout.colliders)
@@ -78,25 +104,67 @@ namespace Lottery.G3.Interaction
             priorPipeline=QualitySettings.renderPipeline as UniversalRenderPipelineAsset;
             var sourcePipeline=Resources.Load<UniversalRenderPipelineAsset>("G3/Shop/G3VisualPipeline")??priorPipeline??GraphicsSettings.defaultRenderPipeline as UniversalRenderPipelineAsset;
             if(configureQuality&&sourcePipeline!=null){runtimePipeline=Instantiate(sourcePipeline);runtimePipeline.name="G3 visual candidate runtime lighting";runtimePipeline.shadowDistance=12;runtimePipeline.msaaSampleCount=4;QualitySettings.renderPipeline=runtimePipeline;}
-            var sun=new GameObject("Soft window daylight");sun.transform.SetParent(transform,false);sun.transform.rotation=Quaternion.Euler(47,232,0);
+            var sun=new GameObject("Soft window daylight");sun.transform.SetParent(transform,false);sun.transform.rotation=Quaternion.Euler(25,190,0);
             daylight=sun.AddComponent<Light>();daylight.type=LightType.Directional;daylight.color=new Color(1f,.94f,.84f);
             daylight.intensity=DaylightStrength;daylight.shadows=LightShadows.Soft;daylight.shadowStrength=.55f;
             daylight.shadowBias=.015f;daylight.shadowNormalBias=.06f;
             daylight.GetUniversalAdditionalLightData().usePipelineSettings=false;RenderSettings.sun=daylight;
             // Real ceiling/pendant sources supply local shape and contact shadows.
             // Explicit ambient SH below supplies the bounce that an unbaked room lacks.
-            Practical("Warm counter pendant",AnchorPosition("light_counter",new Vector3(1.12f,2.30f,-.9f)),new Color(1,.89f,.72f),PracticalStrengths[0],4.8f,new Vector3(.4f,.9f,-1.7f),true);
-            Practical("Table reading pendant",AnchorPosition("light_table",new Vector3(-1.71f,2.30f,-.24f)),new Color(1,.95f,.86f),PracticalStrengths[1],4.2f,TicketPosition,true);
+            Practical("Warm counter pendant",AnchorPosition("light_counter",new Vector3(1.12f,2.30f,-.9f)),new Color(1,.89f,.72f),PracticalStrengths[0],4.8f,new Vector3(.4f,.9f,-1.7f),false);
+            Practical("Table reading pendant",AnchorPosition("light_table",new Vector3(-1.71f,2.30f,-.24f)),new Color(1,.95f,.86f),PracticalStrengths[1],4.2f,TicketPosition,false);
             Practical("Shelf ambient fill",AnchorPosition("light_shelf",new Vector3(2.2f,2.2f,-.4f)),new Color(.83f,.91f,1),PracticalStrengths[2],4,new Vector3(2.1f,1.1f,-.4f),false);
             Practical("Counter board wash",new Vector3(.45f,2.04f,-2.287f),new Color(1,.93f,.81f),PracticalStrengths[3],2f,new Vector3(.45f,1.6f,-2.5f),false);
             var probe=new GameObject("Shop material reflection");probe.transform.SetParent(transform,false);probe.transform.localPosition=new Vector3(-.4f,1.35f,-.2f);
-            roomReflection=probe.AddComponent<ReflectionProbe>();roomReflection.mode=ReflectionProbeMode.Realtime;
+            roomReflection=probe.AddComponent<ReflectionProbe>();roomReflection.mode=bakingReflection?ReflectionProbeMode.Baked:ReflectionProbeMode.Custom;
+            roomReflection.hdr=true;
             roomReflection.refreshMode=ReflectionProbeRefreshMode.ViaScripting;roomReflection.timeSlicingMode=ReflectionProbeTimeSlicingMode.NoTimeSlicing;
-            roomReflection.resolution=128;roomReflection.size=new Vector3(6.4f,3.1f,5.6f);roomReflection.center=new Vector3(.4f,0,.2f);
-            roomReflection.boxProjection=true;roomReflection.nearClipPlane=.08f;roomReflection.farClipPlane=12;roomReflection.intensity=.85f;
+            roomReflection.resolution=ReflectionFaceSize;roomReflection.size=new Vector3(6.4f,3.1f,5.6f);roomReflection.center=new Vector3(.4f,0,.2f);
+            roomReflection.boxProjection=true;roomReflection.shadowDistance=12;roomReflection.nearClipPlane=.08f;roomReflection.farClipPlane=12;roomReflection.intensity=.85f;
             // Only authored room geometry enters reflections, never camera-attached HUD.
-            roomReflection.cullingMask=1<<ReflectionGeometryLayer;roomReflection.clearFlags=ReflectionProbeClearFlags.SolidColor;
-            SetNight(false);Physics.SyncTransforms();
+            roomReflection.cullingMask=1<<(bakingReflection?31:ReflectionGeometryLayer);roomReflection.clearFlags=ReflectionProbeClearFlags.SolidColor;
+            BuildExteriorDepth();SetNight(false);Physics.SyncTransforms();
+        }
+        // V19 presentation-only depth; no colliders, interaction targets or Update loop.
+        void BuildExteriorDepth()
+        {
+            exteriorDay=Resources.Load<Texture2D>("G3/Shop/Exterior/Street-day");
+            exteriorNight=Resources.Load<Texture2D>("G3/Shop/Exterior/Street-night");
+            var shader=Resources.Load<Shader>("G3/Shop/Exterior/ExteriorBackdrop");
+            if(exteriorDay==null||exteriorNight==null||shader==null)throw new InvalidOperationException("Missing v19 exterior day/night assets");
+            int replacements=0;
+            foreach(var renderer in art.GetComponentsInChildren<Renderer>())
+            {
+                var materials=renderer.sharedMaterials;bool changed=false;
+                for(int i=0;i<materials.Length;i++)if(materials[i].name.StartsWith("StreetBlur",StringComparison.Ordinal))
+                {
+                    if(exteriorMaterial==null){exteriorMaterial=new Material(shader){name="V19 exterior day-night"};instantiatedMaterials.Add(exteriorMaterial);}
+                    materials[i]=exteriorMaterial;changed=true;replacements++;
+                }
+                if(changed){renderer.sharedMaterials=materials;renderer.shadowCastingMode=ShadowCastingMode.Off;renderer.receiveShadows=false;}
+            }
+            if(replacements!=1)throw new InvalidOperationException("Expected one existing exterior backdrop; found "+replacements);
+            var vertices=new List<Vector3>();var triangles=new List<int>();
+            // Outside the existing glass at Z2.61, before the backdrop at Z3.8.
+            AddExteriorBox(vertices,triangles,new Vector3(0,-.045f,3.25f),new Vector3(9.1f,.09f,1.26f));
+            AddExteriorBox(vertices,triangles,new Vector3(-.405f,.021f,2.76f),new Vector3(1.13f,.042f,.13f));
+            // Short storefront returns/awning occlude the finite card at grazing angles.
+            AddExteriorBox(vertices,triangles,new Vector3(-3.75f,1.4f,3.175f),new Vector3(.14f,2.8f,1.953f),-50.194f);
+            AddExteriorBox(vertices,triangles,new Vector3(3.75f,1.4f,3.175f),new Vector3(.14f,2.8f,1.953f),50.194f);
+            AddExteriorBox(vertices,triangles,new Vector3(0,2.83f,3.25f),new Vector3(9.1f,.14f,1.26f));
+            exteriorNearMesh=new Mesh{name="V19 static exterior sidewalk and threshold"};
+            exteriorNearMesh.SetVertices(vertices);exteriorNearMesh.SetTriangles(triangles,0);exteriorNearMesh.RecalculateNormals();exteriorNearMesh.RecalculateBounds();
+            var go=new GameObject("Exterior near-field sidewalk and threshold");go.transform.SetParent(transform,false);go.layer=bakingReflection?31:ReflectionGeometryLayer;
+            go.AddComponent<MeshFilter>().sharedMesh=exteriorNearMesh;var r=go.AddComponent<MeshRenderer>();
+            var stone=new Material(Shader.Find("Universal Render Pipeline/Lit")){name="V19 warm pavement"};stone.SetColor("_BaseColor",new Color(.39f,.36f,.30f));stone.SetFloat("_Smoothness",.13f);instantiatedMaterials.Add(stone);
+            r.sharedMaterial=stone;r.shadowCastingMode=ShadowCastingMode.Off;r.receiveShadows=true;
+        }
+        static void AddExteriorBox(List<Vector3> vertices,List<int> triangles,Vector3 center,Vector3 size,float yaw=0)
+        {
+            // Separate vertices per face preserve stone's hard edges: 24 verts/12 triangles per box.
+            Vector3[] p={new Vector3(-1,-1,-1),new Vector3(1,-1,-1),new Vector3(1,1,-1),new Vector3(-1,1,-1),new Vector3(-1,-1,1),new Vector3(1,-1,1),new Vector3(1,1,1),new Vector3(-1,1,1)};
+            int[] faces={0,3,2,1,4,5,6,7,0,4,7,3,1,2,6,5,0,1,5,4,3,7,6,2};
+            for(int face=0;face<6;face++){int n=vertices.Count;for(int j=0;j<4;j++)vertices.Add(center+Quaternion.Euler(0,yaw,0)*Vector3.Scale(p[faces[face*4+j]],size*.5f));triangles.AddRange(new[]{n,n+1,n+2,n,n+2,n+3});}
         }
         void Practical(string name,Vector3 p,Color color,float strength,float range,Vector3 target,bool shadow)
         {
@@ -106,11 +174,24 @@ namespace Lottery.G3.Interaction
             light.shadowStrength=.6f;light.shadowBias=.008f;light.shadowNormalBias=.025f;
             light.GetUniversalAdditionalLightData().usePipelineSettings=false;practicals.Add(light);
         }
-        void LateUpdate()
+        void LoadBakedReflections()
         {
-            if(!refreshReflection||roomReflection==null)return;
-            refreshReflection=false;roomReflection.RenderProbe();
+            const string root="G3/Shop/Reflections/";
+            var text=Resources.Load<TextAsset>(root+"reflection-receipt");
+            if(text==null||System.Text.Encoding.UTF8.GetByteCount(text.text)>16384)throw new InvalidOperationException("Missing or oversized authored shop reflection receipt; run the Editor bake");
+            var receipt=JsonUtility.FromJson<ReflectionReceipt>(text.text);
+            if(receipt==null||receipt.schemaVersion!=1||receipt.status!="COMPLETE_BAKED_STATIC_REFLECTIONS"||receipt.recipe!=ReflectionRecipe||receipt.colorSpace!=QualitySettings.activeColorSpace.ToString()||!IsDigest(receipt.sourceDigest))throw new InvalidOperationException("Invalid authored shop reflection recipe");
+            dayReflection=Resources.Load<Cubemap>(root+"Day");nightReflection=Resources.Load<Cubemap>(root+"Night");
+            RequireReflection(dayReflection,receipt.day,"Day.exr");RequireReflection(nightReflection,receipt.night,"Night.exr");
         }
+        public static void RequireReflection(Cubemap cube,ReflectionTexture info,string filename)
+        {
+            if(cube==null||info==null||info.file!=filename||info.faceSize!=ReflectionFaceSize||info.mipCount!=ReflectionMipCount||info.format!="RGBAHalf"||info.shape!="Cube"||!info.linear||!info.specular||!IsDigest(info.sha256)||!IsDigest(info.metaSha256)||info.bytes<=0||info.bytes>8388608||info.metaBytes<=0||info.metaBytes>16384||info.pixelSampleCount!=98304||float.IsNaN(info.maxChannelRange)||float.IsInfinity(info.maxChannelRange)||info.maxChannelRange<=.01f||info.maxChannelRange>65504)
+                throw new InvalidOperationException("Missing or invalid authored shop reflection "+filename);
+            if(cube.width!=ReflectionFaceSize||cube.height!=ReflectionFaceSize||cube.mipmapCount!=ReflectionMipCount||cube.dimension!=TextureDimension.Cube||cube.format!=TextureFormat.RGBAHalf)
+                throw new InvalidOperationException("Shop reflection dimensions, mips or HDR format differ from recipe");
+        }
+        static bool IsDigest(string value)=>value!=null&&value.Length==64&&value.All(c=>(c>='0'&&c<='9')||(c>='a'&&c<='f'));
         public void SetNight(bool value)
         {
             if(night==value)return;night=value;
@@ -125,15 +206,25 @@ namespace Lottery.G3.Interaction
             bounce.AddDirectionalLight(Vector3.up,value?new Color(.16f,.13f,.10f):new Color(.20f,.22f,.25f),.7f);
             RenderSettings.ambientProbe=bounce;RenderSettings.reflectionIntensity=value ? .7f : 1;
             for(int i=0;i<practicals.Count;i++)practicals[i].intensity=PracticalStrengths[i]*(value?1.04f:1);
-            roomReflection.backgroundColor=value?new Color(.08f,.10f,.15f):new Color(.40f,.45f,.49f);refreshReflection=true;
-            if(art!=null)foreach(var renderer in art.GetComponentsInChildren<Renderer>())foreach(var material in renderer.materials)
-                {instantiatedMaterials.Add(material);if((material.name.StartsWith("Window")||material.name.StartsWith("StreetBlur"))&&material.HasProperty("_BaseColor")){if(!authoredWindowColors.ContainsKey(material))authoredWindowColors[material]=material.GetColor("_BaseColor");material.SetColor("_BaseColor",authoredWindowColors[material]*(value?new Color(.06f,.12f,.24f):Color.white));}}
+            roomReflection.backgroundColor=value?new Color(.08f,.10f,.15f):new Color(.40f,.45f,.49f);
+            if(!bakingReflection)roomReflection.customBakedTexture=value?nightReflection:dayReflection;
+            if(exteriorMaterial!=null){exteriorMaterial.SetTexture("_BaseMap",value?exteriorNight:exteriorDay);exteriorMaterial.SetFloat("_Exposure",value?.72f:1f);}
+            if(art!=null)foreach(var renderer in art.GetComponentsInChildren<Renderer>())foreach(var material in renderer.sharedMaterials.Any(m=>m==exteriorMaterial)?renderer.sharedMaterials:renderer.materials)
+                {instantiatedMaterials.Add(material);if(material!=exteriorMaterial&&(material.name.StartsWith("Window")||material.name.StartsWith("StreetBlur"))&&material.HasProperty("_BaseColor")){if(!authoredWindowColors.ContainsKey(material))authoredWindowColors[material]=material.GetColor("_BaseColor");material.SetColor("_BaseColor",authoredWindowColors[material]*(value?new Color(.06f,.12f,.24f):Color.white));}}
         }
         public void Sync(RunState state)=>SetNight(state.Phase==DayPhase.NIGHT_BILL||state.Phase==DayPhase.DAY_COMPLETE||state.Phase==DayPhase.RUN_FAILED);
+        static void ReleaseOwned(UnityEngine.Object value)
+        {
+#if UNITY_EDITOR
+            if(!Application.isPlaying){DestroyImmediate(value);return;}
+#endif
+            Destroy(value);
+        }
         void OnDestroy()
         {
-            foreach(var material in instantiatedMaterials)if(material!=null)Destroy(material);
-            if(runtimePipeline!=null){if(QualitySettings.renderPipeline==runtimePipeline)QualitySettings.renderPipeline=priorPipeline;Destroy(runtimePipeline);}
+            foreach(var material in instantiatedMaterials)if(material!=null)ReleaseOwned(material);
+            if(exteriorNearMesh!=null)ReleaseOwned(exteriorNearMesh);
+            if(runtimePipeline!=null){if(QualitySettings.renderPipeline==runtimePipeline)QualitySettings.renderPipeline=priorPipeline;ReleaseOwned(runtimePipeline);}
             // A disabled menu can outlive the newer gameplay environment. It must
             // never restore its old snapshot over another environment's lighting.
             if(capturedLighting&&daylight!=null&&RenderSettings.sun==daylight)

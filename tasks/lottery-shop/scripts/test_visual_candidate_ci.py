@@ -36,7 +36,17 @@ def receipt():
         if name == "phone-mom-pending": f.update(stateSha256="d"*64, phoneEventCount=1)
         if name in ("phone-mom-claimed", "phone-table-return"):
             f.update(stateSha256="e"*64, cashMinor=40000, motherDebtMinor=10000, motherLifetimeMinor=10000, loanCount=1, ledgerCount=1, phoneEventCount=2)
-    return dict(schemaVersion=3, candidatePresentation="V16_SELECTED_C_PHYSICAL_PHONE_NOT_VISUAL_PASS", scope=candidate.SCOPE, sourceCommit="1" * 40, runId="12345", runAttempt="1", unityVersion="6000.3.19f1",
+    for f in frames:
+        if f["stage"] not in candidate.EXTERIOR_FRAMES: continue
+        night=f["stage"] in candidate.EXTERIOR_NIGHT_FRAMES
+        station=f["stage"].removeprefix("exterior-night-" if night else "exterior-day-")
+        position,angles=candidate.EXTERIOR_STATIONS[station]
+        f.update(cameraOrigin="FIXTURE_VIEW_NOT_WALKED",cameraPosition=dict(zip(("x","y","z"),position)),cameraEuler=dict(zip(("x","y","z"),angles)),
+            dayPhase="NIGHT_BILL" if night else "CLOSING_PREP",fixturePoseRestored=True,fixtureStateBefore=f["stateSha256"],fixtureStateAfter=f["stateSha256"],sha256=("b" if night else "a")*64,
+            exterior=dict(basis="MATERIAL_METADATA_NOT_PIXEL_ACCEPTANCE",backdropShader="Lottery/G3/ExteriorBackdrop",textureName="Street-night" if night else "Street-day",
+                textureWidth=1882 if night else 1881,textureHeight=836,exposure=.72 if night else 1,backdropRendererCount=1,backdropFrustumRendererCount=1,glassFrustumRendererCount=1,
+                transparentGlassMaterialCount=1,glassAlpha=.5,glassSurface=1,glassZWrite=0,glassRenderQueue=3000,nearFieldTriangles=60,nearFieldColliderCount=0,feltNormalScale=.6,linerSmoothness=.08,brassSmoothness=.66))
+    return dict(schemaVersion=4, candidatePresentation="V19_EXTERIOR_FIXTURE_VIEWS_NOT_VISUAL_PASS", scope=candidate.SCOPE, sourceCommit="1" * 40, runId="12345", runAttempt="1", unityVersion="6000.3.19f1",
                 graphicsDeviceType="OpenGLCore", inputEvidence="SIMULATED_INPUT_SYSTEM",
                 captureMethod="URP_STANDARD_REQUEST_READPIXELS", hudVisibilityBasis="ENABLED_CAMERA_LAYER_AND_FRUSTUM_TEST_NOT_PIXEL_OCCLUSION", complete=True, frames=frames, actions=[])
 
@@ -281,7 +291,45 @@ class VisualCandidateEvidenceTests(unittest.TestCase):
         return candidate.validate_capture(value, "1" * 40, "12345", "1", complete)
 
     def test_synthetic_complete_shape(self):
-        self.assertEqual(len(self.validate(receipt())), 17)
+        self.assertEqual(len(self.validate(receipt())), 23)
+
+    def test_exterior_missing_any_of_six_frames_is_rejected(self):
+        self.assertEqual([n for n in candidate.FRAMES if n not in candidate.EXTERIOR_FRAMES], candidate.ORIGINAL_VISUAL_FRAMES)
+        self.assertEqual(len(candidate.ORIGINAL_VISUAL_FRAMES),17)
+        for name in candidate.EXTERIOR_FRAMES:
+            value=receipt();value["frames"]=[f for f in value["frames"] if f["stage"]!=name]
+            with self.subTest(name=name),self.assertRaises(ValueError):self.validate(value)
+
+    def test_exterior_wrong_day_fake_restore_or_walk_claim_rejected(self):
+        for name in candidate.EXTERIOR_FRAMES:
+            for key,bad in (("dayPhase","DAY_OPEN"),("fixturePoseRestored",False),("fixtureStateAfter","f"*64),("cameraOrigin","KEYBOARD_TRAVERSED_PLAYER_VIEW"),("panel","Bill"),("phoneFocused",True)):
+                value=receipt();next(f for f in value["frames"] if f["stage"]==name)[key]=bad
+                with self.subTest(name=name,key=key),self.assertRaises(ValueError):self.validate(value)
+
+    def test_exterior_opaque_glass_wrong_texture_and_materials_rejected(self):
+        for key,bad in (("textureName","Street-day"),("glassAlpha",1),("glassSurface",0),("glassZWrite",1),("glassRenderQueue",2000),("exposure",1),("nearFieldTriangles",0),("nearFieldColliderCount",1),("backdropRendererCount",2),("glassFrustumRendererCount",0),("feltNormalScale",.28),("linerSmoothness",.5),("brassSmoothness",.73),("basis","PIXEL_PASS")):
+            value=receipt();next(f for f in value["frames"] if f["stage"]==candidate.EXTERIOR_NIGHT_FRAMES[0])["exterior"][key]=bad
+            with self.subTest(key=key),self.assertRaises(ValueError):self.validate(value)
+
+    def test_exterior_camera_and_production_state_pairing_rejected(self):
+        for key,bad in (("cameraPosition",dict(x=0,y=1.58,z=0)),("cameraFov",90),("sha256","a"*64),("stateSha256","e"*64)):
+            value=receipt();next(f for f in value["frames"] if f["stage"]==candidate.EXTERIOR_NIGHT_FRAMES[0])[key]=bad
+            with self.subTest(key=key),self.assertRaises(ValueError):self.validate(value)
+
+    def test_exterior_fixture_source_and_workflow_do_not_bypass_production(self):
+        root=Path(__file__).resolve().parents[3]
+        source=(root / candidate.TASK / "unity/Assets/G3/Tests/VisualCandidate/VisualCandidateCaptureTests.cs").read_text()
+        body=source.split("IEnumerator ExteriorFixtureViews(bool isNight)",1)[1].split("ExteriorReceipt ExteriorMetadata",1)[0]
+        self.assertNotIn("SetNight(",body)
+        self.assertIn("Physics.OverlapCapsule",body)
+        self.assertIn('"FIXTURE_VIEW_NOT_WALKED"',body)
+        self.assertIn("finally",body)
+        for text in ("P.Walking, Is.EqualTo(walking)","P.View.Phone.IsFocused, Is.EqualTo(phoneFocused)","P.View.Walk.SavedPosition, Is.EqualTo(walkPosition)","StateCodec.ComputeHash(State), Is.EqualTo(hash)"):
+            self.assertIn(text,body)
+        self.assertIn('Capture("closing-day-table", "NORMAL_SEATED_PLAYER_VIEW");\n            yield return ExteriorFixtureViews(false);',source)
+        self.assertIn('Capture("night-table", "SAME_CAMERA_AS_CLOSING_DAY_WITH_BILL_CLOSED");\n            yield return ExteriorFixtureViews(true);',source)
+        workflow=(root / ".github/workflows/lottery-visual-candidate.yml").read_text()
+        for name in candidate.EXTERIOR_FRAMES:self.assertEqual(workflow.count('/captures/'+name+'.png'),1)
 
     def test_missing_six_group_evidence_is_not_complete(self):
         value = receipt(); value["frames"].pop()
@@ -335,7 +383,7 @@ class VisualCandidateEvidenceTests(unittest.TestCase):
 
     def test_measured_layout_fields_are_required_without_art_pass_threshold(self):
         value = receipt(); value["frames"][0]["hudOpaqueAreaRatio"] = .9
-        self.assertEqual(len(self.validate(value)), 17)
+        self.assertEqual(len(self.validate(value)), 23)
         for bad in (None, -1, float("inf"), 1.1):
             value = receipt(); value["frames"][0]["hudOpaqueAreaRatio"] = bad
             with self.subTest(bad=bad), self.assertRaises(ValueError): self.validate(value)
@@ -446,7 +494,7 @@ class PhysicalPhoneEvidenceTests(unittest.TestCase):
     def test_original_eleven_and_six_phone_frames_remain_distinct(self):
         self.assertEqual(len(candidate.BASE_FRAMES), 11)
         self.assertEqual(len(candidate.PHONE_FRAMES), 6)
-        self.assertEqual(len(set(candidate.FRAMES)), 17)
+        self.assertEqual(len(set(candidate.FRAMES)), 23)
         self.validate(receipt())
         for name in candidate.PHONE_FRAMES:
             value=receipt();value["frames"]=[f for f in value["frames"] if f["stage"] != name]
