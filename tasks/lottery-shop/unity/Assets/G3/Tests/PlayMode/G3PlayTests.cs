@@ -303,7 +303,7 @@ namespace Lottery.G3.PlayMode.Tests
         void BorrowAndRepay()
         {
             Close();Click("open-phone");Click("contact-mother");long before=State.CashMinor;ReceivePhoneLoan1000();Assert.That(State.CashMinor,Is.EqualTo(before+10000));
-            Click("phone-repay");Click("repay-1000");Confirm();Assert.That(State.CashMinor,Is.EqualTo(before));Assert.That(State.Contacts.Single(x=>x.ContactId=="mother").BorrowedLifetimeMinor,Is.EqualTo(10000));
+            Click("phone-more");Click("phone-repay");Click("repay-1000");Confirm();Assert.That(State.CashMinor,Is.EqualTo(before));Assert.That(State.Contacts.Single(x=>x.ContactId=="mother").BorrowedLifetimeMinor,Is.EqualTo(10000));
             Close();Click("open-phone");Click("contact-girlfriend");ReceivePhoneLoan1000();Assert.That(State.Loans.Last().DueNight,Is.EqualTo(4));Close();
         }
         [UnityTest]

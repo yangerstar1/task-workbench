@@ -42,6 +42,9 @@ namespace Lottery.G3.Interaction
             outline.AddComponent<MeshFilter>().sharedMesh=edgeMesh;edgeRenderer=outline.AddComponent<MeshRenderer>();edgeRenderer.sharedMaterial=edgeMaterial;
             fillTint=fill;edgeTint=edge;Configure(100,60,8,1);
         }
+        // Keep the outline in its face's transparent draw group rather than behind it.
+        public void SetSortingOrder(int order)
+        {GetComponent<Renderer>().sortingOrder=order;if(edgeRenderer!=null)edgeRenderer.sortingOrder=order;}
         public void Tint(Color fill,Color edge)
         {if(fillTint==fill&&edgeTint==edge)return;fillTint=fill;edgeTint=edge;Paint();}
         public void Configure(float width,float height,float radius=8,float stroke=1)

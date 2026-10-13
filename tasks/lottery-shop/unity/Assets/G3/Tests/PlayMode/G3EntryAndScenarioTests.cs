@@ -91,7 +91,7 @@ namespace Lottery.G3.PlayMode.Tests
             RevealNumberByPointer();Claim();Buy("challenge");RevealSelected(0);Claim();
             while(State.TicketsPurchasedToday<12){Buy("number");Click("quick");Claim();}
             Assert.That(State.Tickets.Count(x=>x.TicketType=="challenge"),Is.EqualTo(1));Assert.That(State.SettledTicketCount,Is.EqualTo(12));
-            Click("open-phone");Click("contact-mother");long cash=State.CashMinor;ReceivePhoneLoan1000();Click("phone-repay");Click("repay-1000");Confirm();Assert.That(State.CashMinor,Is.EqualTo(cash));Close();
+            Click("open-phone");Click("contact-mother");long cash=State.CashMinor;ReceivePhoneLoan1000();Click("phone-more");Click("phone-repay");Click("repay-1000");Confirm();Assert.That(State.CashMinor,Is.EqualTo(cash));Close();
             Click("open-bill");Click("enter-night");Confirm();Assert.That(P.Service.PreviewNightBill().ShortfallMinor,Is.Zero);Click("pay-night");Confirm();
             Assert.That(State.Phase,Is.EqualTo(DayPhase.DAY_COMPLETE));Assert.That(State.InterestPaidMinor,Is.EqualTo(1500));
             yield return ReloadSameStore();Assert.That(State.RunId,Is.EqualTo(run));Assert.That(State.Seed,Is.EqualTo(seed));Assert.That(State.FixtureLabel,Is.Empty);Assert.That(State.Phase,Is.EqualTo(DayPhase.DAY_COMPLETE));
@@ -210,7 +210,7 @@ namespace Lottery.G3.PlayMode.Tests
             rejected=StateCodec.ComputeHash(State);Click("phone-choose");Click("borrow-custom");foreach(char digit in "5000")Click("digit-"+digit);Click("amount-accept");Assert.That(StateCodec.ComputeHash(State),Is.EqualTo(rejected));Assert.That(P.Status,Does.Contain("超过剩余累计额度"));TraceStep(72,11200);
             // An over-limit phone proposal is rejected before sending. Re-open the contact,
             // never substitute a direct loan command or change the frozen ordering.
-            Close();Click("open-phone");Click("contact-mother");Click("phone-repay");Click("repay-custom");Amount("500");Assert.That(State.Loans.Single().RemainingMinor,Is.EqualTo(5000));Close();TraceStep(73,6200);
+            Close();Click("open-phone");Click("contact-mother");Click("phone-more");Click("phone-repay");Click("repay-custom");Amount("500");Assert.That(State.Loans.Single().RemainingMinor,Is.EqualTo(5000));Close();TraceStep(73,6200);
             Click("open-bill");Click("pay-night");var confirmPoint=P.View.ButtonRect("confirm-action").center;MouseEvent(confirmPoint,true);MouseEvent(confirmPoint,false);TraceStep(74,4700);
             MouseEvent(confirmPoint,true);MouseEvent(confirmPoint,false);yield return ReloadSameStore();TraceStep(75,4700,"INPUT_SYSTEM_DUPLICATE_PRESS_AND_SIMULATED_SESSION_RELOAD_NOT_ANDROID_SIGKILL");
             Assert.That(State.Phase,Is.EqualTo(DayPhase.DAY_COMPLETE));Assert.That(State.TicketsPurchasedToday,Is.EqualTo(12));Assert.That(State.SettledTicketCount,Is.EqualTo(12));Assert.That(State.Tickets.Count(x=>x.TicketType=="number"),Is.EqualTo(10));Assert.That(State.Ledger.Count,Is.EqualTo(29));Assert.That(State.EconomicCounter,Is.EqualTo(10));Assert.That(State.InterestPaidMinor,Is.EqualTo(1500));Assert.That(State.PrincipalMinor,Is.EqualTo(297000));Assert.That(State.Stock.All(x=>x.Quantity==0),Is.True);Assert.That(P.Service.PreviewNightBill().NextDayInterestMinor,Is.EqualTo(1485));

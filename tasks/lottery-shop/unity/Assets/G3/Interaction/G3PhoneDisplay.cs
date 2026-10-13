@@ -13,18 +13,21 @@ namespace Lottery.G3.Interaction
         const float Scale=.000264f;const float Width=390,Height=844;
         readonly List<UnityEngine.Object> owned=new List<UnityEngine.Object>();
         readonly List<BoundedGlyphLabel> labels=new List<BoundedGlyphLabel>();
+        readonly List<string> wholeMessages=new List<string>();
         readonly Dictionary<string,Hit> hits=new Dictionary<string,Hit>();
         sealed class Hit {public Rect Rect;public G3Action Action;public bool Enabled;}
         Transform body,screen,content;Collider glass;Camera camera;Font font;Shader flat,glyph;Material textMaterial;G3Presenter presenter;
         static readonly Color Ink=new Color(.08f,.10f,.11f),Quiet=new Color(.42f,.45f,.48f),Background=new Color(.925f,.93f,.935f),Green=new Color(.66f,.92f,.46f),Packet=new Color(1,.30f,.12f);
-        string signature="";int drawOrder;float scrollOffset,maxScroll;bool gesture,dragging;Vector2 pointerStart,pointerLast;G3Action tapped;G3PanelModel lastModel;Rect lastSafe,scrollViewport;string scrollContact="";G3Panel scrollPanel;readonly Rect chatViewport=new Rect(0,168,390,378);
+        string signature="";int drawOrder;float scrollOffset,maxScroll;bool gesture,dragging;Vector2 pointerStart,pointerLast;G3Action tapped;G3PanelModel lastModel;Rect lastSafe,scrollViewport;string scrollContact="";G3Panel scrollPanel;readonly Rect chatViewport=new Rect(0,164,390,514);
+        public Rect ChatViewportLogical=>chatViewport;
+        public string[] WholeVisibleMessageIds=>wholeMessages.ToArray();
         public bool IsFocused {get;private set;}
         public string[] VisibleControlIds=>IsFocused?hits.Keys.ToArray():new string[0];
         public bool AllLabelsFit=>labels.All(x=>x.Fits&&x.MissingGlyphCount==0);
         public string[] OverflowingLabels=>labels.Where(x=>!x.Fits||x.MissingGlyphCount>0).Select(x=>x.name+": "+x.Text).ToArray();
         public Vector3[] ScreenWorldCorners=>new[]{ScreenPoint(0,0),ScreenPoint(Width,0),ScreenPoint(Width,Height),ScreenPoint(0,Height)};
         public Bounds WorldBounds {get{var r=body.GetComponentsInChildren<Renderer>();var b=new Bounds(body.position,Vector3.zero);foreach(var x in r)b.Encapsulate(x.bounds);return b;}}
-        public static bool HandlesPanel(G3Panel panel)=>panel==G3Panel.Phone||panel==G3Panel.Contact||panel==G3Panel.PhoneAmount||panel==G3Panel.PhoneRequest||panel==G3Panel.PhonePacket||panel==G3Panel.PhoneRecords||panel==G3Panel.PhoneRepay;
+        public static bool HandlesPanel(G3Panel panel)=>panel==G3Panel.Phone||panel==G3Panel.Contact||panel==G3Panel.PhoneAmount||panel==G3Panel.PhoneRequest||panel==G3Panel.PhonePacket||panel==G3Panel.PhoneRecords||panel==G3Panel.PhoneRepay||panel==G3Panel.PhoneOptions;
         public void Initialize(Font chinese,Shader flatShader,Shader glyphShader,Shader lit,G3ShopEnvironment environment)
         {
             font=chinese;flat=flatShader;glyph=glyphShader;textMaterial=Own(new Material(glyph));
@@ -39,7 +42,7 @@ namespace Lottery.G3.Interaction
             RoundedSolid("Rear camera island",.030f,.045f,.004f,.008f,new Vector3(-.034f,.080f,.009f),new Color(.075f,.082f,.09f),lit);
             foreach(float y in new[]{.071f,.089f}){var lens=GameObject.CreatePrimitive(PrimitiveType.Cylinder);lens.name="Optical rear lens";lens.transform.SetParent(body,false);lens.transform.localPosition=new Vector3(-.034f,y,.013f);lens.transform.localRotation=Quaternion.Euler(90,0,0);lens.transform.localScale=new Vector3(.011f,.002f,.011f);lens.GetComponent<Renderer>().sharedMaterial=Material(lit,new Color(.02f,.045f,.06f));Destroy(lens.GetComponent<Collider>());}
             // Stand is a real support behind the phone, not a frame painted over the view.
-            Cube("Rubber phone cradle",new Vector3(0,-.111f,.004f),new Vector3(.125f,.010f,.030f),new Color(.075f,.083f,.078f),lit);
+            Cube("Rubber phone cradle",new Vector3(0,-.123f,.010f),new Vector3(.125f,.010f,.024f),new Color(.075f,.083f,.078f),lit);
             Cube("Brass stand riser",new Vector3(0,-.081f,.040f),new Vector3(.024f,.083f,.012f),new Color(.33f,.26f,.15f),lit);
             var foot=Cube("Weighted stand base",new Vector3(0,-.139f,.038f),new Vector3(.15f,.014f,.12f),new Color(.18f,.17f,.14f),lit);
             foot.transform.rotation=Quaternion.identity;foot.transform.position=new Vector3(body.position.x,.965f,body.position.z-.018f);
@@ -86,8 +89,7 @@ namespace Lottery.G3.Interaction
             string next=IsFocused?owner.Panel+"|"+owner.PhoneContact+"|"+model.Title+"|"+model.Body+"|"+model.Footnote+"|"+string.Join("|",model.Cards.Select(c=>c.Id+c.Text+c.Enabled))+"|"+string.Join("|",model.Messages.Select(m=>m.Id+m.Text+m.Caption)):"idle";
             if(next==signature)return;signature=next;Clear();if(!IsFocused){DrawIdle();return;}
             Surface("Chat screen",new Rect(0,0,Width,Height),Background,22);
-            Text("status-time","第 "+owner.Snapshot.DayNumber+" 天",new Rect(18,8,170,20),15,Quiet);
-            Text("status-mode","店内聊天",new Rect(230,8,140,20),15,Quiet,TextAnchor.MiddleRight);
+            Surface("Receiver aperture",new Rect(160,10,70,5),new Color(.20f,.23f,.24f),2.5f);
             Surface("Navigation",new Rect(0,30,390,124),new Color(.98f,.98f,.98f),0);
             Button("phone-back","‹",new G3Action(G3ActionKind.PhoneBack),new Rect(0,30,124,124),!owner.IsCommitting,new Color(.98f,.98f,.98f),Ink,52);
             Text("contact-title",(owner.Panel==G3Panel.Phone?"聊天":owner.PhoneContact=="mother"?"妈妈":"女友"),new Rect(124,30,142,124),42,Ink,TextAnchor.MiddleCenter);
@@ -97,7 +99,7 @@ namespace Lottery.G3.Interaction
             else if(owner.Panel==G3Panel.PhonePacket)DrawPacket(model);
             else if(owner.Panel==G3Panel.CustomAmount)DrawKeypad(model);
             else DrawConversation(model);
-            if(owner.Panel!=G3Panel.CustomAmount)Text("screen-footnote",model.Footnote,new Rect(14,814,362,22),13,Quiet,TextAnchor.MiddleCenter);
+            Surface("Bottom home indicator",new Rect(157,832,76,4),new Color(.31f,.34f,.35f),2);
             RefreshGlyphGeometry();
         }
         void DrawIdle()
@@ -110,10 +112,18 @@ namespace Lottery.G3.Interaction
         }
         void DrawContacts(G3PanelModel model)
         {
-            float y=176;foreach(var c in model.Cards.Where(x=>x.Id.StartsWith("contact-",StringComparison.Ordinal)))
-            {Surface(c.Id+" row",new Rect(8,y,374,180),Color.white,12);Avatar(c.Id,new Rect(22,y+23,72,72));var parts=c.Text.Split('\n');Text(c.Id+" name",parts[0],new Rect(116,y+8,246,55),42,Ink);Text(c.Id+" preview",parts.Length>1?parts[1]:"",new Rect(116,y+67,246,108),42,Quiet);hits[c.Id]=new Hit{Rect=new Rect(8,y,374,180),Action=c.Action,Enabled=c.Enabled};y+=196;}
-            var principal=model.Cards.FirstOrDefault(x=>x.Id=="principal");if(principal!=null)Card(principal,new Rect(8,678,180,124),"还主债");
-            var bill=model.Cards.FirstOrDefault(x=>x.Id=="phone-bill");if(bill!=null)Card(bill,new Rect(202,678,180,124),"账单");
+            float y=174;foreach(var c in model.Cards.Where(x=>x.Id.StartsWith("contact-",StringComparison.Ordinal)))
+            {
+                var r=new Rect(8,y,374,172);Surface(c.Id+" row",r,new Color(.98f,.985f,.98f),6);Avatar(c.Id,new Rect(22,y+24,68,68));var parts=c.Text.Split('\n');
+                Text(c.Id+" name",parts[0],new Rect(112,y+12,250,52),42,Ink);
+                bool decision=parts.Length>1&&parts[1].Contains("红包");float previewSize=42;
+                string preview=decision?(parts[1].Contains("待领取")?"红包待领":"红包已领"):(parts.Length>1?parts[1]:"");
+                Text(c.Id+" preview",preview,new Rect(112,y+66,250,100),previewSize,Quiet);
+                hits[c.Id]=new Hit{Rect=r,Action=c.Action,Enabled=c.Enabled};y+=180;
+            }
+            Surface("Contacts utility divider",new Rect(20,674,350,1),new Color(.83f,.85f,.85f),0);
+            var principal=model.Cards.FirstOrDefault(x=>x.Id=="principal");if(principal!=null)Button(principal.Id,"主债",principal.Action,new Rect(8,684,180,124),principal.Enabled,Background,Quiet,42);
+            var bill=model.Cards.FirstOrDefault(x=>x.Id=="phone-bill");if(bill!=null)Button(bill.Id,"账单",bill.Action,new Rect(202,684,180,124),bill.Enabled,Background,Quiet,42);
         }
         void DrawPacket(G3PanelModel model)
         {
@@ -133,30 +143,53 @@ namespace Lottery.G3.Interaction
             float y=170;var cards=model.Cards;
             if(standard)
             {
-                var heights=model.Messages.Select(m=>m.Packet?282:Wrap(m.Text,280,42).Count*49+24).ToArray();
-                scrollViewport=chatViewport;float total=heights.Sum()+Mathf.Max(0,heights.Length-1)*16;maxScroll=Mathf.Max(0,total-chatViewport.height);scrollOffset=Mathf.Clamp(scrollOffset,0,maxScroll);
-                y=chatViewport.y-maxScroll+scrollOffset;
+                var heights=model.Messages.Select(m=>m.Packet?244:Wrap(m.Text,270,42).Count*(42)*1.16f+20).ToArray();
+                scrollViewport=chatViewport;float total=heights.Sum()+Mathf.Max(0,heights.Length-1)*14;
+                float naturalTop=Mathf.Max(0,total-chatViewport.height),alignedTop=0;
+                // On entry show complete recent messages instead of a clipped last syllable.
+                for(int i=0;i<heights.Length&&alignedTop<naturalTop;i++)alignedTop+=heights[i]+14;
+                maxScroll=naturalTop>0?alignedTop:0;scrollOffset=Mathf.Clamp(scrollOffset,0,maxScroll);y=chatViewport.y-maxScroll+scrollOffset;
                 for(int i=0;i<model.Messages.Count;i++)
                 {
-                    var msg=model.Messages[i];float h=heights[i],x=msg.Player?12:66,w=312;var rect=new Rect(x,y,w,h);
+                    var msg=model.Messages[i];float size=42,h=heights[i],w=msg.Packet?300:Mathf.Clamp(Wrap(msg.Text,270,size).Max(line=>Measure(line,size))+30,112,300),x=msg.Player?324-w:66;var rect=new Rect(x,y,w,h);
                     if(rect.yMax>chatViewport.yMin&&rect.yMin<chatViewport.yMax)
                     {
+                        if(rect.yMin>=chatViewport.yMin&&rect.yMax<=chatViewport.yMax)wholeMessages.Add(msg.Id);
                         var avatar=new Rect(msg.Player?336:8,y+4,46,46);if(avatar.yMin>=chatViewport.yMin&&avatar.yMax<=chatViewport.yMax)Avatar(msg.Player?"player":presenter.PhoneContact,avatar);
-                        Surface(msg.Id+" bubble",Clip(rect,chatViewport),msg.Packet?Packet:msg.Player?Green:Color.white,12);
+                        bool claimed=msg.Packet&&msg.Caption.StartsWith("已领取",StringComparison.Ordinal);Color packetColor=claimed?new Color(.82f,.46f,.29f):new Color(.96f,.34f,.15f);
+                        Surface(msg.Id+" bubble",Clip(rect,chatViewport),msg.Packet?packetColor:msg.Player?Green:Color.white,msg.Packet?14:10);
                         if(msg.Packet)
                         {
-                            ChatText(msg.Id+" value",msg.Text.Replace("游戏金币","金币"),new Rect(x+18,y+18,w-36,114),42,Color.white);
-                            ChatText(msg.Id+" status",msg.Caption.Replace(" · ","\n"),new Rect(x+18,y+134,w-36,104),42,Color.white);
-                            ChatText(msg.Id+" type","游戏虚拟红包",new Rect(x+18,y+250,w-36,24),19,new Color(1,.91f,.80f));
+                            if(y+12>=chatViewport.yMin&&y+60<=chatViewport.yMax)Envelope(msg.Id,new Rect(x+16,y+16,40,44),claimed);
+                            ChatText(msg.Id+" heading",claimed?"已领取":"借款红包",new Rect(x+68,y+12,w-84,49),42,Color.white);
+                            string amount=msg.Text.Split('\n').Last().Replace("游戏金币","金币");
+                            ChatText(msg.Id+" value",amount,new Rect(x+18,y+66,w-36,49),42,Color.white);
+                            string status=claimed&&msg.Caption.Contains("第")?msg.Caption.Substring(msg.Caption.IndexOf("第",StringComparison.Ordinal)):"拆开领取";
+                            ChatText(msg.Id+" status",status,new Rect(x+18,y+120,w-36,49),42,Color.white);
+                            if(y+177>=chatViewport.yMin&&y+178<=chatViewport.yMax)Surface(msg.Id+" footer rule",new Rect(x+14,y+177,w-28,1),new Color(1,.77f,.56f),0);
+                            ChatText(msg.Id+" type","游戏虚拟红包",new Rect(x+18,y+184,w-36,49),42,new Color(1,.92f,.82f));
                         }
-                        else ChatText(msg.Id+" text",msg.Text,new Rect(x+16,y+12,w-32,h-24),42,Ink);
+                        else ChatText(msg.Id+" text",msg.Text,new Rect(x+14,y+10,w-28,h-20),size,Ink);
                         if(msg.Enabled)hits[msg.Id]=new Hit{Rect=Clip(rect,chatViewport),Action=msg.Action,Enabled=true};
                     }
-                    y+=h+16;
+                    y+=h+14;
                 }
-
-                foreach(var c in cards)
-                {if(c.Id=="phone-choose")Card(c,new Rect(8,550,180,124),"借金币",42);else if(c.Id=="phone-repay")Card(c,new Rect(202,550,180,124),"还金币",42);else Card(c,new Rect(8,684,374,124),"借还记录");}
+                Surface("Fixed phrase composer bar",new Rect(0,680,390,132),new Color(.955f,.96f,.965f),0);
+                Surface("Composer top hairline",new Rect(0,680,390,1),new Color(.82f,.84f,.85f),0);
+                var phrase=cards.FirstOrDefault(c=>c.Id=="phone-choose");
+                if(phrase!=null)
+                {
+                    Surface("Fixed phrase input",new Rect(8,702,242,80),Color.white,13);
+                    Text("phone-choose label",phrase.Enabled?"说一句话":"待领红包",new Rect(20,707,218,68),42,phrase.Enabled?Quiet:new Color(.55f,.56f,.57f),TextAnchor.MiddleCenter);
+                    hits[phrase.Id]=new Hit{Rect=new Rect(8,684,242,124),Action=phrase.Action,Enabled=phrase.Enabled};
+                }
+                var more=cards.FirstOrDefault(c=>c.Id=="phone-more");
+                if(more!=null)
+                {
+                    Surface("Composer plus outline",new Rect(286,708,68,68),new Color(.70f,.74f,.74f),34);Surface("Composer plus inside",new Rect(289,711,62,62),new Color(.955f,.96f,.965f),31);
+                    Text("phone-more label","＋",new Rect(286,708,68,68),52,Ink,TextAnchor.MiddleCenter);
+                    hits[more.Id]=new Hit{Rect=new Rect(258,684,124,124),Action=more.Action,Enabled=more.Enabled};
+                }
                 return;
             }
             if(records)
@@ -177,6 +210,15 @@ namespace Lottery.G3.Interaction
                 Card(cards[i],new Rect(8,start+i*(cardHeight+gap),374,cardHeight),caption,42);
             }
         }
+        void Envelope(string id,Rect r,bool muted)
+        {
+            Surface(id+" envelope body",r,muted?new Color(.66f,.29f,.15f):new Color(.83f,.18f,.08f),5);
+            var a=Surface(id+" envelope flap left",new Rect(r.x+2,r.y+17,r.width*.53f,2),new Color(1,.78f,.44f),0);a.localRotation=Quaternion.Euler(0,0,-24);
+            var b=Surface(id+" envelope flap right",new Rect(r.x+r.width*.47f,r.y+17,r.width*.49f,2),new Color(1,.78f,.44f),0);b.localRotation=Quaternion.Euler(0,0,24);
+            Surface(id+" envelope seal",new Rect(r.center.x-5,r.y+20,10,10),new Color(1,.80f,.48f),5);
+        }
+        float Measure(string value,float size)
+        {float width=0;foreach(char c in value)width+=font.GetCharacterInfo(c,out var info,80,FontStyle.Normal)?info.advance*size/80:size;return width;}
         static Rect Clip(Rect a,Rect b)=>Rect.MinMaxRect(Mathf.Max(a.xMin,b.xMin),Mathf.Max(a.yMin,b.yMin),Mathf.Min(a.xMax,b.xMax),Mathf.Min(a.yMax,b.yMax));
         List<string> Wrap(string text,float width,float size)
         {
@@ -211,16 +253,27 @@ namespace Lottery.G3.Interaction
         }
         void Avatar(string who,Rect r)
         {
-            bool player=who=="player",mother=who.Contains("mother");Color background=player?new Color(.37f,.52f,.61f):mother?new Color(.52f,.68f,.45f):new Color(.88f,.68f,.66f);
-            Surface(who+" avatar",r,background,8);
-            // Original simple portrait/garden glyphs, no platform trademarks or asset copying.
-            string symbol=player?"我":mother?"花":"晴";Text(who+" avatar mark",symbol,new Rect(r.x+4,r.y+3,r.width-8,r.height-6),r.height*.48f,Color.white,TextAnchor.MiddleCenter);
+            bool player=who=="player",mother=who.Contains("mother");Color background=player?new Color(.40f,.59f,.69f):mother?new Color(.64f,.75f,.52f):new Color(.81f,.62f,.60f);
+            Surface(who+" avatar",r,background,8);float unit=r.width/46;
+            if(mother)
+            {
+                Surface(who+" flower stem",new Rect(r.x+22*unit,r.y+15*unit,2*unit,22*unit),new Color(.29f,.44f,.22f),0);
+                foreach(var p in new[]{new Vector2(15,13),new Vector2(22,10),new Vector2(28,15),new Vector2(25,22),new Vector2(17,21)})Surface(who+" flower petal",new Rect(r.x+p.x*unit,r.y+p.y*unit,9*unit,9*unit),new Color(.96f,.74f,.68f),4.5f*unit);
+                Surface(who+" flower center",new Rect(r.x+22*unit,r.y+17*unit,6*unit,6*unit),new Color(1,.90f,.58f),3*unit);
+                Surface(who+" terracotta pot",new Rect(r.x+14*unit,r.y+32*unit,20*unit,10*unit),new Color(.73f,.46f,.31f),3*unit);
+            }
+            else
+            {
+                Surface(who+" avatar sun",new Rect(r.x+28*unit,r.y+8*unit,11*unit,11*unit),new Color(1,.82f,.52f),5.5f*unit);
+                Surface(who+" horizon",new Rect(r.x+3*unit,r.y+31*unit,40*unit,11*unit),player?new Color(.21f,.34f,.43f):new Color(.52f,.39f,.46f),2*unit);
+                for(int i=0;i<4;i++)Surface(who+" skyline "+i,new Rect(r.x+(7+i*8)*unit,r.y+(26-i%2*6)*unit,5*unit,(12+i%2*6)*unit),new Color(.31f,.35f,.43f),unit);
+            }
         }
         void Card(G3Card card,Rect r,string caption=null,float size=42)=>Button(card.Id,caption??card.Text,card.Action,r,card.Enabled,Color.white,Ink,size);
-        void Button(string id,string value,G3Action action,Rect r,bool enabled,Color fill,Color ink,float size=22,float radius=13)
+        void Button(string id,string value,G3Action action,Rect r,bool enabled,Color fill,Color ink,float size=42,float radius=13)
         {Surface(id+" plate",r,enabled?fill:Color.Lerp(fill,Background,.65f),radius);Text(id+" label",value,new Rect(r.x+12,r.y+4,r.width-24,r.height-8),size,enabled?ink:Quiet,TextAnchor.MiddleCenter);hits[id]=new Hit{Rect=r,Action=action,Enabled=enabled};}
-        void Surface(string name,Rect r,Color color,float radius)
-        {var t=G3HudSurface.Create(name,content,glyph,color,color);t.localPosition=new Vector3(r.center.x-Width*.5f,Height*.5f-r.center.y,-.3f);t.localScale=new Vector3(r.width,r.height,1);t.GetComponent<G3HudSurface>().Configure(r.width,r.height,radius,0);foreach(var renderer in t.GetComponentsInChildren<Renderer>())renderer.sortingOrder=drawOrder++;}
+        Transform Surface(string name,Rect r,Color color,float radius)
+        {var t=G3HudSurface.Create(name,content,glyph,color,color);t.localPosition=new Vector3(r.center.x-Width*.5f,Height*.5f-r.center.y,-.3f);t.localScale=new Vector3(r.width,r.height,1);t.GetComponent<G3HudSurface>().Configure(r.width,r.height,radius,0);foreach(var renderer in t.GetComponentsInChildren<Renderer>())renderer.sortingOrder=drawOrder++;return t;}
         void Text(string name,string value,Rect r,float size,Color color,TextAnchor anchor=TextAnchor.MiddleLeft)
         {var go=new GameObject(name);go.transform.SetParent(content,false);go.transform.localPosition=new Vector3(r.center.x-Width*.5f,Height*.5f-r.center.y,-.7f);var label=go.AddComponent<BoundedGlyphLabel>();label.Initialize(font,textMaterial,color,anchor);label.SetBox(r.width,r.height,size,true);label.SetText(value);go.GetComponent<Renderer>().sortingOrder=drawOrder++;labels.Add(label);}
         Vector3 ScreenPoint(float x,float y)=>screen.TransformPoint(new Vector3(x-Width*.5f,Height*.5f-y,-.7f));
@@ -240,7 +293,7 @@ namespace Lottery.G3.Interaction
             return true; // Screen exterior cannot scratch the table or move the player.
         }
         public void RefreshGlyphGeometry(){foreach(var label in labels)label.RebuildIfNeeded();}
-        void Clear(){drawOrder=0;hits.Clear();labels.Clear();for(int i=content.childCount-1;i>=0;i--){var child=content.GetChild(i).gameObject;child.SetActive(false);Destroy(child);}}
+        void Clear(){drawOrder=0;wholeMessages.Clear();hits.Clear();labels.Clear();for(int i=content.childCount-1;i>=0;i--){var child=content.GetChild(i).gameObject;child.SetActive(false);Destroy(child);}}
         void OnDestroy(){foreach(var item in owned)if(item!=null)Destroy(item);}
     }
 }

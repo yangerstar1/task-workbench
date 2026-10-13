@@ -96,11 +96,18 @@ namespace Lottery.G3.Interaction
                 foreach(var c in s.Contacts)
                 {
                     var last=s.PhoneEvents.LastOrDefault(x=>x.ContactId==c.ContactId&&(x.Kind=="BORROWED"||x.Kind=="REPAID"));bool pending=phoneProposals.TryGetValue(c.ContactId,out var draft)&&draft.Sent;
-                    string recent=pending?"[借款红包] 待领取":last==null?(c.ContactId=="mother"?"吃饭了吗？":"今天店里怎么样？"):(last.Kind=="REPAID"?"收到了，谢谢。":"[借款红包] 已领取");
+                    string recent=pending?"[借款红包] 待领取":last==null?(c.ContactId=="mother"?"吃饭了吗？":"店里好吗？"):(last.Kind=="REPAID"?"收到了，谢谢。":"[借款红包] 已领取");
                     m.Add("contact-"+c.ContactId,G3Text.Contact(c.ContactId)+"\n"+recent,new G3Action(G3ActionKind.InspectContact,c.ContactId));
                 }
                 m.Add("principal","归还主债本金",new G3Action(G3ActionKind.RepayPrincipal,amount:-1),!terminal&&stable);
                 m.Add("phone-bill","查看今晚账单",new G3Action(G3ActionKind.Open,slot:(int)G3Panel.Bill));return m;
+            }
+            if(Panel==G3Panel.PhoneOptions)
+            {
+                m.Title="聊天工具";m.Body="选择一句话或查看记录";
+                m.Add("phone-choose","借点周转金币",new G3Action(G3ActionKind.PhoneChoose),canBorrow&&(proposal==null||!proposal.Sent));
+                m.Add("phone-repay","归还金币",new G3Action(G3ActionKind.PhoneRepay),!terminal&&stable&&s.Loans.Any(x=>x.ContactId==selectedContact&&x.RemainingMinor>0));
+                m.Add("phone-records","借还记录",new G3Action(G3ActionKind.PhoneRecords));return m;
             }
             if(Panel==G3Panel.PhoneRepay)
             {
@@ -137,17 +144,22 @@ namespace Lottery.G3.Interaction
             }
             if(Panel==G3Panel.Confirm)
             {m.Title="确认归还";m.Body=confirmText+"\n持有 "+G3Text.Money(s.AvailableCashMinor)+" 游戏金币";m.Add("confirm-action","确认归还",new G3Action(G3ActionKind.Confirm));m.Add("cancel-action","再想想",new G3Action(G3ActionKind.Cancel));return m;}
-            m.Messages.Add(new G3PhoneMessage("hello",selectedContact=="mother"?"吃饭了吗？":"今天店里怎么样？"));
+            m.Messages.Add(new G3PhoneMessage("hello",selectedContact=="mother"?"吃饭了吗？":"店里好吗？"));
             foreach(var e in s.PhoneEvents.Where(x=>x.ContactId==selectedContact&&(x.Kind=="BORROWED"||x.Kind=="REPAID")))
             {
-                if(e.Kind=="BORROWED")m.Messages.Add(new G3PhoneMessage(e.EventId,"借款红包\n"+G3Text.Money(e.AmountMinor)+" 游戏金币",false,true,"已领取 · 第 "+e.DueNight+" 晚到期",new G3Action(G3ActionKind.PhoneRecords),true));
-                m.Messages.Add(new G3PhoneMessage("receipt-"+e.EventId,(e.Kind=="REPAID"?"已归还 ":"已到账 ")+G3Text.Money(e.AmountMinor)+" 游戏金币。",true));
+                if(e.Kind=="BORROWED")
+                {
+                    m.Messages.Add(new G3PhoneMessage("request-"+e.EventId,"借我周转一下\n"+G3Text.Money(e.AmountMinor)+" 金币",true));
+                    m.Messages.Add(new G3PhoneMessage("reply-"+e.EventId,(e.DueNight-e.Day)+"天后还我。"));
+                    m.Messages.Add(new G3PhoneMessage(e.EventId,"借款红包\n"+G3Text.Money(e.AmountMinor)+" 游戏金币",false,true,"已领取 · 第 "+e.DueNight+" 晚到期",new G3Action(G3ActionKind.PhoneRecords),true));
+                }
+                m.Messages.Add(new G3PhoneMessage("receipt-"+e.EventId,(e.Kind=="REPAID"?"归还":"到账")+G3Text.Money(e.AmountMinor)+"金币",true));
                 if(e.Kind=="REPAID")m.Messages.Add(new G3PhoneMessage("thanks-"+e.EventId,selectedContact=="mother"?"收到了，踏实经营。":"收到了，量力而行。"));
             }
             if(proposal!=null&&proposal.Sent)
             {
-                m.Messages.Add(new G3PhoneMessage("request","想借 "+G3Text.Money(proposal.Amount)+" 游戏金币，"+days+" 个游戏日内还你。",true));
-                m.Messages.Add(new G3PhoneMessage("reply",selectedContact=="mother"?"好，记得按时还。":"给你周转，记好还款时间。"));
+                m.Messages.Add(new G3PhoneMessage("request","借我周转一下\n"+G3Text.Money(proposal.Amount)+" 金币",true));
+                m.Messages.Add(new G3PhoneMessage("reply",days+"天后还我。"));
                 m.Messages.Add(new G3PhoneMessage("packet-pending","借款红包\n"+G3Text.Money(proposal.Amount)+" 游戏金币",false,true,"点击拆开 · 领取后需归还",new G3Action(G3ActionKind.Open,slot:(int)G3Panel.PhonePacket),true));
             }
             if(Panel==G3Panel.PhoneRequest)
@@ -166,8 +178,7 @@ namespace Lottery.G3.Interaction
             else if(Status.StartsWith("这次",StringComparison.Ordinal)||Status.StartsWith("这位",StringComparison.Ordinal)||Status.StartsWith("本次未执行",StringComparison.Ordinal))m.Body=Status;
             if(m.Body.Length>0){m.Messages.Add(new G3PhoneMessage("phone-notice",m.Body));m.Body="";}
             m.Add("phone-choose","想借点周转金币",new G3Action(G3ActionKind.PhoneChoose),canBorrow&&(proposal==null||!proposal.Sent));
-            m.Add("phone-repay","归还金币",new G3Action(G3ActionKind.PhoneRepay),!terminal&&stable&&s.Loans.Any(x=>x.ContactId==selectedContact&&x.RemainingMinor>0));
-            m.Add("phone-records","借还记录",new G3Action(G3ActionKind.PhoneRecords));return m;
+            m.Add("phone-more","更多聊天操作",new G3Action(G3ActionKind.Open,slot:(int)G3Panel.PhoneOptions));return m;
         }
     }
 }

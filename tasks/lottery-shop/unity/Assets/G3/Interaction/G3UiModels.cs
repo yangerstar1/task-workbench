@@ -5,7 +5,7 @@ using Lottery.G3.Core;
 namespace Lottery.G3.Interaction
 {
     public enum G3Mode { WALK,TABLE_SCRATCH,CELL_REVEAL,PANEL,COMMITTING,NIGHT_BILL }
-    public enum G3Panel { None,Settlement,Tickets,Shop,StockDetail,Inventory,ToolDetail,Drawer,Phone,Contact,CustomAmount,Bill,Rules,Settings,Confirm,InformationTargets,QaEvidence,PhoneAmount,PhoneRequest,PhonePacket,PhoneRecords,PhoneRepay }
+    public enum G3Panel { None,Settlement,Tickets,Shop,StockDetail,Inventory,ToolDetail,Drawer,Phone,Contact,CustomAmount,Bill,Rules,Settings,Confirm,InformationTargets,QaEvidence,PhoneAmount,PhoneRequest,PhonePacket,PhoneRecords,PhoneRepay,PhoneOptions }
     public enum G3ActionKind { None,CancelBoost,ResumeNext,CancelNext,Open,Close,Stand,Sit,InspectStock,InspectTool,InspectContact,BuyTicket,Claim,ClaimThenBuy,QuickReveal,BuyStock,Upgrade,Sell,Equip,Remove,UseDrawer,UseLamp,TargetCell,ConfirmTargets,Borrow,RepayLoan,RepayPrincipal,BeginClosing,EnterNight,PayNight,Restart,Retry,Confirm,Cancel,Digit,Backspace,AmountAccept,ToggleQuick,ToggleFlash,ToggleVibration,CopyEvidence,ScrollEvidence,MoveForward,MoveBack,MoveLeft,MoveRight,TurnLeft,TurnRight,ToggleMore,PhoneChoose,PhoneSend,PhoneClaim,PhoneBack,PhoneRecords,PhoneRepay,PhonePage,PhoneCancelRequest }
     public readonly struct G3Action
     {

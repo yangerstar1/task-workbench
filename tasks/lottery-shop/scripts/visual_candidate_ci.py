@@ -432,9 +432,67 @@ def export_progress(root):
         write(outdir(root) / "preparation-scenes.json", value)
 
 
+def regression_case_keys(root):
+    contract = read_json(root / TASK / "ci/g3-test-contract.json")
+    names = [name for profile in ("regression-play", "play") for cases in contract["profiles"][profile].values() for name in cases]
+    require(len(names) == len(set(names)), "Duplicate regression progress contract identity")
+    return {hashlib.sha256(name.encode("utf-8")).hexdigest() for name in names}
+
+
+def validate_regression_progress(value, ident, allowed_keys):
+    keys = {"schemaVersion", "scope", "sourceCommit", "reviewedCandidateCommit", "runId", "runAttempt", "status", "events"}
+    require(isinstance(value, dict) and set(value) == keys, "Unexpected regression progress fields")
+    require(type(value["schemaVersion"]) is int and value["schemaVersion"] == 1 and value["scope"] == SCOPE and value["status"] == "MILESTONES_ONLY_NOT_TEST_PASS", "Invalid regression progress schema/scope/status")
+    require(all(value[k] == ident[k] for k in ("sourceCommit", "reviewedCandidateCommit", "runId", "runAttempt")), "Regression progress identity mismatch")
+    events = value["events"]
+    require(isinstance(events, list) and 1 <= len(events) <= 128, "Regression progress event count exceeds bound")
+    started, finished, active = set(), set(), None
+    last_elapsed, last_utc = -1, None
+    for index, event in enumerate(events):
+        require(isinstance(event, dict) and set(event) == {"sequence", "stage", "caseKey", "result", "utc", "elapsedMs"}, "Unexpected regression progress event fields")
+        require(type(event["sequence"]) is int and event["sequence"] == index + 1, "Regression progress sequence mismatch")
+        elapsed = event["elapsedMs"]
+        require(type(elapsed) is int and 0 <= elapsed <= 86400000 and elapsed >= last_elapsed, "Invalid regression progress clock")
+        require(isinstance(event["utc"], str) and re.fullmatch(r"[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\.[0-9]{1,7})?(?:Z|\+00:00)", event["utc"]), "Invalid regression progress UTC")
+        try:
+            timestamp = datetime.fromisoformat(event["utc"].replace("Z", "+00:00"))
+        except ValueError:
+            raise ValueError("Invalid regression progress UTC") from None
+        require(timestamp.tzinfo is not None and timestamp.utcoffset().total_seconds() == 0 and (last_utc is None or timestamp >= last_utc), "Non-UTC or non-monotonic regression progress time")
+        last_elapsed, last_utc = elapsed, timestamp
+        stage, key, result = event["stage"], event["caseKey"], event["result"]
+        require(stage in {"run-start", "case-start", "case-end", "run-end"}, "Unknown regression progress stage")
+        if stage in ("run-start", "run-end"):
+            require(key == "" and result == "UNAVAILABLE", "Run milestone cannot contain case details or verdict")
+            require((stage == "run-start" and index == 0 and elapsed == 0) or (stage == "run-end" and index > 0 and index == len(events)-1 and active is None), "Invalid regression run milestone order")
+        else:
+            require(index > 0 and key in allowed_keys, "Unknown regression progress case")
+            if stage == "case-start":
+                require(active is None and key not in started and result == "UNAVAILABLE", "Invalid/duplicate regression case start")
+                started.add(key); active = key
+            else:
+                require(active == key and key not in finished and result in {"PASSED", "FAILED", "SKIPPED", "INCONCLUSIVE"}, "Invalid regression case finish")
+                finished.add(key); active = None
+    require(events[0]["stage"] == "run-start", "Missing regression run-start milestone")
+    # Partial trails, failed cases and a final active case are useful diagnostics.
+    # Even a complete trail grants no NUnit, image, device or G3 pass.
+    return value
+
+
+def export_regression_progress(root):
+    ident = identity(root)
+    source = root / TASK / "artifacts/visual-regression-play/test-progress.json"
+    destination = outdir(root) / "regression-play-progress.json"
+    if destination.exists(): destination.unlink()
+    if not source.exists():
+        return
+    value = validate_regression_progress(read_json(source, 65536), ident, regression_case_keys(root))
+    write(destination, value)
+
+
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("command", choices=("guard", "restore-font", "snapshot", "snapshot-after", "tests", "captures", "partial-captures", "progress", "prepare-original-g3-captures", "original-g3-captures"))
+    parser.add_argument("command", choices=("guard", "restore-font", "snapshot", "snapshot-after", "tests", "captures", "partial-captures", "progress", "regression-progress", "prepare-original-g3-captures", "original-g3-captures"))
     parser.add_argument("--root", type=Path, default=Path(__file__).resolve().parents[3])
     parser.add_argument("--stage", choices=STAGES, default="capture")
     args = parser.parse_args(); root = args.root.resolve()
@@ -446,6 +504,7 @@ def main():
     elif args.command == "prepare-original-g3-captures": prepare_original_g3_captures(root)
     elif args.command == "original-g3-captures": export_original_g3_captures(root)
     elif args.command == "progress": export_progress(root)
+    elif args.command == "regression-progress": export_regression_progress(root)
     elif args.command == "tests": export_tests(root, args.stage)
     else: export_captures(root, require_complete=args.command == "captures")
 

@@ -20,6 +20,11 @@ namespace Lottery.G3.Interaction
         AmbientMode previousAmbientMode;Color previousSky,previousEquator,previousGround,previousAmbient;
         SphericalHarmonicsL2 previousAmbientProbe;Light previousSun;float previousReflectionIntensity;
         const int ReflectionGeometryLayer=10;
+        // Run08 clipped walnut/printed stock under the additive direct sources.
+        // Keep authored texture factors and ambient bounce; reduce source energy
+        // in this Gamma/LDR room instead of baking a compensating dark tint.
+        const float DaylightStrength=.8f;
+        static readonly float[] PracticalStrengths={1.15f,1.25f,.55f,.06f};
         UniversalRenderPipelineAsset priorPipeline,runtimePipeline;
         public float TicketWidth=>layout!=null&&layout.ticketWidth>0?layout.ticketWidth:.4f;
         public Vector3 TicketPosition=>AnchorPosition("ticket",new Vector3(-2.025f,.81825f,.50f));
@@ -75,15 +80,15 @@ namespace Lottery.G3.Interaction
             if(configureQuality&&sourcePipeline!=null){runtimePipeline=Instantiate(sourcePipeline);runtimePipeline.name="G3 visual candidate runtime lighting";runtimePipeline.shadowDistance=12;runtimePipeline.msaaSampleCount=4;QualitySettings.renderPipeline=runtimePipeline;}
             var sun=new GameObject("Soft window daylight");sun.transform.SetParent(transform,false);sun.transform.rotation=Quaternion.Euler(47,232,0);
             daylight=sun.AddComponent<Light>();daylight.type=LightType.Directional;daylight.color=new Color(1f,.94f,.84f);
-            daylight.intensity=1.05f;daylight.shadows=LightShadows.Soft;daylight.shadowStrength=.55f;
+            daylight.intensity=DaylightStrength;daylight.shadows=LightShadows.Soft;daylight.shadowStrength=.55f;
             daylight.shadowBias=.015f;daylight.shadowNormalBias=.06f;
             daylight.GetUniversalAdditionalLightData().usePipelineSettings=false;RenderSettings.sun=daylight;
             // Real ceiling/pendant sources supply local shape and contact shadows.
             // Explicit ambient SH below supplies the bounce that an unbaked room lacks.
-            Practical("Warm counter pendant",AnchorPosition("light_counter",new Vector3(1.12f,2.30f,-.9f)),new Color(1,.89f,.72f),3.1f,4.8f,new Vector3(.4f,.9f,-1.7f),true);
-            Practical("Table reading pendant",AnchorPosition("light_table",new Vector3(-1.71f,2.30f,-.24f)),new Color(1,.95f,.86f),3.4f,4.2f,TicketPosition,true);
-            Practical("Shelf ambient fill",AnchorPosition("light_shelf",new Vector3(2.2f,2.2f,-.4f)),new Color(.83f,.91f,1),1.15f,4,new Vector3(2.1f,1.1f,-.4f),false);
-            Practical("Counter board wash",new Vector3(.45f,2.04f,-2.287f),new Color(1,.93f,.81f),.65f,2f,new Vector3(.45f,1.6f,-2.5f),false);
+            Practical("Warm counter pendant",AnchorPosition("light_counter",new Vector3(1.12f,2.30f,-.9f)),new Color(1,.89f,.72f),PracticalStrengths[0],4.8f,new Vector3(.4f,.9f,-1.7f),true);
+            Practical("Table reading pendant",AnchorPosition("light_table",new Vector3(-1.71f,2.30f,-.24f)),new Color(1,.95f,.86f),PracticalStrengths[1],4.2f,TicketPosition,true);
+            Practical("Shelf ambient fill",AnchorPosition("light_shelf",new Vector3(2.2f,2.2f,-.4f)),new Color(.83f,.91f,1),PracticalStrengths[2],4,new Vector3(2.1f,1.1f,-.4f),false);
+            Practical("Counter board wash",new Vector3(.45f,2.04f,-2.287f),new Color(1,.93f,.81f),PracticalStrengths[3],2f,new Vector3(.45f,1.6f,-2.5f),false);
             var probe=new GameObject("Shop material reflection");probe.transform.SetParent(transform,false);probe.transform.localPosition=new Vector3(-.4f,1.35f,-.2f);
             roomReflection=probe.AddComponent<ReflectionProbe>();roomReflection.mode=ReflectionProbeMode.Realtime;
             roomReflection.refreshMode=ReflectionProbeRefreshMode.ViaScripting;roomReflection.timeSlicingMode=ReflectionProbeTimeSlicingMode.NoTimeSlicing;
@@ -109,7 +114,7 @@ namespace Lottery.G3.Interaction
         public void SetNight(bool value)
         {
             if(night==value)return;night=value;
-            daylight.intensity=value ? .16f : 1.05f;daylight.color=value?new Color(.49f,.62f,.91f):new Color(1,.94f,.84f);
+            daylight.intensity=value ? .16f : DaylightStrength;daylight.color=value?new Color(.49f,.62f,.91f):new Color(1,.94f,.84f);
             RenderSettings.ambientMode=AmbientMode.Trilight;
             RenderSettings.ambientSkyColor=value?new Color(.30f,.34f,.43f):new Color(.68f,.74f,.80f);
             RenderSettings.ambientEquatorColor=value?new Color(.35f,.31f,.27f):new Color(.58f,.57f,.51f);
@@ -119,8 +124,7 @@ namespace Lottery.G3.Interaction
             var bounce=new SphericalHarmonicsL2();bounce.AddAmbientLight(value?new Color(.20f,.21f,.24f):new Color(.42f,.46f,.43f));
             bounce.AddDirectionalLight(Vector3.up,value?new Color(.16f,.13f,.10f):new Color(.20f,.22f,.25f),.7f);
             RenderSettings.ambientProbe=bounce;RenderSettings.reflectionIntensity=value ? .7f : 1;
-            float[] strengths={3.1f,3.4f,1.15f,.65f};
-            for(int i=0;i<practicals.Count;i++)practicals[i].intensity=strengths[i]*(value?1.04f:1);
+            for(int i=0;i<practicals.Count;i++)practicals[i].intensity=PracticalStrengths[i]*(value?1.04f:1);
             roomReflection.backgroundColor=value?new Color(.08f,.10f,.15f):new Color(.40f,.45f,.49f);refreshReflection=true;
             if(art!=null)foreach(var renderer in art.GetComponentsInChildren<Renderer>())foreach(var material in renderer.materials)
                 {instantiatedMaterials.Add(material);if((material.name.StartsWith("Window")||material.name.StartsWith("StreetBlur"))&&material.HasProperty("_BaseColor")){if(!authoredWindowColors.ContainsKey(material))authoredWindowColors[material]=material.GetColor("_BaseColor");material.SetColor("_BaseColor",authoredWindowColors[material]*(value?new Color(.06f,.12f,.24f):Color.white));}}

@@ -28,7 +28,8 @@ class BoundaryTests(unittest.TestCase):
                 '-coverageOptions','generateAdditionalMetrics;generateHtmlReport;generateBadgeReport;dontClear','-assemblyNames',assemblies]
             if phase!='regression-edit':expected+=['-force-glcore','-screen-width','1280','-screen-height','720']
             expected+=['-job-worker-count','2','-probeCommit','1'*40,'-probeRunId','12345']
-            if phase=='capture':expected+=['-probeRunAttempt','1']
+            if phase in ('capture','regression-play'):expected+=['-probeRunAttempt','1']
+            if phase=='regression-play':expected+=['-g3RegressionProgress','1','-probeReviewedCommit','2'*40]
             self.assertEqual(safe.project_argv(phase,IDENT),expected)
             for forbidden in ('-quit','-nographics','-executeMethod'):self.assertNotIn(forbidden,expected)
 
@@ -125,6 +126,18 @@ class SessionTests(unittest.TestCase):
         with patch.object(safe,'native',side_effect=lambda *a:a[3].update(status='PROCESS_TIMEOUT')):self.assertEqual(safe.test(self.root,'capture'),1)
         self.cleanup.assert_called_once_with('lottery-visual-safe-12345-1')
         with patch.object(safe,'native') as native:self.assertEqual(safe.test(self.root,'regression-edit'),1);native.assert_not_called()
+    def test_play_clears_only_fixed_old_progress_before_native_call(self):
+        artifacts = self.root/safe.private.TASK/'artifacts/visual-regression-play'; artifacts.mkdir(parents=True)
+        evidence = safe.visual.outdir(self.root); evidence.mkdir(parents=True, exist_ok=True)
+        fixed = [artifacts/'test-progress.json', evidence/'regression-play-progress.json']
+        for p in fixed: p.write_text('SYNTHETIC_OLD_ATTEMPT')
+        sibling = artifacts/'unrelated.txt'; sibling.write_text('KEEP')
+        def native(*args):
+            self.assertTrue(all(not p.exists() for p in fixed)); self.assertEqual(sibling.read_text(), 'KEEP')
+            self.assertEqual(args[2], 480); self.assertIn('-g3RegressionProgress 1', args[1])
+            self.successful(*args)
+        with patch.object(safe, 'native', side_effect=native): self.assertEqual(safe.test(self.root, 'regression-play'), 0)
+
     def test_phase_cannot_repeat_or_reactivate(self):
         with patch.object(safe,'native',side_effect=self.successful):self.assertEqual(safe.test(self.root,'capture'),0)
         with patch.object(safe,'native') as native:self.assertEqual(safe.test(self.root,'capture'),1);native.assert_not_called()

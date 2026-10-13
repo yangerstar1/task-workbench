@@ -147,7 +147,8 @@ def project_argv(phase, ident):
             '-enableCodeCoverage', '-debugCodeOptimization', '-coverageOptions', COVERAGE, '-assemblyNames', assemblies]
     if phase != 'regression-edit': argv += ['-force-glcore', '-screen-width', '1280', '-screen-height', '720']
     argv += ['-job-worker-count', '2', '-probeCommit', ident['sourceCommit'], '-probeRunId', ident['runId']]
-    if phase == 'capture': argv += ['-probeRunAttempt', ident['runAttempt']]
+    if phase in ('capture', 'regression-play'): argv += ['-probeRunAttempt', ident['runAttempt']]
+    if phase == 'regression-play': argv += ['-g3RegressionProgress', '1', '-probeReviewedCommit', ident['reviewedCandidateCommit']]
     return argv
 
 
@@ -207,6 +208,10 @@ def test(root, phase):
         # Fixed native destination only; never reuse a prior stage's XML.
         xml = artifacts / (platform + '-results.xml')
         if xml.exists(): xml.unlink()
+        if phase == 'regression-play':
+            # Only the two fixed progress destinations; no prior attempt can survive.
+            for progress in (artifacts / 'test-progress.json', visual.outdir(root) / 'regression-play-progress.json'):
+                if progress.exists(): progress.unlink()
         native(ident, shell(shlex.join(project_argv(phase, ident))), seconds, record, compiler_assets(root, ident))
         # Normal NUnit/test failure still permits the other exact suites to run.
         # Missing exits, native licensing failures or synchronous timeouts do not.

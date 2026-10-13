@@ -131,7 +131,7 @@ namespace Lottery.G3.Interaction
         float HeightAt(float z)=>SceneCamera.orthographic?SceneCamera.orthographicSize*2:2*Mathf.Tan(SceneCamera.fieldOfView*Mathf.Deg2Rad*.5f)*z;
         Vector3 PixelPoint(float x,float y,float z){float h=HeightAt(z);return new Vector3((x/PresentationWidth-.5f)*h*SceneCamera.aspect,(y/PresentationHeight-.5f)*h,z);}
         void PlacePlate(Transform p,Rect r,float z)
-        {p.GetComponent<Renderer>().sortingOrder=30000;float h=HeightAt(z);p.localPosition=PixelPoint(r.center.x,r.center.y,z);p.localScale=new Vector3(r.width/PresentationHeight*h,r.height/PresentationHeight*h,1);p.GetComponent<G3HudSurface>()?.Configure(r.width,r.height,Mathf.Min(24*Safe.height/720f,r.height*.5f),Safe.height/720f);}
+        {p.GetComponent<G3HudSurface>().SetSortingOrder(30000);float h=HeightAt(z);p.localPosition=PixelPoint(r.center.x,r.center.y,z);p.localScale=new Vector3(r.width/PresentationHeight*h,r.height/PresentationHeight*h,1);p.GetComponent<G3HudSurface>()?.Configure(r.width,r.height,Mathf.Min(24*Safe.height/720f,r.height*.5f),Safe.height/720f);}
         void PlaceIcon(G3HudIcon icon,Rect r,float z)
         {float h=HeightAt(z);icon.transform.localPosition=PixelPoint(r.center.x,r.center.y,z);icon.transform.localScale=Vector3.one*(r.height/PresentationHeight*h);}
         void PlaceLabel(BoundedGlyphLabel l,Rect r,float pixels,float z,bool wrap=true)
@@ -177,16 +177,21 @@ namespace Lottery.G3.Interaction
             else if(t.Phase==TicketPhase.SETTLED){var record=state.Settlements.LastOrDefault(x=>x.TicketId==t.Id);summary=record==null?"已结算":"已收 "+G3Text.Money(record.TotalMinor)+" · 明细";}
             else{var p=presenter.Service.PreviewSettlement();summary=p==null?(t.TicketType=="number"?"已揭 "+t.Scratch.RevealedCellCount+" / 6":"安全 "+t.SafeCount+" 格")+" · 明细":"可收 "+G3Text.Money(p.TotalMinor)+" · 明细";}
             resultText.SetText(summary);
-            float summaryWidth=Mathf.Min(396*s,Mathf.Max(210*s,TextWidth(summary,32*s)+32*s));
-            footerRect=new Rect(lastSafe.x+372*s,lastSafe.y+36*s,summaryWidth,Mathf.Max(48*s,TextHeight(summary,32*s,summaryWidth-32*s)+14*s));
+            // Exact pixel widths can become a slightly narrower world-space text box.
+            // Normal summaries have real breathing room and never wrap a final glyph.
+            float summaryTextWidth=TextWidth(summary,32*s);
+            float summaryWidth=Mathf.Min(396*s,Mathf.Max(210*s,summaryTextWidth+48*s));
+            bool summaryWrap=summaryTextWidth>summaryWidth-40*s;
+            footerRect=new Rect(lastSafe.x+372*s,lastSafe.y+36*s,summaryWidth,summaryWrap?Mathf.Max(48*s,TextHeight(summary,32*s,summaryWidth-32*s)+14*s):48*s);
             footerHitRect=new Rect(footerRect.x,lastSafe.y+12*s,footerRect.width,Mathf.Max(96*s,footerRect.yMax-lastSafe.y-8*s));
-            PlacePlate(footer,footerRect,.55f);PlaceLabel(resultText,Inset(footerRect,16*s,7*s),32*s,.47f,true);
-            string feedback=presenter.Status;
-            if(G3QaEvidence.Enabled&&!string.IsNullOrEmpty(state.FixtureLabel)&&!presenter.IsCommitting&&!state.RecoveryRequired&&t!=null&&t.SelectedCell>=0&&!PanelVisible)
+            PlacePlate(footer,footerRect,.55f);PlaceLabel(resultText,Inset(footerRect,16*s,7*s),32*s,.47f,summaryWrap);
+            string feedback=PlayerFeedback(presenter.Status);
+            bool selectionEvidence=G3QaEvidence.Enabled&&!string.IsNullOrEmpty(state.FixtureLabel)&&!presenter.IsCommitting&&!state.RecoveryRequired&&t!=null&&t.SelectedCell>=0&&!PanelVisible;
+            if(selectionEvidence)
                 feedback="已保存格 "+(((t.SelectedCell+4)%8)+1)+" · QA r"+state.Revision+" · selection="+G3QaEvidence.SelectionMarker(t);
             statusText.SetText(feedback);if(lastFeedback!=feedback){lastFeedback=feedback;feedbackUntil=Time.unscaledTime+5f;}
-            persistentFeedback=presenter.IsCommitting||state.RecoveryRequired||(G3QaEvidence.Enabled&&!string.IsNullOrEmpty(state.FixtureLabel));
-            float feedbackWidth=Mathf.Min(lastSafe.width-48*s,Mathf.Max(480*s,Mathf.Min(1000*s,TextWidth(feedback,32*s)))),feedbackHeight=TextHeight(feedback,32*s,feedbackWidth);
+            persistentFeedback=presenter.IsCommitting||state.RecoveryRequired||selectionEvidence||CriticalFeedback(presenter.Status);
+            float feedbackWidth=Mathf.Min(lastSafe.width-48*s,Mathf.Max(192*s,Mathf.Min(720*s,TextWidth(feedback,32*s)+8*s))),feedbackHeight=TextHeight(feedback,32*s,feedbackWidth);
             feedbackRect=new Rect(lastSafe.center.x-feedbackWidth*.5f-16*s,headerRect.yMin-14*s-feedbackHeight-16*s,feedbackWidth+32*s,feedbackHeight+16*s);
             PlacePlate(feedbackPlate,feedbackRect,.55f);PlaceLabel(statusText,Inset(feedbackRect,16*s,8*s),32*s,.47f,true);
             bool empty=t==null&&!state.RecoveryRequired;emptyText.gameObject.SetActive(empty);
@@ -198,7 +203,7 @@ namespace Lottery.G3.Interaction
                 var live=t?.ConfigurationSnapshot.SingleOrDefault(x=>x.TableSlot==i);
                 string id=t==null?state.NextToolIds[i]:live?.ItemId??"";
                 int level=t==null?(string.IsNullOrEmpty(id)?0:state.Tools.Single(x=>x.ItemId==id).Level):live?.Level??0;
-                toolLabels[i].SetText(state.RecoveryRequired?"存档待恢复":(t==null?"下张":"本张")+(i+1)+"\n"+(string.IsNullOrEmpty(id)?"空位":G3Text.Tool(id)+" "+level));
+                toolLabels[i].SetText(state.RecoveryRequired?"存档待恢复":(t==null?"下张":"本张")+(i+1)+(string.IsNullOrEmpty(id)?" 空位":"\n"+G3Text.Tool(id)+" "+level));
                 toolDisplays[i].Show(state.RecoveryRequired?"":id);
                 toolObjects[i].sharedMaterial.color=state.RecoveryRequired||string.IsNullOrEmpty(id)?new Color(.48f,.48f,.38f):new Color(.78f,.65f,.30f);
             }
@@ -237,18 +242,19 @@ namespace Lottery.G3.Interaction
             header.gameObject.SetActive(clearHud);dayHeader.gameObject.SetActive(clearHud);headerText.gameObject.SetActive(clearHud);dayText.gameObject.SetActive(clearHud);
             cashValue.gameObject.SetActive(clearHud&&!headerFallback);nightCaption.gameObject.SetActive(clearHud&&!headerFallback);nightValue.gameObject.SetActive(clearHud&&!headerFallback);walletIcon.gameObject.SetActive(clearHud&&!headerFallback);nightIcon.gameObject.SetActive(clearHud&&!headerFallback);headerDivider.gameObject.SetActive(clearHud&&!headerFallback);
             bool qa=clearHud&&!string.IsNullOrEmpty(state.FixtureLabel);qaTag.gameObject.SetActive(qa);qaText.gameObject.SetActive(qa);
-            footer.gameObject.SetActive(clearHud&&!moreVisible);resultText.gameObject.SetActive(clearHud&&!moreVisible);
+            bool showSummary=clearHud&&!moreVisible&&t!=null;footer.gameObject.SetActive(showSummary);resultText.gameObject.SetActive(showSummary);
             ShowModal(model,s);
             foreach(var b in pool.Skip(used))b.Root.SetActive(false);
         }
         void LayoutToolChips(float s)
         {
             var corners=new[]{new Uv(0,0),new Uv(0,1),new Uv(1,0),new Uv(1,1)}.Select(uv=>WorldToPresentationPoint(Surface.PaperUvToWorld(uv))).ToArray();
-            float paperLeft=corners.Min(p=>p.x),paperRight=corners.Max(p=>p.x),w=216*s,h=84*s;
+            float paperLeft=corners.Min(p=>p.x),paperRight=corners.Max(p=>p.x),w=216*s;
             for(int i=0;i<toolLabels.Count;i++)
             {
                 bool show=!walking&&!PanelVisible&&!moreVisible;toolChipPlates[i].gameObject.SetActive(show);toolLabels[i].gameObject.SetActive(show);if(!show)continue;
                 var p=WorldToPresentationPoint(Environment.AnchorPosition("tool_"+(i+1),Environment.TicketPosition)+Vector3.forward*.07f);
+                bool emptySlot=toolLabels[i].Text.Contains("空位");float h=(emptySlot?48:84)*s;
                 bool left=i==1;float lo=left?Safe.x+12*s:paperRight+12*s,hi=left?paperLeft-12*s-w:Safe.xMax-12*s-w;
                 float x=Mathf.Clamp(p.x-w*.5f,Mathf.Min(lo,hi),Mathf.Max(lo,hi));
                 float y=Mathf.Clamp(p.y-h*.5f,Safe.y+(i==2?120:250)*s,Safe.yMax-164*s);
@@ -309,6 +315,25 @@ namespace Lottery.G3.Interaction
             }
             return lines.ToArray();
         }
+        // Presentation-only copy; unknown messages and errors keep their full wording.
+        static string PlayerFeedback(string raw)
+        {
+            switch(raw)
+            {
+                case "第 1 天开店。所有钱款、刮痕和选择确认保存后才显示。":
+                case "开店状态已保存。可看规则、购物或购买两种票。":
+                case "进度已保存。可以继续刮，或在稳定点打开面板。":return "";
+                case "本票已唯一结算入账，可继续选择下一笔开销。":return "奖金已到账";
+                case "本格选择已保存，请擦开；退出也不会撤回。":return "本格已选定，请刮开";
+                case "票已揭晓，奖金尚未入账；可先处理合法耗材。":return "已揭晓，可领取奖金";
+                case "进入关店准备。余货、布置、借还款仍可处理，然后确认夜账。":return "准备关店，请查看今晚账单";
+                case "首日账单已支付，日末收据已保存。G3 切片在第二日开店前结束。":return "今晚账单已付清";
+                case "上笔交易已确认，没有重复扣款或重复奖励。":return "交易已确认，未重复扣款或发奖";
+                default:return raw??"";
+            }
+        }
+        static bool CriticalFeedback(string raw)
+        {return !string.IsNullOrEmpty(raw)&&(raw.Contains("保存失败")||raw.Contains("未提交")||raw.Contains("人工恢复")||raw.Contains("本局失败")||raw.Contains("购买未完成")||raw.Contains("购买尚未完成"));}
         float TextWidth(string text,float pixels)
         {font.RequestCharactersInTexture(text??"",80,FontStyle.Normal);float width=0;foreach(char c in text??"")if(font.GetCharacterInfo(c,out var info,80,FontStyle.Normal))width+=info.advance*pixels/80;return width;}
         public bool HandleLocalAction(G3Action action)
@@ -316,7 +341,7 @@ namespace Lottery.G3.Interaction
         public bool CloseMore(){if(!moreVisible)return false;moreVisible=false;Show(current,panelModel);return true;}
         float TextHeight(string text,float pixels,float width)
         {
-            font.RequestCharactersInTexture(text??"",80,FontStyle.Normal);float line=0;int lines=1;
+            font.RequestCharactersInTexture(text??"",80,FontStyle.Normal);width=Mathf.Max(pixels,width-pixels*.125f);float line=0;int lines=1;
             foreach(char c in text??"")
             {
                 if(c=='\n'){lines++;line=0;continue;}if(!font.GetCharacterInfo(c,out var info,80,FontStyle.Normal))continue;
@@ -330,12 +355,13 @@ namespace Lottery.G3.Interaction
             if(!visible)return;
             // Context drawer keeps the left-hand room visible. Dense explanations may
             // expand rather than shrink the 16 sp body or 48 dp touch targets.
+            string footnote=PlayerFeedback(model.Footnote);panelFoot.gameObject.SetActive(!string.IsNullOrEmpty(footnote));
             float maxWidth=lastSafe.width-24*s,width=Mathf.Min(860*s,maxWidth),available=lastSafe.height-24*s;
             int cols=model.LargeGrid?4:model.Cards.Count>=5?3:model.Cards.Count>1?2:1;
             int rows=Mathf.CeilToInt((float)model.Cards.Count/cols);float bodyHeight=0,footHeight=0,required=0;float[] rowHeights=new float[rows];
             for(int attempt=0;attempt<6;attempt++)
             {
-                bodyHeight=TextHeight(model.Body,32*s,width-40*s);footHeight=TextHeight(model.Footnote,32*s,width-40*s);
+                bodyHeight=TextHeight(model.Body,32*s,width-40*s);footHeight=string.IsNullOrEmpty(footnote)?2*s:TextHeight(footnote,32*s,width-40*s);
                 float cardWidth=(width-40*s-(cols-1)*8*s)/cols;float cardsHeight=0;
                 for(int row=0;row<rows;row++)
                 {float rh=96*s;for(int col=0;col<cols;col++){int i=row*cols+col;if(i<model.Cards.Count)rh=Mathf.Max(rh,TextHeight(model.Cards[i].Text,32*s,cardWidth-(CatalogCard(model.Cards[i].Action)?108:32)*s)+28*s);}rowHeights[row]=rh;cardsHeight+=rh;}
@@ -350,7 +376,7 @@ namespace Lottery.G3.Interaction
             panelTitle.SetText(title);PlaceLabel(panelTitle,new Rect(modalRect.x+20*s,modalRect.yMax-96*s,modalRect.width-208*s,76*s),32*s,.22f,true);
             bool pendingQa=G3QaEvidence.Enabled&&current.IsCommitting&&current.Panel!=G3Panel.QaEvidence&&current.Panel!=G3Panel.Settings;
             AddButton(pendingQa?"qa-settings":"close-panel",pendingQa?"QA 设置":"返回",pendingQa?new G3Action(G3ActionKind.Open,slot:(int)G3Panel.Settings):new G3Action(G3ActionKind.Close),new Rect(modalRect.xMax-176*s,modalRect.yMax-108*s,156*s,96*s),true,.25f);
-            panelBody.SetText(model.Body);panelFoot.SetText(model.Footnote);
+            panelBody.SetText(model.Body);panelFoot.SetText(footnote);
             if(model.Evidence)
             {
                 evidenceBodyRect=new Rect(modalRect.x+24*s,modalRect.y+190*s,modalRect.width-48*s,modalRect.height-302*s);
@@ -402,10 +428,12 @@ namespace Lottery.G3.Interaction
             }
             else
             {
-                b.Label.SetText(text);float inset=b.Movement?4*s:8*s,width=b.FaceRect.width-2*inset,textH=TextHeight(text,fontPixels*s,width);
-                PlaceLabel(b.Label,Inset(b.FaceRect,inset,Mathf.Max(4*s,(b.FaceRect.height-textH)*.5f)),fontPixels*s,z-.025f,true);
                 b.Symbol=id=="quick"?G3HudSymbol.FastForward:id=="claim"?(!b.Enabled?G3HudSymbol.Lock:G3HudSymbol.Check):G3HudSymbol.None;
-                if(b.Symbol!=G3HudSymbol.None){float iconSize=TextWidth(text,32*s)>145*s?16*s:28*s;PlaceIcon(b.Icon,new Rect(b.FaceRect.x+8*s,b.FaceRect.center.y-iconSize*.5f,iconSize,iconSize),z-.025f);}
+                b.Label.SetText(text);float inset=b.Movement?4*s:8*s;
+                var textRect=b.Symbol==G3HudSymbol.None?Inset(b.FaceRect,inset,4*s):new Rect(b.FaceRect.x+44*s,b.FaceRect.y+4*s,b.FaceRect.width-52*s,b.FaceRect.height-8*s);
+                float textH=TextHeight(text,fontPixels*s,textRect.width);textRect.y=b.FaceRect.center.y-Mathf.Max(32*s,textH)*.5f;textRect.height=Mathf.Max(32*s,textH);
+                PlaceLabel(b.Label,textRect,fontPixels*s,z-.025f,true);
+                if(b.Symbol!=G3HudSymbol.None)PlaceIcon(b.Icon,new Rect(b.FaceRect.x+10*s,b.FaceRect.center.y-14*s,28*s,28*s),z-.025f);
             }
             b.Pressed=false;StyleButton(b,false);
         }
@@ -451,7 +479,7 @@ namespace Lottery.G3.Interaction
             for(int i=used-1;i>=0;i--){var b=pool[i];if(b.Root.activeInHierarchy&&b.Rect.Contains(pixel)){action=b.Enabled?b.Action:default;return true;}}
             if(!PanelVisible&&!moreVisible&&footerHitRect.Contains(pixel)&&current.Snapshot.CurrentTicket!=null){action=new G3Action(G3ActionKind.Open,slot:(int)G3Panel.Settlement);return true;}
             for(int i=0;i<toolChipPlates.Count;i++)if(toolChipPlates[i].gameObject.activeInHierarchy&&toolChipRects[i].Contains(pixel)){action=default;return true;}
-            action=default;return PanelVisible||moreVisible||headerRect.Contains(pixel)||dayRect.Contains(pixel)||(!moreVisible&&footerHitRect.Contains(pixel))||(feedbackPlate.gameObject.activeInHierarchy&&feedbackRect.Contains(pixel));
+            action=default;return PanelVisible||moreVisible||headerRect.Contains(pixel)||dayRect.Contains(pixel)||(footer.gameObject.activeInHierarchy&&footerHitRect.Contains(pixel))||(feedbackPlate.gameObject.activeInHierarchy&&feedbackRect.Contains(pixel));
         }
         public bool TryScratchUv(Vector2 pixel,out Uv uv)
         {

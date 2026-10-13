@@ -687,5 +687,97 @@ class SeparateRequestTests(unittest.TestCase):
             with patch.dict(os.environ, env), self.assertRaises(ValueError): candidate.guard(root)
 
 
+class RegressionProgressTests(unittest.TestCase):
+    def setUp(self):
+        self.root = Path(__file__).resolve().parents[3]
+        self.ident = dict(sourceCommit="1"*40, reviewedCandidateCommit="2"*40, runId="123", runAttempt="1")
+        self.allowed = candidate.regression_case_keys(self.root)
+        self.case = sorted(self.allowed)[0]
+
+    def value(self, finish=False):
+        events = [dict(sequence=1, stage="run-start", caseKey="", result="UNAVAILABLE", utc="2026-10-13T00:00:00Z", elapsedMs=0),
+                  dict(sequence=2, stage="case-start", caseKey=self.case, result="UNAVAILABLE", utc="2026-10-13T00:00:01Z", elapsedMs=1000)]
+        if finish:
+            events += [dict(sequence=3, stage="case-end", caseKey=self.case, result="FAILED", utc="2026-10-13T00:00:02Z", elapsedMs=2000),
+                       dict(sequence=4, stage="run-end", caseKey="", result="UNAVAILABLE", utc="2026-10-13T00:00:03Z", elapsedMs=3000)]
+        return dict(schemaVersion=1, scope=candidate.SCOPE, status="MILESTONES_ONLY_NOT_TEST_PASS", events=events, **self.ident)
+
+    def check(self, value):
+        return candidate.validate_regression_progress(value, self.ident, self.allowed)
+
+    def test_partial_and_failed_case_trails_are_diagnostic_only(self):
+        for finish in (False, True):
+            value = self.value(finish); self.assertEqual(self.check(value), value)
+            self.assertNotIn("allExpectedPassed", value)
+
+    def test_trigger_reviewed_source_run_and_attempt_must_all_match(self):
+        for key in self.ident:
+            value = self.value(); value[key] = "3"*40 if "Commit" in key else "99"
+            with self.subTest(key=key), self.assertRaises(ValueError): self.check(value)
+
+    def test_unknown_fields_case_stage_and_payload_are_rejected(self):
+        for level in ("top", "event"):
+            value = self.value(); target = value if level == "top" else value["events"][1]
+            target["message"] = "SYNTHETIC_PRIVATE_LICENSE_XML"
+            with self.assertRaises(ValueError): self.check(value)
+        for field, bad in (("caseKey", "a"*64), ("caseKey", "Assets/private.cs"), ("stage", "arbitrary-log"), ("result", "SYNTHETIC_PRIVATE")):
+            value = self.value(); value["events"][1][field] = bad
+            with self.subTest(field=field), self.assertRaises(ValueError): self.check(value)
+
+    def test_sequence_time_event_cap_and_verdict_claim_are_rejected(self):
+        for field, bad in (("sequence", 3), ("sequence", True), ("elapsedMs", -1), ("elapsedMs", 86400001), ("elapsedMs", True), ("utc", "2026-10-13T00:00:01+01:00")):
+            value = self.value(); value["events"][1][field] = bad
+            with self.subTest(field=field), self.assertRaises(ValueError): self.check(value)
+        value = self.value(); value["events"][1]["utc"] = "SYNTHETIC_PRIVATE_LICENSE_XML"
+        with self.assertRaisesRegex(ValueError, "^Invalid regression progress UTC$"): self.check(value)
+        value = self.value(); value["events"] *= 65
+        with self.assertRaises(ValueError): self.check(value)
+        value = self.value(); value["status"] = "ALL_PASSED"
+        with self.assertRaises(ValueError): self.check(value)
+        value = self.value(True); value["events"][2]["elapsedMs"] = 0
+        with self.assertRaises(ValueError): self.check(value)
+        value = self.value(True); value["events"][2]["utc"] = "2026-10-12T00:00:00Z"
+        with self.assertRaises(ValueError): self.check(value)
+
+    def test_duplicate_start_unpaired_finish_and_early_run_end_rejected(self):
+        mutations = [lambda v: v["events"][2].update(stage="case-start", result="UNAVAILABLE"),
+                     lambda v: v["events"][1].update(stage="case-end", result="PASSED"),
+                     lambda v: v["events"][2].update(stage="run-end", caseKey="", result="UNAVAILABLE")]
+        for change in mutations:
+            value = self.value(True); change(value)
+            with self.assertRaises(ValueError): self.check(value)
+
+    def test_only_fixed_file_exports_and_oversize_never_leaks(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d); source = root/candidate.TASK/"artifacts/visual-regression-play/test-progress.json"
+            source.parent.mkdir(parents=True); destination = candidate.outdir(root)/"regression-play-progress.json"
+            source.write_text(json.dumps(self.value()))
+            with patch.object(candidate, "identity", return_value=self.ident), patch.object(candidate, "regression_case_keys", return_value=self.allowed):
+                candidate.export_regression_progress(root); self.assertEqual(json.loads(destination.read_text()), self.value())
+                source.write_text("x"*65537)
+                with self.assertRaises(Exception): candidate.export_regression_progress(root)
+                self.assertFalse(destination.exists())
+                source.unlink(); candidate.export_regression_progress(root); self.assertFalse(destination.exists())
+
+    def test_callback_whitelist_matches_exact_current_contract_and_is_explicitly_gated(self):
+        text = (self.root/candidate.TASK/"unity/Assets/G3/Tests/PlayMode/G3RegressionProgress.cs").read_text()
+        keys = set(re.findall(r'"([0-9a-f]{64})"', text)); self.assertEqual(keys, self.allowed); self.assertEqual(len(keys), 35)
+        for required in ('[assembly: TestRunCallback(', 'ITestRunCallback', 'Arg("-g3RegressionProgress")=="1"', 'Arg("-assemblyNames")==Assemblies', 'Arg("-testPlatform")=="playmode"', 'Arg("-probeReviewedCommit")', 'MaximumBytes=65536, MaximumEvents=128'):
+            self.assertIn(required, text)
+        for forbidden in ('.Message', '.StackTrace', '.Output', 'ToXml', 'GetEnvironmentVariable', 'test.Name'):
+            self.assertNotIn(forbidden, text)
+        self.assertIn('if(Enabled&&!test.IsSuite)', text)
+
+    def test_workflow_exports_only_named_validated_progress_after_real_play_attempt(self):
+        text = (self.root/candidate.WORKFLOW).read_text()
+        begin = text.index('      - name: Preserve exact-contract bounded PlayMode progress even on timeout')
+        end = text.index('      - name: Verify existing exact PlayMode', begin)
+        block = text[begin:end]
+        self.assertIn("steps.regressionplay.outcome != 'skipped'", block)
+        self.assertIn("steps.guard.outcome == 'success'", block)
+        self.assertIn('visual_candidate_ci.py regression-progress', block)
+        self.assertEqual(text.count('            tasks/lottery-shop/evidence/visual-candidate/regression-play-progress.json'), 1)
+
+
 if __name__ == "__main__":
     unittest.main()

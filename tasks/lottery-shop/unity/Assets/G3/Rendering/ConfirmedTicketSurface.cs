@@ -32,7 +32,8 @@ namespace Lottery.G3.Rendering
             collider=paperObject.AddComponent<MeshCollider>();collider.sharedMesh=paperObject.GetComponent<MeshFilter>().sharedMesh;
             // Thin paper edge and contact shadow share the atomic display body, so
             // neither survives a failed save or leaks an unconfirmed ticket.
-            var edge=GameObject.CreatePrimitive(PrimitiveType.Cube);edge.name="Fine paper stock edge";edge.transform.SetParent(body.transform,false);edge.transform.localPosition=new Vector3(0,-.00012f,0);edge.transform.localScale=new Vector3(width,.00024f,depth);Destroy(edge.GetComponent<Collider>());
+            var edge=new GameObject("Fine paper stock edge");edge.transform.SetParent(body.transform,false);
+            edge.AddComponent<MeshFilter>().sharedMesh=BuildPaperStockMesh();edge.AddComponent<MeshRenderer>();
             var edgeMat=Own(new Material(Shader.Find("Universal Render Pipeline/Lit")));edgeMat.color=new Color(.78f,.74f,.62f);edgeMat.SetFloat("_Smoothness",.1f);edge.GetComponent<Renderer>().sharedMaterial=edgeMat;
             // Natural edge contact comes from the lit stock mesh. No enlarged black
             // backing box: a 0.4 m sheet must read as paper rather than a rigid board.
@@ -63,6 +64,34 @@ namespace Lottery.G3.Rendering
             }
             var headerMat=Own(new Material(ordinaryFont));
             foreach(var region in Layout.Labels) legends.Add(region.Id,Label("Live "+region.Id,region.Bounds,headerMat,font,region.Id.Contains("strip")?44:68));
+        }
+        Mesh BuildPaperStockMesh()
+        {
+            // The printed quad is the sole top face. A cube at y=-thickness/2
+            // puts its untextured top at PaperY too, making opaque draws compete
+            // at equal depth and erase the approved artwork (observed in run08).
+            // Four outward sides and an underside preserve real paper thickness
+            // and contact while leaving the original UV/collider/layers untouched.
+            const float thickness=.00024f;
+            float x=width*.5f,z=depth*.5f;
+            var a=new Vector3(-x,PaperY,-z);var b=new Vector3(x,PaperY,-z);
+            var c=new Vector3(x,PaperY,z);var d=new Vector3(-x,PaperY,z);
+            var down=Vector3.down*thickness;
+            var vertices=new List<Vector3>();var uvs=new List<Vector2>();var triangles=new List<int>();
+            AddStockFace(vertices,uvs,triangles,a,b,b+down,a+down); // -Z
+            AddStockFace(vertices,uvs,triangles,b,c,c+down,b+down); // +X
+            AddStockFace(vertices,uvs,triangles,c,d,d+down,c+down); // +Z
+            AddStockFace(vertices,uvs,triangles,d,a,a+down,d+down); // -X
+            AddStockFace(vertices,uvs,triangles,a+down,b+down,c+down,d+down); // -Y
+            var mesh=Own(new Mesh{name="Paper stock sides and underside; no top face"});
+            mesh.SetVertices(vertices);mesh.SetUVs(0,uvs);mesh.SetTriangles(triangles,0);
+            mesh.RecalculateNormals();mesh.RecalculateBounds();return mesh;
+        }
+        static void AddStockFace(List<Vector3> vertices,List<Vector2> uvs,List<int> triangles,Vector3 a,Vector3 b,Vector3 c,Vector3 d)
+        {
+            int start=vertices.Count;vertices.AddRange(new[]{a,b,c,d});
+            uvs.AddRange(new[]{Vector2.zero,Vector2.right,Vector2.one,Vector2.up});
+            triangles.AddRange(new[]{start,start+1,start+2,start,start+2,start+3});
         }
         T Own<T>(T value)where T:UnityEngine.Object{owned.Add(value);return value;}
         BoundedGlyphLabel Label(string name,PixelRect rect,Material mat,Font font,float fontPixels)
