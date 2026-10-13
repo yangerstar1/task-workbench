@@ -39,6 +39,8 @@ jobs:
           PYTHONDONTWRITEBYTECODE=1 python3 tasks/lottery-shop/scripts/test_safe_project_ci.py -v
           PYTHONDONTWRITEBYTECODE=1 python3 tasks/lottery-shop/scripts/test_reflection_bake_ci.py -v
           PYTHONDONTWRITEBYTECODE=1 python3 tasks/lottery-shop/scripts/test_reflection_progress_ci.py -v
+          PYTHONDONTWRITEBYTECODE=1 python3 tasks/lottery-shop/scripts/test_startup_progress_ci.py -v
+          PYTHONDONTWRITEBYTECODE=1 python3 tasks/lottery-shop/scripts/test_independent_g3_frames_ci.py -v
       - name: Prepare existing authorized disposable runner disk layout
         run: |
           python3 tasks/lottery-shop/scripts/visual_candidate_ci.py guard
@@ -86,6 +88,9 @@ jobs:
       - name: Preserve bounded reflection preparation stages and fixed failure codes
         if: ${{ always() && steps.guard.outcome == 'success' && steps.capture.outcome != 'skipped' }}
         run: PYTHONDONTWRITEBYTECODE=1 python3 tasks/lottery-shop/scripts/reflection_progress_ci.py
+      - name: Preserve fixed-schema startup observations without native logs
+        if: ${{ always() && steps.guard.outcome == 'success' && steps.capture.outcome != 'skipped' }}
+        run: PYTHONDONTWRITEBYTECODE=1 python3 tasks/lottery-shop/scripts/startup_progress_ci.py
       - name: Preserve bounded capture NUnit XML, including real failures
         if: ${{ always() && steps.guard.outcome == 'success' && steps.capture.outcome != 'skipped' }}
         run: python3 tasks/lottery-shop/scripts/visual_candidate_ci.py tests --stage capture
@@ -110,6 +115,8 @@ jobs:
             tasks/lottery-shop/evidence/visual-candidate/reflections/Night.exr.meta
             tasks/lottery-shop/evidence/visual-candidate/reflections/reflection-receipt.json
             tasks/lottery-shop/evidence/visual-candidate/reflection-progress.json
+            tasks/lottery-shop/evidence/visual-candidate/reflection-export-diagnostic.json
+            tasks/lottery-shop/evidence/visual-candidate/startup-progress.json
             tasks/lottery-shop/evidence/visual-candidate/safe-start.json
             tasks/lottery-shop/evidence/visual-candidate/safe-capture.json
             tasks/lottery-shop/evidence/visual-candidate/prebuild-progress.json
@@ -196,6 +203,36 @@ jobs:
             tasks/lottery-shop/evidence/visual-candidate/original-g3-captures/night.png
             tasks/lottery-shop/evidence/visual-candidate/original-g3-captures/day-end.png
             tasks/lottery-shop/evidence/visual-candidate/original-g3-captures/challenge-protected.png
+          if-no-files-found: error
+          retention-days: 7
+      - name: Preserve 14 originals from exact passed G3 case independently of sibling failures
+        id: independentg3caseframes
+        if: ${{ always() && steps.guard.outcome == 'success' && steps.prepareoriginal.outcome == 'success' && steps.regressionplay.outcome != 'skipped' }}
+        run: PYTHONDONTWRITEBYTECODE=1 python3 tasks/lottery-shop/scripts/independent_g3_frames_ci.py
+      - name: Upload independently verified G3 case originals without granting 23-frame or suite pass
+        if: ${{ always() && steps.guard.outcome == 'success' && steps.independentg3caseframes.outcome == 'success' }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: lottery-independent-g3-case-14-frames-not-23-or-suite-pass-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            tasks/lottery-shop/evidence/visual-candidate/source-receipt.json
+            tasks/lottery-shop/evidence/visual-candidate/original-g3-preparation.json
+            tasks/lottery-shop/evidence/visual-candidate/independent-g3-case-captures/empty.png
+            tasks/lottery-shop/evidence/visual-candidate/independent-g3-case-captures/number-half.png
+            tasks/lottery-shop/evidence/visual-candidate/independent-g3-case-captures/number-revealed.png
+            tasks/lottery-shop/evidence/visual-candidate/independent-g3-case-captures/number-copy.png
+            tasks/lottery-shop/evidence/visual-candidate/independent-g3-case-captures/number-settled.png
+            tasks/lottery-shop/evidence/visual-candidate/independent-g3-case-captures/configuration.png
+            tasks/lottery-shop/evidence/visual-candidate/independent-g3-case-captures/phone.png
+            tasks/lottery-shop/evidence/visual-candidate/independent-g3-case-captures/challenge-two-safe.png
+            tasks/lottery-shop/evidence/visual-candidate/independent-g3-case-captures/challenge-selected.png
+            tasks/lottery-shop/evidence/visual-candidate/independent-g3-case-captures/shop-shortcut.png
+            tasks/lottery-shop/evidence/visual-candidate/independent-g3-case-captures/shop-physical.png
+            tasks/lottery-shop/evidence/visual-candidate/independent-g3-case-captures/night.png
+            tasks/lottery-shop/evidence/visual-candidate/independent-g3-case-captures/day-end.png
+            tasks/lottery-shop/evidence/visual-candidate/independent-g3-case-captures/challenge-protected.png
+            tasks/lottery-shop/evidence/visual-candidate/independent-g3-case-captures/render-receipt.json
+            tasks/lottery-shop/evidence/visual-candidate/independent-g3-case-captures/export-receipt.json
           if-no-files-found: error
           retention-days: 7
       - name: Return only this temporary session and verify its container is gone

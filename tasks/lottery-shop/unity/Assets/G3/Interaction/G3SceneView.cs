@@ -489,7 +489,7 @@ namespace Lottery.G3.Interaction
         public G3WorldTarget WorldTarget(Vector2 pixel)
         {
             var ray=SceneCamera.ViewportPointToRay(new Vector3(pixel.x/PresentationWidth,pixel.y/PresentationHeight,0));
-            if(Physics.Raycast(ray,out RaycastHit hit,5))return hit.collider.GetComponent<G3WorldTarget>();return null;
+            if(Physics.Raycast(ray,out RaycastHit hit,5,Physics.DefaultRaycastLayers,QueryTriggerInteraction.Collide))return hit.collider.GetComponent<G3WorldTarget>();return null;
         }
         public Vector2 WorldToPresentationPoint(Vector3 point){var v=SceneCamera.WorldToViewportPoint(point);return new Vector2(v.x*PresentationWidth,v.y*PresentationHeight);}
         public void RefreshGlyphGeometry(){Phone?.RefreshGlyphGeometry();foreach(var label in labels)label.RebuildIfNeeded();if(number.CellLabels!=null)foreach(var label in number.CellLabels)label.RebuildIfNeeded();if(challenge.CellLabels!=null)foreach(var label in challenge.CellLabels)label.RebuildIfNeeded();}

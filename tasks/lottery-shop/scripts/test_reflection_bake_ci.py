@@ -171,4 +171,83 @@ class ReflectionEvidenceTests(unittest.TestCase):
         self.assertIn("steps.guard.outcome == 'success' && steps.capture.outcome != 'skipped'",text)
 
 
+
+class ExportDiagnosticTests(unittest.TestCase):
+    setUp=ReflectionEvidenceTests.setUp
+    save=ReflectionEvidenceTests.save
+    def diagnostic(self):return json.loads((bake.visual.outdir(self.root)/bake.DIAGNOSTIC_NAME).read_text())
+    def test_diagnostic_complete_is_fixed_bound_sidecar(self):
+        self.assertEqual(bake.run(self.root),0);d=self.diagnostic()
+        self.assertEqual(set(d),{'schemaVersion','scope','sourceCommit','runId','runAttempt','status','stage','fileRole','metaScope','metaField','errorCode','exceptionKind'})
+        self.assertEqual((d['status'],d['stage'],d['errorCode']),('COMPLETE','COMPLETE','NONE'))
+        self.assertEqual(d['sourceCommit'],IDENT['sourceCommit']);self.assertLess(len(json.dumps(d)),2048)
+        for name in bake.FILES:self.assertEqual((bake.visual.outdir(self.root)/'reflections'/name).read_bytes(),(self.root/bake.SOURCE/name).read_bytes())
+    def test_diagnostic_receipt_reject_stays_nonzero_and_no_originals(self):
+        self.receipt['recipe']='OLD';self.save();self.assertEqual(bake.run(self.root),1);d=self.diagnostic()
+        self.assertEqual((d['stage'],d['errorCode']),('RECEIPT_VALIDATE','REFLECTION_COMPLETENESS_REJECTED'))
+        self.assertFalse((bake.visual.outdir(self.root)/'reflections/reflection-receipt.json').exists())
+    def test_diagnostic_source_digest_stage(self):
+        (self.root/bake.TASK/'unity'/bake.RECIPE_SOURCES[0]).write_text('CHANGED');self.assertEqual(bake.run(self.root),1)
+        self.assertEqual((self.diagnostic()['stage'],self.diagnostic()['errorCode']),('SOURCE_DIGEST','REFLECTION_SOURCE_INPUT_CHANGED'))
+    def alter_meta(self,payload):
+        p=self.root/bake.SOURCE/'Day.exr.meta';p.write_bytes(payload);self.receipt['day'].update(metaSha256=bake.digest(payload),metaBytes=len(payload));self.save()
+    def test_diagnostic_unknown_meta_key_never_exports_key_or_value(self):
+        self.alter_meta(meta(bake.GUIDS['day'])+b'  SECRET_ACCOUNT: PRIVATE_VALUE\n');self.assertEqual(bake.run(self.root),1);d=self.diagnostic()
+        self.assertEqual((d['stage'],d['fileRole'],d['metaScope'],d['metaField']),('META_VALIDATE','DAY','TEXTURE_IMPORTER','UNKNOWN'))
+        self.assertNotIn('PRIVATE_VALUE',json.dumps(d));self.assertNotIn('SECRET_ACCOUNT',json.dumps(d))
+    def test_diagnostic_known_meta_field_only_no_value(self):
+        self.alter_meta(meta(bake.GUIDS['day']).replace(b'userData: ',b'userData: SECRET_TOKEN'));self.assertEqual(bake.run(self.root),1);d=self.diagnostic()
+        self.assertEqual(d['metaField'],'userData');self.assertNotIn('SECRET_TOKEN',json.dumps(d))
+    def test_diagnostic_duplicate_json_code_without_raw_content(self):
+        p=self.root/bake.SOURCE/'reflection-receipt.json';p.write_text(p.read_text().replace('"schemaVersion": 1','"schemaVersion": "SECRET_TOKEN", "schemaVersion": 1'));self.assertEqual(bake.run(self.root),1);d=self.diagnostic()
+        self.assertEqual(d['errorCode'],'REFLECTION_JSON_DUPLICATE_KEY');self.assertNotIn('SECRET_TOKEN',json.dumps(d))
+    def test_diagnostic_unknown_exception_is_enum_only(self):
+        with patch.object(bake,'source_digest',side_effect=RuntimeError('SECRET_PATH_OR_LOG')):self.assertEqual(bake.run(self.root),1)
+        d=self.diagnostic();self.assertEqual((d['errorCode'],d['exceptionKind']),('UNKNOWN','UNKNOWN'));self.assertNotIn('SECRET_PATH_OR_LOG',json.dumps(d))
+    def test_diagnostic_unknown_valueerror_does_not_leak_message(self):
+        with patch.object(bake,'source_digest',side_effect=ValueError('SECRET_FREE_TEXT')):self.assertEqual(bake.run(self.root),1)
+        d=self.diagnostic();self.assertEqual((d['errorCode'],d['exceptionKind']),('UNKNOWN','VALIDATION'));self.assertNotIn('SECRET_FREE_TEXT',json.dumps(d))
+    def test_diagnostic_unbound_identity_no_receipt(self):
+        with patch.dict(os.environ,GITHUB_RUN_ATTEMPT='2'):self.assertEqual(bake.run(self.root),1)
+        self.assertFalse((bake.visual.outdir(self.root)/bake.DIAGNOSTIC_NAME).exists())
+    def test_diagnostic_stale_success_cleared_before_unbound_failure(self):
+        self.assertEqual(bake.run(self.root),0)
+        with patch.dict(os.environ,GITHUB_SHA='3'*40):self.assertEqual(bake.run(self.root),1)
+        self.assertFalse((bake.visual.outdir(self.root)/bake.DIAGNOSTIC_NAME).exists())
+    def test_diagnostic_symlink_destination_not_followed(self):
+        target=self.root/'private-target';target.write_text('DO_NOT_TOUCH');dest=bake.visual.outdir(self.root)/bake.DIAGNOSTIC_NAME;dest.symlink_to(target)
+        self.assertEqual(bake.run(self.root),1);self.assertEqual(target.read_text(),'DO_NOT_TOUCH')
+    def test_diagnostic_write_failure_cannot_green_job(self):
+        original=Path.write_bytes
+        def fail_diag(path,data):
+            if path.name==bake.DIAGNOSTIC_NAME:raise OSError('SECRET_DISK_PATH')
+            return original(path,data)
+        with patch.object(Path,'write_bytes',fail_diag):self.assertEqual(bake.run(self.root),1)
+    def test_diagnostic_workflow_adds_one_exact_file_no_glob(self):
+        w=(Path(__file__).resolve().parents[3]/'.github/workflows/lottery-visual-candidate.yml').read_text();line='tasks/lottery-shop/evidence/visual-candidate/'+bake.DIAGNOSTIC_NAME
+        self.assertEqual(w.count(line),1);self.assertNotIn('reflection-export-*',w)
+
+
+    def test_diagnostic_original_hash_and_exr_stages_remain_distinct(self):
+        p=self.root/bake.SOURCE/'Day.exr';p.write_bytes(b'BAD_HEADER'*20);self.assertEqual(bake.run(self.root),1);self.assertEqual(self.diagnostic()['stage'],'ORIGINAL_HASH')
+        self.receipt['day'].update(sha256=bake.digest(p.read_bytes()),bytes=p.stat().st_size);self.save();self.assertEqual(bake.run(self.root),1)
+        self.assertEqual((self.diagnostic()['stage'],self.diagnostic()['errorCode']),('EXR_HEADER','REFLECTION_EXR_REJECTED'))
+    def test_diagnostic_invalid_meta_syntax_has_no_stale_prior_field(self):
+        self.alter_meta(meta(bake.GUIDS['day'])+b'SECRET_UNPARSEABLE_LINE\n');self.assertEqual(bake.run(self.root),1);d=self.diagnostic()
+        self.assertEqual((d['metaScope'],d['metaField']),('UNKNOWN','UNKNOWN'));self.assertNotIn('SECRET_UNPARSEABLE_LINE',json.dumps(d))
+    def test_diagnostic_unknown_utf8_has_no_prior_meta_context(self):
+        self.alter_meta(b'\xff');self.assertEqual(bake.run(self.root),1);d=self.diagnostic()
+        self.assertEqual((d['stage'],d['metaScope'],d['metaField']),('META_VALIDATE','NONE','NONE'))
+    def test_diagnostic_bound_identity_rejects_free_text(self):
+        bad=dict(IDENT,runId='SECRET_ID');bake.visual.write(bake.visual.outdir(self.root)/'source-receipt.json',bad)
+        with patch.dict(os.environ,GITHUB_RUN_ID='SECRET_ID'):self.assertEqual(bake.run(self.root),1)
+        self.assertFalse((bake.visual.outdir(self.root)/bake.DIAGNOSTIC_NAME).exists())
+    def test_diagnostic_failure_write_does_not_mask_original_failure(self):
+        self.receipt['recipe']='OLD';self.save();original=Path.write_bytes
+        def fail_diag(path,data):
+            if path.name==bake.DIAGNOSTIC_NAME:raise OSError('SECRET_PATH')
+            return original(path,data)
+        with patch.object(Path,'write_bytes',fail_diag):self.assertEqual(bake.run(self.root),1)
+        self.assertFalse((bake.visual.outdir(self.root)/'reflections/reflection-receipt.json').exists())
+
 if __name__=='__main__':unittest.main()

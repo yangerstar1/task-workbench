@@ -99,6 +99,9 @@ namespace Lottery.G3.Interaction
                 var collider=go.AddComponent<BoxCollider>();collider.size=V(box.size);
                 // The shop hit box now belongs to the authored tool-sample tray, not the whole till.
                 if(box.target=="none"||string.IsNullOrEmpty(box.target))continue;
+                // Interaction volumes are selection targets, not solid room geometry.
+                // Phone glass rays ignore these triggers but still hit real obstacles.
+                collider.isTrigger=true;
                 var target=go.AddComponent<G3WorldTarget>();target.IsTable=box.target=="table";
                 switch(box.target){case "shop":target.Panel=G3Panel.Shop;break;case "tickets":target.Panel=G3Panel.Tickets;break;case "inventory":target.Panel=G3Panel.Inventory;break;case "drawer":target.Panel=G3Panel.Drawer;break;case "phone":target.Panel=G3Panel.Phone;break;}
             }

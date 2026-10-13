@@ -49,11 +49,27 @@ namespace Lottery.G3.PlayMode.Tests
         }
         [UnityTest]public IEnumerator PhysicalPhoneKeysMeetProjectedReferenceTargetsAndOcclusionBlocksTap()
         {
+            // The lower-left principal button projects through the non-physical ticket
+            // selection volume. It must remain a world target without blocking glass.
+            var roomBoxes=P.View.Environment.GetComponentsInChildren<BoxCollider>();
+            var ticketTarget=roomBoxes.Single(x=>x.name=="Interaction_Tickets");
+            Assert.That(ticketTarget.isTrigger,Is.True);
+            Assert.That(roomBoxes.Where(x=>x.GetComponent<G3WorldTarget>()==null).All(x=>!x.isTrigger),Is.True,"Physical room boundaries must remain solid");
+            foreach(string name in new[]{"Wall_West","Wall_East","Wall_North","Front_NoExit_Collider","Cashier_Base","Scratch_Desk_Top"})
+                Assert.That(roomBoxes.Single(x=>x.name==name).enabled,Is.True,name+" physical collider must remain enabled");
+            Click("open-phone");var principalPoint=P.View.ButtonRect("principal").center;
+            Assert.That(P.View.WorldTarget(principalPoint),Is.EqualTo(ticketTarget.GetComponent<G3WorldTarget>()),"World selection must still include the nearest interaction trigger");
+            Assert.That(Physics.Raycast(P.View.SceneCamera.ScreenPointToRay(principalPoint),out var principalHit,30,~0,QueryTriggerInteraction.Ignore),Is.True);
+            Assert.That(principalHit.collider.name,Is.EqualTo("Physical portrait display 390 by 844"),"The real phone glass must be the nearest solid hit");
+            string principalState=StateCodec.ComputeHash(State);Click("principal");Assert.That(P.Panel,Is.EqualTo(G3Panel.CustomAmount));
+            Click("digit-3");Assert.That(P.BuildPanel().Body,Does.Contain("游戏金币：3"));
+            Assert.That(StateCodec.ComputeHash(State),Is.EqualTo(principalState),"Entering a principal amount alone must not transact");Close();
             Click("open-phone");Click("contact-mother");Click("phone-choose");Click("borrow-custom");float scale=P.View.PresentationSafeArea.height/720f;
             foreach(string id in new[]{"phone-back","close-phone","digit-1","digit-5","digit-0","digit-del","amount-accept"})
             {var r=P.View.ButtonRect(id);Assert.That(r.width,Is.GreaterThanOrEqualTo(96*scale-1),id+" projected width");Assert.That(r.height,Is.GreaterThanOrEqualTo(96*scale-1),id+" projected height");}
             AssertPhoneTypeSize("digit-5 label",scale);AssertPhoneTypeSize("Chosen amount",scale);
             var pixel=P.View.ButtonRect("digit-5").center;var ray=P.View.SceneCamera.ScreenPointToRay(pixel);var obstacle=GameObject.CreatePrimitive(PrimitiveType.Cube);obstacle.name="Phone occlusion test object";obstacle.transform.position=ray.GetPoint(.12f);obstacle.transform.localScale=Vector3.one*.04f;Physics.SyncTransforms();
+            Assert.That(P.View.WorldTarget(pixel),Is.Null,"A nearer solid obstacle must prevent selecting any target behind it");
             string before=P.BuildPanel().Body;MouseEvent(pixel,true);MouseEvent(pixel,false);Assert.That(P.BuildPanel().Body,Is.EqualTo(before),"A closer physical blocker must prevent typing");Object.Destroy(obstacle);yield return null;Physics.SyncTransforms();Click("digit-5");Assert.That(P.BuildPanel().Body,Does.Contain("5"));
             Click("phone-back");Click("phone-more");Click("phone-records");AssertPhoneTypeSize("phone-prev label",scale);AssertPhoneTypeSize("phone-next label",scale);AssertPhoneTypeSize("Records summary",scale);
             Click("phone-back");Click("phone-choose");Click("borrow-1000");Click("phone-send");AssertPhoneTypeSize("packet-pending value line 0",scale);AssertPhoneTypeSize("packet-pending status line 0",scale);

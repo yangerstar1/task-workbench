@@ -32,6 +32,7 @@ namespace Lottery.G3.VisualCandidate.Tests
 #if UNITY_EDITOR
             if(!IsCaptureProcess()) throw new InvalidOperationException("Lifecycle probe needs the dedicated capture assembly");
             RequireIdentity();
+            VisualCandidateStartupProbe.Arm();
             Directory.CreateDirectory(Path.GetDirectoryName(PathName));
             // Only this probe's own fixed output, never project/source/store files.
             if(File.Exists(PathName)) File.Delete(PathName);

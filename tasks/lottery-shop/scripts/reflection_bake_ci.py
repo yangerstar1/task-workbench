@@ -77,13 +77,15 @@ META_PLATFORMS = {'DefaultTexturePlatform','Standalone','Android','iPhone','WebG
 NUMBER = r'-?[0-9]+(?:\.[0-9]+)?(?:[eE][+-]?[0-9]+)?'
 
 
-def validate_meta(data):
+def validate_meta(data, trace=None):
     text = data.decode('utf-8'); lines = text.splitlines()
     require(len(lines) <= 256 and all(len(line) <= 512 for line in lines), 'REFLECTION_META_SIZE_REJECTED')
     seen = {}; section = None; platform = -1; targets = set()
     for line in lines:
+        if trace is not None:trace.meta('UNKNOWN','UNKNOWN')
         match = re.fullmatch(r'( *)(- )?([A-Za-z_][A-Za-z0-9_]*):[ ]*(.*)', line)
         require(match is not None, 'REFLECTION_META_LINE_REJECTED')
+        if trace is not None:trace.meta('UNKNOWN',match[3])
         indent=len(match[1]); dash=match[2] is not None; key=match[3]; value=match[4].rstrip(' ')
         if indent == 0:
             require(not dash and key in {'fileFormatVersion','guid','TextureImporter'}, 'REFLECTION_META_ROOT_REJECTED')
@@ -100,6 +102,7 @@ def validate_meta(data):
             scope=section+':'+str(platform) if section == 'platformSettings' else section
         else:
             require(False, 'REFLECTION_META_STRUCTURE_REJECTED')
+        if trace is not None:trace.meta(scope,key)
         location=(scope,key);require(location not in seen, 'REFLECTION_META_DUPLICATE_KEY');seen[location]=value
         kind=scope.split(':')[0]
         if kind == 'root':
@@ -199,7 +202,10 @@ def validate_receipt(receipt, ident):
     return receipt
 
 
-def export_reflections(root):
+def export_reflections(root, trace=None):
+    def mark(stage,role="NONE"):
+        if trace is not None:trace.stage=stage;trace.fileRole=role;trace.metaScope='NONE';trace.metaField='NONE'
+    mark("DESTINATION")
     dest = visual.outdir(root) / 'reflections'
     require(dest.resolve() == dest.absolute(), 'REFLECTION_DESTINATION_REJECTED')
     # Clear only these five previous exported files, so a failed revalidation
@@ -208,30 +214,95 @@ def export_reflections(root):
         path = dest / name
         if path.exists() or path.is_symlink():
             require(path.is_file() and not path.is_symlink(), 'REFLECTION_STALE_OUTPUT_REJECTED'); path.unlink()
+    mark("IDENTITY")
     ident = visual.identity(root)
     require(ident['runId'] == os.environ.get('GITHUB_RUN_ID') and ident['runAttempt'] == os.environ.get('GITHUB_RUN_ATTEMPT') and visual.HEX40.fullmatch(ident.get('reviewedCandidateCommit','')), 'REFLECTION_RUN_IDENTITY_REJECTED')
+    if trace is not None:trace.bind(ident)
+    mark('RECEIPT_READ','RECEIPT')
     raw = read_fixed(root,SOURCE,'reflection-receipt.json',TEXT_LIMIT)
+    mark('RECEIPT_VALIDATE','RECEIPT')
     receipt = validate_receipt(load_receipt(raw),ident)
+    mark('SOURCE_DIGEST','RECEIPT')
     require(source_digest(root,receipt) == receipt['sourceDigest'], 'REFLECTION_SOURCE_INPUT_CHANGED')
     originals = {'reflection-receipt.json': raw}
     for key in ('day','night'):
+        mark('ORIGINAL_READ',key.upper())
         value=receipt[key]; name=value['file']
         data=read_fixed(root,SOURCE,name,EXR_LIMIT); meta=read_fixed(root,SOURCE,name+'.meta',TEXT_LIMIT)
+        mark('ORIGINAL_HASH',key.upper())
         require(len(data)==value['bytes'] and digest(data)==value['sha256'] and len(meta)==value['metaBytes'] and digest(meta)==value['metaSha256'], 'REFLECTION_ORIGINAL_HASH_REJECTED')
+        mark('EXR_HEADER',key.upper())
         require(exr_size(data)==(value['sourceWidth'],value['sourceHeight']), 'REFLECTION_EXR_DIMENSIONS_REJECTED')
-        validate_meta(meta)
+        mark('META_VALIDATE',key.upper())
+        validate_meta(meta,trace)
+        mark('META_GUID',key.upper())
         require(re.findall(r'^guid: ([0-9a-f]{32})$',meta.decode('utf-8'),re.M)==[value['metaGuid']], 'REFLECTION_META_GUID_REJECTED')
         originals[name]=data; originals[name+'.meta']=meta
+    mark('EXPORT_COPY')
     dest.mkdir(parents=True,exist_ok=True)
     for name in FILES:(dest/name).write_bytes(originals[name])
+    mark('COMPLETE')
     print('SOURCE_BOUND_REFLECTION_ORIGINALS_VERIFIED')
 
 
-def main():
+DIAGNOSTIC_NAME = 'reflection-export-diagnostic.json'
+DIAGNOSTIC_SCOPE = 'REFLECTION_EXPORT_DIAGNOSTIC_NOT_NATIVE_OR_VISUAL_PASS'
+DIAGNOSTIC_CODES = frozenset(['REFLECTION_BACKGROUND_ONLY_REJECTED', 'REFLECTION_BAKE_EVIDENCE_REJECTED', 'REFLECTION_CAPTURE_GEOMETRY_REJECTED', 'REFLECTION_COMPLETENESS_REJECTED', 'REFLECTION_DEPENDENCY_REJECTED', 'REFLECTION_DESTINATION_REJECTED', 'REFLECTION_EXR_DIMENSIONS_REJECTED', 'REFLECTION_EXR_HEADER_REJECTED', 'REFLECTION_EXR_REJECTED', 'REFLECTION_EXR_VERSION_REJECTED', 'REFLECTION_EXR_WINDOW_MISSING', 'REFLECTION_EXR_WINDOW_REJECTED', 'REFLECTION_FILE_REJECTED', 'REFLECTION_HASH_REJECTED', 'REFLECTION_IDENTITY_REJECTED', 'REFLECTION_IMPORT_REJECTED', 'REFLECTION_INPUT_BYTES_REJECTED', 'REFLECTION_INPUT_DIRECTORY_REJECTED', 'REFLECTION_INPUT_LINK_REJECTED', 'REFLECTION_INPUT_PATH_REJECTED', 'REFLECTION_INPUT_SET_REJECTED', 'REFLECTION_JSON_DUPLICATE_KEY', 'REFLECTION_LINK_REJECTED', 'REFLECTION_META_DUPLICATE_KEY', 'REFLECTION_META_FIELD_OR_VALUE_REJECTED', 'REFLECTION_META_GUID_REJECTED', 'REFLECTION_META_IMPORT_REJECTED', 'REFLECTION_META_LINE_REJECTED', 'REFLECTION_META_LIST_REJECTED', 'REFLECTION_META_PLATFORM_REJECTED', 'REFLECTION_META_ROOT_REJECTED', 'REFLECTION_META_SIZE_REJECTED', 'REFLECTION_META_STRUCTURE_REJECTED', 'REFLECTION_ORIGINAL_HASH_REJECTED', 'REFLECTION_RECEIPT_FIELDS_REJECTED', 'REFLECTION_RECIPE_REJECTED', 'REFLECTION_RUN_IDENTITY_REJECTED', 'REFLECTION_SOURCE_DIGEST_REJECTED', 'REFLECTION_SOURCE_INPUT_CHANGED', 'REFLECTION_STALE_OUTPUT_REJECTED', 'REFLECTION_TEXTURE_FIELDS_REJECTED', 'REFLECTION_TEXTURE_IDENTITY_REJECTED', 'REFLECTION_TEXTURE_SIZE_REJECTED']) | {'NONE','UNKNOWN'}
+DIAGNOSTIC_STAGES = frozenset({'DESTINATION','IDENTITY','RECEIPT_READ','RECEIPT_VALIDATE','SOURCE_DIGEST','ORIGINAL_READ','ORIGINAL_HASH','EXR_HEADER','META_VALIDATE','META_GUID','EXPORT_COPY','COMPLETE'})
+META_FIELD_CODES = frozenset().union(*META_NUMERIC.values(),META_SECTIONS,META_EMPTY,{'fileFormatVersion','guid','TextureImporter','internalIDToNameTable','externalObjects','spritePivot','spriteBorder','buildTarget','sprites','outline','physicsShape','bones','vertices','edges','weights','secondaryTextures','indices','nameFileIdTable','spriteID'})
+META_SCOPE_CODES = {'root':'ROOT','TextureImporter':'TEXTURE_IMPORTER','mipmaps':'MIPMAPS','bumpmap':'BUMPMAP','textureSettings':'TEXTURE_SETTINGS','platformSettings':'PLATFORM_SETTINGS','spriteSheet':'SPRITE_SHEET'}
+
+
+class ExportTrace:
+    def __init__(self):
+        self.ident=None;self.stage='DESTINATION';self.fileRole='NONE';self.metaScope='NONE';self.metaField='NONE'
+    def bind(self,ident):
+        require(visual.HEX40.fullmatch(ident.get('sourceCommit','')) and visual.HEX40.fullmatch(ident.get('reviewedCandidateCommit','')) and all(re.fullmatch(r'[1-9][0-9]*',ident.get(k,'')) for k in ('runId','runAttempt')), 'REFLECTION_RUN_IDENTITY_REJECTED')
+        self.ident={k:ident[k] for k in ('sourceCommit','runId','runAttempt')}
+    def meta(self,scope,key):
+        self.metaScope=META_SCOPE_CODES.get(scope.split(':')[0],'UNKNOWN')
+        self.metaField=key if key in META_FIELD_CODES else 'UNKNOWN'
+    def receipt(self,error=None):
+        require(self.ident is not None and self.stage in DIAGNOSTIC_STAGES,'REFLECTION_RUN_IDENTITY_REJECTED')
+        code='NONE';kind='NONE'
+        if error is not None:
+            code=error.args[0] if type(error) is ValueError and len(error.args)==1 and type(error.args[0]) is str and error.args[0] in DIAGNOSTIC_CODES-{'NONE'} else 'UNKNOWN'
+            kind='VALIDATION' if isinstance(error,ValueError) else 'IO' if isinstance(error,OSError) else 'UNKNOWN'
+        return dict(schemaVersion=1,scope=DIAGNOSTIC_SCOPE,**self.ident,status='FAILED' if error is not None else 'COMPLETE',stage=self.stage,fileRole=self.fileRole,metaScope=self.metaScope,metaField=self.metaField,errorCode=code,exceptionKind=kind)
+
+
+def diagnostic_path(root):
+    p=visual.outdir(root)/DIAGNOSTIC_NAME
+    require(p.parent.resolve()==p.parent.absolute() and not p.is_symlink(),'REFLECTION_DESTINATION_REJECTED')
+    return p
+
+
+def run(root):
+    trace=ExportTrace()
     try:
-        export_reflections(Path(__file__).resolve().parents[3]);return 0
-    except BaseException:
+        dest=diagnostic_path(root)
+        if dest.exists():
+            require(dest.is_file(),'REFLECTION_STALE_OUTPUT_REJECTED');dest.unlink()
+        export_reflections(root,trace)
+    except BaseException as error:
+        if trace.ident is not None:
+            try:
+                payload=json.dumps(trace.receipt(error),sort_keys=True).encode('utf-8')
+                require(len(payload)<=2048,'REFLECTION_RECEIPT_FIELDS_REJECTED')
+                dest=diagnostic_path(root);dest.parent.mkdir(parents=True,exist_ok=True);dest.write_bytes(payload)
+            except BaseException:pass
         print('REFLECTION_BAKE_EVIDENCE_REJECTED');return 1
+    try:
+        payload=json.dumps(trace.receipt(),sort_keys=True).encode('utf-8')
+        require(len(payload)<=2048,'REFLECTION_RECEIPT_FIELDS_REJECTED')
+        dest=diagnostic_path(root);dest.parent.mkdir(parents=True,exist_ok=True);dest.write_bytes(payload)
+    except BaseException:
+        print('REFLECTION_EXPORT_DIAGNOSTIC_WRITE_REJECTED');return 1
+    return 0
+
+
+def main():
+    return run(Path(__file__).resolve().parents[3])
 
 
 if __name__ == '__main__':raise SystemExit(main())

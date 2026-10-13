@@ -84,6 +84,7 @@ namespace Lottery.G3.VisualCandidate.Tests
                 PrepareAndVerify(prepare, preserved, progress, new PreparationSceneTrail());
                 progress.Mark("prebuild-scene-guard-passed");
                 progress.Mark("prebuild-end");
+                VisualCandidateStartupProbe.PrebuildReturned();
             }
             catch(Exception failure)
             {
