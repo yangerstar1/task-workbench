@@ -1,0 +1,74 @@
+name: Lottery bounded activation diagnostic only
+on:
+  push:
+    branches: [lottery-shop-g0-20261011]
+    paths: [tasks/lottery-shop/ci/activation-probe-request.json]
+permissions:
+  contents: read
+concurrency:
+  group: unity-personal-proof
+  cancel-in-progress: false
+jobs:
+  activation-only:
+    if: >-
+      github.event_name == 'push' && github.repository == 'yangerstar1/task-workbench' &&
+      github.repository_owner == 'yangerstar1' && github.actor == 'yangerstar1' &&
+      github.triggering_actor == 'yangerstar1' && github.ref == 'refs/heads/lottery-shop-g0-20261011' &&
+      github.event.repository.private == false && github.event.repository.fork == false && github.event.deleted == false
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+          lfs: false
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /tasks/lottery-shop/scripts/
+            /tasks/lottery-shop/ci/activation-probe-request.json
+            /.github/workflows/lottery-activation-probe.yml
+      - name: Require independently reviewed request-only first attempt
+        id: guard
+        run: PYTHONDONTWRITEBYTECODE=1 python3 tasks/lottery-shop/scripts/activation_probe.py guard
+      - name: Synthetic output-isolation and guard tests without secrets
+        run: PYTHONDONTWRITEBYTECODE=1 python3 tasks/lottery-shop/scripts/test_activation_probe.py -v
+      - name: Read same pinned public activation mechanism and blank project
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          repository: game-ci/unity-test-runner
+          ref: 0ff419b913a3630032cbe0de48a0099b5a9f0ed9
+          path: .activation-upstream
+          persist-credentials: false
+          lfs: false
+          sparse-checkout: |
+            dist/BlankProject
+            dist/unity-config
+            dist/platforms/ubuntu
+      - name: Prepare already authorized disposable runner disk layout
+        run: |
+          PYTHONDONTWRITEBYTECODE=1 python3 tasks/lottery-shop/scripts/activation_probe.py guard
+          sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/.ghcup /usr/local/lib/android /opt/hostedtoolcache/CodeQL
+          python3 - <<'PY'
+          import shutil
+          if shutil.disk_usage('.').free < 30*1024**3:
+              raise SystemExit('INSUFFICIENT_IMAGE_DISK_SPACE')
+          PY
+      - name: One activation only with bounded private process output
+        id: activation
+        timeout-minutes: 14
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+        run: PYTHONDONTWRITEBYTECODE=1 python3 tasks/lottery-shop/scripts/activation_probe.py diagnose
+      - name: Preserve only fixed non-sensitive activation receipts
+        if: ${{ always() && steps.guard.outcome == 'success' }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: lottery-activation-only-not-g3-pass-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            tasks/lottery-shop/evidence/activation-probe/source-receipt.json
+            tasks/lottery-shop/evidence/activation-probe/activation-receipt.json
+          if-no-files-found: error
+          retention-days: 7
