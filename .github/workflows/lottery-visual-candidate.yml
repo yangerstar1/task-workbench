@@ -17,7 +17,7 @@ jobs:
       github.triggering_actor == 'yangerstar1' && github.ref == 'refs/heads/lottery-shop-g0-20261011' &&
       github.event.repository.private == false && github.event.repository.fork == false && github.event.deleted == false
     runs-on: ubuntu-24.04
-    timeout-minutes: 60
+    timeout-minutes: 75
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
@@ -32,7 +32,10 @@ jobs:
         id: guard
         run: python3 tasks/lottery-shop/scripts/visual_candidate_ci.py guard
       - name: Run diagnostic evidence validator synthetic tests
-        run: PYTHONDONTWRITEBYTECODE=1 python3 tasks/lottery-shop/scripts/test_visual_candidate_ci.py -v
+        run: |
+          PYTHONDONTWRITEBYTECODE=1 python3 tasks/lottery-shop/scripts/test_visual_candidate_ci.py -v
+          PYTHONDONTWRITEBYTECODE=1 python3 tasks/lottery-shop/scripts/test_activation_probe.py -v
+          PYTHONDONTWRITEBYTECODE=1 python3 tasks/lottery-shop/scripts/test_safe_project_ci.py -v
       - name: Prepare existing authorized disposable runner disk layout
         run: |
           python3 tasks/lottery-shop/scripts/visual_candidate_ci.py guard
@@ -42,28 +45,35 @@ jobs:
           if shutil.disk_usage('.').free < 30*1024**3:
               raise SystemExit('Need at least 30 GiB for cold pinned Unity image')
           PY
+      - name: Read pinned public command inputs without running the raw-logging action
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          repository: game-ci/unity-test-runner
+          ref: 0ff419b913a3630032cbe0de48a0099b5a9f0ed9
+          path: .visual-safe-upstream
+          persist-credentials: false
+          lfs: false
+          sparse-checkout: |
+            dist/BlankProject
+            dist/unity-config
+            dist/platforms/ubuntu
       - name: Restore same verified licensed font and hash source metadata
         run: |
           python3 tasks/lottery-shop/scripts/visual_candidate_ci.py restore-font
           python3 tasks/lottery-shop/scripts/visual_candidate_ci.py snapshot
-      - name: Capture actual runtime with imported FBX, routed input, and visible HUD
-        id: capture
-        timeout-minutes: 30
-        uses: game-ci/unity-test-runner@0ff419b913a3630032cbe0de48a0099b5a9f0ed9
+      - name: Activate once in this attempt's private temporary container
+        id: safestart
+        timeout-minutes: 14
         env:
           UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
           UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
           UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
-        with:
-          unityVersion: 6000.3.19f1
-          projectPath: tasks/lottery-shop/unity
-          testMode: playmode
-          artifactsPath: tasks/lottery-shop/artifacts/visual-candidate
-          customParameters: >-
-            -assemblyNames Lottery.G3.VisualCandidate.Tests -force-glcore -screen-width 1280 -screen-height 720
-            -job-worker-count 2 -probeCommit ${{ github.sha }} -probeRunId ${{ github.run_id }} -probeRunAttempt ${{ github.run_attempt }}
-          dockerCpuLimit: 2
-          dockerMemoryLimit: 12g
+        run: PYTHONDONTWRITEBYTECODE=1 python3 tasks/lottery-shop/scripts/safe_project_ci.py start
+      - name: Capture actual runtime with imported FBX, routed input, and visible HUD
+        id: capture
+        if: ${{ steps.safestart.outcome == 'success' }}
+        timeout-minutes: 32
+        run: PYTHONDONTWRITEBYTECODE=1 python3 tasks/lottery-shop/scripts/safe_project_ci.py capture
       - name: Preserve fixed-schema bounded prebuild, lifecycle and runtime milestones
         if: ${{ always() && steps.guard.outcome == 'success' && steps.capture.outcome != 'skipped' }}
         run: python3 tasks/lottery-shop/scripts/visual_candidate_ci.py progress
@@ -85,6 +95,8 @@ jobs:
             tasks/lottery-shop/evidence/visual-candidate/source-receipt.json
             tasks/lottery-shop/evidence/visual-candidate/source-before.json
             tasks/lottery-shop/evidence/visual-candidate/font-receipt.json
+            tasks/lottery-shop/evidence/visual-candidate/safe-start.json
+            tasks/lottery-shop/evidence/visual-candidate/safe-capture.json
             tasks/lottery-shop/evidence/visual-candidate/prebuild-progress.json
             tasks/lottery-shop/evidence/visual-candidate/runtime-progress.json
             tasks/lottery-shop/evidence/visual-candidate/lifecycle-progress.json
@@ -108,22 +120,9 @@ jobs:
           retention-days: 7
       - name: Existing Probe, G2, and G3 EditMode suites without skipped cases
         id: regressionedit
-        if: ${{ always() && steps.guard.outcome == 'success' && steps.capture.outcome != 'skipped' }}
-        uses: game-ci/unity-test-runner@0ff419b913a3630032cbe0de48a0099b5a9f0ed9
-        env:
-          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
-          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
-          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
-        with:
-          unityVersion: 6000.3.19f1
-          projectPath: tasks/lottery-shop/unity
-          testMode: editmode
-          artifactsPath: tasks/lottery-shop/artifacts/visual-regression-edit
-          customParameters: >-
-            -assemblyNames Lottery.Probe.Tests;Lottery.G2.EditMode.Tests;Lottery.G3.EditMode.Tests
-            -job-worker-count 2 -probeCommit ${{ github.sha }} -probeRunId ${{ github.run_id }}
-          dockerCpuLimit: 2
-          dockerMemoryLimit: 12g
+        if: ${{ always() && steps.guard.outcome == 'success' && steps.safestart.outcome == 'success' && steps.capture.outcome != 'skipped' }}
+        timeout-minutes: 10
+        run: PYTHONDONTWRITEBYTECODE=1 python3 tasks/lottery-shop/scripts/safe_project_ci.py regression-edit
       - name: Verify existing exact EditMode identities and preserve bounded original XML
         if: ${{ always() && steps.guard.outcome == 'success' && steps.regressionedit.outcome != 'skipped' }}
         run: python3 tasks/lottery-shop/scripts/visual_candidate_ci.py tests --stage regression-edit
@@ -133,22 +132,9 @@ jobs:
         run: python3 tasks/lottery-shop/scripts/visual_candidate_ci.py prepare-original-g3-captures
       - name: Existing G2 and G3 PlayMode suites including original 75-step flow and captures
         id: regressionplay
-        if: ${{ always() && steps.guard.outcome == 'success' && steps.capture.outcome != 'skipped' }}
-        uses: game-ci/unity-test-runner@0ff419b913a3630032cbe0de48a0099b5a9f0ed9
-        env:
-          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
-          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
-          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
-        with:
-          unityVersion: 6000.3.19f1
-          projectPath: tasks/lottery-shop/unity
-          testMode: playmode
-          artifactsPath: tasks/lottery-shop/artifacts/visual-regression-play
-          customParameters: >-
-            -assemblyNames Lottery.G2.PlayMode.Tests;Lottery.G3.PlayMode.Tests -force-glcore -screen-width 1280 -screen-height 720
-            -job-worker-count 2 -probeCommit ${{ github.sha }} -probeRunId ${{ github.run_id }}
-          dockerCpuLimit: 2
-          dockerMemoryLimit: 12g
+        if: ${{ always() && steps.guard.outcome == 'success' && steps.safestart.outcome == 'success' && steps.capture.outcome != 'skipped' }}
+        timeout-minutes: 10
+        run: PYTHONDONTWRITEBYTECODE=1 python3 tasks/lottery-shop/scripts/safe_project_ci.py regression-play
       - name: Verify existing exact PlayMode identities and preserve bounded original XML
         if: ${{ always() && steps.guard.outcome == 'success' && steps.regressionplay.outcome != 'skipped' }}
         run: python3 tasks/lottery-shop/scripts/visual_candidate_ci.py tests --stage regression-play
@@ -182,6 +168,10 @@ jobs:
             tasks/lottery-shop/evidence/visual-candidate/original-g3-captures/challenge-protected.png
           if-no-files-found: error
           retention-days: 7
+      - name: Return only this temporary session and verify its container is gone
+        if: ${{ always() && steps.guard.outcome == 'success' && steps.safestart.outcome != 'skipped' }}
+        timeout-minutes: 5
+        run: PYTHONDONTWRITEBYTECODE=1 python3 tasks/lottery-shop/scripts/safe_project_ci.py finish
       - name: Capture source mutation metadata without exporting project settings or logs
         if: ${{ always() && steps.guard.outcome == 'success' && steps.capture.outcome != 'skipped' }}
         run: python3 tasks/lottery-shop/scripts/visual_candidate_ci.py snapshot-after
@@ -194,6 +184,12 @@ jobs:
             tasks/lottery-shop/evidence/visual-candidate/source-receipt.json
             tasks/lottery-shop/evidence/visual-candidate/source-after.json
             tasks/lottery-shop/evidence/visual-candidate/source-changes.json
+            tasks/lottery-shop/evidence/visual-candidate/safe-start.json
+            tasks/lottery-shop/evidence/visual-candidate/safe-capture.json
+            tasks/lottery-shop/evidence/visual-candidate/safe-regression-edit.json
+            tasks/lottery-shop/evidence/visual-candidate/safe-regression-play.json
+            tasks/lottery-shop/evidence/visual-candidate/safe-finish.json
+            tasks/lottery-shop/evidence/visual-candidate/safe-session.json
             tasks/lottery-shop/evidence/visual-candidate/regression-edit/raw-test-results.xml
             tasks/lottery-shop/evidence/visual-candidate/regression-edit/raw-test-report-receipt.json
             tasks/lottery-shop/evidence/visual-candidate/regression-edit/test-receipt.json

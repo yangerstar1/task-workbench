@@ -117,8 +117,8 @@ class ProgressReceiptTests(unittest.TestCase):
         for text in ("State.TicketsPurchasedToday, Is.EqualTo(12)", "State.SettledTicketCount, Is.EqualTo(12)", "State.Phase, Is.EqualTo(DayPhase.CLOSING_PREP)", "frame < 600", "i < 1200", "Is.LessThan(UnloadSeconds)"):
             self.assertIn(text, source)
         workflow = (root / candidate.WORKFLOW).read_text()
-        self.assertIn("id: capture\n        timeout-minutes: 30", workflow)
-        self.assertIn("timeout-minutes: 60", workflow)
+        self.assertIn("timeout-minutes: 32", workflow)
+        self.assertIn("timeout-minutes: 75", workflow)
 
 
 class PreparationSceneReceiptTests(unittest.TestCase):
