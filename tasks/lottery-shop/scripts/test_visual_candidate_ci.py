@@ -45,7 +45,7 @@ def receipt():
             dayPhase="NIGHT_BILL" if night else "CLOSING_PREP",fixturePoseRestored=True,fixtureStateBefore=f["stateSha256"],fixtureStateAfter=f["stateSha256"],sha256=("b" if night else "a")*64,
             exterior=dict(basis="MATERIAL_METADATA_NOT_PIXEL_ACCEPTANCE",backdropShader="Lottery/G3/ExteriorBackdrop",textureName="Street-night" if night else "Street-day",
                 textureWidth=1882 if night else 1881,textureHeight=836,exposure=.72 if night else 1,backdropRendererCount=1,backdropFrustumRendererCount=1,glassFrustumRendererCount=1,
-                transparentGlassMaterialCount=1,glassAlpha=.5,glassSurface=1,glassZWrite=0,glassRenderQueue=3000,nearFieldTriangles=60,nearFieldColliderCount=0,feltNormalScale=.6,linerSmoothness=.08,brassSmoothness=.66))
+                transparentGlassMaterialCount=1,glassAlpha=.5,glassSurface=1,glassZWrite=0,glassRenderQueue=3000,nearFieldTriangles=60,nearFieldColliderCount=0,feltNormalScale=.6,linerSmoothness=.08,brassSmoothness=1))
     return dict(schemaVersion=4, candidatePresentation="V19_EXTERIOR_FIXTURE_VIEWS_NOT_VISUAL_PASS", scope=candidate.SCOPE, sourceCommit="1" * 40, runId="12345", runAttempt="1", unityVersion="6000.3.19f1",
                 graphicsDeviceType="OpenGLCore", inputEvidence="SIMULATED_INPUT_SYSTEM",
                 captureMethod="URP_STANDARD_REQUEST_READPIXELS", hudVisibilityBasis="ENABLED_CAMERA_LAYER_AND_FRUSTUM_TEST_NOT_PIXEL_OCCLUSION", complete=True, frames=frames, actions=[])
@@ -307,7 +307,7 @@ class VisualCandidateEvidenceTests(unittest.TestCase):
                 with self.subTest(name=name,key=key),self.assertRaises(ValueError):self.validate(value)
 
     def test_exterior_opaque_glass_wrong_texture_and_materials_rejected(self):
-        for key,bad in (("textureName","Street-day"),("glassAlpha",1),("glassSurface",0),("glassZWrite",1),("glassRenderQueue",2000),("exposure",1),("nearFieldTriangles",0),("nearFieldColliderCount",1),("backdropRendererCount",2),("glassFrustumRendererCount",0),("feltNormalScale",.28),("linerSmoothness",.5),("brassSmoothness",.73),("basis","PIXEL_PASS")):
+        for key,bad in (("textureName","Street-day"),("glassAlpha",1),("glassSurface",0),("glassZWrite",1),("glassRenderQueue",2000),("exposure",1),("nearFieldTriangles",0),("nearFieldColliderCount",1),("backdropRendererCount",2),("glassFrustumRendererCount",0),("feltNormalScale",.28),("linerSmoothness",.5),("brassSmoothness",.73),("brassSmoothness",.66),("basis","PIXEL_PASS")):
             value=receipt();next(f for f in value["frames"] if f["stage"]==candidate.EXTERIOR_NIGHT_FRAMES[0])["exterior"][key]=bad
             with self.subTest(key=key),self.assertRaises(ValueError):self.validate(value)
 

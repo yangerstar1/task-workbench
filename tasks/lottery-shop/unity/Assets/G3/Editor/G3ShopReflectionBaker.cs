@@ -94,7 +94,7 @@ namespace Lottery.G3.Editor
                 ()=>Observed(trace,()=>{
                     trace?.Mark(321);File.WriteAllText(ReceiptPath,json,new UTF8Encoding(false));AssetDatabase.ImportAsset(ReceiptPath,ImportAssetOptions.ForceUpdate);
                     trace?.Mark(322);AssetDatabase.SaveAssets();trace?.Mark(323);
-                    if(trace!=null){trace.digestCompared=false;trace.digestSame=false;trace.changedInputCount=-1;trace.changedInputKinds=0;}
+                    if(trace!=null){trace.digestCompared=false;trace.digestSame=false;trace.changedInputCount=-1;trace.changedInputKinds=0;trace.matBits=trace.metaBits=trace.packBits=trace.packMetaBits=0;trace.changedOther=0;}
                     trace?.Mark(324);bool finalSame=ComputeDigest(out var finalInputs)==digest;
                     if(trace!=null){trace.digestCompared=true;trace.digestSame=finalSame;trace.ObserveInputChanges(beforeInputs,finalInputs);}trace?.Mark(325);
                     if(!finalSame)throw new BakeFailure(FailureCode.SOURCE_DIGEST_CHANGED);
@@ -239,6 +239,21 @@ namespace Lottery.G3.Editor
         {try{operation();}catch(Exception error){trace?.Failure(error);throw;}}
         // Fixed observations only. No exception message, stack, file path, hardware
         // string, editor log or asset content enters this sidecar.
+        // Stable diagnostic IDs only; never serialize file paths or asset text.
+        static readonly string[] DiagnosticMaterials={"Aged_Aluminium","Bone_Laminate","Brass_Worn","Ceramic_Glazed","Charcoal_Metal","CounterToolTag_1","CounterToolTag_2","CounterToolTag_3","Cream_Plaster","Dark_Green_Felt","Decoration_Print_Atlas","Display_Silver_Coating","Glass_Blue_Water","Glass_Clear","Grout","Heritage_Green_Paint","Ink","Leaves_Green","Newspaper","Oxblood_Enamel","Paper_Ivory","Plastic_Cream","Rubber","Service_Monitor","ShopSign","StreetBlur","Ticket_Swap_1","Ticket_Swap_2","Ticket_Type_Label","Warm_Light","Warm_Oak","Warm_Terrazzo","Tool_Dock_Liner"};
+        static int DiagnosticMaterial(string path,out int role)
+        {
+            role=0;string prefix=G3ShopArtImporter.Root+"/Materials/";
+            for(int i=0;i<DiagnosticMaterials.Length;i++)
+            {
+                string stem=prefix+DiagnosticMaterials[i];
+                if(path==stem+".mat"){role=1;return i;}
+                if(path==stem+".mat.meta"){role=2;return i;}
+                if(path==stem+"_MetallicSmoothness.asset"){role=3;return i;}
+                if(path==stem+"_MetallicSmoothness.asset.meta"){role=4;return i;}
+            }
+            return -1;
+        }
         sealed class BakeTrace
         {
             readonly System.Diagnostics.Stopwatch clock=System.Diagnostics.Stopwatch.StartNew();
@@ -249,10 +264,12 @@ namespace Lottery.G3.Editor
             public int bakeIndex=-1,captureRenderers=-1,foreignRenderers=-1,foreignLights=-1,foreignProbes=-1,width=-1,height=-1,mipCount=-1,formatCode=-1,
                 sourceWidth=-1,sourceHeight=-1,pixelSampleCount,changedInputCount=-1,changedInputKinds;
             public long captureTriangles=-1,fileBytes=-1,metaBytes=-1;public float maxChannelRange=-1;
+            public long matBits,metaBits,packBits,packMetaBits,dirtyMatBits=-1,dirtyPackBits=-1;
+            public int changedOther,dirtyStage=-1;
             int stageCode;
             BakeTrace(string commit,string run,string attempt)
             {
-                receipt=new TraceReceipt{sourceCommit=commit,runId=run,runAttempt=attempt};
+                receipt=new TraceReceipt{startedUtc=DateTime.UtcNow.ToString("O",System.Globalization.CultureInfo.InvariantCulture),sourceCommit=commit,runId=run,runAttempt=attempt};
                 path=Path.GetFullPath(Path.Combine(Application.dataPath,"../../artifacts/visual-candidate/reflection-progress.json"));
             }
             public static BakeTrace CreateForCapture()
@@ -282,15 +299,29 @@ namespace Lottery.G3.Editor
             }
             public void ObserveInputChanges(System.Collections.Generic.Dictionary<string,string> before,System.Collections.Generic.Dictionary<string,string> after)
             {
-                changedInputCount=0;changedInputKinds=0;
+                changedInputCount=0;changedInputKinds=0;matBits=metaBits=packBits=packMetaBits=0;changedOther=0;
                 foreach(string key in before.Keys.Union(after.Keys))
                 {
                     if(before.TryGetValue(key,out string a)&&after.TryGetValue(key,out string b)&&a==b)continue;
                     changedInputCount++;
+                    int role;int id=DiagnosticMaterial(key.StartsWith("FILE|",StringComparison.Ordinal)?key.Substring(5):"",out role);
+                    if(id<0)changedOther++;
+                    else {long bit=1L<<id;if(role==1)matBits|=bit;else if(role==2)metaBits|=bit;else if(role==3)packBits|=bit;else packMetaBits|=bit;}
+
                     changedInputKinds|=key.StartsWith("DEPENDENCY|",StringComparison.Ordinal)?64:key.Contains("/Generated/")?1:key.Contains("/Materials/")?2:key.Contains("/Textures/")?4:key.Contains("/Exterior/")?8:key.StartsWith("FILE|"+G3ShopArtImporter.Root+"/",StringComparison.Ordinal)?16:32;
                 }
             }
-            public void Mark(int stage){stageCode=stage;Append(FailureCode.NONE,"NONE");}
+            void ObserveLoadedDirty(int stage)
+            {
+                // Observe only already-loaded objects: do not load, save, refresh or repair assets.
+                try {
+                    long materials=0,packed=0;
+                    foreach(var asset in Resources.FindObjectsOfTypeAll<Material>().Cast<UnityEngine.Object>().Concat(Resources.FindObjectsOfTypeAll<Texture2D>()))
+                    {int role;int id=DiagnosticMaterial(AssetDatabase.GetAssetPath(asset),out role);if(id>=0&&EditorUtility.IsDirty(asset)){if(role==1)materials|=1L<<id;else if(role==3)packed|=1L<<id;}}
+                    dirtyMatBits=materials;dirtyPackBits=packed;dirtyStage=stage;
+                } catch {dirtyMatBits=dirtyPackBits=-1;dirtyStage=-1;writeFailed=true;}
+            }
+            public void Mark(int stage){stageCode=stage;if(stage==21||stage==71||stage==112||stage==212||stage==306||stage==310||stage==311||stage==320||stage==321||stage==322||stage==323||stage==324||stage==325)ObserveLoadedDirty(stage);Append(FailureCode.NONE,"NONE");}
             bool AlreadyRecorded(Exception error)
             {return recorded.Contains(error)||(error is AggregateException aggregate&&aggregate.InnerExceptions.Count>0&&aggregate.InnerExceptions.All(AlreadyRecorded));}
             public void Failure(Exception error)
@@ -317,6 +348,7 @@ namespace Lottery.G3.Editor
                     textureObserved=textureObserved,textureExists=textureExists,width=width,height=height,mipCount=mipCount,formatCode=formatCode,sourceWidth=sourceWidth,sourceHeight=sourceHeight,
                     bakeAttempted=bakeAttempted,bakeReturned=bakeReturned,rangeObserved=rangeObserved,rangeFinite=rangeFinite,pixelSampleCount=pixelSampleCount,maxChannelRange=maxChannelRange,
                     digestCompared=digestCompared,digestSame=digestSame,changedInputCount=changedInputCount,changedInputKinds=changedInputKinds,
+                    matBits=matBits,metaBits=metaBits,packBits=packBits,packMetaBits=packMetaBits,changedOther=changedOther,dirtyMatBits=dirtyMatBits,dirtyPackBits=dirtyPackBits,dirtyStage=dirtyStage,
                     guidObserved=guidObserved,guidPresent=guidPresent,guidMatches=guidMatches,metaObserved=metaObserved,metaExists=metaExists,metaBytes=metaBytes});
                 Write();
             }
@@ -344,6 +376,7 @@ namespace Lottery.G3.Editor
         [Serializable] sealed class TraceReceipt
         {
             public int schemaVersion=1,firstFailureStage=-1,failureCount;
+            public string startedUtc;
             public string scope="REFLECTION_PREPARATION_DIAGNOSTIC_NOT_VISUAL_PASS",sourceCommit,runId,runAttempt,status="RUNNING",firstFailureCode="NONE",firstExceptionKind="NONE";
             public bool cacheHit,diagnosticWriteFailed;public long elapsedMs;
             public System.Collections.Generic.List<TraceEvent> events=new System.Collections.Generic.List<TraceEvent>();
@@ -351,7 +384,8 @@ namespace Lottery.G3.Editor
         [Serializable] sealed class TraceEvent
         {
             public int stageCode,bakeIndex,captureRenderers,foreignRenderers,foreignLights,foreignProbes,width,height,mipCount,formatCode,sourceWidth,sourceHeight,pixelSampleCount,changedInputCount,changedInputKinds;
-            public long elapsedMs,captureTriangles,fileBytes,metaBytes;
+            public long elapsedMs,captureTriangles,fileBytes,metaBytes,matBits,metaBits,packBits,packMetaBits,dirtyMatBits,dirtyPackBits;
+            public int changedOther,dirtyStage;
             public string errorCode,exceptionKind;
             public bool sceneObserved,sceneValid,sceneLoaded,activeMatches,fileObserved,fileExists,textureObserved,textureExists,bakeAttempted,bakeReturned,rangeObserved,rangeFinite,digestCompared,digestSame,
                 guidObserved,guidPresent,guidMatches,metaObserved,metaExists;

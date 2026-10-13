@@ -35,8 +35,16 @@ namespace Lottery.G3.Rendering
             var edge=new GameObject("Fine paper stock edge");edge.transform.SetParent(body.transform,false);
             edge.AddComponent<MeshFilter>().sharedMesh=BuildPaperStockMesh();edge.AddComponent<MeshRenderer>();
             var edgeMat=Own(new Material(Shader.Find("Universal Render Pipeline/Lit")));edgeMat.color=new Color(.78f,.74f,.62f);edgeMat.SetFloat("_Smoothness",.1f);edge.GetComponent<Renderer>().sharedMaterial=edgeMat;
-            // Natural edge contact comes from the lit stock mesh. No enlarged black
-            // backing box: a 0.4 m sheet must read as paper rather than a rigid board.
+            // A sub-millimetre stock edge cannot resolve its own map shadow at
+            // this mobile view. A soft local rim follows the same atomic body.
+            var contactShader=Resources.Load<Shader>("G3/Shop/ContactShade");
+            if(contactShader==null)throw new InvalidOperationException("Missing paper contact presentation shader");
+            var contactMat=Own(new Material(contactShader));contactMat.SetColor("_Color",new Color(.025f,.04f,.03f,.32f));
+            contactMat.SetVector("_Inner",new Vector4((float)Layout.Width/(Layout.Width+24),(float)Layout.Height/(Layout.Height+24),0,0));
+            var contactRect=new PixelRect(-12,-12,Layout.Width+24,Layout.Height+24);
+            var contact=Quad("Soft paper contact rim",contactRect,PaperY-.00016f,contactMat);
+            contact.GetComponent<Renderer>().shadowCastingMode=UnityEngine.Rendering.ShadowCastingMode.Off;
+            contact.GetComponent<Renderer>().receiveShadows=false;
 
             masks=new Texture2D[Layout.Cells.Count];cellText=new BoundedGlyphLabel[Layout.Cells.Count];cellNumbers=new BoundedGlyphLabel[Layout.Id=="challenge"?8:0];
             var publicFont=Own(new Material(ordinaryFont));

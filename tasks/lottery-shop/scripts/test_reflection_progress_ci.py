@@ -20,12 +20,13 @@ def event(stage,elapsed=0,**extra):
     value={key:False for key in progress.BOOL_FIELDS}
     value.update({key:-1 for key in progress.INT_FIELDS|progress.LONG_FIELDS})
     value.update(stageCode=stage,elapsedMs=elapsed,pixelSampleCount=0,changedInputKinds=0,errorCode='NONE',exceptionKind='NONE',maxChannelRange=-1)
+    value.update({k:0 for k in progress.CHANGE_BITS});value.update(changedOther=extra.get("changedInputCount",0) if extra.get("changedInputCount",0)>0 else 0)
     value.update(extra);return value
 
 
 def receipt(status='COMPLETE',cold=False):
     stages=sorted(progress.STAGES-{499}) if cold else [10,20,21,30,320,321,322,323,324,325,400]
-    value=dict(schemaVersion=1,scope=progress.SCOPE,sourceCommit=IDENT['sourceCommit'],runId='123',runAttempt='1',status=status,cacheHit=not cold,diagnosticWriteFailed=False,firstFailureStage=-1,firstFailureCode='NONE',firstExceptionKind='NONE',failureCount=0,elapsedMs=100,events=[event(stage,n) for n,stage in enumerate(stages)])
+    value=dict(startedUtc="2026-10-13T17:30:00.1234567Z",schemaVersion=1,scope=progress.SCOPE,sourceCommit=IDENT['sourceCommit'],runId='123',runAttempt='1',status=status,cacheHit=not cold,diagnosticWriteFailed=False,firstFailureStage=-1,firstFailureCode='NONE',firstExceptionKind='NONE',failureCount=0,elapsedMs=100,events=[event(stage,n) for n,stage in enumerate(stages)])
     if cold:
         by_stage={e['stageCode']:e for e in value['events']};by_stage[81].update(captureRenderers=39,captureTriangles=70000)
         for stage,index in ((112,0),(212,1)):
@@ -181,6 +182,62 @@ class ReflectionProgressTests(unittest.TestCase):
     def test_extended_cold_path_stays_within_existing_event_and_byte_limits(self):
         value=receipt(cold=True);self.validate(value);self.assertEqual(len(value['events']),57)
         self.assertLessEqual(len(json.dumps(value).encode()),65536);self.assertLessEqual(len(value['events']),64)
+
+    def test_material_ids_exact_frozen_source_table(self):
+        root=Path(__file__).resolve().parents[3];shop=root/progress.visual.TASK/'unity/Assets/G3/Shop/Resources/G3/Shop'
+        names=tuple(x['name'] for x in json.loads((shop/'materials.json').read_text())['materials'])
+        self.assertTrue(set(progress.MATERIAL_IDS)<=set(names));self.assertEqual(len(progress.MATERIAL_IDS),33);self.assertEqual(len(set(progress.MATERIAL_IDS)),33)
+        source=(root/progress.visual.TASK/'unity/Assets/G3/Editor/G3ShopReflectionBaker.cs').read_text()
+        table=source.split('DiagnosticMaterials={',1)[1].split('};',1)[0]
+        self.assertEqual(tuple(re.findall(r'"([A-Za-z0-9_]+)"',table)),progress.MATERIAL_IDS)
+    def test_all_fixed_material_roles_and_high_bit_export(self):
+        for key in progress.CHANGE_BITS:
+            for idx in (0,32):
+                value=receipt('FAILED');value['events']=[event(10),event(325,70,digestCompared=True,digestSame=False,changedInputCount=1,changedInputKinds=2,changedOther=0,**{key:1<<idx},errorCode='SOURCE_DIGEST_CHANGED',exceptionKind='REQUIRE')]
+                value.update(firstFailureStage=325,firstFailureCode='SOURCE_DIGEST_CHANGED',firstExceptionKind='REQUIRE',failureCount=1)
+                self.validate(value);dest,raw,ok=self.export(value);self.assertFalse(ok);self.assertEqual(dest.read_bytes(),raw)
+    def test_input_id_bounds_and_count_rejected(self):
+        for patch_event in [dict(matBits=-1),dict(matBits=True),dict(matBits=1<<33),dict(packBits=1),dict(changedOther=1),dict(changedOther='RAW_PRIVATE_PATH')]:
+            value=receipt();value['events'][0].update(patch_event)
+            with self.assertRaises(ValueError):self.validate(value)
+    def test_material_bit_requires_material_category(self):
+        value=receipt('FAILED');value['events']=[event(10),event(325,70,digestCompared=True,changedInputCount=1,changedInputKinds=1,matBits=1,changedOther=0)]
+        with self.assertRaises(ValueError):self.validate(value)
+    def test_dirty_unknown_bounds_stage_and_bool_rejected(self):
+        for patch_event in [dict(dirtyMatBits=0),dict(dirtyStage=325,dirtyMatBits=0,dirtyPackBits=0),dict(dirtyStage=30,dirtyMatBits=0,dirtyPackBits=0),dict(dirtyStage=21,dirtyMatBits=1<<33,dirtyPackBits=0),dict(dirtyStage=21,dirtyMatBits=True,dirtyPackBits=0)]:
+            value=receipt();value['events'][1].update(patch_event)
+            with self.assertRaises(ValueError):self.validate(value)
+    def test_dirty_observation_is_not_success_or_changed_bytes(self):
+        value=receipt();e=next(x for x in value['events'] if x['stageCode']==325);e.update(dirtyStage=325,dirtyMatBits=1<<32,dirtyPackBits=1)
+        self.validate(value) # Dirty flags alone are observations, not a changed-file verdict.
+        e.update(digestSame=False,changedInputCount=1,changedOther=1,changedInputKinds=32)
+        with self.assertRaises(ValueError):self.validate(value)
+    def test_dirty_source_is_loaded_only_and_does_not_save_or_load(self):
+        root=Path(__file__).resolve().parents[3];source=(root/progress.visual.TASK/'unity/Assets/G3/Editor/G3ShopReflectionBaker.cs').read_text()
+        body=source.split('void ObserveLoadedDirty',1)[1].split('public void Mark',1)[0]
+        self.assertIn('Resources.FindObjectsOfTypeAll<Material>()',body);self.assertIn('EditorUtility.IsDirty(asset)',body)
+        for forbidden in ('LoadAsset','SaveAssets','SetDirty','Refresh(','Debug.Log','error.Message','GetPixels'):self.assertNotIn(forbidden,body)
+        self.assertIn('writeFailed=true',body)
+    def test_expanded_normal_cold_receipt_with_dirty_highbits_within_cap(self):
+        value=receipt(cold=True)
+        for e in value['events']:
+            if e['stageCode']>=21:e.update(dirtyStage=21,dirtyMatBits=progress.BIT_LIMIT,dirtyPackBits=progress.BIT_LIMIT)
+        self.validate(value);self.assertEqual(len(value['events']),57)
+        self.assertLess(len(json.dumps(value,separators=(',',':')).encode()),progress.LIMIT)
+
+    def test_started_utc_strict_format_calendar_and_range(self):
+        for utc in [None,1,'RAW_TEXT','2026-10-13T17:30:00Z','2026-10-13T17:30:00.1234567+00:00','2026-02-30T17:30:00.1234567Z','2019-12-31T17:30:00.1234567Z','2100-01-01T00:00:00.1234567Z','2026-10-13T25:30:00.1234567Z','2026-10-13T17:30:00.1234567Z\n']:
+            value=receipt();value['startedUtc']=utc
+            with self.subTest(utc=utc),self.assertRaises(ValueError):self.validate(value)
+    def test_started_utc_end_range_and_valid_leap_date(self):
+        value=receipt();value['startedUtc']='2099-12-31T23:59:59.9999999Z';value['elapsedMs']=3600000
+        with self.assertRaises(ValueError):self.validate(value)
+        value=receipt();value['startedUtc']='2028-02-29T00:00:00.0000000Z';self.validate(value)
+    def test_source_utc_is_fixed_invariant_root_only(self):
+        root=Path(__file__).resolve().parents[3];source=(root/progress.visual.TASK/'unity/Assets/G3/Editor/G3ShopReflectionBaker.cs').read_text()
+        self.assertEqual(source.count('DateTime.UtcNow.ToString("O",System.Globalization.CultureInfo.InvariantCulture)'),1)
+        event=source.split('[Serializable] sealed class TraceEvent',1)[1]
+        self.assertNotIn('startedUtc',event)
 
 
 if __name__=='__main__':unittest.main()

@@ -2,6 +2,8 @@
 """Fixed reflection preparation observations; no native logs or error text."""
 import os
 import math
+import re
+from datetime import datetime, timezone, timedelta
 from pathlib import Path
 import visual_candidate_ci as visual
 import reflection_bake_ci as baked
@@ -20,12 +22,21 @@ def integer(value, low, high):
 STAGES = frozenset({324,325,10, 400, 20, 21, 30, 40, 300, 301, 302, 303, 304, 305, 50, 51, 306, 310, 311, 60, 61, 190, 320, 321, 322, 323, 70, 71, 200, 201, 202, 203, 204, 205, 206, 207, 80, 81, 208, 209, 210, 211, 212, 90, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 499})
 ERRORS = frozenset({'UNCLASSIFIED_NATIVE_EXCEPTION', 'SOURCE_INPUT_MISSING', 'BAKE_RETURNED_FALSE', 'EXR_DIMENSIONS', 'FIXED_FILE_MISSING_OR_SIZE', 'IN_PLAY_MODE', 'NONE', 'FINAL_TEXTURE_CONTRACT', 'HDR_NONFINITE', 'IMPORTER_EXTERNAL_REMAP', 'IMPORTER_MISSING', 'SOURCE_DEPENDENCY_MISSING', 'STATIC_FLAG_MISSING', 'RECEIPT_SIZE', 'HDR_FLAT_OR_RANGE', 'CACHE_ARTIFACT_MISMATCH', 'CLEANUP_PIPELINE_OR_SCENE', 'STATIC_MESH_MISSING', 'CLEANUP_LIGHTING', 'PROBE_CONFIG', 'GEOMETRY_BOUNDS', 'ISOLATION_CONFLICT', 'DIAGNOSTIC_WRITE_FAILURE', 'GUID_OWNERSHIP', 'CUBEMAP_LAYOUT', 'BUILD_IDENTITY_INVALID', 'STATIC_LAYER_MISMATCH', 'SOURCE_DIGEST_CHANGED', 'GUID_MISMATCH'})
 KINDS = frozenset({'UNITY', 'ACCESS', 'NONE', 'NULL_REFERENCE', 'ARGUMENT', 'AGGREGATE', 'REQUIRE', 'IO', 'OTHER', 'NOT_SUPPORTED', 'INVALID_OPERATION'})
-ROOT_FIELDS = frozenset({'elapsedMs', 'diagnosticWriteFailed', 'schemaVersion', 'events', 'scope', 'cacheHit', 'runId', 'runAttempt', 'sourceCommit', 'firstFailureCode', 'firstExceptionKind', 'failureCount', 'status', 'firstFailureStage'})
+ROOT_FIELDS = frozenset({'startedUtc','elapsedMs', 'diagnosticWriteFailed', 'schemaVersion', 'events', 'scope', 'cacheHit', 'runId', 'runAttempt', 'sourceCommit', 'firstFailureCode', 'firstExceptionKind', 'failureCount', 'status', 'firstFailureStage'})
 EVENT_FIELDS = frozenset({'stageCode', 'bakeAttempted', 'captureRenderers', 'textureExists', 'maxChannelRange', 'foreignProbes', 'sourceHeight', 'sceneObserved', 'sceneValid', 'errorCode', 'changedInputCount', 'elapsedMs', 'metaBytes', 'guidMatches', 'bakeReturned', 'rangeFinite', 'digestCompared', 'fileExists', 'width', 'activeMatches', 'foreignLights', 'guidObserved', 'guidPresent', 'sceneLoaded', 'fileObserved', 'exceptionKind', 'rangeObserved', 'textureObserved', 'mipCount', 'formatCode', 'foreignRenderers', 'sourceWidth', 'digestSame', 'pixelSampleCount', 'metaObserved', 'height', 'fileBytes', 'changedInputKinds', 'captureTriangles', 'metaExists', 'bakeIndex'})
 BOOL_FIELDS = frozenset({'bakeAttempted', 'textureExists', 'sceneObserved', 'sceneValid', 'guidMatches', 'bakeReturned', 'rangeFinite', 'digestCompared', 'fileExists', 'activeMatches', 'guidObserved', 'guidPresent', 'sceneLoaded', 'fileObserved', 'rangeObserved', 'textureObserved', 'digestSame', 'metaObserved', 'metaExists'})
 INT_FIELDS = frozenset({'stageCode', 'pixelSampleCount', 'height', 'captureRenderers', 'changedInputCount', 'changedInputKinds', 'mipCount', 'formatCode', 'foreignRenderers', 'foreignProbes', 'sourceWidth', 'width', 'sourceHeight', 'foreignLights', 'bakeIndex'})
 LONG_FIELDS = frozenset({'fileBytes', 'metaBytes', 'captureTriangles'})
 
+
+MATERIAL_IDS = ('Aged_Aluminium', 'Bone_Laminate', 'Brass_Worn', 'Ceramic_Glazed', 'Charcoal_Metal', 'CounterToolTag_1', 'CounterToolTag_2', 'CounterToolTag_3', 'Cream_Plaster', 'Dark_Green_Felt', 'Decoration_Print_Atlas', 'Display_Silver_Coating', 'Glass_Blue_Water', 'Glass_Clear', 'Grout', 'Heritage_Green_Paint', 'Ink', 'Leaves_Green', 'Newspaper', 'Oxblood_Enamel', 'Paper_Ivory', 'Plastic_Cream', 'Rubber', 'Service_Monitor', 'ShopSign', 'StreetBlur', 'Ticket_Swap_1', 'Ticket_Swap_2', 'Ticket_Type_Label', 'Warm_Light', 'Warm_Oak', 'Warm_Terrazzo', 'Tool_Dock_Liner')
+CHANGE_BITS = frozenset(('matBits','metaBits','packBits','packMetaBits'))
+DIRTY_BITS = frozenset(('dirtyMatBits','dirtyPackBits'))
+DIRTY_STAGES = frozenset((21,71,112,212,306,310,311,320,321,322,323,324,325))
+EVENT_FIELDS |= CHANGE_BITS | DIRTY_BITS | {'changedOther','dirtyStage'}
+LONG_FIELDS |= CHANGE_BITS | DIRTY_BITS
+INT_FIELDS |= {'changedOther','dirtyStage'}
+BIT_LIMIT = (1 << len(MATERIAL_IDS)) - 1
 
 def validate_progress(receipt, ident):
     require(isinstance(receipt,dict) and set(receipt)==ROOT_FIELDS, 'REFLECTION_PROGRESS_FIELDS_REJECTED')
@@ -34,6 +45,11 @@ def validate_progress(receipt, ident):
         require(receipt[key]==ident[key], 'REFLECTION_PROGRESS_IDENTITY_REJECTED')
     require(receipt['status'] in ('RUNNING','COMPLETE','FAILED') and type(receipt['cacheHit']) is bool and type(receipt['diagnosticWriteFailed']) is bool and integer(receipt['elapsedMs'],0,3600000), 'REFLECTION_PROGRESS_STATUS_REJECTED')
     require(integer(receipt['failureCount'],0,MAX_EVENTS) and type(receipt['firstFailureStage']) is int and receipt['firstFailureStage'] in STAGES|{-1} and receipt['firstFailureCode'] in ERRORS and receipt['firstExceptionKind'] in KINDS, 'REFLECTION_PROGRESS_FIRST_FAILURE_REJECTED')
+    utc=receipt['startedUtc']
+    require(isinstance(utc,str) and re.fullmatch(r'20[2-9][0-9]-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\.[0-9]{7}Z',utc) is not None, 'REFLECTION_PROGRESS_UTC_REJECTED')
+    try: started=datetime.strptime(utc[:26]+'Z','%Y-%m-%dT%H:%M:%S.%fZ').replace(tzinfo=timezone.utc)
+    except ValueError: raise ValueError('REFLECTION_PROGRESS_UTC_REJECTED') from None
+    require(started+timedelta(milliseconds=receipt['elapsedMs'])<datetime(2100,1,1,tzinfo=timezone.utc), 'REFLECTION_PROGRESS_UTC_RANGE_REJECTED')
     events=receipt['events'];require(isinstance(events,list) and 1<=len(events)<=MAX_EVENTS, 'REFLECTION_PROGRESS_EVENT_COUNT_REJECTED')
     last_ms=0;last_stage=0; failures=[]
     for event in events:
@@ -41,6 +57,12 @@ def validate_progress(receipt, ident):
         require(all(type(event[key]) is bool for key in BOOL_FIELDS), 'REFLECTION_PROGRESS_BOOL_REJECTED')
         require(all(integer(event[key],-1,2147483647) for key in INT_FIELDS) and all(integer(event[key],-1,9007199254740991) for key in LONG_FIELDS), 'REFLECTION_PROGRESS_NUMBER_REJECTED')
         require(event['stageCode'] in STAGES and event['stageCode']>=last_stage and event['bakeIndex'] in (-1,0,1) and 0<=event['changedInputKinds']<=127 and integer(event['elapsedMs'],last_ms,receipt['elapsedMs']), 'REFLECTION_PROGRESS_STAGE_CLOCK_REJECTED');last_ms=event['elapsedMs'];last_stage=event['stageCode']
+        require(all(integer(event[k],0,BIT_LIMIT) for k in CHANGE_BITS) and integer(event['changedOther'],0,2147483647), 'REFLECTION_PROGRESS_INPUT_IDS_REJECTED')
+        measured=sum(event[k].bit_count() for k in CHANGE_BITS)+event['changedOther']
+        require(measured==(event['changedInputCount'] if event['digestCompared'] else 0), 'REFLECTION_PROGRESS_INPUT_ID_COUNT_REJECTED')
+        require(not any(event[k] for k in CHANGE_BITS) or event['changedInputKinds']&2, 'REFLECTION_PROGRESS_INPUT_ID_KIND_REJECTED')
+        require(event['dirtyStage']==-1 or event['dirtyStage'] in DIRTY_STAGES and event['dirtyStage']<=event['stageCode'], 'REFLECTION_PROGRESS_DIRTY_STAGE_REJECTED')
+        require(all(event[k]==-1 for k in DIRTY_BITS) if event['dirtyStage']==-1 else all(integer(event[k],0,BIT_LIMIT) for k in DIRTY_BITS), 'REFLECTION_PROGRESS_DIRTY_OBSERVATION_REJECTED')
         require(event['errorCode'] in ERRORS and event['exceptionKind'] in KINDS and (event['errorCode']=='NONE')==(event['exceptionKind']=='NONE'), 'REFLECTION_PROGRESS_ERROR_REJECTED')
         require(type(event['maxChannelRange']) in (int,float) and math.isfinite(event['maxChannelRange']) and -1<=event['maxChannelRange']<=131008, 'REFLECTION_PROGRESS_RANGE_REJECTED')
         if event['errorCode']!='NONE':failures.append(event)

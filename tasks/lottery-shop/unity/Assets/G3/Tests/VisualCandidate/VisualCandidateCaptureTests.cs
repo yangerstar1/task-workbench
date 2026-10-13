@@ -35,6 +35,8 @@ namespace Lottery.G3.VisualCandidate.Tests
         Scene prior, scene;
         G3SliceBootstrap app;
         G3PhoneDisplay phoneIdentity;
+        Material verifiedBrass;
+        Texture verifiedBrassBase,verifiedBrassNormal,verifiedBrassPacked;
         FileStateStore store;
         Mouse mouse;
         Keyboard keyboard;
@@ -272,6 +274,7 @@ namespace Lottery.G3.VisualCandidate.Tests
         [UnitySetUp]
         public IEnumerator SetUpRuntime()
         {
+            verifiedBrass=null;verifiedBrassBase=null;verifiedBrassNormal=null;verifiedBrassPacked=null;
             runtimeProgress = new ProgressTrail("runtime");
             runtimeProgress.Mark("runtime-setup-begin");
             prior = SceneManager.GetActiveScene();
@@ -567,7 +570,7 @@ namespace Lottery.G3.VisualCandidate.Tests
             Assert.That(felt.GetFloat("_BumpScale"), Is.EqualTo(.60f).Within(.0001f));
             Assert.That(liner.GetFloat("_Smoothness"), Is.EqualTo(.08f).Within(.0001f));
             Assert.That(liner.GetTexture("_BumpMap"), Is.SameAs(felt.GetTexture("_BumpMap")));
-            Assert.That(brass.GetFloat("_Smoothness"), Is.EqualTo(.66f).Within(.0001f));
+            RequireBrassPbr(brass);
             return new ExteriorReceipt { basis="MATERIAL_METADATA_NOT_PIXEL_ACCEPTANCE", backdropShader=backdrop.shader.name,
                 textureName=texture.name, textureWidth=texture.width, textureHeight=texture.height,
                 exposure=backdrop.GetFloat("_Exposure"), backdropRendererCount=backdropCount,
@@ -575,6 +578,113 @@ namespace Lottery.G3.VisualCandidate.Tests
                 glassSurface=glass.Min(m=>m.GetFloat("_Surface")), glassZWrite=glass.Max(m=>m.GetFloat("_ZWrite")),
                 glassRenderQueue=glass.Min(m=>m.renderQueue), nearFieldTriangles=triangles, nearFieldColliderCount=near.GetComponentsInChildren<Collider>().Length,
                 feltNormalScale=felt.GetFloat("_BumpScale"), linerSmoothness=liner.GetFloat("_Smoothness"), brassSmoothness=brass.GetFloat("_Smoothness") };
+        }
+
+        // v24: scalar smoothness is the packed-alpha multiplier, not roughness.
+        // One full content verification per fixture; paired views reuse one material.
+        void RequireBrassPbr(Material brass)
+        {
+            if(verifiedBrass != null)
+            {
+                Assert.That(brass, Is.SameAs(verifiedBrass), "Brass material identity changed between paired views");
+                RequireBrassProperties(brass,verifiedBrassBase,verifiedBrassNormal,verifiedBrassPacked);
+                return;
+            }
+#if UNITY_EDITOR
+            var timer=Stopwatch.StartNew();
+            const string root="Assets/G3/Shop/Resources/G3/Shop/";
+            Assert.That(brass, Is.SameAs(UnityEditor.AssetDatabase.LoadAssetAtPath<Material>(root+"Materials/Brass_Worn.mat")));
+            var baseMap=RequireBrassSource(root+"Textures/BrushedBrass_v24_BaseColor.png",291373,"8aae14d147ad7baec41880cad0cb46f0840b0173d422bcf74a7606cb393ed5da",UnityEditor.TextureImporterType.Default,true);
+            var normal=RequireBrassSource(root+"Textures/BrushedBrass_v24_Normal.png",876507,"87529521ff91022ef5b6b747ec31157c9e9d9b32da7fad91e4a7e045d62e9904",UnityEditor.TextureImporterType.NormalMap,false);
+            const string roughPath=root+"Textures/BrushedBrass_v24_Roughness.png";
+            RequireBrassSource(roughPath,164909,"37623986d2a49befaa5acb9e8468698866d27d449210a304c8e4c7dcdbd09cc2",UnityEditor.TextureImporterType.Default,false);
+            var packed=UnityEditor.AssetDatabase.LoadAssetAtPath<Texture2D>(root+"Materials/Brass_Worn_MetallicSmoothness.asset");
+            Assert.That(packed, Is.Not.Null); Assert.That(packed.width, Is.EqualTo(1024)); Assert.That(packed.height, Is.EqualTo(1024));
+            Assert.That(packed.format, Is.EqualTo(TextureFormat.RGBA32)); Assert.That(packed.isDataSRGB, Is.False);
+            Assert.That(packed.isReadable, Is.True); Assert.That(packed.mipmapCount, Is.EqualTo(11));
+            Assert.That(packed.wrapMode, Is.EqualTo(TextureWrapMode.Repeat)); Assert.That(packed.filterMode, Is.EqualTo(FilterMode.Trilinear));
+            RequireBrassProperties(brass,baseMap,normal,packed);
+            Texture2D decoded=null; Material negative=null;
+            try
+            {
+                // Decode the frozen PNG into a temporary linear texture. Never toggle
+                // source importer readability or rewrite a project asset for this test.
+                decoded=new Texture2D(2,2,TextureFormat.RGBA32,false,true);
+                Assert.That(ImageConversion.LoadImage(decoded,File.ReadAllBytes(roughPath),false), Is.True);
+                Assert.That(decoded.width, Is.EqualTo(1024)); Assert.That(decoded.height, Is.EqualTo(1024));
+                var sourcePixels=decoded.GetPixels32(); var packedPixels=packed.GetPixels32(0);
+                Assert.That(sourcePixels.Length, Is.EqualTo(1048576)); Assert.That(packedPixels.Length, Is.EqualTo(sourcePixels.Length));
+                int minimum,maximum;
+                int mismatches=BrassPackingErrors(sourcePixels,packedPixels,out minimum,out maximum);
+                Assert.That(mismatches, Is.Zero, "Packed brass must be R199/G0/B0/A(255-sourceR) for every source pixel");
+                Assert.That(minimum, Is.EqualTo(109)); Assert.That(maximum, Is.EqualTo(214));
+                // Constant-size negative probes exercise the same predicates without
+                // re-reading or re-scanning the million-pixel real texture.
+                var s=new[]{new Color32(41,41,41,255),new Color32(146,146,146,255)};
+                var good=new[]{new Color32(199,0,0,214),new Color32(199,0,0,109)};
+                Assert.That(BrassPackingErrors(s,good,out minimum,out maximum), Is.Zero);
+                var reversed=new[]{new Color32(199,0,0,41),new Color32(199,0,0,146)};
+                Assert.That(BrassPackingErrors(s,reversed,out minimum,out maximum), Is.GreaterThan(0), "Non-inverted roughness must fail");
+                var flat=new[]{new Color32(199,0,0,180),new Color32(199,0,0,180)};
+                Assert.That(BrassPackingErrors(s,flat,out minimum,out maximum), Is.GreaterThan(0), "Flat packed alpha must fail");
+                negative=new Material(brass);
+                negative.SetTexture("_BaseMap",normal);
+                Assert.That(BrassPbrBindingMatches(negative,baseMap,normal,packed), Is.False, "Wrong map binding must fail");
+                negative.SetTexture("_BaseMap",baseMap);negative.DisableKeyword("_NORMALMAP");
+                Assert.That(BrassPbrBindingMatches(negative,baseMap,normal,packed), Is.False, "Disabled normal map must fail");
+                negative.EnableKeyword("_NORMALMAP");negative.DisableKeyword("_METALLICSPECGLOSSMAP");
+                Assert.That(BrassPbrBindingMatches(negative,baseMap,normal,packed), Is.False, "Disabled packed map must fail");
+                verifiedBrassBase=baseMap;verifiedBrassNormal=normal;verifiedBrassPacked=packed;
+                verifiedBrass=brass;
+            }
+            finally
+            {
+                if(negative!=null)Object.DestroyImmediate(negative);
+                if(decoded!=null)Object.DestroyImmediate(decoded);
+                timer.Stop();
+                TestContext.WriteLine("G3_BRASS_PBR_CONTENT_CHECK elapsedMs="+timer.ElapsedMilliseconds+" realPixels=1048576");
+            }
+            CheckRuntimeBudget();
+#else
+            Assert.Fail("Brass source-content contract requires the Editor capture fixture");
+#endif
+        }
+#if UNITY_EDITOR
+        static Texture2D RequireBrassSource(string path,int bytes,string sha,UnityEditor.TextureImporterType type,bool srgb)
+        {
+            var raw=File.ReadAllBytes(path);Assert.That(raw.Length, Is.EqualTo(bytes)); Assert.That(StateCodec.HashBytes(raw), Is.EqualTo(sha));
+            var importer=UnityEditor.AssetImporter.GetAtPath(path) as UnityEditor.TextureImporter;
+            Assert.That(importer, Is.Not.Null);Assert.That(importer.textureType, Is.EqualTo(type));Assert.That(importer.sRGBTexture, Is.EqualTo(srgb));
+            var texture=UnityEditor.AssetDatabase.LoadAssetAtPath<Texture2D>(path);
+            Assert.That(texture, Is.Not.Null);Assert.That(texture.width, Is.EqualTo(1024));Assert.That(texture.height, Is.EqualTo(1024));
+            return texture;
+        }
+#endif
+        static void RequireBrassProperties(Material brass,Texture baseMap,Texture normal,Texture packed)
+        {
+            Assert.That(BrassPbrBindingMatches(brass,baseMap,normal,packed), Is.True, "Brass PBR binding/keywords differ from frozen source");
+            Assert.That(brass.GetFloat("_Smoothness"), Is.EqualTo(1f).Within(.0001f));
+            Assert.That(brass.GetFloat("_SmoothnessTextureChannel"), Is.EqualTo(0f));
+            Assert.That(brass.GetFloat("_Metallic"), Is.EqualTo(.78f).Within(.0001f));
+            Assert.That(brass.GetFloat("_BumpScale"), Is.EqualTo(.18f).Within(.0001f));
+            Assert.That(brass.GetColor("_BaseColor"), Is.EqualTo(Color.white));
+            Assert.That(brass.GetTextureScale("_BaseMap"), Is.EqualTo(Vector2.one));
+        }
+        static bool BrassPbrBindingMatches(Material m,Texture baseMap,Texture normal,Texture packed) =>
+            m!=null && baseMap!=null && normal!=null && packed!=null && m.shader.name=="Universal Render Pipeline/Lit" && m.GetTexture("_BaseMap")==baseMap &&
+            m.GetTexture("_BumpMap")==normal && m.GetTexture("_MetallicGlossMap")==packed &&
+            m.IsKeywordEnabled("_NORMALMAP") && m.IsKeywordEnabled("_METALLICSPECGLOSSMAP");
+        static int BrassPackingErrors(Color32[] source,Color32[] packed,out int minimum,out int maximum)
+        {
+            minimum=255;maximum=0;
+            if(source.Length!=packed.Length)return int.MaxValue;
+            int errors=0;
+            for(int i=0;i<source.Length;i++)
+            {
+                var s=source[i];var p=packed[i];minimum=Math.Min(minimum,p.a);maximum=Math.Max(maximum,p.a);
+                if(s.r!=s.g||s.r!=s.b||s.a!=255||p.r!=199||p.g!=0||p.b!=0||p.a!=255-s.r)errors++;
+            }
+            return errors;
         }
 
         // Six additional frames exercise one production phone flow inside the

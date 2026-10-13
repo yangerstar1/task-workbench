@@ -118,7 +118,7 @@ namespace Lottery.G3.Interaction
                 Text(c.Id+" name",parts[0],new Rect(112,y+12,250,52),42,Ink);
                 bool decision=parts.Length>1&&parts[1].Contains("红包");float previewSize=42;
                 string preview=decision?(parts[1].Contains("待领取")?"红包待领":"红包已领"):(parts.Length>1?parts[1]:"");
-                Text(c.Id+" preview",preview,new Rect(112,y+66,250,100),previewSize,Quiet);
+                Text(c.Id+" preview",ContactSummary(preview,250,previewSize),new Rect(112,y+66,250,100),previewSize,Quiet,wordWrap:false);
                 hits[c.Id]=new Hit{Rect=r,Action=c.Action,Enabled=c.Enabled};y+=180;
             }
             Surface("Contacts utility divider",new Rect(20,674,350,1),new Color(.83f,.85f,.85f),0);
@@ -217,6 +217,21 @@ namespace Lottery.G3.Interaction
             var b=Surface(id+" envelope flap right",new Rect(r.x+r.width*.47f,r.y+17,r.width*.49f,2),new Color(1,.78f,.44f),0);b.localRotation=Quaternion.Euler(0,0,24);
             Surface(id+" envelope seal",new Rect(r.center.x-5,r.y+20,10,10),new Color(1,.80f,.48f),5);
         }
+        string ContactSummary(string value,float width,float size)
+        {
+            // Preview only: keep the original conversation and touch/layout bounds.
+            // Match BoundedGlyphLabel's raster size/advances, reserving a small
+            // rounding margin. Never shrink text or split a text element.
+            value=(value??"").Replace('\r',' ').Replace('\n',' ');const string ellipsis="…";
+            font.RequestCharactersInTexture(value+ellipsis,80,FontStyle.Normal);
+            float limit=Mathf.Max(0,width-2);
+            if(Measure(value,size)<=limit)return value;
+            if(Measure(ellipsis,size)>limit)return "";
+            string prefix="";var elements=System.Globalization.StringInfo.GetTextElementEnumerator(value);
+            while(elements.MoveNext())
+            {string next=prefix+elements.GetTextElement();if(Measure(next+ellipsis,size)>limit)break;prefix=next;}
+            return prefix+ellipsis;
+        }
         float Measure(string value,float size)
         {float width=0;foreach(char c in value)width+=font.GetCharacterInfo(c,out var info,80,FontStyle.Normal)?info.advance*size/80:size;return width;}
         static Rect Clip(Rect a,Rect b)=>Rect.MinMaxRect(Mathf.Max(a.xMin,b.xMin),Mathf.Max(a.yMin,b.yMin),Mathf.Min(a.xMax,b.xMax),Mathf.Min(a.yMax,b.yMax));
@@ -274,8 +289,8 @@ namespace Lottery.G3.Interaction
         {Surface(id+" plate",r,enabled?fill:Color.Lerp(fill,Background,.65f),radius);Text(id+" label",value,new Rect(r.x+12,r.y+4,r.width-24,r.height-8),size,enabled?ink:Quiet,TextAnchor.MiddleCenter);hits[id]=new Hit{Rect=r,Action=action,Enabled=enabled};}
         Transform Surface(string name,Rect r,Color color,float radius)
         {var t=G3HudSurface.Create(name,content,glyph,color,color);t.localPosition=new Vector3(r.center.x-Width*.5f,Height*.5f-r.center.y,-.3f);t.localScale=new Vector3(r.width,r.height,1);t.GetComponent<G3HudSurface>().Configure(r.width,r.height,radius,0);foreach(var renderer in t.GetComponentsInChildren<Renderer>())renderer.sortingOrder=drawOrder++;return t;}
-        void Text(string name,string value,Rect r,float size,Color color,TextAnchor anchor=TextAnchor.MiddleLeft)
-        {var go=new GameObject(name);go.transform.SetParent(content,false);go.transform.localPosition=new Vector3(r.center.x-Width*.5f,Height*.5f-r.center.y,-.7f);var label=go.AddComponent<BoundedGlyphLabel>();label.Initialize(font,textMaterial,color,anchor);label.SetBox(r.width,r.height,size,true);label.SetText(value);go.GetComponent<Renderer>().sortingOrder=drawOrder++;labels.Add(label);}
+        void Text(string name,string value,Rect r,float size,Color color,TextAnchor anchor=TextAnchor.MiddleLeft,bool wordWrap=true)
+        {var go=new GameObject(name);go.transform.SetParent(content,false);go.transform.localPosition=new Vector3(r.center.x-Width*.5f,Height*.5f-r.center.y,-.7f);var label=go.AddComponent<BoundedGlyphLabel>();label.Initialize(font,textMaterial,color,anchor);label.SetBox(r.width,r.height,size,wordWrap);label.SetText(value);go.GetComponent<Renderer>().sortingOrder=drawOrder++;labels.Add(label);}
         Vector3 ScreenPoint(float x,float y)=>screen.TransformPoint(new Vector3(x-Width*.5f,Height*.5f-y,-.7f));
         public Rect ButtonRect(string id)
         {

@@ -67,23 +67,23 @@
     {
       "name": "Brass_Worn",
       "baseColor": [
-        0.4699999988079071,
-        0.26499998569488525,
-        0.07199999690055847,
-        1.0
+        1,
+        1,
+        1,
+        1
       ],
       "baseColorFactor": [
-        0.4699999988079071,
-        0.26499998569488525,
-        0.07199999690055847,
-        1.0
+        1,
+        1,
+        1,
+        1
       ],
-      "metallic": 0.7799999713897705,
-      "roughness": 0.34,
-      "normalStrength": 0,
-      "transmission": 0.0,
+      "metallic": 0.78,
+      "roughness": 0.3,
+      "normalStrength": 0.18,
+      "transmission": 0,
       "ior": 1.5,
-      "emission": 0.0,
+      "emission": 0,
       "emissionColor": [
         1.0,
         1.0,
@@ -94,28 +94,33 @@
       "mainTextureScale": [
         1,
         1
-      ]
+      ],
+      "baseColorTexture": "textures/BrushedBrass_v24_BaseColor.png",
+      "normalTexture": "textures/BrushedBrass_v24_Normal.png",
+      "roughnessTexture": "textures/BrushedBrass_v24_Roughness.png",
+      "roughnessColorSpace": "Linear",
+      "roughnessEncoding": "Grayscale roughness; Unity smoothness=1-R."
     },
     {
       "name": "Ceramic_Glazed",
       "baseColor": [
-        0.5,
-        0.49000000953674316,
-        0.36000001430511475,
-        1.0
+        1,
+        1,
+        1,
+        1
       ],
       "baseColorFactor": [
-        0.5,
-        0.49000000953674316,
-        0.36000001430511475,
-        1.0
+        1,
+        1,
+        1,
+        1
       ],
-      "metallic": 0.0,
-      "roughness": 0.25,
-      "normalStrength": 0,
-      "transmission": 0.0,
+      "metallic": 0,
+      "roughness": 0.3,
+      "normalStrength": 0.24,
+      "transmission": 0,
       "ior": 1.5,
-      "emission": 0.0,
+      "emission": 0,
       "emissionColor": [
         1.0,
         1.0,
@@ -126,7 +131,12 @@
       "mainTextureScale": [
         1,
         1
-      ]
+      ],
+      "baseColorTexture": "textures/IvoryGlaze_v24_BaseColor.png",
+      "normalTexture": "textures/IvoryGlaze_v24_Normal.png",
+      "roughnessTexture": "textures/IvoryGlaze_v24_Roughness.png",
+      "roughnessColorSpace": "Linear",
+      "roughnessEncoding": "Grayscale roughness; Unity smoothness=1-R."
     },
     {
       "name": "Charcoal_Metal",
@@ -1099,6 +1109,35 @@
       "roughnessColorSpace": "Linear",
       "roughnessEncoding": "Grayscale roughness; Unity smoothness=1-R.",
       "normalTexture": "textures/Felt_v15_Normal.png"
+    },
+    {
+      "name": "Nearfield_Tea",
+      "baseColor": [
+        1,
+        1,
+        1,
+        1
+      ],
+      "baseColorFactor": [
+        1,
+        1,
+        1,
+        1
+      ],
+      "baseColorTexture": "textures/Tea_v24_BaseColor.png",
+      "normalTexture": "textures/Tea_v24_Normal.png",
+      "roughnessTexture": "textures/Tea_v24_Roughness.png",
+      "roughnessColorSpace": "Linear",
+      "roughnessEncoding": "Grayscale roughness; Unity smoothness=1-R.",
+      "normalStrength": 0.08,
+      "metallic": 0,
+      "roughness": 0.3,
+      "mainTextureScale": [
+        1,
+        1
+      ],
+      "transmission": 0,
+      "emission": 0
     }
   ],
   "colorSpaceNote": "Base color PNG is sRGB; factors are linear Principled values; roughness/normal Linear."

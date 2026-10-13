@@ -16,7 +16,7 @@ namespace Lottery.G3.Interaction
         [Serializable] public sealed class LayoutData { public Anchor[] anchors; public CollisionBox[] colliders;public float ticketWidth=.4f;public bool requiresUnityXReflection; }
         readonly List<Light> practicals=new List<Light>();readonly HashSet<Material> instantiatedMaterials=new HashSet<Material>();readonly Dictionary<Material,Color> authoredWindowColors=new Dictionary<Material,Color>();
         Light daylight; LayoutData layout; bool? night; GameObject art;
-        Material exteriorMaterial;Texture2D exteriorDay,exteriorNight;Mesh exteriorNearMesh;
+        Material exteriorMaterial;Texture2D exteriorDay,exteriorNight;Mesh exteriorNearMesh,tableContactMesh;
         ReflectionProbe roomReflection;bool capturedLighting,bakingReflection;
         Cubemap dayReflection,nightReflection;
         public const string ReflectionRecipe="G3_SHOP_STATIC_REFLECTION_V2";
@@ -128,7 +128,26 @@ namespace Lottery.G3.Interaction
             roomReflection.boxProjection=true;roomReflection.shadowDistance=12;roomReflection.nearClipPlane=.08f;roomReflection.farClipPlane=12;roomReflection.intensity=.85f;
             // Only authored room geometry enters reflections, never camera-attached HUD.
             roomReflection.cullingMask=1<<(bakingReflection?ReflectionBakeLayer:ReflectionGeometryLayer);roomReflection.clearFlags=ReflectionProbeClearFlags.SolidColor;
-            BuildExteriorDepth();SetNight(false);Physics.SyncTransforms();
+            BuildExteriorDepth();BuildTableContactShades();SetNight(false);Physics.SyncTransforms();
+        }
+        void BuildTableContactShades()
+        {
+            var shader=Resources.Load<Shader>("G3/Shop/ContactShade");
+            if(shader==null)throw new InvalidOperationException("Missing local contact presentation shader");
+            var vertices=new List<Vector3>();var uv=new List<Vector2>();var indices=new List<int>();
+            // Existing authored pads: top=.840, thickness=.022, felt top=.818.
+            // The 6 mm outside rim is translucent, never a raised opaque backing.
+            for(int i=1;i<=3;i++)
+            {
+                var p=AnchorPosition("tool_"+i,TicketPosition);p.y-=.02196f;int n=vertices.Count;const float h=.066f;
+                vertices.AddRange(new[]{p+new Vector3(-h,0,-h),p+new Vector3(h,0,-h),p+new Vector3(h,0,h),p+new Vector3(-h,0,h)});
+                uv.AddRange(new[]{Vector2.zero,Vector2.right,Vector2.one,Vector2.up});indices.AddRange(new[]{n,n+2,n+1,n,n+3,n+2});
+            }
+            tableContactMesh=new Mesh{name="Three authored pad contact footprints"};tableContactMesh.SetVertices(vertices);tableContactMesh.SetUVs(0,uv);tableContactMesh.SetTriangles(indices,0);tableContactMesh.RecalculateBounds();tableContactMesh.RecalculateNormals();
+            var material=new Material(shader){name="Local pad contact shade"};material.SetColor("_Color",new Color(.025f,.04f,.03f,.28f));material.SetVector("_Inner",new Vector4(.12f/.132f,.12f/.132f,0,0));instantiatedMaterials.Add(material);
+            var go=new GameObject("Subtle contact beneath authored tool pads");go.transform.SetParent(transform,false);go.layer=bakingReflection?ReflectionBakeLayer:ReflectionGeometryLayer;
+            go.AddComponent<MeshFilter>().sharedMesh=tableContactMesh;var renderer=go.AddComponent<MeshRenderer>();renderer.sharedMaterial=material;
+            renderer.shadowCastingMode=ShadowCastingMode.Off;renderer.receiveShadows=false;
         }
         // V19 presentation-only depth; no colliders, interaction targets or Update loop.
         void BuildExteriorDepth()
@@ -200,6 +219,7 @@ namespace Lottery.G3.Interaction
         public void SetNight(bool value)
         {
             if(night==value)return;night=value;
+            daylight.shadowStrength=value?.55f:.65f;
             daylight.intensity=value ? .16f : DaylightStrength;daylight.color=value?new Color(.49f,.62f,.91f):new Color(1,.94f,.84f);
             RenderSettings.ambientMode=AmbientMode.Trilight;
             RenderSettings.ambientSkyColor=value?new Color(.30f,.34f,.43f):new Color(.68f,.74f,.80f);
@@ -207,7 +227,7 @@ namespace Lottery.G3.Interaction
             RenderSettings.ambientGroundColor=value?new Color(.20f,.18f,.17f):new Color(.34f,.31f,.26f);
             // Setting only Trilight colours does not establish a new runtime scene's
             // ambient probe. Set its actual SH coefficients synchronously as well.
-            var bounce=new SphericalHarmonicsL2();bounce.AddAmbientLight(value?new Color(.20f,.21f,.24f):new Color(.42f,.46f,.43f));
+            var bounce=new SphericalHarmonicsL2();bounce.AddAmbientLight(value?new Color(.20f,.21f,.24f):new Color(.336f,.368f,.344f));
             bounce.AddDirectionalLight(Vector3.up,value?new Color(.16f,.13f,.10f):new Color(.20f,.22f,.25f),.7f);
             RenderSettings.ambientProbe=bounce;RenderSettings.reflectionIntensity=value ? .7f : 1;
             for(int i=0;i<practicals.Count;i++)practicals[i].intensity=PracticalStrengths[i]*(value?1.04f:1);
@@ -257,6 +277,7 @@ namespace Lottery.G3.Interaction
         {
             foreach(var material in instantiatedMaterials)if(material!=null)ReleaseOwned(material);
             if(exteriorNearMesh!=null)ReleaseOwned(exteriorNearMesh);
+            if(tableContactMesh!=null)ReleaseOwned(tableContactMesh);
             if(runtimePipeline!=null){if(QualitySettings.renderPipeline==runtimePipeline)QualitySettings.renderPipeline=priorPipeline;ReleaseOwned(runtimePipeline);}
             // A disabled menu can outlive the newer gameplay environment. It must
             // never restore its old snapshot over another environment's lighting.
