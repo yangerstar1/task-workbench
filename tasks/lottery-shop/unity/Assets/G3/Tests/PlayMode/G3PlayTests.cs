@@ -478,7 +478,12 @@ namespace Lottery.G3.PlayMode.Tests
             for(int i=0;i<120;i++)
             {
                 var v=app.SceneCamera.WorldToViewportPoint(target);if(v.z>0&&v.x>.43f&&v.x<.57f){KeyboardEvent();yield break;}
-                KeyboardEvent(Key.LeftArrow);yield return null;
+                // Take the shortest yaw route from the actual pose, still through
+                // genuine keyboard events rather than changing the camera directly.
+                var forward=Vector3.ProjectOnPlane(app.SceneCamera.transform.forward,Vector3.up);
+                var direction=Vector3.ProjectOnPlane(target-app.SceneCamera.transform.position,Vector3.up);
+                float turn=Vector3.SignedAngle(forward,direction,Vector3.up);
+                KeyboardEvent(turn>=0?Key.RightArrow:Key.LeftArrow);yield return null;
             }
             KeyboardEvent();Assert.Fail("Could not face the shelf using the real keyboard router");
         }

@@ -1,8 +1,10 @@
 # Lottery project progress
 
-Updated: 2026-10-12 22:39 UTC
+Updated: 2026-10-13 02:13 UTC
 
 ## Current status
+
+G3 reversible 3D presentation repair is active. Original authored shop assets and integration source are backed up at 994bbdedfa67a3987fa4232424e048959b65e1ea. This candidate has not yet run in Unity or passed visual acceptance. The two Blender model-inspection renders are authoring previews only. The approved ticket PNGs and core game rules remain unchanged. No G4 progression or physical-device acceptance is claimed.
 
 G3 native tests and the cold Android APK passed independent build verification in run38312982947. APK SHA256: c2be0b3bbaf11fe6f28a3f45246591b6d694d0d5d2e6ff40faa8217c4ad98d93. Physical-device acceptance is NOT_RUN; G3/G4 gates remain unpassed. See the latest dated entry below.
 
@@ -85,3 +87,7 @@ Prepared at 2026-10-12 15:07 UTC for independent source preflight. First-day ser
 2026-10-12 22:39 UTC. Run38312982947 at51f535247689f43d5470848a54f5abcf1062b609 completed SUCCESS. Independent actual audit confirms baseline45 Edit/8 Play, G3 242 Edit/24 Play,25+37 actual Linux process kills,241 helper tests with no skips, and18 original frames. The cold Android package, AXML versionCode3, six ARM64 ELF libraries, both approved original ticket imports, source mutation audit and APK v2 signature were independently verified. APK size59,126,454 bytes; SHA256 c2be0b3bbaf11fe6f28a3f45246591b6d694d0d5d2e6ff40faa8217c4ad98d93. Its certificate differs from the archived G2 package, so upgrade compatibility is not assumed and existing data must not be cleared to work around a conflict.
 
 The APK is durably saved in the owner's Library and a separate materialized copy matched its hash. Chat attachment delivery was rejected by the size limit; only instructions/checklists were sent as attachments, and the owner was directed to Library. No APK chat-delivery claim is made. All six same-build physical Android actions and independent normal-input device acceptance remain NOT_RUN. G3 is not passed; G4 remains blocked. Store/UI whitebox presentation is not final art quality. This progress-only commit does not change the reviewed build source or trigger another run.
+
+## G3 authored 3D presentation candidate
+
+2026-10-13 02:13 UTC. Source checkpoint994bbded contains the authored shop FBX, original material maps and licensed typography attribution, physical tool models, perspective tabletop, scene-integrated menu, compact action strip and context drawers. Static source checks and diagnostic validator synthetic tests passed; these do not establish Unity import/compilation or visual quality. A separate diagnostic request will capture the actual shop and tabletop with visible HUD, then run all original native regression identities. Independent visual review remains required; current Blender previews show overly coarse paint/wood texture and insufficient lighting hierarchy and are not approved final art. A test-only shortest-turn adaptation is being added for the new physical shelf position, without weakening game assertions.
