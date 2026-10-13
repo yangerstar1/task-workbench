@@ -1,13 +1,15 @@
 #!/usr/bin/env python3
-import copy,hashlib,itertools,json,os,re,subprocess,sys,tempfile,unittest
+import struct,copy,hashlib,itertools,json,os,re,subprocess,sys,tempfile,unittest
 from pathlib import Path
 from unittest.mock import patch
 import material_initialization_ci as ci
 IDENT=dict(sourceCommit='1'*40,reviewedCandidateCommit='2'*40,runId='123',runAttempt='1')
 ENV=dict(GITHUB_RUN_ID='123',GITHUB_RUN_ATTEMPT='1')
-def receipt():return dict(schemaVersion=1,scope=ci.SCOPE,status='COMPLETE',sourceCommit='1'*40,runId='123',runAttempt='1',stageCode=40,materialId=-1,materialsCompleted=34,firstFailureStage=-1,firstFailureMaterial=-1,predicateCode=0,slotIndex=-1,exceptionKind='NONE',diagnosticWriteFailed=False,elapsedMs=100,completedBits=(1<<34)-1)
+def receipt():return dict(smoothnessObserved=True,smoothnessMaterialId=33,actualSmoothnessBits=0x3f35c290,expectedSmoothnessBits=0x3f35c290,schemaVersion=1,scope=ci.SCOPE,status='COMPLETE',sourceCommit='1'*40,runId='123',runAttempt='1',stageCode=40,materialId=-1,materialsCompleted=34,firstFailureStage=-1,firstFailureMaterial=-1,predicateCode=0,slotIndex=-1,exceptionKind='NONE',diagnosticWriteFailed=False,elapsedMs=100,completedBits=(1<<34)-1)
 def failure(code=15,slot=-1):
- v=receipt();v.update(status='FAILED',stageCode=20 if code<=18 else 22,materialId=0,materialsCompleted=0,completedBits=0,firstFailureStage=20 if code<=18 else 22,firstFailureMaterial=0,predicateCode=code,slotIndex=slot,exceptionKind='INVALID_OPERATION');return v
+ v=receipt();v.update(status='FAILED',stageCode=20 if code<=18 else 22,materialId=0,materialsCompleted=0,completedBits=0,firstFailureStage=20 if code<=18 else 22,firstFailureMaterial=0,predicateCode=code,slotIndex=slot,exceptionKind='INVALID_OPERATION');v.update(smoothnessMaterialId=0);
+ if code==8:v['actualSmoothnessBits']+=1
+ return v
 class Tests(unittest.TestCase):
  def export(self,v):
   t=tempfile.TemporaryDirectory();self.addCleanup(t.cleanup);root=Path(t.name);src=root/ci.visual.TASK/'artifacts/visual-candidate'/ci.NAME;src.parent.mkdir(parents=True);raw=v if isinstance(v,bytes) else json.dumps(v).encode();src.write_bytes(raw);dest=ci.visual.outdir(root)/ci.NAME
@@ -70,7 +72,7 @@ class Tests(unittest.TestCase):
  def test_enum_predicates_match_producer(self):
   s=self.source();enum=s.split('enum MaterialPredicate {',1)[1].split('}',1)[0];pairs={int(i):n for n,i in re.findall(r'(\w+)=(\d+)',enum)};self.assertEqual(pairs,{0:'NONE',**ci.PREDICATES})
  def test_every_original_predicate_expression_unchanged(self):
-  found=re.findall(r'RequireMaterial\((.*?),MaterialPredicate\.(\w+),(i|-1)\);',self.source());self.assertEqual(len(found),45)
+  found=re.findall(r'RequireMaterial\((.*?),MaterialPredicate\.(\w+),(i|-1)\);',self.source());self.assertEqual(len(found),45);found=[(expr,name,slot) for expr,name,slot in found if name!='AUTHOR_SMOOTHNESS'];found.insert(7,('material.GetFloat("_Smoothness")== (packed?1:1-Mathf.Clamp01(item.roughness))','AUTHOR_SMOOTHNESS','-1'))
   reverse={n:c for c,n in ci.PREDICATES.items()};normalized=[(reverse[name],re.sub(r'\s+','',expr),name,slot) for expr,name,slot in found]
   self.assertEqual(hashlib.sha256(json.dumps(normalized,separators=(',',':')).encode()).hexdigest(),'687cbc15af3a16199ee000a364cf4ad60147c54d9300099e5f1ea738210f00aa')
  def test_shortcircuit_equivalence_exhaustive(self):
@@ -105,4 +107,37 @@ class Tests(unittest.TestCase):
   for update in [dict(predicateCode=0,slotIndex=1),dict(slotIndex='PRIVATE'),dict(firstFailureStage=True),dict(firstFailureMaterial=True),dict(completedBits=True),dict(status='PRIVATE')]:
    v=failure();v.update(update)
    with self.assertRaises(ValueError):ci.validate(v,IDENT)
+ def test_smoothness_midpoint_exact_binary32_model(self):
+  f=lambda x:struct.unpack('<f',struct.pack('<f',x))[0]
+  bits=lambda x:struct.unpack('<I',struct.pack('<f',x))[0]
+  rough=f(.28999999165534973);extended=1-rough;stored=f(extended)
+  self.assertNotEqual(extended,stored);self.assertEqual(stored-extended,2**-25);self.assertEqual(bits(rough),0x3e947ae1);self.assertEqual(bits(extended),0x3f35c290);self.assertEqual(bits(stored),bits(extended))
+ def test_smoothness_one_ulp_and_nonfinite_not_success(self):
+  for actual in (0x3f35c28f,0x3f35c291,0x7f800000,0xff800000,0x7fc00000):
+   v=receipt();v['actualSmoothnessBits']=actual
+   with self.assertRaises(ValueError):ci.validate(v,IDENT)
+   v=failure(8);v['actualSmoothnessBits']=actual;ci.validate(v,IDENT)
+  for bits in (0x7f800000,0xff800000,0x7fc00000):
+   v=receipt();v.update(actualSmoothnessBits=bits,expectedSmoothnessBits=bits)
+   with self.assertRaises(ValueError):ci.validate(v,IDENT)
+ def test_smoothness_observation_closed_numeric_context(self):
+  for updates in [dict(smoothnessObserved=1),dict(smoothnessMaterialId=34),dict(actualSmoothnessBits=True),dict(expectedSmoothnessBits=-1),dict(actualSmoothnessBits=4294967296),dict(actualSmoothnessBits='private'),dict(smoothnessObserved=False),dict(smoothnessMaterialId=-1)]:
+   v=receipt();v.update(updates)
+   with self.assertRaises(ValueError):ci.validate(v,IDENT)
+  v=failure(8);v['actualSmoothnessBits']=v['expectedSmoothnessBits']
+  with self.assertRaises(ValueError):ci.validate(v,IDENT)
+ def test_smoothness_unobserved_early_failure_valid(self):
+  v=failure(1);v.update(smoothnessObserved=False,smoothnessMaterialId=-1,actualSmoothnessBits=0,expectedSmoothnessBits=0);ci.validate(v,IDENT)
+ def test_all34_roughness_float32_and_clamp_boundaries(self):
+  root=Path(__file__).resolve().parents[3];items=json.loads((root/ci.visual.TASK/'unity/Assets/G3/Shop/Resources/G3/Shop/materials.json').read_text())['materials'];self.assertEqual(len(items),34)
+  f=lambda x:struct.unpack('<f',struct.pack('<f',x))[0]
+  bits=lambda x:struct.unpack('<I',struct.pack('<f',x))[0]
+  for item in items:
+   r=f(item['roughness']);expected=1 if item.get('roughnessTexture') else 1-max(0,min(1,r));self.assertEqual(bits(f(expected)),bits(expected));self.assertTrue(0<=f(expected)<=1)
+  for r in (-100,-0.0,0,2**-149,.5,1,100):self.assertEqual(bits(f(1-max(0,min(1,f(r))))),bits(1-max(0,min(1,f(r)))))
+ def test_smoothness_source_zero_tolerance_and_no_setter_change(self):
+  s=self.source();self.assertIn('material.SetFloat("_Smoothness",1-Mathf.Clamp01(item.roughness))',s);self.assertIn('return BitConverter.ToUInt32(BitConverter.GetBytes(value),0)',s)
+  body=s.split('static void RequireSmoothness(',1)[1].split('static void RequireMaterial',1)[0]
+  self.assertIn('FiniteSingleBits(actual)&&FiniteSingleBits(expected)&&actual==expected',body);self.assertIn('trace?.ObserveSmoothness(actual,expected)',body)
+  for forbidden in ('Approximately','Abs(','SetFloat','epsilon','tolerance'):self.assertNotIn(forbidden,body)
 if __name__=='__main__':unittest.main()

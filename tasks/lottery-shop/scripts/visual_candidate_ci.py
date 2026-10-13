@@ -80,6 +80,31 @@ def read_json(path, maximum=2 * 1024 * 1024):
     return json.loads(bounded.bounded_read(path, maximum))
 
 
+FULL_DIAGNOSTIC = "FULL_DIAGNOSTIC"
+EARLY_STOP = "EARLY_STOP_ON_PREBUILD_FAILURE"
+
+
+def read_diagnostic_request(path):
+    def unique_object(pairs):
+        value = {}
+        for key, item in pairs:
+            require(key not in value, "Duplicate diagnostic request key")
+            value[key] = item
+        return value
+    return json.loads(bounded.bounded_read(path, 8192), object_pairs_hook=unique_object)
+
+
+def request_profile(request):
+    require(type(request) is dict and type(request.get("schemaVersion")) is int, "Diagnostic request schema mismatch")
+    keys = {"schemaVersion", "requestId", "sourceCommit", "purpose", "sourceReview"}
+    if request["schemaVersion"] == 1:
+        require(set(request) == keys, "Diagnostic request keys mismatch")
+        return FULL_DIAGNOSTIC
+    require(request["schemaVersion"] == 2 and set(request) == keys | {"executionProfile"}, "Diagnostic request keys mismatch")
+    require(type(request["executionProfile"]) is str and request["executionProfile"] in {FULL_DIAGNOSTIC, EARLY_STOP}, "Diagnostic execution profile rejected")
+    return request["executionProfile"]
+
+
 def guard(root):
     env = os.environ
     for key, value in {"GITHUB_EVENT_NAME": "push", "GITHUB_REPOSITORY": "yangerstar1/task-workbench",
@@ -90,9 +115,9 @@ def guard(root):
     require(event.get("repository", {}).get("private") is False and event["repository"].get("fork") is False and not event.get("deleted"), "Unexpected repository event")
     source = env.get("GITHUB_SHA", "")
     require(HEX40.fullmatch(source) and source == git(root, "rev-parse", "HEAD"), "Source commit mismatch")
-    request = read_json(root / REQUEST, 8192)
-    require(set(request) == {"schemaVersion", "requestId", "sourceCommit", "purpose", "sourceReview"}, "Diagnostic request keys mismatch")
-    require(request["schemaVersion"] == 1 and request["purpose"] == SCOPE, "Request is not a diagnostic visual candidate")
+    request = read_diagnostic_request(root / REQUEST)
+    request_profile(request)
+    require(request["purpose"] == SCOPE, "Request is not a diagnostic visual candidate")
     require(re.fullmatch(r"lottery-visual-[0-9]{8}-[0-9]{2,3}", request["requestId"]), "Invalid request identity")
     require(HEX40.fullmatch(request["sourceCommit"]) and request["sourceCommit"] == git(root, "rev-parse", "HEAD^"), "Trigger must directly follow the separately reviewed candidate source")
     review = request["sourceReview"]

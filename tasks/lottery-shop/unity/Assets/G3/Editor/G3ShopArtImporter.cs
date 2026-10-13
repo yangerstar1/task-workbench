@@ -114,7 +114,7 @@ namespace Lottery.G3.Editor
         {
             public int schemaVersion=1,stageCode=1,materialId=-1,materialsCompleted,firstFailureStage=-1,firstFailureMaterial=-1,predicateCode,slotIndex=-1;
             public string scope="MATERIAL_INITIALIZATION_DIAGNOSTIC_NOT_TEST_PASS",status="RUNNING",sourceCommit,runId,runAttempt,exceptionKind="NONE";
-            public bool diagnosticWriteFailed;public long elapsedMs,completedBits;
+            public bool diagnosticWriteFailed,smoothnessObserved;public int smoothnessMaterialId=-1;public long actualSmoothnessBits,expectedSmoothnessBits;public long elapsedMs,completedBits;
         }
         sealed class MaterialTrace
         {
@@ -131,6 +131,7 @@ namespace Lottery.G3.Editor
                 string commit=Arg(args,"-probeCommit","\\A[0-9a-f]{40}\\z"),run=Arg(args,"-probeRunId","\\A[1-9][0-9]{0,19}\\z"),attempt=Arg(args,"-probeRunAttempt","\\A[1-9][0-9]{0,19}\\z");
                 return commit==null||run==null||attempt==null?null:new MaterialTrace(commit,run,attempt);
             }
+            public void ObserveSmoothness(uint actual,uint expected){receipt.smoothnessObserved=true;receipt.smoothnessMaterialId=receipt.materialId;receipt.actualSmoothnessBits=actual;receipt.expectedSmoothnessBits=expected;Write();}
             public void Mark(int stage){receipt.stageCode=stage;Write();}
             public void BeginMaterial(string name){receipt.materialId=Array.IndexOf(Names,name);if(receipt.materialId<0)receipt.diagnosticWriteFailed=true;Mark(10);}
             public void MaterialDone(){if(receipt.materialId>=0){if((receipt.completedBits&(1L<<receipt.materialId))!=0||receipt.materialsCompleted>=34)receipt.diagnosticWriteFailed=true;receipt.completedBits|=1L<<receipt.materialId;}receipt.materialsCompleted=Math.Min(receipt.materialsCompleted+1,34);Mark(24);}
@@ -148,6 +149,16 @@ namespace Lottery.G3.Editor
                 try{receipt.elapsedMs=clock.ElapsedMilliseconds;string json=JsonUtility.ToJson(receipt,false);if(System.Text.Encoding.UTF8.GetByteCount(json)>8192)throw new InvalidOperationException();Directory.CreateDirectory(Path.GetDirectoryName(path));File.WriteAllText(path,json,new System.Text.UTF8Encoding(false));}
                 catch{receipt.diagnosticWriteFailed=true;}
             }
+        }
+        // Material native storage is IEEE754 binary32. Compare exact stored bits,
+        // not an arithmetic temporary that the CLI may retain at higher precision.
+        static uint SingleBits(float value){return BitConverter.ToUInt32(BitConverter.GetBytes(value),0);}
+        static bool FiniteSingleBits(uint bits){return (bits&0x7f800000U)!=0x7f800000U;}
+        static void RequireSmoothness(Material material,MaterialEntry item,bool packed,MaterialTrace trace)
+        {
+            uint actual=SingleBits(material.GetFloat("_Smoothness")),expected=SingleBits(packed?1:1-Mathf.Clamp01(item.roughness));
+            trace?.ObserveSmoothness(actual,expected);
+            RequireMaterial(FiniteSingleBits(actual)&&FiniteSingleBits(expected)&&actual==expected,MaterialPredicate.AUTHOR_SMOOTHNESS,-1);
         }
         static void RequireMaterial(bool valid,MaterialPredicate predicate,int slot)
         {if(!valid)throw new MaterialContractFailure(predicate,slot);}
@@ -174,7 +185,7 @@ namespace Lottery.G3.Editor
             RequireMaterial((textures[2]!=null)==packed,MaterialPredicate.AUTHOR_PACKED_MAP,-1);
             RequireMaterial((textures[3]!=null)==(emissive&&!string.IsNullOrEmpty(item.emissionTexture)),MaterialPredicate.AUTHOR_EMISSION_MAP,-1);
             RequireMaterial(material.GetFloat("_Metallic")==Mathf.Clamp01(item.metallic),MaterialPredicate.AUTHOR_METALLIC,-1);
-            RequireMaterial(material.GetFloat("_Smoothness")== (packed?1:1-Mathf.Clamp01(item.roughness)),MaterialPredicate.AUTHOR_SMOOTHNESS,-1);
+            RequireSmoothness(material,item,packed,trace);
             RequireMaterial(material.GetFloat("_SmoothnessTextureChannel")==0,MaterialPredicate.AUTHOR_SMOOTHNESS_CHANNEL,-1);
             RequireMaterial(!normal||material.GetFloat("_BumpScale")==item.normalStrength,MaterialPredicate.AUTHOR_NORMAL_STRENGTH,-1);
             var expectedScale=item.mainTextureScale!=null&&item.mainTextureScale.Length==2?new Vector2(item.mainTextureScale[0],item.mainTextureScale[1]):Vector2.one;

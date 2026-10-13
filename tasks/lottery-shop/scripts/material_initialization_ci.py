@@ -9,7 +9,7 @@ LIMIT=8192
 SCOPE='MATERIAL_INITIALIZATION_DIAGNOSTIC_NOT_TEST_PASS'
 STAGES=frozenset((1,2,10,11,12,20,21,22,23,24,30,31,32,33,34,40))
 KINDS=frozenset(('NONE','INVALID_OPERATION','ARGUMENT','IO','ACCESS','UNITY','NULL_REFERENCE','AGGREGATE','OTHER'))
-FIELDS=frozenset(('schemaVersion','scope','status','sourceCommit','runId','runAttempt','stageCode','materialId','materialsCompleted','firstFailureStage','firstFailureMaterial','predicateCode','slotIndex','exceptionKind','diagnosticWriteFailed','elapsedMs','completedBits'))
+FIELDS=frozenset(('smoothnessObserved','smoothnessMaterialId','actualSmoothnessBits','expectedSmoothnessBits','schemaVersion','scope','status','sourceCommit','runId','runAttempt','stageCode','materialId','materialsCompleted','firstFailureStage','firstFailureMaterial','predicateCode','slotIndex','exceptionKind','diagnosticWriteFailed','elapsedMs','completedBits'))
 PREDICATES={1: 'AUTHOR_SHADER', 2: 'AUTHOR_BASE_COLOR', 3: 'AUTHOR_BASE_MAP', 4: 'AUTHOR_NORMAL_MAP', 5: 'AUTHOR_PACKED_MAP', 6: 'AUTHOR_EMISSION_MAP', 7: 'AUTHOR_METALLIC', 8: 'AUTHOR_SMOOTHNESS', 9: 'AUTHOR_SMOOTHNESS_CHANNEL', 10: 'AUTHOR_NORMAL_STRENGTH', 11: 'AUTHOR_BASE_SCALE', 12: 'AUTHOR_SURFACE', 13: 'AUTHOR_EMISSION_COLOR', 14: 'AUTHOR_CULL', 15: 'DETAIL_ALBEDO_ABSENT', 16: 'DETAIL_NORMAL_ABSENT', 17: 'DETAIL_MULX2_OFF', 18: 'DETAIL_SCALED_OFF', 19: 'FINAL_SHADER', 20: 'FINAL_BASE_COLOR', 21: 'FINAL_EMISSION_COLOR', 22: 'FINAL_TEXTURE_REFERENCE', 23: 'FINAL_TEXTURE_SCALE', 24: 'FINAL_TEXTURE_OFFSET', 25: 'FINAL_FLOAT_PRESENCE', 26: 'FINAL_FLOAT_VALUE', 27: 'ALIAS_TEXTURE', 28: 'ALIAS_SCALE', 29: 'ALIAS_OFFSET', 30: 'ALIAS_COLOR', 31: 'NORMAL_KEYWORD', 32: 'PACKED_KEYWORD', 33: 'EMISSION_KEYWORD', 34: 'TRANSPARENT_KEYWORD', 35: 'ALPHA_TEST_OFF', 36: 'ALPHA_PREMULTIPLY_OFF', 37: 'ALPHA_MODULATE_OFF', 38: 'ALBEDO_SMOOTHNESS_OFF', 39: 'SOURCE_BLEND', 40: 'DEST_BLEND', 41: 'DEPTH_WRITE', 42: 'RENDER_QUEUE', 43: 'RENDER_TAG', 44: 'GI_FLAGS', 45: 'DOUBLE_SIDED_GI'}
 require=visual.require
 
@@ -35,6 +35,15 @@ def validate(value,ident):
     else:require(slot==-1,'MATERIAL_INITIALIZATION_UNKNOWN_SLOT_REJECTED')
     if value['status']=='COMPLETE':
         require(value['stageCode']==40 and value['materialId']==-1 and value['materialsCompleted']==34 and value['completedBits']==(1<<34)-1,'MATERIAL_INITIALIZATION_COMPLETENESS_REJECTED')
+    require(type(value['smoothnessObserved']) is bool and integer(value['smoothnessMaterialId'],-1,33) and all(integer(value[k],0,4294967295) for k in ('actualSmoothnessBits','expectedSmoothnessBits')),'MATERIAL_INITIALIZATION_FLOAT_BITS_REJECTED')
+    observed=value['smoothnessObserved'];actual=value['actualSmoothnessBits'];expected=value['expectedSmoothnessBits'];mid=value['smoothnessMaterialId']
+    if observed:
+        require(mid>=0,'MATERIAL_INITIALIZATION_FLOAT_CONTEXT_REJECTED')
+        equal=(actual&0x7f800000)!=0x7f800000 and (expected&0x7f800000)!=0x7f800000 and actual==expected
+        if code==8:require(mid==value['materialId'] and not equal,'MATERIAL_INITIALIZATION_FLOAT_FAILURE_REJECTED')
+        else:require(equal,'MATERIAL_INITIALIZATION_FLOAT_SUCCESS_REJECTED')
+    else:
+        require((mid,actual,expected)==(-1,0,0) and code!=8 and value['status']!='COMPLETE','MATERIAL_INITIALIZATION_FLOAT_MISSING_REJECTED')
     return value
 
 def export(root):
