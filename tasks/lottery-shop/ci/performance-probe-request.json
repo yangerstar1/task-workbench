@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "requestId": "lottery-performance-20261013-01",
+  "sourceCommit": "f690efc61023c76d699c1405eb4649890520e39a",
+  "purpose": "PERFORMANCE_DIAGNOSTIC_NOT_G3_PASS",
+  "sourceReview": {
+    "sourceCommit": "f690efc61023c76d699c1405eb4649890520e39a",
+    "status": "APPROVED_FOR_PERFORMANCE_DIAGNOSTIC_ONLY",
+    "reviewId": "performance-source-20261013-01",
+    "reviewer": "independent-source-review",
+    "reviewedAtUtc": "2026-10-13T11:51:04.872211+00:00"
+  }
+}
