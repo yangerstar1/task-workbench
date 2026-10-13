@@ -5,8 +5,8 @@ using Lottery.G3.Core;
 namespace Lottery.G3.Interaction
 {
     public enum G3Mode { WALK,TABLE_SCRATCH,CELL_REVEAL,PANEL,COMMITTING,NIGHT_BILL }
-    public enum G3Panel { None,Settlement,Tickets,Shop,StockDetail,Inventory,ToolDetail,Drawer,Phone,Contact,CustomAmount,Bill,Rules,Settings,Confirm,InformationTargets,QaEvidence }
-    public enum G3ActionKind { None,CancelBoost,ResumeNext,CancelNext,Open,Close,Stand,Sit,InspectStock,InspectTool,InspectContact,BuyTicket,Claim,ClaimThenBuy,QuickReveal,BuyStock,Upgrade,Sell,Equip,Remove,UseDrawer,UseLamp,TargetCell,ConfirmTargets,Borrow,RepayLoan,RepayPrincipal,BeginClosing,EnterNight,PayNight,Restart,Retry,Confirm,Cancel,Digit,Backspace,AmountAccept,ToggleQuick,ToggleFlash,ToggleVibration,CopyEvidence,ScrollEvidence,MoveForward,MoveBack,MoveLeft,MoveRight,TurnLeft,TurnRight,ToggleMore }
+    public enum G3Panel { None,Settlement,Tickets,Shop,StockDetail,Inventory,ToolDetail,Drawer,Phone,Contact,CustomAmount,Bill,Rules,Settings,Confirm,InformationTargets,QaEvidence,PhoneAmount,PhoneRequest,PhonePacket,PhoneRecords,PhoneRepay }
+    public enum G3ActionKind { None,CancelBoost,ResumeNext,CancelNext,Open,Close,Stand,Sit,InspectStock,InspectTool,InspectContact,BuyTicket,Claim,ClaimThenBuy,QuickReveal,BuyStock,Upgrade,Sell,Equip,Remove,UseDrawer,UseLamp,TargetCell,ConfirmTargets,Borrow,RepayLoan,RepayPrincipal,BeginClosing,EnterNight,PayNight,Restart,Retry,Confirm,Cancel,Digit,Backspace,AmountAccept,ToggleQuick,ToggleFlash,ToggleVibration,CopyEvidence,ScrollEvidence,MoveForward,MoveBack,MoveLeft,MoveRight,TurnLeft,TurnRight,ToggleMore,PhoneChoose,PhoneSend,PhoneClaim,PhoneBack,PhoneRecords,PhoneRepay,PhonePage,PhoneCancelRequest }
     public readonly struct G3Action
     {
         public readonly G3ActionKind Kind;public readonly string Key;public readonly int Slot;public readonly long Amount;
@@ -21,8 +21,15 @@ namespace Lottery.G3.Interaction
     public sealed class G3PanelModel
     {
         public string Title="",Body="";public readonly List<G3Card> Cards=new List<G3Card>();
+        public readonly List<G3PhoneMessage> Messages=new List<G3PhoneMessage>();
         public bool Grid,LargeGrid,Evidence;public string Footnote="";
         public void Add(string id,string text,G3Action action,bool enabled=true)=>Cards.Add(new G3Card(id,text,action,enabled));
+    }
+    public sealed class G3PhoneMessage
+    {
+        public string Id,Text,Caption;public bool Player,Packet;public G3Action Action;public bool Enabled;
+        public G3PhoneMessage(string id,string text,bool player=false,bool packet=false,string caption="",G3Action action=default,bool enabled=false)
+        {Id=id;Text=text;Player=player;Packet=packet;Caption=caption;Action=action;Enabled=enabled;}
     }
     public static class G3Text
     {

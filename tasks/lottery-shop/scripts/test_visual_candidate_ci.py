@@ -26,7 +26,17 @@ def receipt():
             cameraOrthographic=False, hudFrustumRendererCount=20, importedRendererCount=200, inputUpdates=123,
             cameraPosition=dict(x=1, y=2, z=3), cameraEuler=dict(x=60, y=180, z=0), cameraFov=64, dayPhase="NIGHT_BILL" if name == "night-table" else "DAY_OPEN",
             panel="None", hudOpaqueAreaRatio=.18, visibleControlIds=["open-shop", "open-inventory", "open-phone", "stand", "open-more"], moreVisible=False, paperVisible=True, renderedShopRendererCount=32, renderedShopMaterialCount=31, paperPresentationBounds=dict(x=300,y=200,width=600,height=400), toolPresentationBounds=[dict(x=400+i*100,y=510,width=60,height=80) for i in range(3)], currentTools=["small_prize_box", "inspection_lamp", "large_prize_stamp"], revealedCells=3))
-    return dict(schemaVersion=2, candidatePresentation="V13_MORE_NAVIGATION_MEASURED_GEOMETRY_NOT_VISUAL_PASS", scope=candidate.SCOPE, sourceCommit="1" * 40, runId="12345", runAttempt="1", unityVersion="6000.3.19f1",
+    for f in frames:
+        name = f["stage"]
+        f.update(ticketId="fixed-ticket", ticketPhase="ACTIVE", ticketMaskSha256="d"*64, ticketContentSha256="f"*64,
+                 nextTools=["small_prize_box", "inspection_lamp", "large_prize_stamp"],
+                 phoneFocused=name in ("phone-contacts", "phone-mom-pending", "phone-mom-claimed"),
+                 phoneFrustumRendererCount=10, phoneWorldObjectActive=True, phoneActiveRendererCount=10, phoneInstanceId=42, phoneScreenMinDepth=1, phoneScreenMaxDepth=1.2, phonePlaneCameraAbsCosine=.9, phoneScreenBounds=dict(x=500,y=200,width=150,height=300),
+                 cashMinor=30000, motherDebtMinor=0, motherLifetimeMinor=0, loanCount=0, ledgerCount=0, phoneEventCount=0)
+        if name == "phone-mom-pending": f.update(stateSha256="d"*64, phoneEventCount=1)
+        if name in ("phone-mom-claimed", "phone-table-return"):
+            f.update(stateSha256="e"*64, cashMinor=40000, motherDebtMinor=10000, motherLifetimeMinor=10000, loanCount=1, ledgerCount=1, phoneEventCount=2)
+    return dict(schemaVersion=3, candidatePresentation="V16_SELECTED_C_PHYSICAL_PHONE_NOT_VISUAL_PASS", scope=candidate.SCOPE, sourceCommit="1" * 40, runId="12345", runAttempt="1", unityVersion="6000.3.19f1",
                 graphicsDeviceType="OpenGLCore", inputEvidence="SIMULATED_INPUT_SYSTEM",
                 captureMethod="URP_STANDARD_REQUEST_READPIXELS", hudVisibilityBasis="ENABLED_CAMERA_LAYER_AND_FRUSTUM_TEST_NOT_PIXEL_OCCLUSION", complete=True, frames=frames, actions=[])
 
@@ -96,7 +106,7 @@ class ProgressReceiptTests(unittest.TestCase):
         with self.assertRaises(ValueError): self.validate(value)
         value = progress_receipt(); value["events"].append(dict(value["events"][0], elapsedMs=-1))
         with self.assertRaises(ValueError): self.validate(value)
-        for key, wrong in (("elapsedMs", -1), ("inputUpdates", True), ("frameCount", 12), ("purchased", 13), ("settled", -2), ("utc", "not-a-date")):
+        for key, wrong in (("elapsedMs", -1), ("inputUpdates", True), ("frameCount", len(candidate.FRAMES)+1), ("purchased", 13), ("settled", -2), ("utc", "not-a-date")):
             value = progress_receipt(); value["events"][0][key] = wrong
             with self.subTest(key=key), self.assertRaises(ValueError): self.validate(value)
 
@@ -271,7 +281,7 @@ class VisualCandidateEvidenceTests(unittest.TestCase):
         return candidate.validate_capture(value, "1" * 40, "12345", "1", complete)
 
     def test_synthetic_complete_shape(self):
-        self.assertEqual(len(self.validate(receipt())), 11)
+        self.assertEqual(len(self.validate(receipt())), 17)
 
     def test_missing_six_group_evidence_is_not_complete(self):
         value = receipt(); value["frames"].pop()
@@ -301,16 +311,16 @@ class VisualCandidateEvidenceTests(unittest.TestCase):
             with self.subTest(key=key), self.assertRaises(ValueError): self.validate(value)
 
     def test_shelf_and_return_must_preserve_ticket(self):
-        value = receipt(); value["frames"][6]["stateSha256"] = "d" * 64
+        value = receipt(); next(f for f in value["frames"] if f["stage"] == "shelf-after-open")["stateSha256"] = "d" * 64
         with self.assertRaises(ValueError): self.validate(value)
 
     def test_day_night_must_use_same_camera(self):
-        value = receipt(); value["frames"][9]["cameraPosition"]["x"] = 8
+        value = receipt(); next(f for f in value["frames"] if f["stage"] == "night-table")["cameraPosition"]["x"] = 8
         with self.assertRaises(ValueError): self.validate(value)
 
     def test_same_position_different_rotation_or_fov_is_rejected(self):
         for key, bad in (("cameraEuler", dict(x=0, y=0, z=0)), ("cameraFov", 90)):
-            value = receipt(); value["frames"][9][key] = bad
+            value = receipt(); next(f for f in value["frames"] if f["stage"] == "night-table")[key] = bad
             with self.subTest(key=key), self.assertRaises(ValueError): self.validate(value)
 
     def test_aspect_pair_and_seed_cannot_be_mixed(self):
@@ -320,12 +330,12 @@ class VisualCandidateEvidenceTests(unittest.TestCase):
 
     def test_night_must_be_real_phase_with_closed_bill(self):
         for key, bad in (("dayPhase", "DAY_OPEN"), ("panel", "Bill")):
-            value = receipt(); value["frames"][9][key] = bad
+            value = receipt(); next(f for f in value["frames"] if f["stage"] == "night-table")[key] = bad
             with self.subTest(key=key), self.assertRaises(ValueError): self.validate(value)
 
     def test_measured_layout_fields_are_required_without_art_pass_threshold(self):
         value = receipt(); value["frames"][0]["hudOpaqueAreaRatio"] = .9
-        self.assertEqual(len(self.validate(value)), 11)
+        self.assertEqual(len(self.validate(value)), 17)
         for bad in (None, -1, float("inf"), 1.1):
             value = receipt(); value["frames"][0]["hudOpaqueAreaRatio"] = bad
             with self.subTest(bad=bad), self.assertRaises(ValueError): self.validate(value)
@@ -348,9 +358,22 @@ class NativeReportShapeTests(unittest.TestCase):
     def test_existing_contract_union_has_287_edit_and_32_play_cases(self):
         task = Path(candidate.__file__).resolve().parents[1]
         contracts = [json.loads((task / "ci" / (name + "-test-contract.json")).read_text()) for name in ("g2", "g3")]
-        for stage, expected in (("edit", 287), ("play", 32)):
+        source = (task / "unity/Assets/G3/Tests/EditMode/PhoneLoanTests.cs").read_text()
+        ordinary = re.findall(r"\[Test\]\s*public void (\w+)\(", source)
+        self.assertEqual(len(ordinary), 8)
+        phone_edit = {"Lottery.G3.EditMode.Tests.PhoneLoanTests." + name for name in ordinary}
+        phone_edit |= {"Lottery.G3.EditMode.Tests.PhoneLoanTests.PhoneAtomic_" + action + "_" + point + "_" + mode
+                       for action in ("Request", "Claim", "Cancel")
+                       for point in ("BeforeWrite", "TempHalfWritten", "TempFlushed", "BeforePublish", "AfterPublish", "BeforeResponse")
+                       for mode in ("cold", "live")}
+        interaction = (task / "unity/Assets/G3/Tests/PlayMode/G3PhoneInteractionTests.cs").read_text()
+        phone_play = {"Lottery.G3.PlayMode.Tests.G3PlayTests." + method for method in re.findall(r"\[UnityTest\]\s*public IEnumerator (\w+)\(", interaction)}
+        self.assertEqual(len(phone_edit), 44); self.assertEqual(len(phone_play), 3)
+        for stage, original_count, additional in (("edit", 287, phone_edit), ("play", 32, phone_play)):
             names = {case for contract in contracts for cases in contract["profiles"][stage].values() for case in cases}
-            self.assertEqual(len(names), expected)
+            self.assertTrue(additional <= names)
+            self.assertEqual(len(names - additional), original_count, "The original 287 Edit / 32 Play identities remain required")
+            self.assertEqual(len(names), original_count + len(additional))
 
     def test_original_candidate_report_is_preserved_and_checked(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -412,6 +435,99 @@ class NativeReportShapeTests(unittest.TestCase):
             self.assertFalse((candidate.outdir(root) / "capture/raw-test-results.xml").exists())
 
 
+class PhysicalPhoneEvidenceTests(unittest.TestCase):
+    def validate(self, value):
+        return candidate.validate_capture(value, "1"*40, "12345", "1")
+
+    @staticmethod
+    def frame(value, stage):
+        return next(f for f in value["frames"] if f["stage"] == stage)
+
+    def test_original_eleven_and_six_phone_frames_remain_distinct(self):
+        self.assertEqual(len(candidate.BASE_FRAMES), 11)
+        self.assertEqual(len(candidate.PHONE_FRAMES), 6)
+        self.assertEqual(len(set(candidate.FRAMES)), 17)
+        self.validate(receipt())
+        for name in candidate.PHONE_FRAMES:
+            value=receipt();value["frames"]=[f for f in value["frames"] if f["stage"] != name]
+            with self.subTest(stage=name), self.assertRaises(ValueError):self.validate(value)
+
+    def test_pending_request_must_not_credit_money_debt_limit_or_loan(self):
+        for key in ("cashMinor", "motherDebtMinor", "motherLifetimeMinor", "loanCount", "ledgerCount"):
+            value=receipt();self.frame(value,"phone-mom-pending")[key] += 1
+            with self.subTest(field=key), self.assertRaises(ValueError):self.validate(value)
+        value=receipt();self.frame(value,"phone-mom-pending")["phoneEventCount"]=0
+        with self.assertRaises(ValueError):self.validate(value)
+
+    def test_claim_exact_game_coin_units_and_unique_financial_entries(self):
+        for key in ("cashMinor", "motherDebtMinor", "motherLifetimeMinor", "loanCount", "ledgerCount", "phoneEventCount"):
+            value=receipt();self.frame(value,"phone-mom-claimed")[key] += 1
+            with self.subTest(field=key), self.assertRaises(ValueError):self.validate(value)
+        value=receipt();self.frame(value,"phone-mom-claimed")["cashMinor"]=31000
+        with self.assertRaises(ValueError):self.validate(value)
+
+    def test_phone_return_preserves_ticket_mask_tools_camera_and_saved_state(self):
+        for key,bad in (("ticketId","other"),("ticketMaskSha256","a"*64),("ticketContentSha256","a"*64),
+                        ("currentTools",[]),("nextTools",[]),("revealedCells",4),("stateSha256","a"*64),
+                        ("cameraPosition",dict(x=99,y=0,z=0))):
+            value=receipt();self.frame(value,"phone-table-return")[key]=bad
+            with self.subTest(field=key), self.assertRaises(ValueError):self.validate(value)
+
+    def test_table_views_may_exclude_active_counter_phone_but_visibility_views_cannot(self):
+        value=receipt()
+        for name in ("phone-table-before","phone-table-return"):
+            self.frame(value,name).update(phoneFrustumRendererCount=0,phoneScreenBounds=dict(x=-1000,y=-200,width=50,height=90),phoneScreenMinDepth=-1,phoneScreenMaxDepth=-.5)
+        self.validate(value)
+        for name in candidate.PHONE_VISIBLE_FRAMES:
+            value=receipt();self.frame(value,name)["phoneFrustumRendererCount"]=0
+            with self.subTest(stage=name),self.assertRaises(ValueError):self.validate(value)
+        for key,bad in (("phoneWorldObjectActive",False),("phoneActiveRendererCount",0),("phoneInstanceId",43)):
+            value=receipt();self.frame(value,"phone-table-return")[key]=bad
+            with self.subTest(field=key),self.assertRaises(ValueError):self.validate(value)
+
+    def test_phone_requires_real_focused_geometry_not_zero_or_offscreen(self):
+        for key,bad in (("phoneFrustumRendererCount",0),("phoneFocused",False),
+                        ("phoneScreenBounds",dict(x=-1,y=1,width=100,height=200)),
+                        ("phoneScreenBounds",dict(x=500,y=200,width=0,height=300))):
+            value=receipt();self.frame(value,"phone-contacts")[key]=bad
+            with self.subTest(field=key), self.assertRaises(ValueError):self.validate(value)
+
+    def test_only_three_phone_closeups_can_hide_normal_hud(self):
+        value=receipt()
+        for name in ("phone-contacts", "phone-mom-pending", "phone-mom-claimed"):
+            self.frame(value,name).update(hudVisible=False,hudFrustumRendererCount=0)
+        self.validate(value)
+        for name in candidate.BASE_FRAMES + ["phone-room-standing","phone-table-before","phone-table-return"]:
+            value=receipt();self.frame(value,name).update(hudVisible=False,hudFrustumRendererCount=0)
+            with self.subTest(stage=name),self.assertRaises(ValueError):self.validate(value)
+        for key,bad in (("phoneScreenMinDepth",-1),("phonePlaneCameraAbsCosine",0),("phoneScreenMaxDepth",float("inf"))):
+            value=receipt();self.frame(value,"phone-contacts")[key]=bad
+            with self.subTest(field=key),self.assertRaises(ValueError):self.validate(value)
+
+    def test_phone_interaction_fixture_retains_cancel_scroll_and_real_input_routes(self):
+        root=Path(__file__).resolve().parents[3]
+        source=(root/candidate.TASK/'unity/Assets/G3/Tests/VisualCandidate/VisualCandidateCaptureTests.cs').read_text()
+        body=source.split('IEnumerator PhysicalPhoneBorrowKeepsConfirmedTicket()',1)[1].split('static long MotherDebt',1)[0]
+        for forbidden in ('P.Execute(', 'P.Service.Borrow(', 'P.Service.RequestPhoneLoan('):self.assertNotIn(forbidden,body)
+        for token in ('MouseEvent(sendPoint, true)', 'Router.NotifyFocus(false); Router.NotifyFocus(true); MouseEvent(sendPoint, false)',
+                      'phone-send-focus-cancelled-no-request', 'MouseEvent(packetPoint + Vector2.up * 24, true)',
+                      'phone-packet-scroll-no-claim', 'Click("phone-claim")', 'Click("close-phone")'):
+            self.assertIn(token,body)
+
+    def test_original_capture_method_identity_and_contract_files_unchanged(self):
+        root=Path(__file__).resolve().parents[3]
+        fixture=(root/candidate.TASK/'unity/Assets/G3/Tests/VisualCandidate/VisualCandidateCaptureTests.cs').read_text()
+        self.assertEqual(fixture.count('[UnityTest]'),1)
+        self.assertIn('RealRuntimeSixGroupsRetainHudAndRoutePurchasesScratchShelfAndNight',fixture)
+        for marker in ('Assert.That(State.TicketsPurchasedToday, Is.EqualTo(12))',
+                       'Assert.That(State.SettledTicketCount, Is.EqualTo(12))',
+                       'PreviewSettlement().RawPrizeMinor, Is.EqualTo(2000)',
+                       'CurrentTicket.RevealedCells.Count(x => x), Is.EqualTo(2)'):
+            self.assertIn(marker,fixture)
+        workflow=(root/candidate.WORKFLOW).read_text()
+        for frame in candidate.PHONE_FRAMES:self.assertEqual(workflow.count('/captures/'+frame+'.png'),1)
+
+
 class OriginalG3FrameExportTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -466,10 +582,23 @@ class OriginalG3FrameExportTests(unittest.TestCase):
         self.export(); folder = candidate.outdir(self.root) / "original-g3-captures"
         self.assertEqual(len(list(folder.glob("*.png"))), 14)
         result = candidate.read_json(folder / "export-receipt.json")
+        self.assertEqual(result["exactPlayModeCases"], 35)
         self.assertEqual(result["legacyReceiptRunAttempt"], "NOT_PRESENT_IN_LEGACY_SCHEMA")
         self.assertEqual(result["separateProtectedFixtureFrame"], "challenge-protected")
         self.assertEqual(result["g3Gate"], "NOT_EVALUATED")
         self.assertFalse((candidate.outdir(self.root) / "captures/capture-receipt.json").exists())
+
+    def test_expanded_phone_play_cases_cannot_be_omitted_to_reuse_old_32_pass(self):
+        suffixes={"PhysicalPhoneProjectsRealGlassAndRestoresCameraWithoutChangingTicket", "PhoneSendRequiresReleaseAndSavedPendingPacketSurvivesReload", "PhysicalPhoneKeysMeetProjectedReferenceTargetsAndOcclusionBlocksTap"}
+        removed=0
+        for suite in self.xml.iter("test-suite"):
+            for case in list(suite):
+                if case.tag=="test-case" and case.get("fullname","").rsplit(".",1)[-1] in suffixes:
+                    suite.remove(case);removed+=1
+        self.assertEqual(removed,3)
+        self.xml.set("total","32");self.xml.set("passed","32");self.xmlpath.write_bytes(ET.tostring(self.xml))
+        with self.assertRaises(ValueError):self.export()
+        self.assert_no_frames_exported()
 
     def test_old_frames_upload_requires_successful_export_and_is_separate(self):
         root = Path(__file__).resolve().parents[3]

@@ -114,7 +114,7 @@ class SessionTests(unittest.TestCase):
         self.clean=patch.object(safe.private,'cleanup',return_value=dict(status='ABSENCE_VERIFIED',removalExitCode=0));self.cleanup=self.clean.start()
     def tearDown(self):self.ident.stop();self.clean.stop();self.temp.cleanup()
     @staticmethod
-    def successful(_ident,_command,_seconds,record):record.update(status='NATIVE_SUCCEEDED',nativeExitCode=0,dockerExitCode=0,nativeExitMarkerCount=1)
+    def successful(_ident,_command,_seconds,record,_compiler_files=()):record.update(status='NATIVE_SUCCEEDED',nativeExitCode=0,dockerExitCode=0,nativeExitMarkerCount=1)
     def test_failed_capture_keeps_regressions_runnable_but_capture_exit_is_failure(self):
         def failure(*args):args[3].update(status='NATIVE_FAILED',nativeExitCode=2,dockerExitCode=2,nativeExitMarkerCount=1)
         with patch.object(safe,'native',side_effect=failure):self.assertEqual(safe.test(self.root,'capture'),1)
@@ -146,5 +146,136 @@ class SessionTests(unittest.TestCase):
         with patch.object(safe,'native') as native,self.assertRaises(ValueError):safe.test(self.root,'capture')
         native.assert_not_called()
 
+
+
+class CompilerLocatorTests(unittest.TestCase):
+    ASSET = 'Assets/G3/Runtime/G3SceneView.cs'
+    EXPECTED = dict(code='CS1002', path=ASSET, line=12, column=7)
+    LINE = ASSET.encode() + b'(12,7): error CS1002: SYNTHETIC_PRIVATE <License account="hidden"/>\n'
+
+    def test_reviewed_tree_only_and_no_generated_unknown_paths(self):
+        prefix = safe.private.TASK + '/unity/'
+        paths = [prefix + self.ASSET, prefix + 'Assets/../private.cs', prefix + 'Assets/./private.cs',
+                 prefix + 'Assets//private.cs', prefix + 'Assets/secret@example.cs', prefix + 'Assets/Other.txt',
+                 'elsewhere/Assets/Hidden.cs', prefix + 'Assets/' + 'x'*250 + '.cs']
+        with patch.object(safe.private, 'git', return_value='\n'.join(paths)) as git:
+            self.assertEqual(safe.compiler_assets(Path('/synthetic'), IDENT), {self.ASSET})
+        git.assert_called_once_with(Path('/synthetic'), 'ls-tree', '-r', '--name-only', '2'*40, '--', prefix + 'Assets')
+        with patch.object(safe.private, 'git', side_effect=ValueError('SYNTHETIC_PRIVATE')):
+            self.assertEqual(safe.compiler_assets(Path('/synthetic'), IDENT), set())
+
+    def test_invalid_review_source_disables_locations_without_reading_other_commits(self):
+        for commit in ('HEAD', '../private', 'secret@example.invalid', 'f'*41):
+            with patch.object(safe.private, 'git') as git:
+                self.assertEqual(safe.compiler_assets(Path('/synthetic'), dict(IDENT, reviewedCandidateCommit=commit)), set())
+                git.assert_not_called()
+
+    def test_metadata_cancel_does_not_start_native_and_retains_cancelled_cleanup(self):
+        for error in (KeyboardInterrupt(), InterruptedError('SYNTHETIC_PRIVATE')):
+            with tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                value = dict(IDENT, status='READY', activationSucceeded=True, stagesStarted=[], cleanup=None)
+                safe.private.write(safe.file(root, 'session'), value)
+                with patch.object(safe, 'identity', return_value=IDENT), patch.object(safe.private, 'git', side_effect=error), \
+                     patch.object(safe, 'native') as native, \
+                     patch.object(safe.private, 'cleanup', return_value=dict(status='ABSENCE_VERIFIED', removalExitCode=0)) as cleanup:
+                    self.assertEqual(safe.test(root, 'capture'), 1)
+                    native.assert_not_called(); cleanup.assert_called_once_with('lottery-visual-safe-12345-1')
+                record = json.loads(safe.file(root, 'capture').read_text())
+                self.assertEqual(record['status'], 'CANCELLED')
+                self.assertEqual(record['cleanup']['status'], 'ABSENCE_VERIFIED')
+                self.assertEqual(safe.session(root, IDENT)['status'], 'BLOCKED')
+                self.assertNotIn('SYNTHETIC_PRIVATE', json.dumps(record))
+
+    def test_output_limit_or_cancel_preserves_safe_prior_locations_without_raw_details(self):
+        for error, status in [(ValueError('SYNTHETIC_PRIVATE'), 'OUTPUT_LIMIT_OR_INPUT_REJECTED'),
+                              (InterruptedError('SYNTHETIC_PRIVATE'), 'CANCELLED')]:
+            record = safe.process_receipt(IDENT, 'capture')
+            def captured(*args, **kwargs):
+                kwargs['scan'].feed(self.LINE)
+                raise error
+            with patch.object(safe.private, 'captured', side_effect=captured):
+                safe.native(IDENT, 'synthetic', 1, record, [self.ASSET])
+            self.assertEqual(record['compilerErrors'], [self.EXPECTED])
+            self.assertEqual(record['status'], status); self.assertIsNone(record['dockerExitCode'])
+            self.assertNotIn('SYNTHETIC_PRIVATE', json.dumps(record))
+
+    def test_every_chunk_boundary_and_absolute_prefix(self):
+        for data in (self.LINE, b'/github/workspace/tasks/lottery-shop/unity/' + self.LINE):
+            for split in range(len(data)+1):
+                scan = safe.ProcessScan([self.ASSET]); scan.feed(data[:split]); scan.feed(data[split:])
+                self.assertEqual(scan.compiler_errors, [self.EXPECTED])
+        scan = safe.ProcessScan([self.ASSET])
+        for byte in self.LINE: scan.feed(bytes([byte]))
+        self.assertEqual(scan.compiler_errors, [self.EXPECTED])
+
+    def test_unknown_traversal_encoded_control_and_sensitive_path_baits_rejected(self):
+        paths = [b'Assets/Unknown.cs', b'Assets/../G3/Runtime/G3SceneView.cs', b'Assets//G3/Runtime/G3SceneView.cs',
+                 b'Assets/./G3/Runtime/G3SceneView.cs', b'Assets/%2e%2e/private.cs', b'Assets/G3/Runtime/secret@example.cs',
+                 b'/root/.local/private.cs', b'C:\\private\\Assets\\G3SceneView.cs', b'Assets/G3/Runtime/\xff.cs',
+                 b'Assets/G3/Runtime/G3SceneView.cs\x00', b'prefix Assets/G3/Runtime/G3SceneView.cs',
+                 b'<license_xml>Assets/G3/Runtime/G3SceneView.cs']
+        scan = safe.ProcessScan([self.ASSET])
+        for path in paths: scan.feed(path + b'(12,7): error CS1002: SYNTHETIC_PRIVATE\n')
+        self.assertEqual(scan.compiler_errors, [])
+
+    def test_code_and_integer_fields_are_fixed_and_bounded(self):
+        scan = safe.ProcessScan([self.ASSET])
+        for suffix in (b'(0,7): error CS1002:', b'(-1,7): error CS1002:', b'(10000000,7): error CS1002:',
+                       b'(12,7): error CS99999:', b'(12,7): error CSsecret:', b'(12,7): warning CS1002:',
+                       b'(12,secret): error CS1002:'):
+            scan.feed(self.ASSET.encode() + suffix + b' SYNTHETIC_PRIVATE\n')
+        self.assertEqual(scan.compiler_errors, [])
+
+    def test_overlong_prefix_and_forged_midline_header_rejected_and_resync(self):
+        scan = safe.ProcessScan([self.ASSET])
+        scan.feed(b'SYNTHETIC_PRIVATE' * 1000 + self.LINE)
+        self.assertEqual(scan.compiler_errors, [])
+        self.assertLessEqual(len(scan.compiler_prefix), safe.COMPILER_PREFIX_LIMIT)
+        scan.feed(self.LINE); self.assertEqual(scan.compiler_errors, [self.EXPECTED])
+        long_path = b'Assets/' + b'x'*600 + b'.cs(12,7): error CS1002:\n'
+        scan.feed(long_path); self.assertEqual(scan.compiler_errors, [self.EXPECTED])
+
+    def test_long_message_suffix_discarded_with_maximum_24_locations(self):
+        scan = safe.ProcessScan([self.ASSET])
+        scan.feed(self.LINE.rstrip(b'\n') + b'SYNTHETIC_PRIVATE'*1000)
+        self.assertEqual(scan.compiler_errors, [self.EXPECTED]); self.assertEqual(scan.compiler_prefix, b'')
+        scan.feed(b'\n' + self.LINE*40)
+        self.assertEqual(len(scan.compiler_errors), 24)
+        self.assertNotIn('SYNTHETIC_PRIVATE', json.dumps(scan.compiler_errors))
+        self.assertEqual(set(scan.compiler_errors[0]), {'code','path','line','column'})
+
+    def test_native_failure_and_timeout_preserve_only_locations_and_real_exit(self):
+        for timeout in (False, True):
+            record = safe.process_receipt(IDENT, 'capture')
+            def captured(*args, **kwargs):
+                scan = kwargs['scan']; scan.feed(self.LINE + b'SAFE_PROJECT_NATIVE_EXIT_CODE=1\n')
+                if timeout: raise TimeoutError('SYNTHETIC_PRIVATE')
+                return 1, scan
+            with patch.object(safe.private, 'captured', side_effect=captured):
+                safe.native(IDENT, 'synthetic', 1, record, [self.ASSET])
+            self.assertEqual(record['compilerErrors'], [self.EXPECTED]); self.assertEqual(record['nativeExitCode'], 1)
+            self.assertEqual(record['status'], 'PROCESS_TIMEOUT' if timeout else 'NATIVE_FAILED')
+            self.assertEqual(record['dockerExitCode'], None if timeout else 1)
+            self.assertNotIn('SYNTHETIC_PRIVATE', json.dumps(record))
+
+    def test_compiler_signature_does_not_override_existing_exit_verdict_or_license_counts(self):
+        record = safe.process_receipt(IDENT, 'capture')
+        def captured(*args, **kwargs):
+            scan = kwargs['scan']; scan.feed(self.LINE + b'SAFE_PROJECT_NATIVE_EXIT_CODE=0\n'); return 0, scan
+        with patch.object(safe.private, 'captured', side_effect=captured):safe.native(IDENT, 'synthetic', 1, record, [self.ASSET])
+        self.assertEqual(record['status'], 'NATIVE_SUCCEEDED')
+        self.assertEqual(record['observations'], {k:0 for k in safe.private.TOKENS})
+        self.assertEqual(record['compilerErrors'], [self.EXPECTED])
+        scan = safe.ProcessScan([self.ASSET]); data = safe.private.TOKENS['invalidLicenseXml400'] + b'\n' + self.LINE
+        for byte in data:scan.feed(bytes([byte]))
+        self.assertEqual(scan.counts['invalidLicenseXml400'], 1);self.assertEqual(scan.compiler_errors, [self.EXPECTED])
+
+    def test_both_process_streams_are_captured_without_raw_echo(self):
+        command = 'import os;os.write(2,' + repr(self.LINE) + ');os.write(1,b"<license_xml>SYNTHETIC_PRIVATE</license_xml>\\n")'
+        output = io.StringIO()
+        with contextlib.redirect_stdout(output), contextlib.redirect_stderr(output):
+            code, scan = safe.private.captured([sys.executable, '-c', command], 5, scan=safe.ProcessScan([self.ASSET]))
+        self.assertEqual(code, 0);self.assertEqual(scan.compiler_errors, [self.EXPECTED]);self.assertEqual(output.getvalue(), '')
 
 if __name__=='__main__':unittest.main()

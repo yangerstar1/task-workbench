@@ -20,9 +20,60 @@ PHASES = {
 COVERAGE = 'generateAdditionalMetrics;generateHtmlReport;generateBadgeReport;dontClear'
 RETURN_COMMAND = 'unity-editor -logFile /dev/stdout -quit -returnlicense -username "$UNITY_EMAIL" -password "$UNITY_PASSWORD" -projectPath "/BlankProject"'
 MARKER = b'SAFE_PROJECT_NATIVE_EXIT_CODE='
+COMPILER_PREFIX_LIMIT = 512
+COMPILER_ERROR_LIMIT = 24
+COMPILER_ASSET = re.compile(r'Assets/(?:[A-Za-z0-9_.-]+/)*[A-Za-z0-9_.-]+\.cs')
+COMPILER_HEADER = re.compile(rb'(?:/github/workspace/tasks/lottery-shop/unity/)?(Assets/[A-Za-z0-9_./-]+\.cs)\(([1-9][0-9]{0,6}),([1-9][0-9]{0,6})\): error (CS[0-9]{4}):')
+
+
+def compiler_assets(root, ident):
+    # Only names in the independently reviewed commit, never paths from output
+    # or untracked/generated files. Missing metadata disables this optional
+    # diagnostic; it cannot change the existing native/test verdict or guards.
+    try:
+        commit = ident['reviewedCandidateCommit']
+        private.require(re.fullmatch(r'[0-9a-f]{40}', commit), 'COMPILER_SOURCE_REJECTED')
+        prefix = private.TASK + '/unity/'
+        paths = private.git(root, 'ls-tree', '-r', '--name-only', commit, '--', prefix + 'Assets').splitlines()
+        return frozenset(p[len(prefix):] for p in paths if p.startswith(prefix)
+                         and len(p[len(prefix):]) <= 240
+                         and COMPILER_ASSET.fullmatch(p[len(prefix):])
+                         and all(x not in ('.', '..') for x in p[len(prefix):].split('/')))
+    except (KeyboardInterrupt, InterruptedError):
+        raise
+    except Exception:
+        return frozenset()
 
 
 class ProcessScan(private.Scan):
+    def __init__(self, compiler_files=()):
+        super().__init__()
+        self.compiler_files = frozenset(compiler_files)
+        self.compiler_errors = []
+        self.compiler_prefix = b''
+        self.compiler_skip_line = False
+
+    def compiler_feed(self, chunk):
+        if not self.compiler_files or len(self.compiler_errors) >= COMPILER_ERROR_LIMIT:
+            return
+        # A line is eligible only from its actual start. Retain at most the
+        # bounded header, discard every byte after a match/invalid long prefix.
+        for index, part in enumerate(chunk.split(b'\n')):
+            if index:
+                self.compiler_prefix = b''; self.compiler_skip_line = False
+            if self.compiler_skip_line or len(self.compiler_errors) >= COMPILER_ERROR_LIMIT:
+                continue
+            self.compiler_prefix += part[:COMPILER_PREFIX_LIMIT - len(self.compiler_prefix)]
+            match = COMPILER_HEADER.match(self.compiler_prefix)
+            if match:
+                path = match.group(1).decode('ascii')
+                if path in self.compiler_files:
+                    self.compiler_errors.append(dict(code=match.group(4).decode('ascii'), path=path,
+                                                     line=int(match.group(2)), column=int(match.group(3))))
+                self.compiler_skip_line = True; self.compiler_prefix = b''
+            elif len(self.compiler_prefix) == COMPILER_PREFIX_LIMIT:
+                self.compiler_skip_line = True; self.compiler_prefix = b''
+
     def feed(self, chunk):
         self.total += len(chunk)
         private.require(self.total <= private.MAX_OUTPUT, 'OUTPUT_LIMIT')
@@ -33,6 +84,7 @@ class ProcessScan(private.Scan):
             if match.end() > len(self.carry):
                 self.native_exit = int(match.group(1)); self.exit_markers += 1
         self.carry = joined[-256:]
+        self.compiler_feed(chunk)
 
 
 def identity(root):
@@ -58,7 +110,7 @@ def session(root, ident):
 
 def process_receipt(ident, phase):
     return dict(ident, schemaVersion=1, phase=phase, status='NOT_STARTED', dockerExitCode=None, nativeExitCode=None,
-                nativeExitMarkerCount=0, observations={key: 0 for key in private.TOKENS}, cleanup=None,
+                nativeExitMarkerCount=0, observations={key: 0 for key in private.TOKENS}, compilerErrors=[], cleanup=None,
                 image=private.IMAGE, mechanismSourcePin=private.PIN, nativeOutput='BOUNDED_MEMORY_ONLY_NO_RAW_LOG',
                 testVerdict='SEPARATE_EXACT_NUNIT_VALIDATOR_REQUIRED')
 
@@ -67,8 +119,8 @@ def shell(command):
     return 'set +x\nset +v\n' + command + '\ncode=$?\nprintf "\\nSAFE_PROJECT_NATIVE_EXIT_CODE=%d\\n" "$code"\nexit "$code"\n'
 
 
-def native(ident, command, seconds, record):
-    scan = ProcessScan()
+def native(ident, command, seconds, record, compiler_files=()):
+    scan = ProcessScan(compiler_files)
     try:
         code, scan = private.captured(['docker', 'exec', name(ident), '/bin/bash', '-c', command], seconds, scan=scan)
         record['dockerExitCode'] = code
@@ -83,7 +135,8 @@ def native(ident, command, seconds, record):
         record['nativeExitCode'] = scan.native_exit
         record['nativeExitMarkerCount'] = scan.exit_markers
         record['observations'] = scan.counts
-        scan.carry = b''
+        record['compilerErrors'] = scan.compiler_errors
+        scan.carry = b''; scan.compiler_prefix = b''
 
 
 def project_argv(phase, ident):
@@ -154,7 +207,7 @@ def test(root, phase):
         # Fixed native destination only; never reuse a prior stage's XML.
         xml = artifacts / (platform + '-results.xml')
         if xml.exists(): xml.unlink()
-        native(ident, shell(shlex.join(project_argv(phase, ident))), seconds, record)
+        native(ident, shell(shlex.join(project_argv(phase, ident))), seconds, record, compiler_assets(root, ident))
         # Normal NUnit/test failure still permits the other exact suites to run.
         # Missing exits, native licensing failures or synchronous timeouts do not.
         healthy_exit = record['nativeExitMarkerCount'] == 1 and record['nativeExitCode'] == record['dockerExitCode']

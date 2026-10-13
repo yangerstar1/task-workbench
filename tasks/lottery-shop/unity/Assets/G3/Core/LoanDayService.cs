@@ -9,6 +9,36 @@ namespace Lottery.G3.Core
     }
     public sealed partial class DayGameService
     {
+        // A saved chat proposal is non-economic: no cash, quota reservation, debt,
+        // deadline or random draw. Claim uses the existing Borrow transaction ID.
+        public CommandResult RequestPhoneLoan(string contactId,long amountMinor,string claimCommandId,string commandId,long expectedRevision)
+        {
+            return Execute("PHONE_LOAN_REQUEST",commandId,expectedRevision,w=>{w.Write(contactId??"");w.Write(amountMinor);w.Write(claimCommandId??"");},s=>
+            {
+                RequireStable(s);DayRules.ContactLimit(contactId);
+                if(amountMinor<=0)throw new RuleViolation("INVALID_AMOUNT");
+                if(string.IsNullOrWhiteSpace(claimCommandId)||claimCommandId==commandId||claimCommandId.Length>120||claimCommandId.Any(char.IsControl))throw new RuleViolation("INVALID_REQUEST");
+                if(LoanRules.IsFrozen(s,contactId,s.DayNumber))throw new RuleViolation("CONTACT_OVERDUE_FROZEN");
+                if(amountMinor>LoanRules.RemainingLimit(s,contactId))throw new RuleViolation("LOAN_LIMIT");
+                string loanId=s.RunId+":loan:"+claimCommandId;
+                if(s.PhoneEvents.Any(x=>x.Kind=="BORROW_REQUESTED"&&x.LoanId==s.RunId+":loan:"+commandId))throw new RuleViolation("PHONE_REQUEST_EXISTS");
+                if(s.PhoneEvents.Any(x=>x.LoanId==loanId)||s.Commands.Any(x=>x.CommandId==claimCommandId))throw new RuleViolation("PHONE_REQUEST_EXISTS");
+                s.PhoneEvents.Add(new PhoneEvent{EventId=commandId+":request",ContactId=contactId,Kind="BORROW_REQUESTED",LoanId=loanId,AmountMinor=amountMinor,Day=s.DayNumber,DueNight=0});
+                return loanId;
+            });
+        }
+        public CommandResult CancelPhoneLoanRequest(string loanId,string commandId,long expectedRevision)
+        {
+            return Execute("PHONE_LOAN_CANCEL",commandId,expectedRevision,w=>w.Write(loanId??""),s=>
+            {
+                RequireLive(s);
+                var request=s.PhoneEvents.SingleOrDefault(x=>x.Kind=="BORROW_REQUESTED"&&x.LoanId==loanId);
+                if(request==null)throw new RuleViolation("PHONE_REQUEST_NOT_FOUND");
+                if(s.PhoneEvents.Any(x=>x.LoanId==loanId&&(x.Kind=="BORROWED"||x.Kind=="BORROW_CANCELLED")))throw new RuleViolation("PHONE_REQUEST_CLOSED");
+                s.PhoneEvents.Add(new PhoneEvent{EventId=commandId+":cancel",ContactId=request.ContactId,Kind="BORROW_CANCELLED",LoanId=loanId,AmountMinor=request.AmountMinor,Day=s.DayNumber,DueNight=0});
+                return loanId;
+            });
+        }
         public CommandResult Borrow(string contactId,long amountMinor,string commandId,long expectedRevision)
         {
             return Execute("BORROW",commandId,expectedRevision,w=>{w.Write(contactId??"");w.Write(amountMinor);},s=>
@@ -16,7 +46,11 @@ namespace Lottery.G3.Core
                 RequireStable(s);DayRules.ContactLimit(contactId);if(amountMinor<=0)throw new RuleViolation("INVALID_AMOUNT");
                 if(LoanRules.IsFrozen(s,contactId,s.DayNumber))throw new RuleViolation("CONTACT_OVERDUE_FROZEN");
                 var contact=s.Contacts.Single(x=>x.ContactId==contactId);if(amountMinor>DayRules.ContactLimit(contactId)-contact.BorrowedLifetimeMinor)throw new RuleViolation("LOAN_LIMIT");
-                string loanId=s.RunId+":loan:"+commandId;int due=s.DayNumber+DayRules.ContactDueOffset(contactId);
+                string loanId=s.RunId+":loan:"+commandId;
+                var request=s.PhoneEvents.FirstOrDefault(x=>x.Kind=="BORROW_REQUESTED"&&x.LoanId==loanId);
+                if(s.PhoneEvents.Any(x=>x.Kind=="BORROW_CANCELLED"&&x.LoanId==loanId))throw new RuleViolation("PHONE_REQUEST_CLOSED");
+                if(request!=null&&(request.ContactId!=contactId||request.AmountMinor!=amountMinor))throw new RuleViolation("PHONE_REQUEST_MISMATCH");
+                int due=s.DayNumber+DayRules.ContactDueOffset(contactId);
                 s.CashMinor=checked(s.CashMinor+amountMinor);contact.BorrowedLifetimeMinor=checked(contact.BorrowedLifetimeMinor+amountMinor);
                 s.Loans.Add(new LoanRecord{LoanId=loanId,ContactId=contactId,BorrowedMinor=amountMinor,RemainingMinor=amountMinor,BorrowedDay=s.DayNumber,DueNight=due});
                 s.PhoneEvents.Add(new PhoneEvent{EventId=commandId+":borrow",ContactId=contactId,Kind="BORROWED",LoanId=loanId,AmountMinor=amountMinor,Day=s.DayNumber,DueNight=due});return loanId;

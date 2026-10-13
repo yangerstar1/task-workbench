@@ -27,9 +27,12 @@ REQUEST = TASK + "/ci/visual-candidate-request.json"
 WORKFLOW = ".github/workflows/lottery-visual-candidate.yml"
 ASSEMBLY = "Lottery.G3.VisualCandidate.Tests.dll"
 CASE = "Lottery.G3.VisualCandidate.Tests.VisualCandidateCaptureTests.RealRuntimeSixGroupsRetainHudAndRoutePurchasesScratchShelfAndNight"
-FRAMES = ["entry-whole-shop", "table-empty", "number-half", "number-half-20x9",
+BASE_FRAMES = ["entry-whole-shop", "table-empty", "number-half", "number-half-20x9",
           "challenge-two-safe-three-tools", "shelf-before-open", "shelf-after-open",
           "challenge-returned-from-shelf", "closing-day-table", "night-table", "night-bill"]
+PHONE_FRAMES = ["phone-room-standing", "phone-table-before", "phone-contacts", "phone-mom-pending", "phone-mom-claimed", "phone-table-return"]
+FRAMES = BASE_FRAMES[:4] + PHONE_FRAMES + BASE_FRAMES[4:]
+PHONE_VISIBLE_FRAMES = {"phone-room-standing", "phone-contacts", "phone-mom-pending", "phone-mom-claimed"}
 ORIGINAL_G3_FRAMES = ["empty", "number-half", "number-revealed", "number-copy", "number-settled", "configuration", "phone",
                       "challenge-two-safe", "challenge-selected", "shop-shortcut", "shop-physical", "night", "day-end", "challenge-protected"]
 ORIGINAL_G3_CASE = "Lottery.G3.PlayMode.Tests.G3PlayTests.ActualUrpFramesShowOneDayAndDisclosedSeparateProtectedFixture"
@@ -166,7 +169,7 @@ def export_tests(root, stage):
 
 
 def validate_capture(receipt, source, run, attempt, require_complete=True):
-    require(receipt.get("schemaVersion") == 2 and receipt.get("candidatePresentation") == "V13_MORE_NAVIGATION_MEASURED_GEOMETRY_NOT_VISUAL_PASS", "V13 measured presentation receipt required")
+    require(receipt.get("schemaVersion") == 3 and receipt.get("candidatePresentation") == "V16_SELECTED_C_PHYSICAL_PHONE_NOT_VISUAL_PASS", "V16 measured physical-phone receipt required")
     require(receipt.get("scope") == SCOPE and receipt.get("sourceCommit") == source and receipt.get("runId") == run and receipt.get("runAttempt") == attempt, "Capture source/run/attempt mismatch")
     require(receipt.get("unityVersion") == "6000.3.19f1" and receipt.get("graphicsDeviceType") not in (None, "Null"), "Pinned native GPU capture required")
     require(receipt.get("hudVisibilityBasis") == "ENABLED_CAMERA_LAYER_AND_FRUSTUM_TEST_NOT_PIXEL_OCCLUSION", "HUD visibility observation basis missing")
@@ -176,12 +179,16 @@ def validate_capture(receipt, source, run, attempt, require_complete=True):
     require(len(names) == len(set(names)) and all(name in FRAMES for name in names), "Unexpected/duplicate capture names")
     require(len(receipt.get("actions", [])) <= 1200, "Action receipt exceeds bounded scenario")
     if require_complete:
-        require(receipt.get("complete") is True and names == FRAMES, "Six visual groups are incomplete")
+        require(receipt.get("complete") is True and names == FRAMES, "Original eleven and additional six phone frames are incomplete")
     for f in frames:
         require(f.get("file") == f["stage"] + ".png" and HEX64.fullmatch(f.get("sha256", "")), "Invalid frame identity")
         require((f.get("width"), f.get("height")) == ((1600, 720) if f["stage"].endswith("20x9") else (1280, 720)), "Incorrect capture dimensions")
         require(all(HEX64.fullmatch(f.get(k, "")) for k in ("stateSha256", "seedSha256")), "State/seed hash missing")
-        require(f.get("hudVisible") is True and f.get("hudFits") is True and f.get("hudFrustumRendererCount", 0) > 5 and f.get("cameraOrthographic") is False, "Runtime HUD/perspective evidence incomplete")
+        require(f.get("hudFits") is True and f.get("cameraOrthographic") is False, "Runtime label-fit/perspective evidence incomplete")
+        phone_closeup = f["stage"] in {"phone-contacts", "phone-mom-pending", "phone-mom-claimed"}
+        require(type(f.get("hudVisible")) is bool and type(f.get("hudFrustumRendererCount")) is int and f["hudFrustumRendererCount"] >= 0, "HUD visibility observation missing")
+        if not phone_closeup:
+            require(f["hudVisible"] is True and f["hudFrustumRendererCount"] > 5, "Normal runtime HUD evidence incomplete")
         require(f.get("importedRendererCount", 0) > 10 and f.get("inputUpdates", 0) > 0, "Real imported model/input evidence missing")
         ratio = f.get("hudOpaqueAreaRatio")
         require(type(ratio) in (int, float) and math.isfinite(ratio) and 0 <= ratio <= 1.00001, "HUD opaque-area observation missing or invalid")
@@ -191,9 +198,23 @@ def validate_capture(receipt, source, run, attempt, require_complete=True):
         require(all(type(f.get(key)) is int and f[key] >= 0 for key in ("renderedShopRendererCount", "renderedShopMaterialCount")), "Rendered shop resource counts missing")
         tool_bounds = f.get("toolPresentationBounds")
         require(isinstance(tool_bounds, list) and len(tool_bounds) == 3, "Three tool projection observations required")
-        for rect in [f.get("paperPresentationBounds")] + tool_bounds:
+        for rect in [f.get("paperPresentationBounds"), f.get("phoneScreenBounds")] + tool_bounds:
             require(isinstance(rect, dict) and set(rect) == {"x", "y", "width", "height"} and all(type(v) in (int, float) and math.isfinite(v) for v in rect.values()), "Invalid projection observation")
             require(rect["width"] >= 0 and rect["height"] >= 0, "Negative projection size")
+        require(type(f.get("phoneFocused")) is bool, "Phone focus observation missing")
+        require(f.get("phoneWorldObjectActive") is True and type(f.get("phoneActiveRendererCount")) is int and f["phoneActiveRendererCount"] > 2, "Persistent world phone was disabled")
+        require(type(f.get("phoneInstanceId")) is int and -2147483648 <= f["phoneInstanceId"] <= 2147483647 and f["phoneInstanceId"] != 0, "Phone instance identity missing")
+        require(all(type(f.get(key)) in (int, float) and math.isfinite(f[key]) for key in ("phoneScreenMinDepth", "phoneScreenMaxDepth", "phonePlaneCameraAbsCosine")), "Invalid phone plane observation")
+        for key in ("phoneFrustumRendererCount", "cashMinor", "motherDebtMinor", "motherLifetimeMinor", "loanCount", "ledgerCount", "phoneEventCount"):
+            require(type(f.get(key)) is int and f[key] >= 0, "Invalid phone/finance observation")
+        if f["stage"] in PHONE_VISIBLE_FRAMES:
+            require(f["phoneFrustumRendererCount"] > 2, "Physical phone renderers missing")
+            require(0 < f["phoneScreenMinDepth"] <= f["phoneScreenMaxDepth"] and .2 < f["phonePlaneCameraAbsCosine"] <= 1.00001, "Phone plane is behind camera or edge-on")
+            rect = f["phoneScreenBounds"]
+            require(rect["width"] > 2 and rect["height"] > 2 and rect["x"] >= 0 and rect["y"] >= 0 and rect["x"] + rect["width"] <= f["width"] and rect["y"] + rect["height"] <= f["height"], "Phone screen lies outside capture")
+        if f["stage"] in PHONE_FRAMES:
+            require(HEX64.fullmatch(f.get("ticketContentSha256", "")), "Confirmed ticket content observation missing")
+            require(HEX64.fullmatch(f.get("ticketMaskSha256", "")) and isinstance(f.get("ticketId"), str) and 0 < len(f["ticketId"]) <= 256 and f.get("ticketPhase") == "ACTIVE" and f.get("revealedCells") == 3, "Phone must preserve the actual half-scratched active ticket")
         # These observations intentionally do not confer art/layout acceptance.
 
     if require_complete:
@@ -206,6 +227,25 @@ def validate_capture(receipt, source, run, attempt, require_complete=True):
         require(by_name["night-table"]["dayPhase"] == "NIGHT_BILL" and by_name["night-table"]["panel"] == "None", "Night table hidden by modal or not actually night")
         require(len(by_name["challenge-two-safe-three-tools"]["currentTools"]) == 3, "Three current ticket tools missing")
         require(by_name["number-half"]["revealedCells"] == 3, "Number half state mismatch")
+        require(len({f["phoneInstanceId"] for f in frames}) == 1, "The persistent phone was replaced between views")
+        phone = [by_name[name] for name in PHONE_FRAMES]
+        before, contacts, pending, claimed, returned = [by_name[name] for name in PHONE_FRAMES[1:]]
+        for frame in phone:
+            for key in ("ticketId", "ticketPhase", "ticketMaskSha256", "ticketContentSha256", "currentTools", "nextTools", "revealedCells"):
+                require(frame.get(key) == before.get(key), "Phone route changed confirmed ticket/tool state")
+        require(phone[0]["stateSha256"] == before["stateSha256"] == contacts["stateSha256"], "Phone navigation changed saved state")
+        require(claimed["stateSha256"] == returned["stateSha256"], "Closing phone changed saved state")
+        require([f["phoneFocused"] for f in phone] == [False, False, True, True, True, False], "Phone focus sequence mismatch")
+        for key in ("cashMinor", "motherDebtMinor", "motherLifetimeMinor", "loanCount", "ledgerCount"):
+            require(pending[key] == before[key], "Pending request changed economic state")
+        require(pending["phoneEventCount"] == before["phoneEventCount"] + 1, "Pending request must add exactly one saved event")
+        for key in ("cashMinor", "motherDebtMinor", "motherLifetimeMinor"):
+            require(claimed[key] == pending[key] + 10000, "1000 game-coin loan requires exactly 10000 minor units")
+        for key in ("loanCount", "ledgerCount", "phoneEventCount"):
+            require(claimed[key] == pending[key] + 1, "Claim must add one loan/ledger/event")
+        for key in ("cashMinor", "motherDebtMinor", "motherLifetimeMinor", "loanCount", "ledgerCount", "phoneEventCount"):
+            require(returned[key] == claimed[key], "Closing phone changed loan evidence")
+        require(all(before[key] == returned[key] for key in ("cameraPosition", "cameraEuler", "cameraFov")), "Phone close did not restore table camera")
     return frames
 
 
@@ -271,7 +311,9 @@ def export_original_g3_captures(root):
     # identities. A prior JSON saying Passed cannot substitute for native XML.
     export_tests(root, "regression-play")
     tests = read_json(outdir(root) / "regression-play/test-receipt.json")
-    require(tests["allExpectedPassed"] is True and tests["expectedCases"] == 32, "Original exact PlayMode suite did not pass")
+    expected_play_count = sum(len(cases) for contract in ("g2", "g3")
+                              for cases in read_json(root / TASK / ("ci/" + contract + "-test-contract.json"))["profiles"]["play"].values())
+    require(tests["allExpectedPassed"] is True and tests["expectedCases"] == expected_play_count, "Expanded exact PlayMode suite did not pass")
     case = [c for c in tests["cases"] if c["fullname"] == ORIGINAL_G3_CASE]
     require(len(case) == 1 and case[0]["result"] == "Passed", "Original G3 frame test did not pass")
     source = original_g3_source(root)
@@ -289,7 +331,7 @@ def export_original_g3_captures(root):
     write(destination / "export-receipt.json", dict(schemaVersion=1, scope=SCOPE,
           sourceCommit=ident["sourceCommit"], runId=ident["runId"], runAttempt=ident["runAttempt"],
           evidenceGroup="EXISTING_G3_14_FRAMES_SEPARATE_FROM_NEW_11_FRAME_FIXTURE", originalCase=ORIGINAL_G3_CASE,
-          originalCaseResult="Passed", exactPlayModeCases=32, rawXmlSha256=tests["rawXmlSha256"],
+          originalCaseResult="Passed", exactPlayModeCases=tests["expectedCases"], rawXmlSha256=tests["rawXmlSha256"],
           legacyReceiptSha256=sha(source / "render-receipt.json"), preparationReceiptSha256=sha(outdir(root) / "original-g3-preparation.json"),
           legacyReceiptRunAttempt="NOT_PRESENT_IN_LEGACY_SCHEMA", attemptBinding="FIXED_OUTPUTS_CLEARED_BEFORE_THIS_ATTEMPT_AND_RECREATED_AFTER_PREPARATION",
           mainDayFrames=ORIGINAL_G3_FRAMES[:-1], separateProtectedFixtureFrame="challenge-protected",
@@ -346,7 +388,7 @@ def validate_progress(value, kind, source, run, attempt):
         require(isinstance(event["utc"], str) and len(event["utc"]) <= 40, "Invalid progress timestamp")
         timestamp = datetime.fromisoformat(event["utc"].replace("Z", "+00:00"))
         require(timestamp.tzinfo is not None and timestamp.utcoffset().total_seconds() == 0, "Progress timestamp must be UTC")
-        for key, low, high in (("inputUpdates", 0, 100000), ("frameCount", 0, 11), ("purchased", -1, 12), ("settled", -1, 12)):
+        for key, low, high in (("inputUpdates", 0, 100000), ("frameCount", 0, len(FRAMES)), ("purchased", -1, 12), ("settled", -1, 12)):
             require(type(event[key]) is int and low <= event[key] <= high, "Invalid bounded progress counter")
         require(event["dayPhase"] in {"UNAVAILABLE", "DAY_OPEN", "CLOSING_PREP", "NIGHT_BILL", "DAY_COMPLETE", "RUN_FAILED"}, "Invalid progress day phase")
     require(events[0]["stage"] == {"prebuild": "prebuild-begin", "runtime": "runtime-setup-begin", "lifecycle": "editor-exiting-edit-mode"}[kind], "Missing initial progress milestone")

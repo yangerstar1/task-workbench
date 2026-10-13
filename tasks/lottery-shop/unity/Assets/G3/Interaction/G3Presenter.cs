@@ -9,7 +9,7 @@ using UnityEngine;
 namespace Lottery.G3.Interaction
 {
     // Sole UI command gateway: every physical/quick entry shares this presenter.
-    public sealed class G3Presenter : MonoBehaviour
+    public sealed partial class G3Presenter : MonoBehaviour
     {
         DayGameService service;G3SceneView view;RunState confirmed;
         readonly List<CellStroke> strokes=new List<CellStroke>();
@@ -68,6 +68,7 @@ namespace Lottery.G3.Interaction
             // is selected. Never use the general panel's automatic QuickReveal here.
             if(panel==G3Panel.QaEvidence){OpenEvidence();return;}
             if(panel==G3Panel.Settings){if(strokes.Count>0)return;if(Panel!=G3Panel.Settings)settingsReturn=Panel;Router?.ReleaseCapture();Panel=panel;Refresh();return;}
+            if(G3PhoneDisplay.HandlesPanel(panel)){Router?.ReleaseCapture();Panel=panel;Refresh();return;}
             ticketRulesReturn=Panel==G3Panel.Tickets&&panel==G3Panel.Rules;
             FlushScratch();if(IsCommitting)return;Router?.ReleaseCapture();
             var t=Snapshot.CurrentTicket;
@@ -81,6 +82,7 @@ namespace Lottery.G3.Interaction
         }
         public void Execute(G3Action a)
         {
+            if(ExecutePhone(a))return;
             if(a.Kind==G3ActionKind.Open&&(a.Slot==(int)G3Panel.QaEvidence||a.Slot==(int)G3Panel.Settings)){OpenPanel((G3Panel)a.Slot);return;}
             if(a.Kind==G3ActionKind.CopyEvidence){CopyEvidence();return;}
             if(a.Kind==G3ActionKind.ScrollEvidence){ScrollEvidence(a.Slot);return;}
@@ -190,8 +192,8 @@ namespace Lottery.G3.Interaction
                 case G3ActionKind.Remove:Run((id,r)=>service.EquipTool("",a.Slot,id,r),revision);break;
                 case G3ActionKind.UseDrawer:if(ticket!=null)Run((id,r)=>service.UseConsumable(ticket,a.Slot,new int[0],id,r),revision,()=>Panel=G3Panel.None);break;
                 case G3ActionKind.Borrow:Run((id,r)=>service.Borrow(a.Key,a.Amount,id,r),revision);break;
-                case G3ActionKind.RepayLoan:Run((id,r)=>service.RepayLoan(a.Key,a.Amount,id,r),revision);break;
-                case G3ActionKind.RepayPrincipal:Run((id,r)=>service.RepayPrincipal(a.Amount,id,r),revision);break;
+                case G3ActionKind.RepayLoan:Run((id,r)=>service.RepayLoan(a.Key,a.Amount,id,r),revision,()=>{Panel=G3Panel.Contact;Status="已归还 "+G3Text.Contact(a.Key)+" "+G3Text.Money(a.Amount)+" 游戏金币，记录已保存。";});break;
+                case G3ActionKind.RepayPrincipal:Run((id,r)=>service.RepayPrincipal(a.Amount,id,r),revision,()=>{Panel=G3Panel.Phone;Status="已归还主债本金 "+G3Text.Money(a.Amount)+" 游戏金币。";});break;
                 case G3ActionKind.BeginClosing:Run((id,r)=>service.BeginClosing(id,r),revision,()=>Panel=G3Panel.Bill);break;
                 case G3ActionKind.EnterNight:Run((id,r)=>service.EnterNightBill(id,r),revision,()=>Panel=G3Panel.Bill);break;
                 case G3ActionKind.PayNight:Run((id,r)=>service.PayNightBill(a.Slot==1,id,r),revision,()=>Panel=G3Panel.Bill);break;
@@ -219,9 +221,9 @@ namespace Lottery.G3.Interaction
             if(informationLamp)Run((id,r)=>service.UseLamp(t.Id,targets[0],id,r),-1,()=>Panel=G3Panel.None);
             else Run((id,r)=>service.UseConsumable(t.Id,informationDrawer,targets,id,r),-1,()=>Panel=G3Panel.None);
         }
-        void Run(Func<string,long,CommandResult> call,long revision=-1,Action success=null)
+        void Run(Func<string,long,CommandResult> call,long revision=-1,Action success=null,string commandId=null)
         {
-            if(IsCommitting)return;string id="g3-ui-"+Guid.NewGuid().ToString("N");long rev=revision<0?Snapshot.Revision:revision;
+            if(IsCommitting)return;string id=commandId??("g3-ui-"+Guid.NewGuid().ToString("N"));long rev=revision<0?Snapshot.Revision:revision;
             pendingId=id;retry=()=>call(id,rev);unknown=false;if(success!=null)afterCommit=success;
             Handle(retry());
         }
@@ -306,6 +308,7 @@ namespace Lottery.G3.Interaction
         void ClearBoost(){boostSlot=-1;boostStockId="";boostRunId="";}
         void ClosePanel()
         {
+            if(PhoneVisible&&!IsCommitting){ClosePhonePage();return;}
             if(Panel==G3Panel.QaEvidence){Panel=G3Panel.Settings;Router?.ReleaseCapture();Refresh();return;}
             if(Panel==G3Panel.Settings){Panel=settingsReturn;Router?.ReleaseCapture();Refresh();return;}
             if(IsCommitting)return;
@@ -324,6 +327,7 @@ namespace Lottery.G3.Interaction
         static string ItemName(StockItem s)=>s.IsConsumable?DayRules.ConsumableName(s.ItemId):DayRules.Tool(s.ItemId).Name;
         public G3PanelModel BuildPanel()
         {
+            if(PhoneVisible)return BuildPhonePanel();
             var m=new G3PanelModel();var s=Snapshot;var t=s.CurrentTicket;var bill=service.PreviewNightBill();
             bool terminal=s.Phase==DayPhase.DAY_COMPLETE||s.Phase==DayPhase.RUN_FAILED;
             switch(Panel)
@@ -373,15 +377,6 @@ namespace Lottery.G3.Interaction
                     for(int i=0;i<2;i++){var d=s.Drawers[i];m.Add("drawer-"+i,d==null?"抽屉 "+(i+1)+" · 空位":G3Text.Quality(d.Quality)+DayRules.ConsumableName(d.ItemId)+"\n"+(d.ItemId=="boost_coupon"?"预选下一号码票使用":"查看并确认本票使用"),new G3Action(G3ActionKind.UseDrawer,slot:i),d!=null&&!terminal);}
                     bool hasLamp=t!=null&&t.ConfigurationSnapshot.Any(x=>x.ItemId=="inspection_lamp");
                     m.Add("lamp",!hasLamp?"本张无灯 · 下张才生效":t.LampUsed?"本票已用检票灯":"使用本张检票灯",new G3Action(G3ActionKind.UseLamp),hasLamp&&t.TicketType=="challenge"&&!t.LampUsed&&t.SelectedCell<0&&t.Phase==TicketPhase.ACTIVE);break;
-                case G3Panel.Phone:
-                    m.Title="手机 · 游戏中的虚构联系人";m.Body="今晚主债 "+G3Text.Money(bill.TotalDueMinor)+"；可用现金 "+G3Text.Money(s.AvailableCashMinor)+"\n亲友欠款无息。到期当晚可处理，次日逾期才冻结该人新增借款。";
-                    foreach(var contact in s.Contacts){long debt=s.Loans.Where(x=>x.ContactId==contact.ContactId).Sum(x=>x.RemainingMinor),cap=contact.ContactId=="mother"?50000:30000;m.Add("contact-"+contact.ContactId,G3Text.Contact(contact.ContactId)+" · 尚欠 "+G3Text.Money(debt)+"\n未用累计额度 "+G3Text.Money(cap-contact.BorrowedLifetimeMinor),new G3Action(G3ActionKind.InspectContact,contact.ContactId));}
-                    m.Add("principal","主动归还主债本金",new G3Action(G3ActionKind.RepayPrincipal,amount:-1),!terminal);m.Add("phone-bill","查看今晚账单",new G3Action(G3ActionKind.Open,slot:(int)G3Panel.Bill));break;
-                case G3Panel.Contact:
-                    var c=s.Contacts.First(x=>x.ContactId==selectedContact);var loans=s.Loans.Where(x=>x.ContactId==selectedContact&&x.RemainingMinor>0).OrderBy(x=>x.DueNight).ToArray();long outstanding=loans.Sum(x=>x.RemainingMinor);long capacity=(selectedContact=="mother"?50000:30000)-c.BorrowedLifetimeMinor;
-                    m.Title=G3Text.Contact(selectedContact)+" · 借还款";m.Grid=true;m.Body="尚欠 "+G3Text.Money(outstanding)+"；累计已借 "+G3Text.Money(c.BorrowedLifetimeMinor)+"；剩余额度 "+G3Text.Money(capacity)+"\n"+(loans.Length==0?"当前没有未还借款。":"最近到期：第 "+loans[0].DueNight+" 晚；该笔尚欠 "+G3Text.Money(loans[0].RemainingMinor))+"\n"+PhoneHistory(s,selectedContact);
-                    m.Add("borrow-1000","借入 1000",new G3Action(G3ActionKind.Borrow,selectedContact,amount:10000),!terminal);m.Add("borrow-2000","借入 2000",new G3Action(G3ActionKind.Borrow,selectedContact,amount:20000),!terminal);
-                    m.Add("borrow-custom","自定借入金额",new G3Action(G3ActionKind.Borrow,selectedContact,amount:-1),!terminal);m.Add("repay-1000","归还 1000",new G3Action(G3ActionKind.RepayLoan,selectedContact,amount:10000),!terminal&&outstanding>0);m.Add("repay-custom","自定归还金额",new G3Action(G3ActionKind.RepayLoan,selectedContact,amount:-1),!terminal&&outstanding>0);break;
                 case G3Panel.CustomAmount:
                     m.Title="输入准确金币金额";m.Body="金额："+(customAmount.Length==0?"0":customAmount)+"\n最多一位小数，确认后再显示完整交易说明。";m.Grid=true;m.LargeGrid=true;
                     foreach(var digit in new[]{"1","2","3","4","5","6","7","8","9",".","0"})m.Add("digit-"+digit,digit,new G3Action(G3ActionKind.Digit,digit));m.Add("digit-del","退格",new G3Action(G3ActionKind.Backspace));m.Add("amount-accept","核对金额",new G3Action(G3ActionKind.AmountAccept));break;
@@ -415,11 +410,6 @@ namespace Lottery.G3.Interaction
                     m.Title="请核对这笔操作";m.Body=confirmText;m.Add("confirm-action","确认",new G3Action(G3ActionKind.Confirm));m.Add("cancel-action","取消",new G3Action(G3ActionKind.Cancel));break;
             }
             m.Footnote=ticketRulesReturn&&Panel==G3Panel.Rules?"返回将继续这次购票，冲奖预选保留。":Panel==G3Panel.Rules&&!string.IsNullOrEmpty(s.FixtureLabel)?"诊断标记："+s.FixtureLabel:Status;return m;
-        }
-        static string PhoneHistory(RunState s,string contact)
-        {
-            var events=s.PhoneEvents.Where(x=>x.ContactId==contact).Reverse().Take(2).Reverse();
-            return string.Join("\n",events.Select(x=>(x.Kind=="REPAID"?"已归还 ":"借款到账 ")+G3Text.Money(x.AmountMinor)+(x.DueNight>0?" · 第 "+x.DueNight+" 晚到期":"")));
         }
         public static string CurrentConfiguration(RunState s)=>s.CurrentTicket==null?"尚未购票":string.Join(" / ",Enumerable.Range(0,3).Select(i=>{var t=s.CurrentTicket.ConfigurationSnapshot.SingleOrDefault(x=>x.TableSlot==i);return (i+1)+":"+(t==null?"空":G3Text.Tool(t.ItemId)+t.Level);}));
         public static string NextConfiguration(RunState s)=>string.Join(" / ",s.NextToolIds.Select((id,i)=>(i+1)+":"+(string.IsNullOrEmpty(id)?"空":G3Text.Tool(id)+s.Tools.First(x=>x.ItemId==id).Level)));

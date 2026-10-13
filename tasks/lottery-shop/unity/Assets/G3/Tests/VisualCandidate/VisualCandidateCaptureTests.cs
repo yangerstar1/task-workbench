@@ -34,6 +34,7 @@ namespace Lottery.G3.VisualCandidate.Tests
         { "Probe Camera", "Probe Key Light", "Render capability sample", "Probe Overlay", "G3 One Day Whitebox" };
         Scene prior, scene;
         G3SliceBootstrap app;
+        G3PhoneDisplay phoneIdentity;
         FileStateStore store;
         Mouse mouse;
         Keyboard keyboard;
@@ -312,6 +313,7 @@ namespace Lottery.G3.VisualCandidate.Tests
             app = new GameObject("Visual candidate real G3 bootstrap").AddComponent<G3SliceBootstrap>();
             app.Initialize(new DayGameService(store), null, store);
             Router.PollAutomatically = false;
+            phoneIdentity = P.View.Phone;
             BindTarget(1280, 720);
             Physics.SyncTransforms();
             yield return null;
@@ -398,6 +400,7 @@ namespace Lottery.G3.VisualCandidate.Tests
             Capture("number-half-20x9", "SAME_STATE_ALTERNATE_ASPECT");
             Assert.That(StateCodec.ComputeHash(State), Is.EqualTo(halfHash));
             BindTarget(1280, 720); yield return null;
+            yield return PhysicalPhoneBorrowKeepsConfirmedTicket();
             QuickRevealNumber(); Claim();
             BuyStock("inspection_lamp"); Equip("inspection_lamp", 1);
             BuyStock("large_prize_stamp"); Equip("large_prize_stamp", 2);
@@ -415,7 +418,7 @@ namespace Lottery.G3.VisualCandidate.Tests
             P.View.Walk.SetPose(P.View.Environment.StandPosition, P.View.Environment.StandYaw);
             Observe("fixture-position-normal-stand-start");
             yield return WalkTo(new Vector3(0, 0, 1.15f));
-            yield return WalkTo(new Vector3(-.95f, 0, 1.15f));
+            yield return WalkTo(new Vector3(.95f, 0, 1.15f));
             yield return WalkTo(P.View.Environment.ShelfViewPosition);
             yield return Face(P.View.Environment.ShelfTargetPosition);
             yield return null; Capture("shelf-before-open", "KEYBOARD_TRAVERSED_PLAYER_VIEW");
@@ -434,7 +437,7 @@ namespace Lottery.G3.VisualCandidate.Tests
             Close();
             Assert.That(app.SceneCamera.transform.position, Is.EqualTo(pose));
             Assert.That(app.SceneCamera.transform.rotation, Is.EqualTo(rotation));
-            yield return WalkTo(new Vector3(-.95f, 0, 1.15f));
+            yield return WalkTo(new Vector3(.95f, 0, 1.15f));
             yield return WalkTo(new Vector3(0, 0, 1.15f));
             yield return WalkTo(P.View.Environment.StandPosition);
             Click("stand");
@@ -467,12 +470,120 @@ namespace Lottery.G3.VisualCandidate.Tests
             Assert.That(app.SceneCamera.transform.rotation, Is.EqualTo(dayRotation));
             Capture("night-table", "SAME_CAMERA_AS_CLOSING_DAY_WITH_BILL_CLOSED");
             Click("open-bill"); yield return null; Capture("night-bill", "NORMAL_BILL_INFORMATION_HIERARCHY");
-            Assert.That(frames.Count, Is.EqualTo(11));
+            Assert.That(frames.Count, Is.EqualTo(17));
             // Returning to the same confirmed ticket may correctly produce identical pixels.
             Assert.That(frames.Single(x => x.stage == "shelf-before-open").sha256, Is.Not.EqualTo(frames.Single(x => x.stage == "shelf-after-open").sha256));
             Assert.That(frames.Single(x => x.stage == "closing-day-table").sha256, Is.Not.EqualTo(frames.Single(x => x.stage == "night-table").sha256));
             WriteReceipt(true);
             Milestone("scenario-complete");
+        }
+
+        // Six additional frames exercise one production phone flow inside the
+        // original capture test. They are not six independent NUnit tests.
+        IEnumerator PhysicalPhoneBorrowKeepsConfirmedTicket()
+        {
+            Assert.That(P.View.Phone, Is.Not.Null);
+            Assert.That(P.View.Phone.transform.IsChildOf(app.SceneCamera.transform), Is.False, "Phone must be a world object, not a camera overlay");
+            var before = State.Copy();
+            Click("stand");
+            var at = P.View.Environment.StandPosition;
+            var offset = P.View.Phone.WorldBounds.center - (at + Vector3.up * 1.58f);
+            float yaw = Mathf.Atan2(offset.x, offset.z) * Mathf.Rad2Deg;
+            float pitch = Mathf.Atan2(-offset.y, new Vector2(offset.x, offset.z).magnitude) * Mathf.Rad2Deg;
+            P.View.Walk.SetPose(at, yaw, pitch); P.View.Layout(); Physics.SyncTransforms();
+            Observe("fixture-position-standing-phone-camera"); yield return null;
+            Capture("phone-room-standing", "FIXTURE_POSITIONED_STANDING_PHONE_VIEW");
+            Click("stand"); yield return null;
+            Assert.That(StateCodec.ComputeHash(State), Is.EqualTo(StateCodec.ComputeHash(before)));
+            Capture("phone-table-before", "NORMAL_SEATED_CONFIRMED_TICKET_BEFORE_PHONE");
+            var tablePosition = app.SceneCamera.transform.position;
+            var tableRotation = app.SceneCamera.transform.rotation; float tableFov = app.SceneCamera.fieldOfView;
+            Click("open-phone"); yield return null;
+            Assert.That(P.View.Phone.IsFocused, Is.True);
+            Assert.That(StateCodec.ComputeHash(State), Is.EqualTo(StateCodec.ComputeHash(before)));
+            Capture("phone-contacts", "PRODUCTION_FOCUSED_WORLD_PHONE_CAMERA");
+            Click("contact-mother"); Click("phone-choose");
+            long borrowAmount = P.BuildPanel().Cards.Single(x => x.Id == "borrow-1000").Action.Amount;
+            Assert.That(borrowAmount, Is.EqualTo(10000)); Assert.That(G3Text.Money(borrowAmount), Is.EqualTo("1000"));
+            Click("borrow-1000");
+            Assert.That(StateCodec.ComputeHash(State), Is.EqualTo(StateCodec.ComputeHash(before)), "Choosing an amount is not a loan");
+            var sendPoint = P.View.ButtonRect("phone-send").center;
+            MouseEvent(sendPoint, true);
+            Assert.That(StateCodec.ComputeHash(State), Is.EqualTo(StateCodec.ComputeHash(before)), "Phone actions execute on release, never press");
+            Router.NotifyFocus(false); Router.NotifyFocus(true); MouseEvent(sendPoint, false);
+            Assert.That(StateCodec.ComputeHash(State), Is.EqualTo(StateCodec.ComputeHash(before)), "A focus-cancelled send must not persist a request");
+            Assert.That(P.Panel, Is.EqualTo(G3Panel.PhoneRequest)); Observe("phone-send-focus-cancelled-no-request");
+            Click("phone-send"); yield return null;
+            var pending = State.Copy();
+            AssertPhoneEconomyUnchanged(before, pending);
+            Assert.That(pending.PhoneEvents.Count, Is.EqualTo(before.PhoneEvents.Count + 1));
+            var requested = pending.PhoneEvents.Single(x => !before.PhoneEvents.Any(y => y.EventId == x.EventId));
+            Assert.That(requested.Kind, Is.EqualTo("BORROW_REQUESTED"));
+            Assert.That(requested.ContactId, Is.EqualTo("mother")); Assert.That(requested.AmountMinor, Is.EqualTo(borrowAmount));
+            Assert.That(pending.Revision, Is.EqualTo(before.Revision + 1));
+            Assert.That(pending.Commands.Count, Is.EqualTo(before.Commands.Count + 1));
+            Capture("phone-mom-pending", "PRODUCTION_WORLD_PHONE_PERSISTED_REQUEST_NOT_MONEY");
+            var packetPoint = P.View.ButtonRect("packet-pending").center;
+            MouseEvent(packetPoint, true); MouseEvent(packetPoint + Vector2.up * 24, true);
+            MouseEvent(packetPoint, true); MouseEvent(packetPoint, false);
+            Assert.That(StateCodec.ComputeHash(State), Is.EqualTo(StateCodec.ComputeHash(pending)), "Dragging across a packet cannot claim it");
+            Assert.That(P.Panel, Is.EqualTo(G3Panel.Contact)); Observe("phone-packet-scroll-no-claim");
+            Click("packet-pending"); Assert.That(StateCodec.ComputeHash(State), Is.EqualTo(StateCodec.ComputeHash(pending)));
+            Click("phone-claim"); yield return null;
+            var claimed = State.Copy(); AssertTicketAndDrawsUnchanged(before, claimed);
+            Assert.That(claimed.CashMinor, Is.EqualTo(pending.CashMinor + borrowAmount));
+            Assert.That(MotherDebt(claimed), Is.EqualTo(MotherDebt(pending) + borrowAmount));
+            Assert.That(MotherLifetime(claimed), Is.EqualTo(MotherLifetime(pending) + borrowAmount));
+            Assert.That(claimed.Loans.Count, Is.EqualTo(pending.Loans.Count + 1));
+            var loan = claimed.Loans.Single(x => !pending.Loans.Any(y => y.LoanId == x.LoanId));
+            Assert.That(loan.ContactId, Is.EqualTo("mother")); Assert.That(loan.BorrowedMinor, Is.EqualTo(borrowAmount));
+            Assert.That(loan.RemainingMinor, Is.EqualTo(borrowAmount));
+            Assert.That(claimed.PhoneEvents.Count, Is.EqualTo(pending.PhoneEvents.Count + 1));
+            var received = claimed.PhoneEvents.Single(x => !pending.PhoneEvents.Any(y => y.EventId == x.EventId));
+            Assert.That(received.Kind, Is.EqualTo("BORROWED")); Assert.That(received.ContactId, Is.EqualTo("mother"));
+            Assert.That(received.AmountMinor, Is.EqualTo(borrowAmount)); Assert.That(received.LoanId, Is.EqualTo(loan.LoanId));
+            Assert.That(requested.LoanId, Is.EqualTo(loan.LoanId));
+            Assert.That(claimed.Ledger.Count, Is.EqualTo(pending.Ledger.Count + 1));
+            Assert.That(claimed.Ledger.Last().DeltaMinor, Is.EqualTo(borrowAmount));
+            Assert.That(claimed.Ledger.Last().BalanceMinor, Is.EqualTo(claimed.CashMinor));
+            Assert.That(claimed.Revision, Is.EqualTo(pending.Revision + 1));
+            Assert.That(claimed.Commands.Count, Is.EqualTo(pending.Commands.Count + 1));
+            Assert.That(P.View.HasButton("phone-claim"), Is.False, "Claimed packet must not offer another payout");
+            Capture("phone-mom-claimed", "PRODUCTION_WORLD_PHONE_SINGLE_COMMITTED_LOAN");
+            Click("close-phone"); yield return null;
+            Assert.That(P.View.Phone.IsFocused, Is.False); Assert.That(P.Panel, Is.EqualTo(G3Panel.None));
+            Assert.That(StateCodec.ComputeHash(State), Is.EqualTo(StateCodec.ComputeHash(claimed)), "Closing the phone cannot mutate saved state");
+            AssertTicketAndDrawsUnchanged(before, State);
+            Assert.That(app.SceneCamera.transform.position, Is.EqualTo(tablePosition));
+            Assert.That(app.SceneCamera.transform.rotation, Is.EqualTo(tableRotation));
+            Assert.That(app.SceneCamera.fieldOfView, Is.EqualTo(tableFov));
+            Capture("phone-table-return", "NORMAL_SEATED_SAME_TICKET_AFTER_PHONE");
+        }
+        static long MotherDebt(RunState value) => value.Loans.Where(x => x.ContactId == "mother").Sum(x => x.RemainingMinor);
+        static long MotherLifetime(RunState value) => value.Contacts.Single(x => x.ContactId == "mother").BorrowedLifetimeMinor;
+        static string TicketContentHash(TicketState ticket) => ticket == null ? "NONE" : StateCodec.HashBytes(Encoding.UTF8.GetBytes(JsonUtility.ToJson(ticket)));
+        static void AssertTicketAndDrawsUnchanged(RunState before, RunState after)
+        {
+            Assert.That(TicketContentHash(after.CurrentTicket), Is.EqualTo(TicketContentHash(before.CurrentTicket)));
+            Assert.That(after.CurrentTicket.Id, Is.EqualTo(before.CurrentTicket.Id));
+            Assert.That(after.CurrentTicket.Phase, Is.EqualTo(before.CurrentTicket.Phase));
+            Assert.That(after.CurrentTicket.Scratch.ToBytes(), Is.EqualTo(before.CurrentTicket.Scratch.ToBytes()));
+            Assert.That(after.NextToolIds, Is.EqualTo(before.NextToolIds));
+            Assert.That(after.TicketsPurchasedToday, Is.EqualTo(before.TicketsPurchasedToday));
+            Assert.That(after.SettledTicketCount, Is.EqualTo(before.SettledTicketCount));
+            Assert.That(after.Settlements.Count, Is.EqualTo(before.Settlements.Count));
+            Assert.That(after.EconomicCounter, Is.EqualTo(before.EconomicCounter));
+            Assert.That(after.ChallengeCounter, Is.EqualTo(before.ChallengeCounter));
+            Assert.That(after.ShopCounter, Is.EqualTo(before.ShopCounter));
+        }
+        static void AssertPhoneEconomyUnchanged(RunState before, RunState after)
+        {
+            AssertTicketAndDrawsUnchanged(before, after);
+            Assert.That(after.CashMinor, Is.EqualTo(before.CashMinor));
+            Assert.That(MotherDebt(after), Is.EqualTo(MotherDebt(before)));
+            Assert.That(MotherLifetime(after), Is.EqualTo(MotherLifetime(before)));
+            Assert.That(after.Loans.Count, Is.EqualTo(before.Loans.Count));
+            Assert.That(after.Ledger.Count, Is.EqualTo(before.Ledger.Count));
         }
 
         void CheckRuntimeBudget()
@@ -641,6 +752,14 @@ namespace Lottery.G3.VisualCandidate.Tests
                 .Select(uv => P.View.WorldToPresentationPoint(P.View.Surface.PaperUvToWorld(uv))).ToArray();
             return Rect.MinMaxRect(corners.Min(p => p.x), corners.Min(p => p.y), corners.Max(p => p.x), corners.Max(p => p.y));
         }
+        Rect ProjectedPhoneScreenBounds()
+        {
+            var corners = P.View.Phone.ScreenWorldCorners;
+            Assert.That(corners, Has.Length.EqualTo(4));
+            Assert.That(Vector3.Cross(corners[1] - corners[0], corners[2] - corners[0]).sqrMagnitude, Is.GreaterThan(0.00000001f));
+            var points = corners.Select(P.View.WorldToPresentationPoint).ToArray();
+            return Rect.MinMaxRect(points.Min(p => p.x), points.Min(p => p.y), points.Max(p => p.x), points.Max(p => p.y));
+        }
         static ProjectionReceipt Projection(Rect rect)
         { return new ProjectionReceipt { x = rect.x, y = rect.y, width = rect.width, height = rect.height }; }
         void Capture(string stage, string cameraOrigin)
@@ -653,7 +772,34 @@ namespace Lottery.G3.VisualCandidate.Tests
             var frustum = GeometryUtility.CalculateFrustumPlanes(app.SceneCamera);
             int visibleHudRenderers = hud.GetComponentsInChildren<Renderer>().Count(r => r.enabled && r.gameObject.activeInHierarchy &&
                 (app.SceneCamera.cullingMask & (1 << r.gameObject.layer)) != 0 && GeometryUtility.TestPlanesAABB(frustum, r.bounds));
-            Assert.That(visibleHudRenderers, Is.GreaterThan(5), "HUD renderers must actually participate in this camera view");
+            bool phoneCloseUp = stage == "phone-contacts" || stage == "phone-mom-pending" || stage == "phone-mom-claimed";
+            if(!phoneCloseUp) Assert.That(visibleHudRenderers, Is.GreaterThan(5), "HUD renderers must actually participate in this camera view");
+            var phone = P.View.Phone;
+            Assert.That(phone, Is.Not.Null);
+            Assert.That(phone, Is.SameAs(phoneIdentity), "The same persistent phone instance must survive every view");
+            bool phoneWorldObjectActive = phone.isActiveAndEnabled;
+            int phoneActiveRendererCount = phone.GetComponentsInChildren<Renderer>().Count(r => r.enabled && r.gameObject.activeInHierarchy);
+            Assert.That(phoneWorldObjectActive, Is.True); Assert.That(phoneActiveRendererCount, Is.GreaterThan(2));
+            int phoneRenderers = phone.GetComponentsInChildren<Renderer>().Count(r => r.enabled && r.gameObject.activeInHierarchy &&
+                (app.SceneCamera.cullingMask & (1 << r.gameObject.layer)) != 0 && GeometryUtility.TestPlanesAABB(frustum, r.bounds));
+            var phoneBounds = ProjectedPhoneScreenBounds();
+            var phoneCorners = phone.ScreenWorldCorners;
+            float phoneMinDepth = phoneCorners.Min(p => app.SceneCamera.WorldToScreenPoint(p).z);
+            float phoneMaxDepth = phoneCorners.Max(p => app.SceneCamera.WorldToScreenPoint(p).z);
+            var phoneNormal = Vector3.Cross(phoneCorners[1] - phoneCorners[0], phoneCorners[2] - phoneCorners[0]).normalized;
+            var phoneCenter = phoneCorners.Aggregate(Vector3.zero, (sum, point) => sum + point) / 4;
+            float phonePlaneCameraAbsCosine = Mathf.Abs(Vector3.Dot(phoneNormal, (app.SceneCamera.transform.position - phoneCenter).normalized));
+            Assert.That(phone.IsFocused, Is.EqualTo(phoneCloseUp), "Only the three explicit phone close-ups use phone focus");
+            if(stage == "phone-room-standing" || phoneCloseUp)
+            {
+                Assert.That(phoneRenderers, Is.GreaterThan(2), "Real phone body and screen must participate in the camera");
+                Assert.That(phoneBounds.width, Is.GreaterThan(2)); Assert.That(phoneBounds.height, Is.GreaterThan(2));
+                Assert.That(phoneBounds.xMin, Is.GreaterThanOrEqualTo(0)); Assert.That(phoneBounds.yMin, Is.GreaterThanOrEqualTo(0));
+                Assert.That(phoneBounds.xMax, Is.LessThanOrEqualTo(target.width)); Assert.That(phoneBounds.yMax, Is.LessThanOrEqualTo(target.height));
+                Assert.That(phoneMinDepth, Is.GreaterThan(app.SceneCamera.nearClipPlane));
+                Assert.That(phoneMaxDepth, Is.LessThan(app.SceneCamera.farClipPlane));
+                Assert.That(phonePlaneCameraAbsCosine, Is.GreaterThan(.2f), "Phone screen cannot be edge-on");
+            }
             var request = new RenderPipeline.StandardRequest { destination = target };
             Assert.That(RenderPipeline.SupportsRenderRequest(app.SceneCamera, request), Is.True);
             var old = RenderTexture.active; var image = new Texture2D(target.width, target.height, TextureFormat.RGB24, false);
@@ -667,6 +813,12 @@ namespace Lottery.G3.VisualCandidate.Tests
                 frames.Add(new FrameReceipt {
                     stage = stage, file = stage + ".png", sha256 = StateCodec.HashBytes(bytes), bytes = bytes.Length,
                     capturedUtc = DateTime.UtcNow.ToString("O"), width = target.width, height = target.height,
+                    ticketContentSha256 = TicketContentHash(State.CurrentTicket),
+                    phoneFocused = phone.IsFocused, phoneFrustumRendererCount = phoneRenderers, phoneScreenBounds = Projection(phoneBounds),
+                    phoneWorldObjectActive = phoneWorldObjectActive, phoneActiveRendererCount = phoneActiveRendererCount, phoneInstanceId = phone.GetInstanceID(),
+                    phoneScreenMinDepth = phoneMinDepth, phoneScreenMaxDepth = phoneMaxDepth, phonePlaneCameraAbsCosine = phonePlaneCameraAbsCosine,
+                    cashMinor = State.CashMinor, motherDebtMinor = MotherDebt(State), motherLifetimeMinor = MotherLifetime(State),
+                    loanCount = State.Loans.Count, ledgerCount = State.Ledger.Count, phoneEventCount = State.PhoneEvents.Count,
                     stateSha256 = StateCodec.ComputeHash(State), seedSha256 = StateCodec.HashBytes(Encoding.UTF8.GetBytes(State.Seed)),
                     gameRunId = State.RunId, fixtureLabel = State.FixtureLabel, revision = State.Revision,
                     ticketId = ticket?.Id ?? "NONE", ticketPhase = ticket?.Phase.ToString() ?? "NONE",
@@ -747,14 +899,17 @@ namespace Lottery.G3.VisualCandidate.Tests
         [Serializable] sealed class FrameReceipt
         {
             public string stage, file, sha256, capturedUtc, stateSha256, seedSha256, gameRunId, fixtureLabel, ticketId, ticketPhase, ticketMaskSha256, dayPhase, panel, mode, cameraOrigin, qualityName;
+            public string ticketContentSha256; public bool phoneFocused, phoneWorldObjectActive; public int phoneActiveRendererCount, phoneInstanceId; public ProjectionReceipt phoneScreenBounds;
+            public float phoneScreenMinDepth, phoneScreenMaxDepth, phonePlaneCameraAbsCosine;
+            public long cashMinor, motherDebtMinor, motherLifetimeMinor; public int phoneFrustumRendererCount, loanCount, ledgerCount, phoneEventCount;
             public long bytes, revision; public int width, height, revealedCells, inputUpdates, actionCount, importedRendererCount, hudFrustumRendererCount, renderedShopRendererCount, renderedShopMaterialCount;
             public string[] currentTools, nextTools, visibleControlIds; public ProjectionReceipt paperPresentationBounds; public ProjectionReceipt[] toolPresentationBounds; public float hudOpaqueAreaRatio; public Vector3 cameraPosition, cameraEuler; public float cameraFov;
             public bool cameraOrthographic, hudVisible, hudFits, moreVisible, paperVisible;
         }
         [Serializable] sealed class CaptureReceipt
         {
-            public int schemaVersion = 2;
-            public string candidatePresentation = "V13_MORE_NAVIGATION_MEASURED_GEOMETRY_NOT_VISUAL_PASS";
+            public int schemaVersion = 3;
+            public string candidatePresentation = "V16_SELECTED_C_PHYSICAL_PHONE_NOT_VISUAL_PASS";
             public string scope = Scope, sourceCommit, runId, runAttempt, unityVersion, graphicsDeviceType, graphicsDeviceName;
             public string inputEvidence = "SIMULATED_INPUT_SYSTEM", captureMethod = "URP_STANDARD_REQUEST_READPIXELS",
                 seedDisclosure = "FIXED_DIAGNOSTIC_SEED_HASH_ONLY", hudVisibilityBasis = "ENABLED_CAMERA_LAYER_AND_FRUSTUM_TEST_NOT_PIXEL_OCCLUSION", deviceQa = "NOT_RUN", visualReview = "PENDING", g3Gate = "NOT_EVALUATED";

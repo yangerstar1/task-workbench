@@ -266,10 +266,10 @@ namespace Lottery.G3.PlayMode.Tests
             Assert.That(P.View.MoreVisible,Is.True,"The actual More button must open secondary navigation");
             Assert.That(P.View.HasButton(id),Is.True,"The requested secondary route must now be visible: "+id);
         }
-        void Click(string id){RevealNavigationButton(id);var p=P.View.ButtonRect(id).center;MouseEvent(p,true);MouseEvent(p,false);}
+        void Click(string id){RevealNavigationButton(id);Assert.That(P.View.HasButton(id),Is.True,"Missing real runtime control: "+id);var p=P.View.ButtonRect(id).center;MouseEvent(p,true);MouseEvent(p,false);}
         void Claim(){Click("claim");if(P.Panel==G3Panel.Confirm)Confirm();}
         void Confirm(){Assert.That(P.Panel,Is.EqualTo(G3Panel.Confirm));Click("confirm-action");}
-        void Close(){if(P.Panel!=G3Panel.None)Click("close-panel");}
+        void Close(){if(P.Panel!=G3Panel.None)Click(P.PhoneVisible?"close-phone":"close-panel");}
         void Buy(string type)
         {Close();Click("open-tickets");Click(type=="number"?"buy-number":"buy-challenge");Confirm();Assert.That(State.CurrentTicket.TicketType,Is.EqualTo(type));Assert.That(State.CurrentTicket.Phase,Is.EqualTo(TicketPhase.ACTIVE));}
         string StockId(string item)=>State.Stock.Single(x=>x.ItemId==item).StockId;
@@ -290,11 +290,21 @@ namespace Lottery.G3.PlayMode.Tests
         }
         void Select(int core){var p=CellPoint(core);MouseEvent(p,true);MouseEvent(p,false);Assert.That(State.CurrentTicket.SelectedCell,Is.EqualTo(core));}
         void RevealSelected(int core){Select(core);Click("quick");Assert.That(State.CurrentTicket.RevealedCells[core],Is.True);Assert.That(State.CurrentTicket.SelectedCell,Is.EqualTo(-1));}
+        void ReceivePhoneLoan1000()
+        {
+            long cash=State.CashMinor;int loans=State.Loans.Count,events=State.PhoneEvents.Count;
+            Click("phone-choose");Click("borrow-1000");Click("phone-send");
+            Assert.That(State.CashMinor,Is.EqualTo(cash));Assert.That(State.Loans.Count,Is.EqualTo(loans));
+            Assert.That(State.PhoneEvents.Count,Is.EqualTo(events+1));Assert.That(State.PhoneEvents.Last().Kind,Is.EqualTo("BORROW_REQUESTED"));
+            Click("packet-pending");Click("phone-claim");
+            Assert.That(State.CashMinor,Is.EqualTo(cash+10000));Assert.That(State.Loans.Count,Is.EqualTo(loans+1));
+            Assert.That(State.PhoneEvents.Count,Is.EqualTo(events+2));Assert.That(State.PhoneEvents.Last().Kind,Is.EqualTo("BORROWED"));
+        }
         void BorrowAndRepay()
         {
-            Close();Click("open-phone");Click("contact-mother");long before=State.CashMinor;Click("borrow-1000");Confirm();Assert.That(State.CashMinor,Is.EqualTo(before+10000));
-            Click("repay-1000");Confirm();Assert.That(State.CashMinor,Is.EqualTo(before));Assert.That(State.Contacts.Single(x=>x.ContactId=="mother").BorrowedLifetimeMinor,Is.EqualTo(10000));
-            Close();Click("open-phone");Click("contact-girlfriend");Click("borrow-1000");Confirm();Assert.That(State.Loans.Last().DueNight,Is.EqualTo(4));Close();
+            Close();Click("open-phone");Click("contact-mother");long before=State.CashMinor;ReceivePhoneLoan1000();Assert.That(State.CashMinor,Is.EqualTo(before+10000));
+            Click("phone-repay");Click("repay-1000");Confirm();Assert.That(State.CashMinor,Is.EqualTo(before));Assert.That(State.Contacts.Single(x=>x.ContactId=="mother").BorrowedLifetimeMinor,Is.EqualTo(10000));
+            Close();Click("open-phone");Click("contact-girlfriend");ReceivePhoneLoan1000();Assert.That(State.Loans.Last().DueNight,Is.EqualTo(4));Close();
         }
         [UnityTest]
         public IEnumerator DayFlowUsesInputSystemForBothTicketsShoppingConfigurationPhoneAndNight()

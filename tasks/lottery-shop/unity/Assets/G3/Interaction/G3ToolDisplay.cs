@@ -16,7 +16,7 @@ namespace Lottery.G3.Interaction
         public void Show(string id)
         {
             if(shown==id)return;shown=id;if(model!=null)Destroy(model);foreach(var m in owned)if(m!=null)Destroy(m);owned.Clear();
-            if(string.IsNullOrEmpty(id))return;var authored=Resources.Load<GameObject>("G3/Shop/Tool_"+id+"_Runtime");if(authored!=null){model=Instantiate(authored,transform);model.name="Snapshot-bound authored "+id;model.transform.localScale*=id=="inspection_lamp" ? .53f : .55f;return;}if(id=="small_prize_box"||id=="inspection_lamp"||id=="large_prize_stamp")throw new System.InvalidOperationException("Normalized authored tool prefab missing: "+id);model=new GameObject("Snapshot-bound "+id);model.transform.SetParent(transform,false);model.transform.localScale=Vector3.one*.45f;
+            if(string.IsNullOrEmpty(id))return;var authored=Resources.Load<GameObject>("G3/Shop/Tool_"+id+"_Runtime");if(authored!=null){model=Instantiate(authored,transform);model.name="Snapshot-bound authored "+id;model.transform.localScale*=id=="inspection_lamp" ? .53f : .55f;ApplySelectedFinish(id);return;}if(id=="small_prize_box"||id=="inspection_lamp"||id=="large_prize_stamp")throw new System.InvalidOperationException("Normalized authored tool prefab missing: "+id);model=new GameObject("Snapshot-bound "+id);model.transform.SetParent(transform,false);model.transform.localScale=Vector3.one*.45f;
             var brass=Mat("Brushed brass",new Color(.65f,.45f,.18f),.78f,.52f);var wood=Mat("Dark walnut",new Color(.23f,.105f,.055f),0,.22f);
             var ceramic=Mat("Warm cream enamel",new Color(.84f,.80f,.67f),.12f,.42f);var jade=Mat("Green enamel",new Color(.045f,.19f,.14f),.20f,.4f);
             if(id=="small_prize_box")
@@ -49,6 +49,20 @@ namespace Lottery.G3.Interaction
                 Shape("Stamp turned handle",PrimitiveType.Cylinder,new Vector3(0,.14f,0),new Vector3(.058f,.06f,.058f),wood);
                 Shape("Stamp rounded grip",PrimitiveType.Sphere,new Vector3(0,.205f,0),new Vector3(.11f,.08f,.10f),id=="large_prize_stamp"?jade:ceramic);
                 Shape("Handle brass collar",PrimitiveType.Cylinder,new Vector3(0,.095f,0),new Vector3(.075f,.01f,.075f),brass);
+            }
+        }
+        void ApplySelectedFinish(string id)
+        {
+            if(id!="small_prize_box")return;
+            // The selected C reference uses a walnut case with brass fittings.
+            // Keep the authored lid/latch geometry and item/slot identity intact.
+            var walnut=Resources.Load<Material>("G3/Shop/Materials/Warm_Oak");
+            if(walnut==null)throw new System.InvalidOperationException("Authored wooden case material missing");
+            foreach(var renderer in model.GetComponentsInChildren<Renderer>())
+            {
+                var materials=renderer.sharedMaterials;bool changed=false;
+                for(int i=0;i<materials.Length;i++)if(materials[i]!=null&&materials[i].name=="Oxblood_Enamel"){materials[i]=walnut;changed=true;}
+                if(changed)renderer.sharedMaterials=materials;
             }
         }
         void OnDestroy(){foreach(var m in owned)if(m!=null)Destroy(m);}

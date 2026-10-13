@@ -1,23 +1,16 @@
 {
-  "version": "art-v1.3",
+  "version": "art-v1.5-frozen-candidate-r5",
   "fbx": "LotteryShop_Interior.fbx",
-  "sha256": "29a71f0dfaac26ab3409c42f3eeac60e20d334b255e01e23ba5f6b83670f427f",
-  "staticTriangles": 67858,
-  "staticMeshObjects": 558,
-  "tools": [
-    "Tool_small_prize_box.fbx",
-    "Tool_inspection_lamp.fbx",
-    "Tool_large_prize_stamp.fbx"
-  ],
-  "paperMeters": [
-    0.4,
-    0.2666667
-  ],
-  "toolScales": [
-    0.55,
-    0.53,
-    0.55
-  ],
-  "previewStatus": "Render pending. No Unity or mobile performance pass claimed.",
-  "revisionNote": "Separated dock wood top .839 from rubber top .840; no coplanar faces."
+  "sha256": "cfe1ae1dd263172d3dea14b23231c98d20d56a7555566f7b0490a07519ba6521",
+  "staticTriangles": 122798,
+  "staticMeshObjects": 1716,
+  "materials": 32,
+  "anchors": 33,
+  "colliders": 27,
+  "validation": "BLENDER_CANDIDATE_NOT_UNITY_ACCEPTANCE",
+  "status": "FROZEN_FOR_UNITY_NATIVE_REVIEW",
+  "sourceSha256": "e00756f9136241e3c5a03f43e5a554db3a65eb15475da4a9c095e86aa17892c4",
+  "requiresUnityXReflection": false,
+  "printedUVPolicy": "Native import. No U reflection.",
+  "previewLabel": "Blender geometry previews only; r4 table preview superseded by the audited r5 slot clearance."
 }

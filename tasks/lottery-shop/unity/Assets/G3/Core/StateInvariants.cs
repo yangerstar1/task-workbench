@@ -78,6 +78,25 @@ namespace Lottery.G3.Core
                 Need(s.PhoneEvents.Where(e=>e.Kind=="REPAID"&&e.LoanId==loan.LoanId).Sum(e=>e.AmountMinor)==loan.BorrowedMinor-loan.RemainingMinor,"repayment event conservation");
             }
             Need(s.PhoneEvents.Select(x=>x.EventId).Distinct().Count()==s.PhoneEvents.Count,"unique phone events");
+            var phoneRequests=s.PhoneEvents.Where(x=>x.Kind=="BORROW_REQUESTED").ToArray();
+            var phoneCancellations=s.PhoneEvents.Where(x=>x.Kind=="BORROW_CANCELLED").ToArray();
+            Need(phoneCancellations.Select(x=>x.LoanId).Distinct().Count()==phoneCancellations.Length,"unique phone cancellations");
+            foreach(var cancellation in phoneCancellations)
+            {
+                Need(Id(cancellation.EventId)&&cancellation.DueNight==0&&cancellation.Day>0,"identified phone cancellation");
+                Need(phoneRequests.Count(x=>x.LoanId==cancellation.LoanId&&x.ContactId==cancellation.ContactId&&x.AmountMinor==cancellation.AmountMinor)==1,"cancellation matches proposal");
+                Need(!s.PhoneEvents.Any(x=>x.Kind=="BORROWED"&&x.LoanId==cancellation.LoanId),"cancelled packet never borrowed");
+            }
+
+            Need(phoneRequests.Select(x=>x.LoanId).Distinct().Count()==phoneRequests.Length,"unique phone proposal claim identities");
+            foreach(var request in phoneRequests)
+            {
+                Need(Id(request.EventId)&&Id(request.LoanId)&&request.LoanId.StartsWith(s.RunId+":loan:",StringComparison.Ordinal),"identified phone proposal");
+                Need(s.Contacts.Any(x=>x.ContactId==request.ContactId)&&request.AmountMinor>0&&request.Day>0&&request.DueNight==0,"non-economic phone proposal");
+                foreach(var claim in s.PhoneEvents.Where(x=>x.Kind=="BORROWED"&&x.LoanId==request.LoanId))
+                    Need(claim.ContactId==request.ContactId&&claim.AmountMinor==request.AmountMinor,"phone proposal claim matches");
+            }
+
             foreach(var stock in s.Stock)
             {
                 int purchases=s.Commands.Count(c=>(c.Kind=="BUY_STOCK"&&c.TicketId==stock.StockId)||(c.Kind=="AD_COMMIT"&&c.CashDeltaMinor!=0&&s.Ad!=null&&s.Ad.StockId==stock.StockId));

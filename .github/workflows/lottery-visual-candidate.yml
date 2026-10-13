@@ -84,7 +84,7 @@ jobs:
       - name: Preserve verified originals already captured if later interaction failed
         if: ${{ always() && steps.guard.outcome == 'success' && steps.capture.outcome != 'skipped' }}
         run: python3 tasks/lottery-shop/scripts/visual_candidate_ci.py partial-captures
-      - name: Require all six runtime visual groups, same-state shelf and same-camera day-night pair
+      - name: Require original eleven frames, six phone frames, and unchanged paired-state evidence
         if: ${{ always() && steps.guard.outcome == 'success' && steps.capture.outcome != 'skipped' }}
         run: python3 tasks/lottery-shop/scripts/visual_candidate_ci.py captures
       - name: Publish original candidate frames promptly for visual review
@@ -110,6 +110,12 @@ jobs:
             tasks/lottery-shop/evidence/visual-candidate/captures/table-empty.png
             tasks/lottery-shop/evidence/visual-candidate/captures/number-half.png
             tasks/lottery-shop/evidence/visual-candidate/captures/number-half-20x9.png
+            tasks/lottery-shop/evidence/visual-candidate/captures/phone-room-standing.png
+            tasks/lottery-shop/evidence/visual-candidate/captures/phone-table-before.png
+            tasks/lottery-shop/evidence/visual-candidate/captures/phone-contacts.png
+            tasks/lottery-shop/evidence/visual-candidate/captures/phone-mom-pending.png
+            tasks/lottery-shop/evidence/visual-candidate/captures/phone-mom-claimed.png
+            tasks/lottery-shop/evidence/visual-candidate/captures/phone-table-return.png
             tasks/lottery-shop/evidence/visual-candidate/captures/challenge-two-safe-three-tools.png
             tasks/lottery-shop/evidence/visual-candidate/captures/shelf-before-open.png
             tasks/lottery-shop/evidence/visual-candidate/captures/shelf-after-open.png

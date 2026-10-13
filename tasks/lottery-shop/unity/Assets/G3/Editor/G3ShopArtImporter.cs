@@ -13,7 +13,7 @@ namespace Lottery.G3.Editor
         public const string Root="Assets/G3/Shop/Resources/G3/Shop";
         public const string PipelinePath=Root+"/G3VisualPipeline.asset";
         [Serializable] sealed class Materials { public MaterialEntry[] materials; }
-        [Serializable] sealed class MaterialEntry { public string name,baseColorTexture,normalTexture,roughnessTexture;public float[] baseColor,baseColorFactor,mainTextureScale,emissionColor;public float metallic,roughness,transmission,emission,normalStrength=1; }
+        [Serializable] sealed class MaterialEntry { public string name,baseColorTexture,normalTexture,roughnessTexture,emissionTexture;public float[] baseColor,baseColorFactor,mainTextureScale,emissionColor;public float metallic,roughness,transmission,emission,normalStrength=1; }
         [MenuItem("Lottery/G3/Prepare original shop art")]
         public static void Prepare()
         {
@@ -36,7 +36,10 @@ namespace Lottery.G3.Editor
                 var factor=item.baseColorFactor;
                 if(!string.IsNullOrEmpty(item.baseColorTexture)&&(factor==null||factor.Length<4))throw new InvalidOperationException("Textured material needs explicit baseColorFactor: "+item.name);
                 if(factor==null)factor=item.baseColor;
-                material.SetColor("_BaseColor",new Color(factor[0],factor[1],factor[2],factor.Length>3?factor[3]:1));
+                material.SetColor("_BaseColor",SourceLinearBaseColor(factor));
+                // Printed paper panels are physically two-sided. Blender previews did
+                // not cull their reverse side, unlike the default URP/Lit material.
+                material.SetFloat("_Cull",IsPrintedPanel(item.name)||item.name=="Leaves_Green"?(float)CullMode.Off:(float)CullMode.Back);
                 material.SetFloat("_Metallic",Mathf.Clamp01(item.metallic));material.SetFloat("_Smoothness",1-Mathf.Clamp01(item.roughness));
                 material.SetTexture("_BaseMap",string.IsNullOrEmpty(item.baseColorTexture)?null:Texture(item.baseColorTexture,false));
                 material.SetTextureScale("_BaseMap",item.mainTextureScale!=null&&item.mainTextureScale.Length==2?new Vector2(item.mainTextureScale[0],item.mainTextureScale[1]):Vector2.one);
@@ -47,8 +50,8 @@ namespace Lottery.G3.Editor
                 {material.SetTexture("_MetallicGlossMap",PackRoughness(item));material.SetFloat("_Smoothness",1);material.EnableKeyword("_METALLICSPECGLOSSMAP");}
                 material.SetFloat("_Surface",0);material.SetFloat("_SrcBlend",(float)BlendMode.One);material.SetFloat("_DstBlend",(float)BlendMode.Zero);material.SetFloat("_ZWrite",1);material.DisableKeyword("_SURFACE_TYPE_TRANSPARENT");material.renderQueue=(int)RenderQueue.Geometry;
                 if(item.transmission>0){material.SetFloat("_Surface",1);material.SetFloat("_SrcBlend",(float)BlendMode.SrcAlpha);material.SetFloat("_DstBlend",(float)BlendMode.OneMinusSrcAlpha);material.SetFloat("_ZWrite",0);material.EnableKeyword("_SURFACE_TYPE_TRANSPARENT");material.renderQueue=(int)RenderQueue.Transparent;}
-                material.DisableKeyword("_EMISSION");material.SetColor("_EmissionColor",Color.black);
-                if(item.emission>0){var e=item.emissionColor??item.baseColor;material.EnableKeyword("_EMISSION");material.SetColor("_EmissionColor",new Color(e[0],e[1],e[2])*Mathf.Min(item.emission,2));}
+                material.DisableKeyword("_EMISSION");material.SetColor("_EmissionColor",Color.black);material.SetTexture("_EmissionMap",null);
+                if(item.emission>0){var e=item.emissionColor??item.baseColor;material.EnableKeyword("_EMISSION");material.SetColor("_EmissionColor",(new Color(e[0],e[1],e[2])*Mathf.Min(item.emission,2)).gamma);if(!string.IsNullOrEmpty(item.emissionTexture))material.SetTexture("_EmissionMap",Texture(item.emissionTexture,false));}
                 EditorUtility.SetDirty(material);importer.AddRemap(new AssetImporter.SourceAssetIdentifier(typeof(Material),item.name),material);
             }
             importer.SaveAndReimport();
@@ -62,7 +65,7 @@ namespace Lottery.G3.Editor
             if(pipeline==null){pipeline=UnityEngine.Object.Instantiate(source);AssetDatabase.CreateAsset(pipeline,PipelinePath);}else EditorUtility.CopySerialized(source,pipeline);
             pipeline.name="G3 original shop lighting";pipeline.shadowDistance=12;pipeline.msaaSampleCount=4;pipeline.supportsHDR=false;
             var serialized=new SerializedObject(pipeline);SetBool(serialized,"m_MainLightShadowsSupported",true);SetBool(serialized,"m_SoftShadowsSupported",true);
-            SetInt(serialized,"m_MainLightShadowmapResolution",2048);SetInt(serialized,"m_ShadowCascadeCount",2);SetInt(serialized,"m_AdditionalLightsRenderingMode",1);SetInt(serialized,"m_AdditionalLightsPerObjectLimit",4);serialized.ApplyModifiedPropertiesWithoutUndo();
+            SetInt(serialized,"m_MainLightShadowmapResolution",2048);SetInt(serialized,"m_ShadowCascadeCount",2);SetInt(serialized,"m_AdditionalLightsRenderingMode",(int)LightRenderingMode.PerPixel);SetInt(serialized,"m_AdditionalLightsPerObjectLimit",8);SetBool(serialized,"m_AdditionalLightShadowsSupported",true);SetInt(serialized,"m_AdditionalLightsShadowmapResolution",2048);SetBool(serialized,"m_ReflectionProbeBoxProjection",true);serialized.ApplyModifiedPropertiesWithoutUndo();
             GraphicsSettings.defaultRenderPipeline=pipeline;int original=QualitySettings.GetQualityLevel();for(int i=0;i<QualitySettings.names.Length;i++){QualitySettings.SetQualityLevel(i);QualitySettings.renderPipeline=pipeline;}QualitySettings.SetQualityLevel(original);
             EditorUtility.SetDirty(pipeline);AssetDatabase.SaveAssets();
             var loaded=AssetDatabase.LoadAssetAtPath<GameObject>(model);var renderers=loaded.GetComponentsInChildren<Renderer>();
@@ -77,11 +80,11 @@ namespace Lottery.G3.Editor
             // state-bound tools and JSON interaction colliders remain independent.
             string generated=Root+"/Generated";Directory.CreateDirectory(generated);
             var anchors=JsonUtility.FromJson<Lottery.G3.Interaction.G3ShopEnvironment.LayoutData>(File.ReadAllText(Root+"/anchors.json"));
+            // Use the importer mapping actually measured in Unity 6000.3:
+            // (-BlenderX, BlenderZ, -BlenderY). All authored anchors and collision
+            // positions now use that same basis; no reflected prefab parent exists.
+            if(anchors.requiresUnityXReflection)throw new InvalidOperationException("Shop manifest still requests the superseded X reflection");
             var instance=UnityEngine.Object.Instantiate(source);
-            // Unity 6000.3 importer maps the source FBX X into negative world X.
-            // Measured first-CI anchor (-2.05,.824,-.1) proves this handedness step.
-            // Normalize the entire imported hierarchy once, then bake that matrix.
-            if(anchors.requiresUnityXReflection)instance.transform.localScale=Vector3.Scale(instance.transform.localScale,new Vector3(-1,1,1));
             var mirroredMeshes=new Dictionary<Mesh,Mesh>();
             var root=new GameObject(outputName);var groups=new Dictionary<string,List<CombineInstance>>();var materials=new Dictionary<string,Material>();int transparent=0;
             try
@@ -115,19 +118,49 @@ namespace Lottery.G3.Editor
                             }
                             mesh=fixedMesh;
                         }
+                        // Printed UVs retain their authored tile and direction.
+                        // Native room coordinates no longer need a second U mirror.
                         groups[key].Add(new CombineInstance{mesh=mesh,subMeshIndex=sub,transform=matrix});
                     }
                 }
                 foreach(var pair in groups)
                 {
                     string path=generated+"/"+outputName+"_"+pair.Key+".asset";var mesh=AssetDatabase.LoadAssetAtPath<Mesh>(path);if(mesh==null){mesh=new Mesh();AssetDatabase.CreateAsset(mesh,path);}else mesh.Clear();
-                    mesh.name="Static shop "+pair.Key;mesh.indexFormat=IndexFormat.UInt32;mesh.CombineMeshes(pair.Value.ToArray(),true,true);mesh.RecalculateBounds();mesh.RecalculateTangents();EditorUtility.SetDirty(mesh);
+                    mesh.name="Static shop "+pair.Key;mesh.indexFormat=IndexFormat.UInt32;mesh.CombineMeshes(pair.Value.ToArray(),true,true);AlignWindingWithAuthoredNormals(mesh);mesh.RecalculateBounds();mesh.RecalculateTangents();EditorUtility.SetDirty(mesh);
                     var go=new GameObject(pair.Key);go.transform.SetParent(root.transform,false);go.AddComponent<MeshFilter>().sharedMesh=mesh;var renderer=go.AddComponent<MeshRenderer>();renderer.sharedMaterial=materials[pair.Key];renderer.receiveShadows=true;renderer.shadowCastingMode=materials[pair.Key].renderQueue>=(int)RenderQueue.Transparent?ShadowCastingMode.Off:ShadowCastingMode.On;
                 }
                 PrefabUtility.SaveAsPrefabAsset(root,Root+"/"+outputName+".prefab");AssetDatabase.SaveAssets();
                 Debug.Log("G3_SHOP_STATIC_BATCH opaque-by-material plus separate glass renderers="+groups.Count+"; performance on device remains NOT_RUN");
             }
             finally{foreach(var mesh in mirroredMeshes.Values)UnityEngine.Object.DestroyImmediate(mesh);UnityEngine.Object.DestroyImmediate(instance);UnityEngine.Object.DestroyImmediate(root);}
+        }
+        static Color SourceLinearBaseColor(float[] values)
+        {
+            // The manifest exporter reads Blender Principled socket values, which
+            // are scene-linear. The frozen project is Gamma; Material.SetColor stores
+            // an ordinary URP _BaseColor without conversion in this workflow.
+            // Do not transform PNGs or apply a second conversion to white factors.
+            var linear=new Color(values[0],values[1],values[2],values.Length>3?values[3]:1);
+            return PlayerSettings.colorSpace==ColorSpace.Gamma?linear.gamma:linear;
+        }
+        static bool IsPrintedPanel(string name)=>name=="Newspaper"||name=="ShopSign"||name=="ResultsBoard"||name=="Poster_Fortune"||name=="ServiceNotice"||name=="Decoration_Print_Atlas"||name.StartsWith("Ticket_Swap_")||name.StartsWith("CounterToolTag_");
+        static void AlignWindingWithAuthoredNormals(Mesh mesh)
+        {
+            // FBX handedness and CombineMeshes must leave the geometric face and
+            // its imported shading normals facing the same way. Validate the final
+            // baked mesh rather than assuming how negative matrices are handled.
+            var vertices=mesh.vertices;var normals=mesh.normals;
+            if(normals.Length!=vertices.Length)throw new InvalidOperationException("Authored shop mesh lost normals");
+            var triangles=mesh.triangles;int corrected=0;
+            for(int i=0;i<triangles.Length;i+=3)
+            {
+                int a=triangles[i],b=triangles[i+1],c=triangles[i+2];
+                var face=Vector3.Cross(vertices[b]-vertices[a],vertices[c]-vertices[a]);
+                if(Vector3.Dot(face,normals[a]+normals[b]+normals[c]) < -0.0000000001f)
+                {triangles[i+1]=c;triangles[i+2]=b;corrected++;}
+            }
+            if(corrected>0)mesh.triangles=triangles;
+            Debug.Log("G3_SHOP_FINAL_WINDING corrected="+corrected+" triangles="+(triangles.Length/3));
         }
         static Texture2D PackRoughness(MaterialEntry item)
         {

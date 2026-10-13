@@ -36,7 +36,7 @@ namespace Lottery.G3.Interaction
                 if(!touchGesture&&!requireRelease)for(int i=0;i<touches.Count;i++)if(touches[i].phase==IPhase.Began){touchGesture=true;Begin(touches[i].touchId,true,touches[i].screenPosition);break;}
                 if(captured>=0&&capturedTouch)
                 {
-                    bool found=false;for(int i=0;i<touches.Count;i++)if(touches[i].touchId==captured){found=true;var touch=touches[i];if(touch.phase==IPhase.Ended||touch.phase==IPhase.Canceled)End();else if(touch.phase==IPhase.Moved)Move(touch.screenPosition);break;}if(!found)End();
+                    bool found=false;for(int i=0;i<touches.Count;i++)if(touches[i].touchId==captured){found=true;var touch=touches[i];if(touch.phase==IPhase.Ended||touch.phase==IPhase.Canceled)End(touch.phase==IPhase.Canceled,touch.screenPosition);else if(touch.phase==IPhase.Moved)Move(touch.screenPosition);break;}if(!found)End(true);
                 }
                 if(live==0){End();touchGesture=false;requireRelease=false;}
                 MoveHeld(dt);return;
@@ -48,7 +48,7 @@ namespace Lottery.G3.Interaction
                 if(requireRelease){if(!mouse.leftButton.isPressed)requireRelease=false;return;}
                 if(mouse.leftButton.wasPressedThisFrame)Begin(0,false,mouse.position.ReadValue());
                 else if(captured==0&&!capturedTouch&&mouse.leftButton.isPressed)Move(mouse.position.ReadValue());
-                if(captured==0&&!capturedTouch&&!mouse.leftButton.isPressed)End();
+                if(captured==0&&!capturedTouch&&!mouse.leftButton.isPressed)End(false,mouse.position.ReadValue());
             }
             MoveHeld(dt);
             if(Mode==G3Mode.WALK&&keyboard!=null&&!view.MoreVisible)
@@ -63,6 +63,7 @@ namespace Lottery.G3.Interaction
             if(captured>=0)return;captured=id;capturedTouch=touch;previous=pixel;tracker?.Cancel();
             LastInputSource=touch?"TOUCHSCREEN":"MOUSE";evidenceDrag=0;
             evidenceScrollCapture=presenter.IsReadOnlyEvidence&&view.EvidenceBodyRect.Contains(pixel);
+            if(view.Phone!=null&&view.Phone.IsFocused){uiCapture=true;view.Phone.BeginPointer(pixel);return;}
             uiCapture=view.ConsumeUi(pixel,out G3Action action);
             if(uiCapture){held=action;if(!Movement(action.Kind)&&action.Kind!=G3ActionKind.None&&!view.HandleLocalAction(action))presenter.Execute(action);return;}
             if(Mode==G3Mode.WALK)
@@ -86,6 +87,7 @@ namespace Lottery.G3.Interaction
         {
             if(uiCapture)
             {
+                if(view.Phone!=null&&view.Phone.IsFocused){view.Phone.MovePointer(pixel);previous=pixel;return;}
                 if(evidenceScrollCapture&&presenter.IsReadOnlyEvidence)
                 {
                     evidenceDrag+=pixel.y-previous.y;previous=pixel;
@@ -112,9 +114,14 @@ namespace Lottery.G3.Interaction
             switch(held.Kind){case G3ActionKind.MoveForward:v.y=1;break;case G3ActionKind.MoveBack:v.y=-1;break;case G3ActionKind.MoveLeft:v.x=-1;break;case G3ActionKind.MoveRight:v.x=1;break;case G3ActionKind.TurnLeft:turn=-1;break;case G3ActionKind.TurnRight:turn=1;break;}
             if(v!=Vector2.zero||turn!=0)view.Walk.Move(v,turn,dt);
         }
-        void End(){ReleaseCapture();presenter?.FlushScratch();}
-        public void ReleaseCapture(){captured=-1;uiCapture=false;evidenceScrollCapture=false;evidenceDrag=0;held=default;tracker?.Cancel();}
-        public void CancelGesture(){End();requireRelease=true;}
+        void End(bool cancelled=false,Vector2? releasePosition=null)
+        {
+            if(captured>=0&&view?.Phone!=null&&view.Phone.IsFocused&&releasePosition.HasValue)view.Phone.MovePointer(releasePosition.Value);
+            var action=captured>=0&&view?.Phone!=null&&view.Phone.IsFocused?view.Phone.EndPointer(cancelled):default;
+            ReleaseCapture();if(action.Kind!=G3ActionKind.None)presenter?.Execute(action);presenter?.FlushScratch();
+        }
+        public void ReleaseCapture(){view?.Phone?.EndPointer(true);captured=-1;uiCapture=false;evidenceScrollCapture=false;evidenceDrag=0;held=default;tracker?.Cancel();}
+        public void CancelGesture(){End(true);requireRelease=true;}
         public void NotifyFocus(bool value){bool prior=IsFocused;focused=value;if(prior!=IsFocused){CancelGesture();if(!IsFocused)view?.InvalidateTicket();else presenter?.Refresh();}}
         public void NotifyPause(bool value){bool prior=IsFocused;paused=value;if(prior!=IsFocused){CancelGesture();if(!IsFocused)view?.InvalidateTicket();else presenter?.Refresh();}}
         void OnApplicationFocus(bool value){NotifyFocus(value);}
