@@ -1,5 +1,5 @@
 {
   "name": "Lottery.G3.Editor",
-  "references": ["Lottery.Probe.Editor", "Lottery.G2.Core", "Lottery.G3.Core", "Lottery.G3.Interaction", "Lottery.G3.Rendering", "Unity.RenderPipelines.Universal.Runtime", "Unity.RenderPipelines.Core.Runtime"],
+  "references": ["Lottery.Probe.Editor", "Lottery.G2.Core", "Lottery.G3.Core", "Lottery.G3.Interaction", "Lottery.G3.Rendering", "Unity.RenderPipelines.Universal.Runtime", "Unity.RenderPipelines.Universal.Editor", "Unity.RenderPipelines.Core.Runtime"],
   "includePlatforms": ["Editor"]
 }

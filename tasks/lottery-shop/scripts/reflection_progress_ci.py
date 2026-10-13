@@ -38,14 +38,15 @@ LONG_FIELDS |= CHANGE_BITS | DIRTY_BITS
 INT_FIELDS |= {'changedOther','dirtyStage'}
 BIT_LIMIT = (1 << len(MATERIAL_IDS)) - 1
 
+TEXTURE_SLOTS = ('_BaseMap','_MainTex','_BumpMap','_MetallicGlossMap','_EmissionMap','_OcclusionMap','_DetailMask','_DetailAlbedoMap','_DetailNormalMap')
 MATERIAL_STAGES = (20,21,71,101,102,104,106,112,212,322,323,325)
 AUDIT_FIELDS = frozenset(('ready','error','missingBits','stages','changedBits','overflow','records'))
-STATE_FIELDS = frozenset(('gi','queue','keywords','unknownKeywords','present','subCount','versionCount','otherSubCount','version','instancing','doubleSided','saved','floats','colors','textures','valid','invalid','tags','passes','serialized','sub','disk'))
+STATE_FIELDS = frozenset(('gi','queue','keywords','unknownKeywords','present','subCount','versionCount','otherSubCount','version','instancing','doubleSided','saved','floats','colors','textures','valid','invalid','tags','passes','serialized','sub','disk','textureSlots','baseAliases'))
 STATE_HASHES = ('saved','floats','colors','textures','valid','invalid','tags','passes')
 RECORD_FIELDS = frozenset(('id','firstStage','lastStage','changeBits','lastBits','before','first','last'))
 
 def material_difference(a,b):
-    groups=(('gi',),('instancing','doubleSided'),('queue',),('keywords','unknownKeywords','valid','invalid'),('saved','floats','colors','textures'),('tags','passes','present'),('serialized',),('sub','subCount','versionCount','otherSubCount','version'),('disk',))
+    groups=(('gi',),('instancing','doubleSided'),('queue',),('keywords','unknownKeywords','valid','invalid'),('saved','floats','colors','textures','textureSlots','baseAliases'),('tags','passes','present'),('serialized',),('sub','subCount','versionCount','otherSubCount','version'),('disk',))
     return sum(1<<i for i,keys in enumerate(groups) if any(a[k]!=b[k] for k in keys))
 
 def validate_material_audit(receipt):
@@ -74,6 +75,15 @@ def validate_material_audit(receipt):
             require(all(integer(v[k],0,4294967295) for k in STATE_HASHES),'MATERIAL_PROPERTY_HASH_REJECTED')
             require(all(v['present']&(1<<i) or v[k]==0 for i,k in enumerate(STATE_HASHES)),'MATERIAL_PROPERTY_PRESENCE_REJECTED')
             require(all(isinstance(v[k],str) and re.fullmatch('[0-9a-f]{64}',v[k]) for k in ('serialized','sub','disk')),'MATERIAL_ANONYMOUS_HASH_REJECTED')
+            slots=v['textureSlots'];require(isinstance(slots,str) and re.fullmatch('(?:[0-5][0-9a-f]{24}){9}',slots) and integer(v['baseAliases'],0,511),'MATERIAL_TEXTURE_SLOTS_REJECTED')
+            entries=[slots[i:i+25] for i in range(0,225,25)]
+            for i,entry in enumerate(entries):
+                kind=int(entry[0]);require(kind!=0 or entry=='0'*25,'MATERIAL_TEXTURE_ABSENT_REJECTED')
+                require(kind!=1 or entry[1:9]=='0'*8,'MATERIAL_TEXTURE_NULL_REJECTED')
+                if v['baseAliases']&(1<<i):
+                    require(kind>=2 and entry[:9]==entries[0][:9],'MATERIAL_TEXTURE_ALIAS_REJECTED')
+            require(bool(v['baseAliases']&1)==(int(entries[0][0])>=2),'MATERIAL_BASE_ALIAS_REJECTED')
+
         first=material_difference(r['before'],r['first']);last=material_difference(r['before'],r['last'])
         require(first>0 and last==r['lastBits'] and (first|last)&~r['changeBits']==0,'MATERIAL_RECORD_DIFFERENCE_REJECTED')
     require(a['changedBits'].bit_count()==len(rows)+a['overflow'],'MATERIAL_AUDIT_TOTAL_REJECTED')

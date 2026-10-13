@@ -266,13 +266,14 @@ namespace Lottery.G3.Editor
             return -1;
         }
         static readonly string[] DiagnosticKeywords={"_NORMALMAP","_METALLICSPECGLOSSMAP","_EMISSION","_SURFACE_TYPE_TRANSPARENT","_ALPHATEST_ON","_ALPHAPREMULTIPLY_ON","_ALPHAMODULATE_ON","_SPECULAR_SETUP","_SPECULARHIGHLIGHTS_OFF","_ENVIRONMENTREFLECTIONS_OFF","_RECEIVE_SHADOWS_OFF","_SMOOTHNESS_TEXTURE_ALBEDO_CHANNEL_A","_DETAIL_MULX2","_DETAIL_SCALED","_PARALLAXMAP","_OCCLUSIONMAP"};
+        static readonly string[] MaterialTextureSlots={"_BaseMap","_MainTex","_BumpMap","_MetallicGlossMap","_EmissionMap","_OcclusionMap","_DetailMask","_DetailAlbedoMap","_DetailNormalMap"};
         static readonly int[] MaterialStages={20,21,71,101,102,104,106,112,212,322,323,325};
         [Serializable] sealed class MaterialState
         {
             public int gi,queue,keywords,unknownKeywords,present,subCount,versionCount,otherSubCount,version=-1;
             public bool instancing,doubleSided;
             public long saved,floats,colors,textures,valid,invalid,tags,passes;
-            public string serialized,sub,disk;
+            public string serialized,sub,disk,textureSlots;public int baseAliases;
         }
         [Serializable] sealed class MaterialChange
         {
@@ -301,6 +302,23 @@ namespace Lottery.G3.Editor
                 result.valid=PropertyHash(serialized,"m_ValidKeywords",4,result);result.invalid=PropertyHash(serialized,"m_InvalidKeywords",5,result);
                 result.tags=PropertyHash(serialized,"stringTagMap",6,result);result.passes=PropertyHash(serialized,"disabledShaderPasses",7,result);
             }
+            // Fixed-width9-slot encoding: type nibble + three8-hex fingerprints.
+            // Types:0 missing property,1 null,2 Texture2D,3 Cubemap,4 RenderTexture,5 other.
+            // Reference fingerprint is session-local; exact BaseMap alias bits are separate.
+            var slots=new StringBuilder();var baseTexture=material.GetTexture("_BaseMap");
+            for(int index=0;index<MaterialTextureSlots.Length;index++)
+            {
+                string slot=MaterialTextureSlots[index];if(!material.HasProperty(slot)){slots.Append(new string('0',25));continue;}
+                var texture=material.GetTexture(slot);int kind=texture==null?1:texture is Texture2D?2:texture is Cubemap?3:texture is RenderTexture?4:5;
+                string identity=texture==null?"00000000":DiagnosticHash(texture.GetInstanceID().ToString(System.Globalization.CultureInfo.InvariantCulture)).Substring(0,8);
+                var scale=material.GetTextureScale(slot);var offset=material.GetTextureOffset(slot);
+                if(new[]{scale.x,scale.y,offset.x,offset.y}.Any(x=>float.IsNaN(x)||float.IsInfinity(x)))throw new InvalidOperationException();
+                string scaleHash=DiagnosticHash(scale.x.ToString("R",System.Globalization.CultureInfo.InvariantCulture)+","+scale.y.ToString("R",System.Globalization.CultureInfo.InvariantCulture)).Substring(0,8);
+                string offsetHash=DiagnosticHash(offset.x.ToString("R",System.Globalization.CultureInfo.InvariantCulture)+","+offset.y.ToString("R",System.Globalization.CultureInfo.InvariantCulture)).Substring(0,8);
+                slots.Append((char)('0'+kind)).Append(identity).Append(scaleHash).Append(offsetHash);
+                if(texture!=null&&texture==baseTexture)result.baseAliases|=1<<index;
+            }
+            result.textureSlots=slots.ToString();
             // Hashes only leave this process, never serialized material or subasset text.
             result.serialized=DiagnosticHash(EditorJsonUtility.ToJson(material,false));
             string path=G3ShopArtImporter.Root+"/Materials/"+DiagnosticMaterials[id]+".mat";
@@ -322,7 +340,7 @@ namespace Lottery.G3.Editor
         {
             int bits=0;if(a.gi!=b.gi)bits|=1;if(a.instancing!=b.instancing||a.doubleSided!=b.doubleSided)bits|=2;if(a.queue!=b.queue)bits|=4;
             if(a.keywords!=b.keywords||a.unknownKeywords!=b.unknownKeywords||a.valid!=b.valid||a.invalid!=b.invalid)bits|=8;
-            if(a.saved!=b.saved||a.floats!=b.floats||a.colors!=b.colors||a.textures!=b.textures)bits|=16;
+            if(a.saved!=b.saved||a.floats!=b.floats||a.colors!=b.colors||a.textures!=b.textures||a.textureSlots!=b.textureSlots||a.baseAliases!=b.baseAliases)bits|=16;
             if(a.tags!=b.tags||a.passes!=b.passes||a.present!=b.present)bits|=32;
             if(a.serialized!=b.serialized)bits|=64;
             if(a.sub!=b.sub||a.subCount!=b.subCount||a.versionCount!=b.versionCount||a.otherSubCount!=b.otherSubCount||a.version!=b.version)bits|=128;

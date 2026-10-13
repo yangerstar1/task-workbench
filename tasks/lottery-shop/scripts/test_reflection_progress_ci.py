@@ -52,7 +52,7 @@ def failed():
 
 
 def material_state():
-    value={k:0 for k in progress.STATE_FIELDS};value.update(queue=2000,version=-1,instancing=False,doubleSided=False,serialized='0'*64,sub='0'*64,disk='0'*64)
+    value={k:0 for k in progress.STATE_FIELDS};value.update(queue=2000,version=-1,instancing=False,doubleSided=False,serialized='0'*64,sub='0'*64,disk='0'*64,textureSlots='0'*225,baseAliases=0)
     return value
 
 
@@ -68,7 +68,7 @@ class ReflectionProgressTests(unittest.TestCase):
     def validate(self,value):return progress.validate_progress(value,IDENT)
     def export(self,value):
         temporary=tempfile.TemporaryDirectory();self.addCleanup(temporary.cleanup);root=Path(temporary.name)
-        path=root/progress.visual.TASK/'artifacts/visual-candidate'/progress.NAME;path.parent.mkdir(parents=True);raw=value if isinstance(value,bytes) else json.dumps(value).encode();path.write_bytes(raw)
+        path=root/progress.visual.TASK/'artifacts/visual-candidate'/progress.NAME;path.parent.mkdir(parents=True);raw=value if isinstance(value,bytes) else json.dumps(value,separators=(',',':')).encode();path.write_bytes(raw)
         dest=progress.visual.outdir(root)/progress.NAME
         with patch.dict(os.environ,ENV),patch.object(progress.visual,'identity',return_value=IDENT):
             try:progress.export_progress(root)
@@ -326,6 +326,49 @@ class ReflectionProgressTests(unittest.TestCase):
     def test_material_duplicate_nested_key_rejected(self):
         raw=json.dumps(changed_receipt());raw=raw.replace('"gi": 0','"gi": "PRIVATE", "gi": 0',1)
         dest,_,ok=self.export(raw.encode());self.assertFalse(ok);self.assertFalse(dest.exists())
+
+
+    def test_texture_slots_alias_change_is_fixed_saved_category(self):
+        v=changed_receipt((32,));r=v['materialAudit']['records'][0]
+        base='2'+'1'*8+'2'*8+'3'*8;null='1'+'0'*8+'2'*8+'3'*8
+        r['before'].update(textureSlots=base+null+'0'*175,baseAliases=1)
+        r['first']=dict(r['before'],textureSlots=base*2+'0'*175,baseAliases=3);r['last']=copy.deepcopy(r['first']);r['changeBits']=r['lastBits']=16;self.validate(v)
+    def test_texture_slots_missing_null_type_and_hex_width_rejected(self):
+        for encoded in ['RAW_PATH','0'*224,'0'*226,'6'+'0'*224,'1'+'f'*224,'0'+'1'*224,'2'+'A'*224,'2'+'0'*223+'\n']:
+            v=changed_receipt();v['materialAudit']['records'][0]['before']['textureSlots']=encoded
+            with self.assertRaises(ValueError):self.validate(v)
+    def test_texture_slots_alias_constraints_rejected(self):
+        for slots,bits in [('0'*225,1),('2'+'1'*24+'0'*200,0),('2'+'1'*24+'2'+'2'*24+'0'*175,3),('1'+'0'*24+'0'*200,1)]:
+            v=changed_receipt();v['materialAudit']['records'][0]['before'].update(textureSlots=slots,baseAliases=bits)
+            with self.assertRaises(ValueError):self.validate(v)
+        v=changed_receipt();v['materialAudit']['records'][0]['before']['baseAliases']=512
+        with self.assertRaises(ValueError):self.validate(v)
+    def test_texture_slots_only_scale_or_offset_delta_observed(self):
+        for offset in (9,17):
+            v=changed_receipt((33,));r=v['materialAudit']['records'][0];r['before'].update(textureSlots=('2'+'1'*24)*9,baseAliases=511)
+            chars=list(r['before']['textureSlots']);chars[offset]='2';r['first']=dict(r['before'],textureSlots=''.join(chars));r['last']=copy.deepcopy(r['first']);r['changeBits']=r['lastBits']=16;self.validate(v)
+    def test_texture_slots_types_all_supported(self):
+        for kind in range(2,6):
+            v=changed_receipt((32,));r=v['materialAudit']['records'][0]
+            for state in ('before','first','last'):r[state].update(textureSlots=(str(kind)+'1'*24)*9,baseAliases=511)
+            self.validate(v)
+    def test_texture_slots_source_order_and_readonly_api(self):
+        root=Path(__file__).resolve().parents[3];s=(root/progress.visual.TASK/'unity/Assets/G3/Editor/G3ShopReflectionBaker.cs').read_text()
+        names=tuple(re.findall(r'"([^"]+)"',s.split('MaterialTextureSlots={',1)[1].split('};',1)[0]));self.assertEqual(names,progress.TEXTURE_SLOTS)
+        body=s.split('var slots=new StringBuilder()',1)[1].split('result.textureSlots=slots.ToString()',1)[0]
+        for forbidden in ('LoadAsset','SetTexture','ImportAsset','Save','GetAssetPath','asset.name'):self.assertNotIn(forbidden,body)
+        for required in ('GetTexture(slot)','GetTextureScale(slot)','GetTextureOffset(slot)','GetInstanceID()','texture==baseTexture',"new string('0',25)"):self.assertIn(required,body)
+    def test_texture_slots_four_max_width_records_fit_compact_normal_cold(self):
+        v=changed_receipt((0,1,32,33))
+        for r in v['materialAudit']['records']:
+            for state in ('before','first','last'):
+                x=r[state];x.update(textureSlots=('5'+'f'*24)*9,baseAliases=511,present=255,keywords=65535,unknownKeywords=256,queue=5000,version=1024,subCount=8,versionCount=1,otherSubCount=7)
+                for k in progress.STATE_HASHES:x[k]=4294967295
+        self.validate(v);self.assertLess(len(json.dumps(v,separators=(',',':')).encode()),65536)
+    def test_texture_slots_oversized_receipt_still_rejected(self):
+        v=changed_receipt((0,1,32,33));v['events']+= [event(400,100)]*7
+        raw=json.dumps(v).encode();self.assertGreater(len(raw),65536)
+        dest,_,ok=self.export(raw);self.assertFalse(ok);self.assertFalse(dest.exists())
 
 
 if __name__=='__main__':unittest.main()

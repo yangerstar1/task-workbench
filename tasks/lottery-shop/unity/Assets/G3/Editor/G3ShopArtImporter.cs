@@ -59,6 +59,7 @@ namespace Lottery.G3.Editor
                 if(item.transmission>0){material.SetFloat("_Surface",1);material.SetFloat("_SrcBlend",(float)BlendMode.SrcAlpha);material.SetFloat("_DstBlend",(float)BlendMode.OneMinusSrcAlpha);material.SetFloat("_ZWrite",0);material.EnableKeyword("_SURFACE_TYPE_TRANSPARENT");material.renderQueue=(int)RenderQueue.Transparent;}
                 material.DisableKeyword("_EMISSION");material.SetColor("_EmissionColor",Color.black);material.SetTexture("_EmissionMap",null);
                 if(item.emission>0){var e=item.emissionColor??item.baseColor;material.EnableKeyword("_EMISSION");material.SetColor("_EmissionColor",(new Color(e[0],e[1],e[2])*Mathf.Min(item.emission,2)).gamma);if(!string.IsNullOrEmpty(item.emissionTexture))material.SetTexture("_EmissionMap",Texture(item.emissionTexture,false));}
+                FinalizeAuthoredMaterial(material,item,shader);
                 EditorUtility.SetDirty(material);AssetDatabase.SaveAssetIfDirty(material);importer.AddRemap(new AssetImporter.SourceAssetIdentifier(typeof(Material),item.name),material);
             }
             importer.SaveAndReimport();
@@ -90,6 +91,46 @@ namespace Lottery.G3.Editor
                     throw new InvalidOperationException("Owned material preparation remains dirty");
             }
             Debug.Log("G3_SHOP_IMPORT original_authored_meshes="+renderers.Length+" materials="+data.materials.Length+" pipeline="+PipelinePath+" DEVICE_QA_NOT_RUN");
+        }
+        static void RequireMaterial(bool valid)
+        {if(!valid)throw new InvalidOperationException("Owned material finalization contract failed");}
+        static readonly string[] AuthoredTextureSlots={"_BaseMap","_BumpMap","_MetallicGlossMap","_EmissionMap"};
+        static readonly string[] AuthoredFloatSlots={"_Cull","_Metallic","_Smoothness","_SmoothnessTextureChannel","_Surface","_BumpScale","_GlossMapScale"};
+        static void FinalizeAuthoredMaterial(Material material,MaterialEntry item,Shader shader)
+        {
+            // Explicit existing intent: standard alpha, no clipping or queue bias.
+            // Derived blend/pass/GI/alias state is then produced by the public URP API.
+            material.SetFloat("_Blend",0);material.SetFloat("_BlendModePreserveSpecular",0);
+            material.SetFloat("_AlphaClip",0);material.SetFloat("_QueueOffset",0);
+            var textures=AuthoredTextureSlots.Select(material.GetTexture).ToArray();
+            var scales=AuthoredTextureSlots.Select(material.GetTextureScale).ToArray();
+            var offsets=AuthoredTextureSlots.Select(material.GetTextureOffset).ToArray();
+            var present=AuthoredFloatSlots.Select(material.HasProperty).ToArray();
+            var values=AuthoredFloatSlots.Select((name,index)=>present[index]?material.GetFloat(name):0).ToArray();
+            var color=material.GetColor("_BaseColor");var emission=material.GetColor("_EmissionColor");
+            bool transparent=item.transmission>0,normal=!string.IsNullOrEmpty(item.normalTexture),packed=!string.IsNullOrEmpty(item.roughnessTexture),emissive=item.emission>0;
+            RequireMaterial(material.shader==shader&&color==SourceLinearBaseColor(item.baseColorFactor??item.baseColor));
+            RequireMaterial((textures[0]!=null)==!string.IsNullOrEmpty(item.baseColorTexture)&&(textures[1]!=null)==normal&&(textures[2]!=null)==packed&&(textures[3]!=null)==(emissive&&!string.IsNullOrEmpty(item.emissionTexture)));
+            RequireMaterial(material.GetFloat("_Metallic")==Mathf.Clamp01(item.metallic)&&material.GetFloat("_Smoothness")== (packed?1:1-Mathf.Clamp01(item.roughness))&&material.GetFloat("_SmoothnessTextureChannel")==0);
+            RequireMaterial(!normal||material.GetFloat("_BumpScale")==item.normalStrength);
+            var expectedScale=item.mainTextureScale!=null&&item.mainTextureScale.Length==2?new Vector2(item.mainTextureScale[0],item.mainTextureScale[1]):Vector2.one;
+            RequireMaterial(scales[0]==expectedScale&&material.GetFloat("_Surface")== (transparent?1:0));
+            var e=item.emissionColor??item.baseColor;var expectedEmission=emissive?(new Color(e[0],e[1],e[2])*Mathf.Min(item.emission,2)).gamma:Color.black;
+            RequireMaterial(emission==expectedEmission&&material.GetFloat("_Cull")== (IsPrintedPanel(item.name)||item.name=="Leaves_Green"?(float)CullMode.Off:(float)CullMode.Back));
+            // No authoring in this project uses Lit's separate detail workflow.
+            RequireMaterial(material.GetTexture("_DetailAlbedoMap")==null&&material.GetTexture("_DetailNormalMap")==null&&!material.IsKeywordEnabled("_DETAIL_MULX2")&&!material.IsKeywordEnabled("_DETAIL_SCALED"));
+            material.globalIlluminationFlags=emissive?MaterialGlobalIlluminationFlags.BakedEmissive:MaterialGlobalIlluminationFlags.EmissiveIsBlack;
+            UnityEditor.BaseShaderGUI.SetMaterialKeywords(material,UnityEditor.Rendering.Universal.ShaderGUI.LitGUI.SetMaterialKeywords);
+            RequireMaterial(material.shader==shader&&material.GetColor("_BaseColor")==color&&material.GetColor("_EmissionColor")==emission);
+            for(int i=0;i<AuthoredTextureSlots.Length;i++)RequireMaterial(material.GetTexture(AuthoredTextureSlots[i])==textures[i]&&material.GetTextureScale(AuthoredTextureSlots[i])==scales[i]&&material.GetTextureOffset(AuthoredTextureSlots[i])==offsets[i]);
+            for(int i=0;i<AuthoredFloatSlots.Length;i++)RequireMaterial(material.HasProperty(AuthoredFloatSlots[i])==present[i]&&(!present[i]||material.GetFloat(AuthoredFloatSlots[i])==values[i]));
+            RequireMaterial(material.GetTexture("_MainTex")==textures[0]&&material.GetTextureScale("_MainTex")==scales[0]&&material.GetTextureOffset("_MainTex")==offsets[0]&&material.GetColor("_Color")==color);
+            RequireMaterial(material.IsKeywordEnabled("_NORMALMAP")==normal&&material.IsKeywordEnabled("_METALLICSPECGLOSSMAP")==packed&&material.IsKeywordEnabled("_EMISSION")==emissive&&material.IsKeywordEnabled("_SURFACE_TYPE_TRANSPARENT")==transparent);
+            RequireMaterial(!material.IsKeywordEnabled("_ALPHATEST_ON")&&!material.IsKeywordEnabled("_ALPHAPREMULTIPLY_ON")&&!material.IsKeywordEnabled("_ALPHAMODULATE_ON")&&!material.IsKeywordEnabled("_SMOOTHNESS_TEXTURE_ALBEDO_CHANNEL_A"));
+            RequireMaterial(material.GetFloat("_SrcBlend")== (transparent?(float)BlendMode.SrcAlpha:(float)BlendMode.One)&&material.GetFloat("_DstBlend")== (transparent?(float)BlendMode.OneMinusSrcAlpha:(float)BlendMode.Zero)&&material.GetFloat("_ZWrite")== (transparent?0:1));
+            RequireMaterial(material.renderQueue== (int)(transparent?RenderQueue.Transparent:RenderQueue.Geometry)&&material.GetTag("RenderType",false)==(transparent?"Transparent":"Opaque"));
+            RequireMaterial(material.globalIlluminationFlags==(emissive?MaterialGlobalIlluminationFlags.BakedEmissive:MaterialGlobalIlluminationFlags.EmissiveIsBlack));
+            RequireMaterial(material.doubleSidedGI==(material.GetFloat("_Cull")!=(float)CullMode.Back));
         }
         static void BuildRuntimePrefab(GameObject source,string outputName,bool validateRoom)
         {
