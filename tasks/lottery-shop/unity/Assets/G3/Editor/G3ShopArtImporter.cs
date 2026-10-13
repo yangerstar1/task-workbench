@@ -17,17 +17,27 @@ namespace Lottery.G3.Editor
         [MenuItem("Lottery/G3/Prepare original shop art")]
         public static void Prepare()
         {
+            var trace=MaterialTrace.Create();
+            try {PrepareObserved(trace);trace?.Complete();}
+            catch(Exception error){trace?.Failure(error);throw;}
+            finally{trace?.Finish();}
+        }
+        static void PrepareObserved(MaterialTrace trace)
+        {
+            trace?.Mark(1);
             string model=Root+"/LotteryShop_Interior.fbx",json=Root+"/materials.json";
             if(!File.Exists(model)||!File.Exists(json)||!File.Exists(Root+"/anchors.json"))throw new InvalidOperationException("Original shop FBX and manifests are required for this candidate");
             AssetDatabase.Refresh();Directory.CreateDirectory(Root+"/Materials");
             var data=JsonUtility.FromJson<Materials>(File.ReadAllText(json));
             if(data?.materials==null||data.materials.Length<5)throw new InvalidOperationException("Shop material manifest is incomplete");
+            trace?.Mark(2);
             var shader=Shader.Find("Universal Render Pipeline/Lit");if(shader==null)throw new InvalidOperationException("URP/Lit is required");
             var importer=AssetImporter.GetAtPath(model) as ModelImporter;if(importer==null)throw new InvalidOperationException("FBX model importer missing");
             importer.globalScale=1;importer.useFileScale=true;importer.importAnimation=false;importer.importCameras=false;importer.importLights=false;
             importer.materialImportMode=ModelImporterMaterialImportMode.ImportStandard;importer.addCollider=false;importer.isReadable=true;importer.generateSecondaryUV=true;
             foreach(var item in data.materials)
             {
+                trace?.BeginMaterial(item.name);
                 if(string.IsNullOrEmpty(item.name)||item.baseColor==null||item.baseColor.Length<3)throw new InvalidOperationException("Invalid material entry");
                 string path=Root+"/Materials/"+item.name+".mat";var material=AssetDatabase.LoadAssetAtPath<Material>(path);
                 if(material==null){material=new Material(shader);AssetDatabase.CreateAsset(material,path);}else material.shader=shader;
@@ -38,6 +48,7 @@ namespace Lottery.G3.Editor
                 AssetDatabase.ImportAsset(path,ImportAssetOptions.ForceSynchronousImport|ImportAssetOptions.ForceUpdate);
                 material=AssetDatabase.LoadAssetAtPath<Material>(path);
                 if(material==null||material.shader!=shader)throw new InvalidOperationException("Owned material initialization failed");
+                trace?.Mark(11);
                 // Factors describe actual Blender node multiplication, not a second tint
                 // guessed from the texture's average colour. Direct textures use white.
                 var factor=item.baseColorFactor;
@@ -59,15 +70,15 @@ namespace Lottery.G3.Editor
                 if(item.transmission>0){material.SetFloat("_Surface",1);material.SetFloat("_SrcBlend",(float)BlendMode.SrcAlpha);material.SetFloat("_DstBlend",(float)BlendMode.OneMinusSrcAlpha);material.SetFloat("_ZWrite",0);material.EnableKeyword("_SURFACE_TYPE_TRANSPARENT");material.renderQueue=(int)RenderQueue.Transparent;}
                 material.DisableKeyword("_EMISSION");material.SetColor("_EmissionColor",Color.black);material.SetTexture("_EmissionMap",null);
                 if(item.emission>0){var e=item.emissionColor??item.baseColor;material.EnableKeyword("_EMISSION");material.SetColor("_EmissionColor",(new Color(e[0],e[1],e[2])*Mathf.Min(item.emission,2)).gamma);if(!string.IsNullOrEmpty(item.emissionTexture))material.SetTexture("_EmissionMap",Texture(item.emissionTexture,false));}
-                FinalizeAuthoredMaterial(material,item,shader);
-                EditorUtility.SetDirty(material);AssetDatabase.SaveAssetIfDirty(material);importer.AddRemap(new AssetImporter.SourceAssetIdentifier(typeof(Material),item.name),material);
+                trace?.Mark(12);FinalizeAuthoredMaterial(material,item,shader,trace);trace?.Mark(23);
+                EditorUtility.SetDirty(material);AssetDatabase.SaveAssetIfDirty(material);importer.AddRemap(new AssetImporter.SourceAssetIdentifier(typeof(Material),item.name),material);trace?.MaterialDone();
             }
-            importer.SaveAndReimport();
-            foreach(string toolFile in Directory.GetFiles(Root,"Tool_*.fbx"))
+            trace?.Mark(30);importer.SaveAndReimport();
+            trace?.Mark(31);foreach(string toolFile in Directory.GetFiles(Root,"Tool_*.fbx"))
             {var toolImporter=AssetImporter.GetAtPath(toolFile) as ModelImporter;if(toolImporter==null)throw new InvalidOperationException("Tool model importer missing");toolImporter.globalScale=1;toolImporter.useFileScale=true;toolImporter.importAnimation=false;toolImporter.importCameras=false;toolImporter.importLights=false;toolImporter.addCollider=false;toolImporter.isReadable=true;
                 foreach(var item in data.materials)toolImporter.AddRemap(new AssetImporter.SourceAssetIdentifier(typeof(Material),item.name),AssetDatabase.LoadAssetAtPath<Material>(Root+"/Materials/"+item.name+".mat"));toolImporter.SaveAndReimport();}
 
-            var source=AssetDatabase.LoadAssetAtPath<UniversalRenderPipelineAsset>(Lottery.Probe.Editor.ProbeBuild.PipelinePath);
+            trace?.Mark(32);var source=AssetDatabase.LoadAssetAtPath<UniversalRenderPipelineAsset>(Lottery.Probe.Editor.ProbeBuild.PipelinePath);
             if(source==null)throw new InvalidOperationException("Prepare Probe pipeline before G3 shop art");
             var pipeline=AssetDatabase.LoadAssetAtPath<UniversalRenderPipelineAsset>(PipelinePath);
             if(pipeline==null){pipeline=UnityEngine.Object.Instantiate(source);AssetDatabase.CreateAsset(pipeline,PipelinePath);}else EditorUtility.CopySerialized(source,pipeline);
@@ -78,8 +89,9 @@ namespace Lottery.G3.Editor
             EditorUtility.SetDirty(pipeline);AssetDatabase.SaveAssets();
             var loaded=AssetDatabase.LoadAssetAtPath<GameObject>(model);var renderers=loaded.GetComponentsInChildren<Renderer>();
             if(renderers.Length<30||renderers.Any(r=>r.sharedMaterials.Any(m=>m==null||m.shader!=shader)))throw new InvalidOperationException("Shop import has too few authored renderers or unresolved URP materials");
-            BuildRuntimePrefab(loaded,"LotteryShop_Runtime",true);
+            trace?.Mark(33);BuildRuntimePrefab(loaded,"LotteryShop_Runtime",true);
             foreach(string toolFile in Directory.GetFiles(Root,"Tool_*.fbx"))BuildRuntimePrefab(AssetDatabase.LoadAssetAtPath<GameObject>(toolFile),Path.GetFileNameWithoutExtension(toolFile)+"_Runtime",false);
+            trace?.Mark(34);
             // This is still importer preparation, before Baker's first digest.
             // Never accept a dirty authored material as a stable source baseline.
             AssetDatabase.SaveAssets();
@@ -92,12 +104,58 @@ namespace Lottery.G3.Editor
             }
             Debug.Log("G3_SHOP_IMPORT original_authored_meshes="+renderers.Length+" materials="+data.materials.Length+" pipeline="+PipelinePath+" DEVICE_QA_NOT_RUN");
         }
-        static void RequireMaterial(bool valid)
-        {if(!valid)throw new InvalidOperationException("Owned material finalization contract failed");}
+        enum MaterialPredicate { NONE=0,AUTHOR_SHADER=1,AUTHOR_BASE_COLOR=2,AUTHOR_BASE_MAP=3,AUTHOR_NORMAL_MAP=4,AUTHOR_PACKED_MAP=5,AUTHOR_EMISSION_MAP=6,AUTHOR_METALLIC=7,AUTHOR_SMOOTHNESS=8,AUTHOR_SMOOTHNESS_CHANNEL=9,AUTHOR_NORMAL_STRENGTH=10,AUTHOR_BASE_SCALE=11,AUTHOR_SURFACE=12,AUTHOR_EMISSION_COLOR=13,AUTHOR_CULL=14,DETAIL_ALBEDO_ABSENT=15,DETAIL_NORMAL_ABSENT=16,DETAIL_MULX2_OFF=17,DETAIL_SCALED_OFF=18,FINAL_SHADER=19,FINAL_BASE_COLOR=20,FINAL_EMISSION_COLOR=21,FINAL_TEXTURE_REFERENCE=22,FINAL_TEXTURE_SCALE=23,FINAL_TEXTURE_OFFSET=24,FINAL_FLOAT_PRESENCE=25,FINAL_FLOAT_VALUE=26,ALIAS_TEXTURE=27,ALIAS_SCALE=28,ALIAS_OFFSET=29,ALIAS_COLOR=30,NORMAL_KEYWORD=31,PACKED_KEYWORD=32,EMISSION_KEYWORD=33,TRANSPARENT_KEYWORD=34,ALPHA_TEST_OFF=35,ALPHA_PREMULTIPLY_OFF=36,ALPHA_MODULATE_OFF=37,ALBEDO_SMOOTHNESS_OFF=38,SOURCE_BLEND=39,DEST_BLEND=40,DEPTH_WRITE=41,RENDER_QUEUE=42,RENDER_TAG=43,GI_FLAGS=44,DOUBLE_SIDED_GI=45 }
+        sealed class MaterialContractFailure:InvalidOperationException
+        {
+            public readonly MaterialPredicate Predicate;public readonly int Slot;
+            public MaterialContractFailure(MaterialPredicate predicate,int slot):base("Owned material finalization contract failed"){Predicate=predicate;Slot=slot;}
+        }
+        [Serializable] sealed class MaterialProgress
+        {
+            public int schemaVersion=1,stageCode=1,materialId=-1,materialsCompleted,firstFailureStage=-1,firstFailureMaterial=-1,predicateCode,slotIndex=-1;
+            public string scope="MATERIAL_INITIALIZATION_DIAGNOSTIC_NOT_TEST_PASS",status="RUNNING",sourceCommit,runId,runAttempt,exceptionKind="NONE";
+            public bool diagnosticWriteFailed;public long elapsedMs,completedBits;
+        }
+        sealed class MaterialTrace
+        {
+            static readonly string[] Names={"Aged_Aluminium","Bone_Laminate","Brass_Worn","Ceramic_Glazed","Charcoal_Metal","CounterToolTag_1","CounterToolTag_2","CounterToolTag_3","Cream_Plaster","Dark_Green_Felt","Decoration_Print_Atlas","Display_Silver_Coating","Glass_Blue_Water","Glass_Clear","Grout","Heritage_Green_Paint","Ink","Leaves_Green","Newspaper","Oxblood_Enamel","Paper_Ivory","Plastic_Cream","Rubber","Service_Monitor","ShopSign","StreetBlur","Ticket_Swap_1","Ticket_Swap_2","Ticket_Type_Label","Warm_Light","Warm_Oak","Warm_Terrazzo","Tool_Dock_Liner","Nearfield_Tea"};
+            readonly MaterialProgress receipt;readonly string path;
+            readonly System.Diagnostics.Stopwatch clock=System.Diagnostics.Stopwatch.StartNew();
+            MaterialTrace(string commit,string run,string attempt)
+            {receipt=new MaterialProgress{sourceCommit=commit,runId=run,runAttempt=attempt};path=Path.GetFullPath(Path.Combine(Application.dataPath,"../../artifacts/visual-candidate/material-initialization-progress.json"));Write();}
+            static string Arg(string[] args,string name,string pattern)
+            {int i=Array.IndexOf(args,name);return i>=0&&i+1<args.Length&&System.Text.RegularExpressions.Regex.IsMatch(args[i+1],pattern)?args[i+1]:null;}
+            public static MaterialTrace Create()
+            {
+                var args=Environment.GetCommandLineArgs();int i=Array.IndexOf(args,"-assemblyNames");if(i<0||i+1>=args.Length||args[i+1]!="Lottery.G3.VisualCandidate.Tests")return null;
+                string commit=Arg(args,"-probeCommit","\\A[0-9a-f]{40}\\z"),run=Arg(args,"-probeRunId","\\A[1-9][0-9]{0,19}\\z"),attempt=Arg(args,"-probeRunAttempt","\\A[1-9][0-9]{0,19}\\z");
+                return commit==null||run==null||attempt==null?null:new MaterialTrace(commit,run,attempt);
+            }
+            public void Mark(int stage){receipt.stageCode=stage;Write();}
+            public void BeginMaterial(string name){receipt.materialId=Array.IndexOf(Names,name);if(receipt.materialId<0)receipt.diagnosticWriteFailed=true;Mark(10);}
+            public void MaterialDone(){if(receipt.materialId>=0){if((receipt.completedBits&(1L<<receipt.materialId))!=0||receipt.materialsCompleted>=34)receipt.diagnosticWriteFailed=true;receipt.completedBits|=1L<<receipt.materialId;}receipt.materialsCompleted=Math.Min(receipt.materialsCompleted+1,34);Mark(24);}
+            public void Failure(Exception error)
+            {
+                if(receipt.firstFailureStage>=0)return;receipt.firstFailureStage=receipt.stageCode;receipt.firstFailureMaterial=receipt.materialId;
+                var contract=error as MaterialContractFailure;if(contract!=null){receipt.predicateCode=(int)contract.Predicate;receipt.slotIndex=contract.Slot;}
+                receipt.exceptionKind=error is InvalidOperationException?"INVALID_OPERATION":error is ArgumentException?"ARGUMENT":error is IOException?"IO":error is UnauthorizedAccessException?"ACCESS":error is UnityException?"UNITY":error is NullReferenceException?"NULL_REFERENCE":error is AggregateException?"AGGREGATE":"OTHER";
+                receipt.status="FAILED";Write();
+            }
+            public void Complete(){receipt.status="COMPLETE";receipt.materialId=-1;Mark(40);}
+            public void Finish(){Write();}
+            void Write()
+            {
+                try{receipt.elapsedMs=clock.ElapsedMilliseconds;string json=JsonUtility.ToJson(receipt,false);if(System.Text.Encoding.UTF8.GetByteCount(json)>8192)throw new InvalidOperationException();Directory.CreateDirectory(Path.GetDirectoryName(path));File.WriteAllText(path,json,new System.Text.UTF8Encoding(false));}
+                catch{receipt.diagnosticWriteFailed=true;}
+            }
+        }
+        static void RequireMaterial(bool valid,MaterialPredicate predicate,int slot)
+        {if(!valid)throw new MaterialContractFailure(predicate,slot);}
         static readonly string[] AuthoredTextureSlots={"_BaseMap","_BumpMap","_MetallicGlossMap","_EmissionMap"};
         static readonly string[] AuthoredFloatSlots={"_Cull","_Metallic","_Smoothness","_SmoothnessTextureChannel","_Surface","_BumpScale","_GlossMapScale"};
-        static void FinalizeAuthoredMaterial(Material material,MaterialEntry item,Shader shader)
+        static void FinalizeAuthoredMaterial(Material material,MaterialEntry item,Shader shader,MaterialTrace trace)
         {
+            trace?.Mark(20);
             // Explicit existing intent: standard alpha, no clipping or queue bias.
             // Derived blend/pass/GI/alias state is then produced by the public URP API.
             material.SetFloat("_Blend",0);material.SetFloat("_BlendModePreserveSpecular",0);
@@ -109,28 +167,56 @@ namespace Lottery.G3.Editor
             var values=AuthoredFloatSlots.Select((name,index)=>present[index]?material.GetFloat(name):0).ToArray();
             var color=material.GetColor("_BaseColor");var emission=material.GetColor("_EmissionColor");
             bool transparent=item.transmission>0,normal=!string.IsNullOrEmpty(item.normalTexture),packed=!string.IsNullOrEmpty(item.roughnessTexture),emissive=item.emission>0;
-            RequireMaterial(material.shader==shader&&color==SourceLinearBaseColor(item.baseColorFactor??item.baseColor));
-            RequireMaterial((textures[0]!=null)==!string.IsNullOrEmpty(item.baseColorTexture)&&(textures[1]!=null)==normal&&(textures[2]!=null)==packed&&(textures[3]!=null)==(emissive&&!string.IsNullOrEmpty(item.emissionTexture)));
-            RequireMaterial(material.GetFloat("_Metallic")==Mathf.Clamp01(item.metallic)&&material.GetFloat("_Smoothness")== (packed?1:1-Mathf.Clamp01(item.roughness))&&material.GetFloat("_SmoothnessTextureChannel")==0);
-            RequireMaterial(!normal||material.GetFloat("_BumpScale")==item.normalStrength);
+            RequireMaterial(material.shader==shader,MaterialPredicate.AUTHOR_SHADER,-1);
+            RequireMaterial(color==SourceLinearBaseColor(item.baseColorFactor??item.baseColor),MaterialPredicate.AUTHOR_BASE_COLOR,-1);
+            RequireMaterial((textures[0]!=null)==!string.IsNullOrEmpty(item.baseColorTexture),MaterialPredicate.AUTHOR_BASE_MAP,-1);
+            RequireMaterial((textures[1]!=null)==normal,MaterialPredicate.AUTHOR_NORMAL_MAP,-1);
+            RequireMaterial((textures[2]!=null)==packed,MaterialPredicate.AUTHOR_PACKED_MAP,-1);
+            RequireMaterial((textures[3]!=null)==(emissive&&!string.IsNullOrEmpty(item.emissionTexture)),MaterialPredicate.AUTHOR_EMISSION_MAP,-1);
+            RequireMaterial(material.GetFloat("_Metallic")==Mathf.Clamp01(item.metallic),MaterialPredicate.AUTHOR_METALLIC,-1);
+            RequireMaterial(material.GetFloat("_Smoothness")== (packed?1:1-Mathf.Clamp01(item.roughness)),MaterialPredicate.AUTHOR_SMOOTHNESS,-1);
+            RequireMaterial(material.GetFloat("_SmoothnessTextureChannel")==0,MaterialPredicate.AUTHOR_SMOOTHNESS_CHANNEL,-1);
+            RequireMaterial(!normal||material.GetFloat("_BumpScale")==item.normalStrength,MaterialPredicate.AUTHOR_NORMAL_STRENGTH,-1);
             var expectedScale=item.mainTextureScale!=null&&item.mainTextureScale.Length==2?new Vector2(item.mainTextureScale[0],item.mainTextureScale[1]):Vector2.one;
-            RequireMaterial(scales[0]==expectedScale&&material.GetFloat("_Surface")== (transparent?1:0));
+            RequireMaterial(scales[0]==expectedScale,MaterialPredicate.AUTHOR_BASE_SCALE,-1);
+            RequireMaterial(material.GetFloat("_Surface")== (transparent?1:0),MaterialPredicate.AUTHOR_SURFACE,-1);
             var e=item.emissionColor??item.baseColor;var expectedEmission=emissive?(new Color(e[0],e[1],e[2])*Mathf.Min(item.emission,2)).gamma:Color.black;
-            RequireMaterial(emission==expectedEmission&&material.GetFloat("_Cull")== (IsPrintedPanel(item.name)||item.name=="Leaves_Green"?(float)CullMode.Off:(float)CullMode.Back));
+            RequireMaterial(emission==expectedEmission,MaterialPredicate.AUTHOR_EMISSION_COLOR,-1);
+            RequireMaterial(material.GetFloat("_Cull")== (IsPrintedPanel(item.name)||item.name=="Leaves_Green"?(float)CullMode.Off:(float)CullMode.Back),MaterialPredicate.AUTHOR_CULL,-1);
+            // Explicit schema intent: no separate detail layer on owned materials.
+            material.SetTexture("_DetailAlbedoMap",null);material.SetTexture("_DetailNormalMap",null);
+            material.DisableKeyword("_DETAIL_MULX2");material.DisableKeyword("_DETAIL_SCALED");
             // No authoring in this project uses Lit's separate detail workflow.
-            RequireMaterial(material.GetTexture("_DetailAlbedoMap")==null&&material.GetTexture("_DetailNormalMap")==null&&!material.IsKeywordEnabled("_DETAIL_MULX2")&&!material.IsKeywordEnabled("_DETAIL_SCALED"));
+            RequireMaterial(material.GetTexture("_DetailAlbedoMap")==null,MaterialPredicate.DETAIL_ALBEDO_ABSENT,-1);
+            RequireMaterial(material.GetTexture("_DetailNormalMap")==null,MaterialPredicate.DETAIL_NORMAL_ABSENT,-1);
+            RequireMaterial(!material.IsKeywordEnabled("_DETAIL_MULX2"),MaterialPredicate.DETAIL_MULX2_OFF,-1);
+            RequireMaterial(!material.IsKeywordEnabled("_DETAIL_SCALED"),MaterialPredicate.DETAIL_SCALED_OFF,-1);
             material.globalIlluminationFlags=emissive?MaterialGlobalIlluminationFlags.BakedEmissive:MaterialGlobalIlluminationFlags.EmissiveIsBlack;
-            UnityEditor.BaseShaderGUI.SetMaterialKeywords(material,UnityEditor.Rendering.Universal.ShaderGUI.LitGUI.SetMaterialKeywords);
-            RequireMaterial(material.shader==shader&&material.GetColor("_BaseColor")==color&&material.GetColor("_EmissionColor")==emission);
-            for(int i=0;i<AuthoredTextureSlots.Length;i++)RequireMaterial(material.GetTexture(AuthoredTextureSlots[i])==textures[i]&&material.GetTextureScale(AuthoredTextureSlots[i])==scales[i]&&material.GetTextureOffset(AuthoredTextureSlots[i])==offsets[i]);
-            for(int i=0;i<AuthoredFloatSlots.Length;i++)RequireMaterial(material.HasProperty(AuthoredFloatSlots[i])==present[i]&&(!present[i]||material.GetFloat(AuthoredFloatSlots[i])==values[i]));
-            RequireMaterial(material.GetTexture("_MainTex")==textures[0]&&material.GetTextureScale("_MainTex")==scales[0]&&material.GetTextureOffset("_MainTex")==offsets[0]&&material.GetColor("_Color")==color);
-            RequireMaterial(material.IsKeywordEnabled("_NORMALMAP")==normal&&material.IsKeywordEnabled("_METALLICSPECGLOSSMAP")==packed&&material.IsKeywordEnabled("_EMISSION")==emissive&&material.IsKeywordEnabled("_SURFACE_TYPE_TRANSPARENT")==transparent);
-            RequireMaterial(!material.IsKeywordEnabled("_ALPHATEST_ON")&&!material.IsKeywordEnabled("_ALPHAPREMULTIPLY_ON")&&!material.IsKeywordEnabled("_ALPHAMODULATE_ON")&&!material.IsKeywordEnabled("_SMOOTHNESS_TEXTURE_ALBEDO_CHANNEL_A"));
-            RequireMaterial(material.GetFloat("_SrcBlend")== (transparent?(float)BlendMode.SrcAlpha:(float)BlendMode.One)&&material.GetFloat("_DstBlend")== (transparent?(float)BlendMode.OneMinusSrcAlpha:(float)BlendMode.Zero)&&material.GetFloat("_ZWrite")== (transparent?0:1));
-            RequireMaterial(material.renderQueue== (int)(transparent?RenderQueue.Transparent:RenderQueue.Geometry)&&material.GetTag("RenderType",false)==(transparent?"Transparent":"Opaque"));
-            RequireMaterial(material.globalIlluminationFlags==(emissive?MaterialGlobalIlluminationFlags.BakedEmissive:MaterialGlobalIlluminationFlags.EmissiveIsBlack));
-            RequireMaterial(material.doubleSidedGI==(material.GetFloat("_Cull")!=(float)CullMode.Back));
+            trace?.Mark(21);UnityEditor.BaseShaderGUI.SetMaterialKeywords(material,UnityEditor.Rendering.Universal.ShaderGUI.LitGUI.SetMaterialKeywords);trace?.Mark(22);
+            RequireMaterial(material.shader==shader,MaterialPredicate.FINAL_SHADER,-1);
+            RequireMaterial(material.GetColor("_BaseColor")==color,MaterialPredicate.FINAL_BASE_COLOR,-1);
+            RequireMaterial(material.GetColor("_EmissionColor")==emission,MaterialPredicate.FINAL_EMISSION_COLOR,-1);
+            for(int i=0;i<AuthoredTextureSlots.Length;i++){RequireMaterial(material.GetTexture(AuthoredTextureSlots[i])==textures[i],MaterialPredicate.FINAL_TEXTURE_REFERENCE,i); RequireMaterial(material.GetTextureScale(AuthoredTextureSlots[i])==scales[i],MaterialPredicate.FINAL_TEXTURE_SCALE,i); RequireMaterial(material.GetTextureOffset(AuthoredTextureSlots[i])==offsets[i],MaterialPredicate.FINAL_TEXTURE_OFFSET,i);}
+            for(int i=0;i<AuthoredFloatSlots.Length;i++){RequireMaterial(material.HasProperty(AuthoredFloatSlots[i])==present[i],MaterialPredicate.FINAL_FLOAT_PRESENCE,i); RequireMaterial((!present[i]||material.GetFloat(AuthoredFloatSlots[i])==values[i]),MaterialPredicate.FINAL_FLOAT_VALUE,i);}
+            RequireMaterial(material.GetTexture("_MainTex")==textures[0],MaterialPredicate.ALIAS_TEXTURE,-1);
+            RequireMaterial(material.GetTextureScale("_MainTex")==scales[0],MaterialPredicate.ALIAS_SCALE,-1);
+            RequireMaterial(material.GetTextureOffset("_MainTex")==offsets[0],MaterialPredicate.ALIAS_OFFSET,-1);
+            RequireMaterial(material.GetColor("_Color")==color,MaterialPredicate.ALIAS_COLOR,-1);
+            RequireMaterial(material.IsKeywordEnabled("_NORMALMAP")==normal,MaterialPredicate.NORMAL_KEYWORD,-1);
+            RequireMaterial(material.IsKeywordEnabled("_METALLICSPECGLOSSMAP")==packed,MaterialPredicate.PACKED_KEYWORD,-1);
+            RequireMaterial(material.IsKeywordEnabled("_EMISSION")==emissive,MaterialPredicate.EMISSION_KEYWORD,-1);
+            RequireMaterial(material.IsKeywordEnabled("_SURFACE_TYPE_TRANSPARENT")==transparent,MaterialPredicate.TRANSPARENT_KEYWORD,-1);
+            RequireMaterial(!material.IsKeywordEnabled("_ALPHATEST_ON"),MaterialPredicate.ALPHA_TEST_OFF,-1);
+            RequireMaterial(!material.IsKeywordEnabled("_ALPHAPREMULTIPLY_ON"),MaterialPredicate.ALPHA_PREMULTIPLY_OFF,-1);
+            RequireMaterial(!material.IsKeywordEnabled("_ALPHAMODULATE_ON"),MaterialPredicate.ALPHA_MODULATE_OFF,-1);
+            RequireMaterial(!material.IsKeywordEnabled("_SMOOTHNESS_TEXTURE_ALBEDO_CHANNEL_A"),MaterialPredicate.ALBEDO_SMOOTHNESS_OFF,-1);
+            RequireMaterial(material.GetFloat("_SrcBlend")== (transparent?(float)BlendMode.SrcAlpha:(float)BlendMode.One),MaterialPredicate.SOURCE_BLEND,-1);
+            RequireMaterial(material.GetFloat("_DstBlend")== (transparent?(float)BlendMode.OneMinusSrcAlpha:(float)BlendMode.Zero),MaterialPredicate.DEST_BLEND,-1);
+            RequireMaterial(material.GetFloat("_ZWrite")== (transparent?0:1),MaterialPredicate.DEPTH_WRITE,-1);
+            RequireMaterial(material.renderQueue== (int)(transparent?RenderQueue.Transparent:RenderQueue.Geometry),MaterialPredicate.RENDER_QUEUE,-1);
+            RequireMaterial(material.GetTag("RenderType",false)==(transparent?"Transparent":"Opaque"),MaterialPredicate.RENDER_TAG,-1);
+            RequireMaterial(material.globalIlluminationFlags==(emissive?MaterialGlobalIlluminationFlags.BakedEmissive:MaterialGlobalIlluminationFlags.EmissiveIsBlack),MaterialPredicate.GI_FLAGS,-1);
+            RequireMaterial(material.doubleSidedGI==(material.GetFloat("_Cull")!=(float)CullMode.Back),MaterialPredicate.DOUBLE_SIDED_GI,-1);
         }
         static void BuildRuntimePrefab(GameObject source,string outputName,bool validateRoom)
         {

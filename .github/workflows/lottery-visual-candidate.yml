@@ -40,6 +40,7 @@ jobs:
           PYTHONDONTWRITEBYTECODE=1 python3 tasks/lottery-shop/scripts/test_reflection_bake_ci.py -v
           PYTHONDONTWRITEBYTECODE=1 python3 tasks/lottery-shop/scripts/test_reflection_progress_ci.py -v
           PYTHONDONTWRITEBYTECODE=1 python3 tasks/lottery-shop/scripts/test_startup_progress_ci.py -v
+          PYTHONDONTWRITEBYTECODE=1 python3 tasks/lottery-shop/scripts/test_material_initialization_ci.py -v
           PYTHONDONTWRITEBYTECODE=1 python3 tasks/lottery-shop/scripts/test_independent_g3_frames_ci.py -v
       - name: Prepare existing authorized disposable runner disk layout
         run: |
@@ -91,6 +92,9 @@ jobs:
       - name: Preserve fixed-schema startup observations without native logs
         if: ${{ always() && steps.guard.outcome == 'success' && steps.capture.outcome != 'skipped' }}
         run: PYTHONDONTWRITEBYTECODE=1 python3 tasks/lottery-shop/scripts/startup_progress_ci.py
+      - name: Preserve fixed material initialization predicate receipt
+        if: ${{ always() && steps.guard.outcome == 'success' && steps.capture.outcome != 'skipped' }}
+        run: PYTHONDONTWRITEBYTECODE=1 python3 tasks/lottery-shop/scripts/material_initialization_ci.py
       - name: Preserve bounded capture NUnit XML, including real failures
         if: ${{ always() && steps.guard.outcome == 'success' && steps.capture.outcome != 'skipped' }}
         run: python3 tasks/lottery-shop/scripts/visual_candidate_ci.py tests --stage capture
@@ -117,6 +121,7 @@ jobs:
             tasks/lottery-shop/evidence/visual-candidate/reflection-progress.json
             tasks/lottery-shop/evidence/visual-candidate/reflection-export-diagnostic.json
             tasks/lottery-shop/evidence/visual-candidate/startup-progress.json
+            tasks/lottery-shop/evidence/visual-candidate/material-initialization-progress.json
             tasks/lottery-shop/evidence/visual-candidate/safe-start.json
             tasks/lottery-shop/evidence/visual-candidate/safe-capture.json
             tasks/lottery-shop/evidence/visual-candidate/prebuild-progress.json
