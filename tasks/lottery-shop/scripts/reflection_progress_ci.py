@@ -17,7 +17,7 @@ def integer(value, low, high):
     return type(value) is int and low <= value <= high
 
 
-STAGES = frozenset({10, 400, 20, 21, 30, 40, 300, 301, 302, 303, 304, 305, 50, 51, 306, 310, 311, 60, 61, 190, 320, 321, 322, 323, 70, 71, 200, 201, 202, 203, 204, 205, 206, 207, 80, 81, 208, 209, 210, 211, 212, 90, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 499})
+STAGES = frozenset({324,325,10, 400, 20, 21, 30, 40, 300, 301, 302, 303, 304, 305, 50, 51, 306, 310, 311, 60, 61, 190, 320, 321, 322, 323, 70, 71, 200, 201, 202, 203, 204, 205, 206, 207, 80, 81, 208, 209, 210, 211, 212, 90, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 499})
 ERRORS = frozenset({'UNCLASSIFIED_NATIVE_EXCEPTION', 'SOURCE_INPUT_MISSING', 'BAKE_RETURNED_FALSE', 'EXR_DIMENSIONS', 'FIXED_FILE_MISSING_OR_SIZE', 'IN_PLAY_MODE', 'NONE', 'FINAL_TEXTURE_CONTRACT', 'HDR_NONFINITE', 'IMPORTER_EXTERNAL_REMAP', 'IMPORTER_MISSING', 'SOURCE_DEPENDENCY_MISSING', 'STATIC_FLAG_MISSING', 'RECEIPT_SIZE', 'HDR_FLAT_OR_RANGE', 'CACHE_ARTIFACT_MISMATCH', 'CLEANUP_PIPELINE_OR_SCENE', 'STATIC_MESH_MISSING', 'CLEANUP_LIGHTING', 'PROBE_CONFIG', 'GEOMETRY_BOUNDS', 'ISOLATION_CONFLICT', 'DIAGNOSTIC_WRITE_FAILURE', 'GUID_OWNERSHIP', 'CUBEMAP_LAYOUT', 'BUILD_IDENTITY_INVALID', 'STATIC_LAYER_MISMATCH', 'SOURCE_DIGEST_CHANGED', 'GUID_MISMATCH'})
 KINDS = frozenset({'UNITY', 'ACCESS', 'NONE', 'NULL_REFERENCE', 'ARGUMENT', 'AGGREGATE', 'REQUIRE', 'IO', 'OTHER', 'NOT_SUPPORTED', 'INVALID_OPERATION'})
 ROOT_FIELDS = frozenset({'elapsedMs', 'diagnosticWriteFailed', 'schemaVersion', 'events', 'scope', 'cacheHit', 'runId', 'runAttempt', 'sourceCommit', 'firstFailureCode', 'firstExceptionKind', 'failureCount', 'status', 'firstFailureStage'})
@@ -74,11 +74,12 @@ def validate_progress(receipt, ident):
     if receipt['status']=='COMPLETE':
         require(not failures and events[-1]['stageCode']==400 and events[-1]['errorCode']=='NONE', 'REFLECTION_PROGRESS_COMPLETION_REJECTED')
         observed={event['stageCode'] for event in events}
-        common={10,20,21,30,320,321,322,323,400}
+        common={10,20,21,30,320,321,322,323,324,325,400}
         needed=common if receipt['cacheHit'] else STAGES-{499}
         require(needed<=observed and (not receipt['cacheHit'] or not observed.intersection(set(range(100,113))|set(range(200,213)))), 'REFLECTION_PROGRESS_COMPLETENESS_REJECTED')
+        by_stage={event['stageCode']:event for event in events}
+        require(by_stage[325]['digestCompared'] and by_stage[325]['digestSame'], 'REFLECTION_PROGRESS_FINAL_DIGEST_REJECTED')
         if not receipt['cacheHit']:
-            by_stage={event['stageCode']:event for event in events}
             require(1<=by_stage[81]['captureRenderers']<=4096 and 1<=by_stage[81]['captureTriangles']<=2000000, 'REFLECTION_PROGRESS_COMPLETE_GEOMETRY_REJECTED')
             for stage in (112,212):
                 e=by_stage[stage]

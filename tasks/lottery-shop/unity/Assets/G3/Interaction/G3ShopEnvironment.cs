@@ -214,8 +214,36 @@ namespace Lottery.G3.Interaction
             roomReflection.backgroundColor=value?new Color(.08f,.10f,.15f):new Color(.40f,.45f,.49f);
             if(!bakingReflection)roomReflection.customBakedTexture=value?nightReflection:dayReflection;
             if(exteriorMaterial!=null){exteriorMaterial.SetTexture("_BaseMap",value?exteriorNight:exteriorDay);exteriorMaterial.SetFloat("_Exposure",value?.72f:1f);}
-            if(art!=null)foreach(var renderer in art.GetComponentsInChildren<Renderer>())foreach(var material in renderer.sharedMaterials.Any(m=>m==exteriorMaterial)?renderer.sharedMaterials:renderer.materials)
-                {instantiatedMaterials.Add(material);if(material!=exteriorMaterial&&(material.name.StartsWith("Window")||material.name.StartsWith("StreetBlur"))&&material.HasProperty("_BaseColor")){if(!authoredWindowColors.ContainsKey(material))authoredWindowColors[material]=material.GetColor("_BaseColor");material.SetColor("_BaseColor",authoredWindowColors[material]*(value?new Color(.06f,.12f,.24f):Color.white));}}
+            SetWindowColors(value);
+        }
+        void SetWindowColors(bool value)
+        {
+            if(art==null)return;
+            foreach(var renderer in art.GetComponentsInChildren<Renderer>())
+            {
+                // Reading sharedMaterials does not implicitly instantiate assets
+                // while the same environment is built by the offline Editor baker.
+                // Only slots whose colour actually changes get an owned copy.
+                var materials=renderer.sharedMaterials;bool changed=false;
+                for(int i=0;i<materials.Length;i++)
+                {
+                    var material=materials[i];
+                    if(material==null||material==exteriorMaterial||
+                        !(material.name.StartsWith("Window")||material.name.StartsWith("StreetBlur"))||
+                        !material.HasProperty("_BaseColor"))continue;
+                    if(!authoredWindowColors.TryGetValue(material,out var authored))
+                    {
+                        authored=material.GetColor("_BaseColor");
+                        material=new Material(material){name=material.name+" (Instance)"};
+                        instantiatedMaterials.Add(material);authoredWindowColors.Add(material,authored);
+                        materials[i]=material;changed=true;
+                    }
+                    material.SetColor("_BaseColor",authored*(value?new Color(.06f,.12f,.24f):Color.white));
+                }
+                // Reassign the array only after a slot was replaced. Repeated
+                // day/night transitions keep the same copies and authored colours.
+                if(changed)renderer.sharedMaterials=materials;
+            }
         }
         public void Sync(RunState state)=>SetNight(state.Phase==DayPhase.NIGHT_BILL||state.Phase==DayPhase.DAY_COMPLETE||state.Phase==DayPhase.RUN_FAILED);
         static void ReleaseOwned(UnityEngine.Object value)

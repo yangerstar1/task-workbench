@@ -83,11 +83,24 @@ namespace Lottery.G3.Editor
             }
             // Rebinding a validated same-source asset to this build does not rebake
             // it. A stale recipe or either changed file forces the real bake above.
-            trace?.Mark(320);receipt.colorSpace=PlayerSettings.colorSpace.ToString();receipt.runtimeDependencyHash=AssetDatabase.GetAssetDependencyHash(DependencyRoots[0]).ToString();receipt.pipelineDependencyHash=AssetDatabase.GetAssetDependencyHash(DependencyRoots[1]).ToString();
+            trace?.Mark(320);receipt.colorSpace=PlayerSettings.colorSpace.ToString();receipt.runtimeDependencyHash=beforeInputs["DEPENDENCY|"+DependencyRoots[0]];receipt.pipelineDependencyHash=beforeInputs["DEPENDENCY|"+DependencyRoots[1]];
             receipt.sourceCommit=Arg("-probeCommit");receipt.runId=Arg("-probeRunId");receipt.runAttempt=Arg("-probeRunAttempt");
             string json=JsonUtility.ToJson(receipt,true);if(Encoding.UTF8.GetByteCount(json)>SmallBytes)throw new BakeFailure(FailureCode.RECEIPT_SIZE);
-            trace?.Mark(321);File.WriteAllText(ReceiptPath,json,new UTF8Encoding(false));AssetDatabase.ImportAsset(ReceiptPath,ImportAssetOptions.ForceUpdate);
-            trace?.Mark(322);AssetDatabase.SaveAssets();trace?.Mark(323);
+            // Receipt fields and digest must describe the same input snapshot.
+            // Final import/save may flush dirty covered assets: verify, never restamp
+            // an earlier bake with a later digest or silently remove inputs.
+            bool finalValidated=false;
+            Lottery.Probe.Editor.ProbeBuild.RunPreparationWithCleanup(
+                ()=>Observed(trace,()=>{
+                    trace?.Mark(321);File.WriteAllText(ReceiptPath,json,new UTF8Encoding(false));AssetDatabase.ImportAsset(ReceiptPath,ImportAssetOptions.ForceUpdate);
+                    trace?.Mark(322);AssetDatabase.SaveAssets();trace?.Mark(323);
+                    if(trace!=null){trace.digestCompared=false;trace.digestSame=false;trace.changedInputCount=-1;trace.changedInputKinds=0;}
+                    trace?.Mark(324);bool finalSame=ComputeDigest(out var finalInputs)==digest;
+                    if(trace!=null){trace.digestCompared=true;trace.digestSame=finalSame;trace.ObserveInputChanges(beforeInputs,finalInputs);}trace?.Mark(325);
+                    if(!finalSame)throw new BakeFailure(FailureCode.SOURCE_DIGEST_CHANGED);
+                    finalValidated=true;
+                }),
+                ()=>{if(!finalValidated){File.WriteAllText(ReceiptPath,"{\"schemaVersion\":1,\"status\":\"BAKE_INPUT_CHANGED\"}",new UTF8Encoding(false));AssetDatabase.ImportAsset(ReceiptPath,ImportAssetOptions.ForceUpdate);}});
         }
         static void CleanupBake(GameObject owner,Scene prior,Scene owned,RenderPipelineAsset priorDefault,RenderPipelineAsset priorQuality,LightingSnapshot lighting,BakeTrace trace)
         {

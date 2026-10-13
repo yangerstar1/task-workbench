@@ -24,7 +24,7 @@ def event(stage,elapsed=0,**extra):
 
 
 def receipt(status='COMPLETE',cold=False):
-    stages=sorted(progress.STAGES-{499}) if cold else [10,20,21,30,320,321,322,323,400]
+    stages=sorted(progress.STAGES-{499}) if cold else [10,20,21,30,320,321,322,323,324,325,400]
     value=dict(schemaVersion=1,scope=progress.SCOPE,sourceCommit=IDENT['sourceCommit'],runId='123',runAttempt='1',status=status,cacheHit=not cold,diagnosticWriteFailed=False,firstFailureStage=-1,firstFailureCode='NONE',firstExceptionKind='NONE',failureCount=0,elapsedMs=100,events=[event(stage,n) for n,stage in enumerate(stages)])
     if cold:
         by_stage={e['stageCode']:e for e in value['events']};by_stage[81].update(captureRenderers=39,captureTriangles=70000)
@@ -32,6 +32,7 @@ def receipt(status='COMPLETE',cold=False):
             by_stage[stage].update(bakeIndex=index,bakeAttempted=True,bakeReturned=True,fileObserved=True,fileExists=True,fileBytes=102400,textureObserved=True,textureExists=True,width=128,height=128,mipCount=8,formatCode=17,sourceWidth=128,sourceHeight=768,rangeObserved=True,rangeFinite=True,pixelSampleCount=98304,maxChannelRange=.5,guidObserved=True,guidPresent=True,guidMatches=True,metaObserved=True,metaExists=True,metaBytes=3000)
         by_stage[306].update(sceneObserved=True,sceneValid=True,sceneLoaded=True,activeMatches=True)
         by_stage[311].update(digestCompared=True,digestSame=True,changedInputCount=0,changedInputKinds=0)
+    next(e for e in value['events'] if e['stageCode']==325).update(digestCompared=True,digestSame=True,changedInputCount=0,changedInputKinds=0)
     return value
 
 
@@ -137,6 +138,49 @@ class ReflectionProgressTests(unittest.TestCase):
         finish=source.split('public void Finish()',1)[1].split('[Serializable] sealed class TraceReceipt',1)[0]
         self.assertNotIn('throw ',finish);self.assertIn('diagnosticWriteFailed',source)
         self.assertIn('trace?.ClearSceneObservation();trace?.Mark(304)',source)
+
+    def test_postsave_stage_required_for_cold_and_cache(self):
+        for cold in (False,True):
+            for stage in (324,325):
+                value=receipt(cold=cold);value['events']=[e for e in value['events'] if e['stageCode']!=stage]
+                with self.subTest(cold=cold,stage=stage),self.assertRaises(ValueError):self.validate(value)
+    def test_postsave_digest_false_or_unknown_cannot_complete(self):
+        for cold in (False,True):
+            for patch_event in [dict(digestSame=False,changedInputCount=1,changedInputKinds=1),dict(digestCompared=False,digestSame=False,changedInputCount=-1,changedInputKinds=0)]:
+                value=receipt(cold=cold);next(e for e in value['events'] if e['stageCode']==325).update(patch_event)
+                with self.assertRaises(ValueError):self.validate(value)
+    def test_postsave_changed_inputs_preserved_as_failure_not_success(self):
+        value=receipt('FAILED',cold=True);value['events']=[e for e in value['events'] if e['stageCode']<325]
+        value['events'].append(event(325,70,digestCompared=True,digestSame=False,changedInputCount=1,changedInputKinds=64,errorCode='SOURCE_DIGEST_CHANGED',exceptionKind='REQUIRE'))
+        value.update(firstFailureStage=325,firstFailureCode='SOURCE_DIGEST_CHANGED',firstExceptionKind='REQUIRE',failureCount=1)
+        self.validate(value);dest,raw,ok=self.export(value);self.assertFalse(ok);self.assertEqual(dest.read_bytes(),raw)
+    def test_postsave_read_failure_preserves_unknown_measurement_and_original_error(self):
+        value=receipt('FAILED');value['events']=[e for e in value['events'] if e['stageCode']<324]
+        value['events'].append(event(324,70,errorCode='UNCLASSIFIED_NATIVE_EXCEPTION',exceptionKind='IO'))
+        value.update(firstFailureStage=324,firstFailureCode='UNCLASSIFIED_NATIVE_EXCEPTION',firstExceptionKind='IO',failureCount=1)
+        self.validate(value);dest,raw,ok=self.export(value);self.assertFalse(ok);self.assertEqual(dest.read_bytes(),raw)
+    def test_source_receipt_hashes_share_snapshot_and_final_check_follows_save(self):
+        root=Path(__file__).resolve().parents[3];source=(root/progress.visual.TASK/'unity/Assets/G3/Editor/G3ShopReflectionBaker.cs').read_text()
+        body=source.split('static void PrepareObserved',1)[1].split('static void CleanupBake',1)[0]
+        self.assertIn('receipt.runtimeDependencyHash=beforeInputs["DEPENDENCY|"+DependencyRoots[0]]',body)
+        self.assertIn('receipt.pipelineDependencyHash=beforeInputs["DEPENDENCY|"+DependencyRoots[1]]',body)
+        self.assertNotIn('GetAssetDependencyHash',body)
+        self.assertLess(body.index('AssetDatabase.SaveAssets();trace?.Mark(323)'),body.index('trace?.Mark(324)'))
+        self.assertIn('ComputeDigest(out var finalInputs)==digest',body);self.assertIn('ObserveInputChanges(beforeInputs,finalInputs)',body)
+        self.assertNotIn('sourceDigest=ComputeDigest',body);self.assertEqual(body.count('sourceDigest=digest'),1)
+    def test_source_invalidates_complete_receipt_on_any_final_verification_failure(self):
+        root=Path(__file__).resolve().parents[3];source=(root/progress.visual.TASK/'unity/Assets/G3/Editor/G3ShopReflectionBaker.cs').read_text()
+        final=source.split('bool finalValidated=false;',1)[1].split('static void CleanupBake',1)[0]
+        self.assertIn('RunPreparationWithCleanup',final);self.assertIn('()=>Observed(trace,()=>{',final)
+        self.assertIn('AssetDatabase.SaveAssets();trace?.Mark(323)',final)
+        self.assertEqual(final.count('AssetDatabase.ImportAsset(ReceiptPath,ImportAssetOptions.ForceUpdate)'),2)
+        self.assertIn('if(!finalSame)throw new BakeFailure(FailureCode.SOURCE_DIGEST_CHANGED);',final)
+        self.assertLess(final.index('if(!finalSame)throw'),final.index('finalValidated=true;'))
+        self.assertIn('if(!finalValidated){File.WriteAllText(ReceiptPath,',final);self.assertIn('BAKE_INPUT_CHANGED',final)
+        self.assertNotIn('File.Delete',final);self.assertNotIn('while(',final);self.assertNotIn('sourceDigest=',final)
+    def test_extended_cold_path_stays_within_existing_event_and_byte_limits(self):
+        value=receipt(cold=True);self.validate(value);self.assertEqual(len(value['events']),57)
+        self.assertLessEqual(len(json.dumps(value).encode()),65536);self.assertLessEqual(len(value['events']),64)
 
 
 if __name__=='__main__':unittest.main()
