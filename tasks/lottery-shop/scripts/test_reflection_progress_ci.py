@@ -24,6 +24,14 @@ def event(stage,elapsed=0,**extra):
     value.update(extra);return value
 
 
+def audit_for(value):
+    observed={e['stageCode'] for e in value['events']}
+    ready=20 in observed
+    value['materialAudit']=dict(ready=ready,error=not ready,missingBits=0,stages=sum(1<<i for i,s in enumerate(progress.MATERIAL_STAGES) if s in observed) if ready else 0,changedBits=0,overflow=0,records=[])
+    if not ready:value['diagnosticWriteFailed']=True
+    return value
+
+
 def receipt(status='COMPLETE',cold=False):
     stages=sorted(progress.STAGES-{499}) if cold else [10,20,21,30,320,321,322,323,324,325,400]
     value=dict(startedUtc="2026-10-13T17:30:00.1234567Z",schemaVersion=1,scope=progress.SCOPE,sourceCommit=IDENT['sourceCommit'],runId='123',runAttempt='1',status=status,cacheHit=not cold,diagnosticWriteFailed=False,firstFailureStage=-1,firstFailureCode='NONE',firstExceptionKind='NONE',failureCount=0,elapsedMs=100,events=[event(stage,n) for n,stage in enumerate(stages)])
@@ -34,12 +42,25 @@ def receipt(status='COMPLETE',cold=False):
         by_stage[306].update(sceneObserved=True,sceneValid=True,sceneLoaded=True,activeMatches=True)
         by_stage[311].update(digestCompared=True,digestSame=True,changedInputCount=0,changedInputKinds=0)
     next(e for e in value['events'] if e['stageCode']==325).update(digestCompared=True,digestSame=True,changedInputCount=0,changedInputKinds=0)
-    return value
+    return audit_for(value)
 
 
 def failed():
     value=receipt('FAILED');value.update(cacheHit=False,firstFailureStage=102,firstFailureCode='BAKE_RETURNED_FALSE',firstExceptionKind='REQUIRE',failureCount=2)
     value['events']=[event(10,0),event(101,1,bakeIndex=0,bakeAttempted=True),event(102,2,bakeIndex=0,bakeAttempted=True,fileObserved=True),event(102,3,bakeIndex=0,bakeAttempted=True,fileObserved=True,errorCode='BAKE_RETURNED_FALSE',exceptionKind='REQUIRE'),event(304,4),event(304,5,errorCode='UNCLASSIFIED_NATIVE_EXCEPTION',exceptionKind='UNITY'),event(499,6)]
+    return audit_for(value)
+
+
+def material_state():
+    value={k:0 for k in progress.STATE_FIELDS};value.update(queue=2000,version=-1,instancing=False,doubleSided=False,serialized='0'*64,sub='0'*64,disk='0'*64)
+    return value
+
+
+def changed_receipt(ids=(32,33)):
+    value=receipt(cold=True);audit=value['materialAudit']
+    for id in ids:
+        a=material_state();b=copy.deepcopy(a);b['gi']=4
+        audit['records'].append(dict(id=id,firstStage=102,lastStage=325,changeBits=1,lastBits=1,before=a,first=b,last=copy.deepcopy(b)));audit['changedBits']|=1<<id
     return value
 
 
@@ -131,7 +152,7 @@ class ReflectionProgressTests(unittest.TestCase):
             fields=set()
             for group in re.findall(r'public (?:int|long|float|bool|string) ([^;]+);',text):
                 for field in group.split(','):fields.add(field.split('=')[0].strip())
-            if name=='TraceReceipt':fields.add('events')
+            if name=='TraceReceipt':fields.update(('events','materialAudit'))
             classes[name]=fields
         self.assertEqual(classes['TraceReceipt'],progress.ROOT_FIELDS);self.assertEqual(classes['TraceEvent'],progress.EVENT_FIELDS)
         self.assertIn('args[assembly+1]!="Lottery.G3.VisualCandidate.Tests"',source)
@@ -154,12 +175,12 @@ class ReflectionProgressTests(unittest.TestCase):
         value=receipt('FAILED',cold=True);value['events']=[e for e in value['events'] if e['stageCode']<325]
         value['events'].append(event(325,70,digestCompared=True,digestSame=False,changedInputCount=1,changedInputKinds=64,errorCode='SOURCE_DIGEST_CHANGED',exceptionKind='REQUIRE'))
         value.update(firstFailureStage=325,firstFailureCode='SOURCE_DIGEST_CHANGED',firstExceptionKind='REQUIRE',failureCount=1)
-        self.validate(value);dest,raw,ok=self.export(value);self.assertFalse(ok);self.assertEqual(dest.read_bytes(),raw)
+        audit_for(value);self.validate(value);dest,raw,ok=self.export(value);self.assertFalse(ok);self.assertEqual(dest.read_bytes(),raw)
     def test_postsave_read_failure_preserves_unknown_measurement_and_original_error(self):
         value=receipt('FAILED');value['events']=[e for e in value['events'] if e['stageCode']<324]
         value['events'].append(event(324,70,errorCode='UNCLASSIFIED_NATIVE_EXCEPTION',exceptionKind='IO'))
         value.update(firstFailureStage=324,firstFailureCode='UNCLASSIFIED_NATIVE_EXCEPTION',firstExceptionKind='IO',failureCount=1)
-        self.validate(value);dest,raw,ok=self.export(value);self.assertFalse(ok);self.assertEqual(dest.read_bytes(),raw)
+        audit_for(value);self.validate(value);dest,raw,ok=self.export(value);self.assertFalse(ok);self.assertEqual(dest.read_bytes(),raw)
     def test_source_receipt_hashes_share_snapshot_and_final_check_follows_save(self):
         root=Path(__file__).resolve().parents[3];source=(root/progress.visual.TASK/'unity/Assets/G3/Editor/G3ShopReflectionBaker.cs').read_text()
         body=source.split('static void PrepareObserved',1)[1].split('static void CleanupBake',1)[0]
@@ -186,25 +207,25 @@ class ReflectionProgressTests(unittest.TestCase):
     def test_material_ids_exact_frozen_source_table(self):
         root=Path(__file__).resolve().parents[3];shop=root/progress.visual.TASK/'unity/Assets/G3/Shop/Resources/G3/Shop'
         names=tuple(x['name'] for x in json.loads((shop/'materials.json').read_text())['materials'])
-        self.assertTrue(set(progress.MATERIAL_IDS)<=set(names));self.assertEqual(len(progress.MATERIAL_IDS),33);self.assertEqual(len(set(progress.MATERIAL_IDS)),33)
+        self.assertTrue(set(progress.MATERIAL_IDS)<=set(names));self.assertEqual(len(progress.MATERIAL_IDS),34);self.assertEqual(len(set(progress.MATERIAL_IDS)),34)
         source=(root/progress.visual.TASK/'unity/Assets/G3/Editor/G3ShopReflectionBaker.cs').read_text()
         table=source.split('DiagnosticMaterials={',1)[1].split('};',1)[0]
         self.assertEqual(tuple(re.findall(r'"([A-Za-z0-9_]+)"',table)),progress.MATERIAL_IDS)
     def test_all_fixed_material_roles_and_high_bit_export(self):
         for key in progress.CHANGE_BITS:
-            for idx in (0,32):
+            for idx in (0,32,33):
                 value=receipt('FAILED');value['events']=[event(10),event(325,70,digestCompared=True,digestSame=False,changedInputCount=1,changedInputKinds=2,changedOther=0,**{key:1<<idx},errorCode='SOURCE_DIGEST_CHANGED',exceptionKind='REQUIRE')]
                 value.update(firstFailureStage=325,firstFailureCode='SOURCE_DIGEST_CHANGED',firstExceptionKind='REQUIRE',failureCount=1)
-                self.validate(value);dest,raw,ok=self.export(value);self.assertFalse(ok);self.assertEqual(dest.read_bytes(),raw)
+                audit_for(value);self.validate(value);dest,raw,ok=self.export(value);self.assertFalse(ok);self.assertEqual(dest.read_bytes(),raw)
     def test_input_id_bounds_and_count_rejected(self):
-        for patch_event in [dict(matBits=-1),dict(matBits=True),dict(matBits=1<<33),dict(packBits=1),dict(changedOther=1),dict(changedOther='RAW_PRIVATE_PATH')]:
+        for patch_event in [dict(matBits=-1),dict(matBits=True),dict(matBits=1<<34),dict(packBits=1),dict(changedOther=1),dict(changedOther='RAW_PRIVATE_PATH')]:
             value=receipt();value['events'][0].update(patch_event)
             with self.assertRaises(ValueError):self.validate(value)
     def test_material_bit_requires_material_category(self):
         value=receipt('FAILED');value['events']=[event(10),event(325,70,digestCompared=True,changedInputCount=1,changedInputKinds=1,matBits=1,changedOther=0)]
         with self.assertRaises(ValueError):self.validate(value)
     def test_dirty_unknown_bounds_stage_and_bool_rejected(self):
-        for patch_event in [dict(dirtyMatBits=0),dict(dirtyStage=325,dirtyMatBits=0,dirtyPackBits=0),dict(dirtyStage=30,dirtyMatBits=0,dirtyPackBits=0),dict(dirtyStage=21,dirtyMatBits=1<<33,dirtyPackBits=0),dict(dirtyStage=21,dirtyMatBits=True,dirtyPackBits=0)]:
+        for patch_event in [dict(dirtyMatBits=0),dict(dirtyStage=325,dirtyMatBits=0,dirtyPackBits=0),dict(dirtyStage=30,dirtyMatBits=0,dirtyPackBits=0),dict(dirtyStage=21,dirtyMatBits=1<<34,dirtyPackBits=0),dict(dirtyStage=21,dirtyMatBits=True,dirtyPackBits=0)]:
             value=receipt();value['events'][1].update(patch_event)
             with self.assertRaises(ValueError):self.validate(value)
     def test_dirty_observation_is_not_success_or_changed_bytes(self):
@@ -238,6 +259,73 @@ class ReflectionProgressTests(unittest.TestCase):
         self.assertEqual(source.count('DateTime.UtcNow.ToString("O",System.Globalization.CultureInfo.InvariantCulture)'),1)
         event=source.split('[Serializable] sealed class TraceEvent',1)[1]
         self.assertNotIn('startedUtc',event)
+
+    def test_material_fixed_ids_34_and_appended_tea(self):
+        self.assertEqual(progress.MATERIAL_IDS[32:],('Tool_Dock_Liner','Nearfield_Tea'))
+        self.assertEqual(len(set(progress.MATERIAL_IDS)),34)
+    def test_material_two_changed_ids_gi_diagnostic_not_gate_repair(self):
+        value=changed_receipt();self.validate(value)
+        self.assertEqual(value['materialAudit']['changedBits'],(1<<32)|(1<<33))
+        # State changes are observations; strict source-digest verdict remains independent.
+        e=next(e for e in value['events'] if e['stageCode']==325);e.update(digestSame=False,changedInputCount=2,changedOther=0,matBits=(1<<32)|(1<<33),changedInputKinds=2)
+        with self.assertRaises(ValueError):self.validate(value)
+    def test_material_all_nine_difference_categories(self):
+        patches=[dict(gi=4),dict(instancing=True),dict(queue=2001),dict(keywords=1),dict(saved=1,present=1),dict(tags=1,present=64),dict(serialized='1'*64),dict(sub='1'*64),dict(disk='1'*64)]
+        for i,patch_state in enumerate(patches):
+            value=changed_receipt((32,));row=value['materialAudit']['records'][0];row['first']=dict(row['before'],**patch_state);row['last']=copy.deepcopy(row['first']);row['changeBits']=row['lastBits']=progress.material_difference(row['before'],row['first']);self.assertTrue(row['lastBits']&(1<<i));self.validate(value)
+    def test_material_internal_unknown_serialization_and_restored_latest(self):
+        value=changed_receipt((33,));r=value['materialAudit']['records'][0];r['first']=dict(r['before'],serialized='a'*64);r.update(changeBits=64,lastBits=0,last=copy.deepcopy(r['before']));self.validate(value)
+    def test_material_unknown_fields_or_strings_not_exported(self):
+        for mutate in [lambda v:v['materialAudit'].update(rawPath='PRIVATE'),lambda v:v['materialAudit']['records'][0].update(name='PRIVATE'),lambda v:v['materialAudit']['records'][0]['before'].update(yaml='PRIVATE'),lambda v:v['materialAudit']['records'][0]['before'].update(serialized='PRIVATE')]:
+            v=changed_receipt();mutate(v);dest,raw,ok=self.export(v);self.assertFalse(ok);self.assertFalse(dest.exists())
+    def test_material_ids_duplicates_count_and_masks_rejected(self):
+        for mutate in [lambda a:a['records'][0].update(id=34),lambda a:a['records'][0].update(id=True),lambda a:a['records'][1].update(id=32),lambda a:a.update(changedBits=0),lambda a:a.update(records=a['records']*3),lambda a:a.update(overflow=1),lambda a:a.update(changedBits=1<<34)]:
+            v=changed_receipt();mutate(v['materialAudit'])
+            with self.assertRaises(ValueError):self.validate(v)
+    def test_material_numeric_state_and_hash_bounds_rejected(self):
+        for change in [dict(gi=8),dict(gi=True),dict(queue=5001),dict(keywords=65536),dict(unknownKeywords=257),dict(present=256),dict(instancing=1),dict(saved=-1),dict(saved=4294967296),dict(saved=True),dict(saved=1),dict(version=1025),dict(subCount=9),dict(versionCount=1),dict(serialized='a'*63),dict(disk='A'*64),dict(sub='a'*64+'\n')]:
+            v=changed_receipt();v['materialAudit']['records'][0]['before'].update(change)
+            with self.subTest(change=change),self.assertRaises(ValueError):self.validate(v)
+    def test_material_known_subasset_version_and_unknown_count(self):
+        v=changed_receipt((32,));r=v['materialAudit']['records'][0];r['first']=dict(r['before'],subCount=2,versionCount=1,otherSubCount=1,version=10,sub='b'*64);r['last']=copy.deepcopy(r['first']);r['changeBits']=r['lastBits']=128;self.validate(v)
+    def test_material_record_difference_integrity(self):
+        for mutate in [lambda r:r.update(changeBits=0),lambda r:r.update(lastBits=2),lambda r:r.update(first=copy.deepcopy(r['before'])),lambda r:r.update(changeBits=512),lambda r:r.update(firstStage=20),lambda r:r.update(firstStage=325,lastStage=102)]:
+            v=changed_receipt();mutate(v['materialAudit']['records'][0])
+            with self.assertRaises(ValueError):self.validate(v)
+    def test_material_observation_missing_and_future_stages(self):
+        for mutate in [lambda a:a.update(stages=0),lambda a:a.update(ready=False),lambda a:a.update(stages=1<<12),lambda a:a.update(missingBits=1),lambda a:a.update(error=True)]:
+            v=receipt();mutate(v['materialAudit'])
+            with self.assertRaises(ValueError):self.validate(v)
+    def test_material_overflow_failure_flag_and_total(self):
+        v=changed_receipt((0,1,32,33));v['materialAudit'].update(changedBits=v['materialAudit']['changedBits']|4,overflow=1);v['diagnosticWriteFailed']=True
+        self.validate(v);dest,raw,ok=self.export(v);self.assertFalse(ok);self.assertEqual(dest.read_bytes(),raw)
+        v['diagnosticWriteFailed']=False
+        with self.assertRaises(ValueError):self.validate(v)
+    def test_material_missing_loaded_refs_preserved_as_incomplete(self):
+        v=receipt();v.update(diagnosticWriteFailed=True,status='RUNNING');v['materialAudit'].update(ready=False,error=True,missingBits=1<<33,stages=0);self.validate(v)
+    def test_material_four_rows_cold_byte_budget(self):
+        v=changed_receipt((0,1,32,33));self.validate(v)
+        for e in v['events']:
+            if e['stageCode']>=21:e.update(dirtyStage=21,dirtyMatBits=progress.BIT_LIMIT,dirtyPackBits=progress.BIT_LIMIT)
+        raw=json.dumps(v,separators=(',',':')).encode();self.assertLess(len(raw),65536);self.assertEqual(len(v['events']),57)
+    def test_material_producer_observer_has_no_load_save_or_validation(self):
+        root=Path(__file__).resolve().parents[3];s=(root/progress.visual.TASK/'unity/Assets/G3/Editor/G3ShopReflectionBaker.cs').read_text()
+        bodies=[s.split('void ObserveMaterialState',1)[1].split('void ObserveLoadedDirty',1)[0],s.split('static MaterialState ReadMaterialState',1)[1].split('static int MaterialDifference',1)[0]]
+        for body in bodies:
+            for forbidden in ('LoadAsset','SaveAssets','SaveAndReimport','ImportAsset','SetDirty','Refresh(','ValidateMaterial(','ApplyModifiedProperties','Debug.Log','error.Message'):self.assertNotIn(forbidden,body)
+        self.assertIn('Resources.FindObjectsOfTypeAll<Material>()',bodies[0]);self.assertIn('snapshots[id]=ReadMaterialState',bodies[0]);self.assertIn('audit.records.Count<4',bodies[0]);self.assertIn('audit.overflow>0)writeFailed=true',bodies[0])
+        self.assertIn('ObserveMaterialState(stage)',s);self.assertIn('p.contentHash',s);self.assertIn('EditorJsonUtility.ToJson(material,false)',s)
+    def test_material_schema_producer_fields_and_stages_match(self):
+        root=Path(__file__).resolve().parents[3];s=(root/progress.visual.TASK/'unity/Assets/G3/Editor/G3ShopReflectionBaker.cs').read_text()
+        for name,expected,extra in [('MaterialState',progress.STATE_FIELDS,set()),('MaterialChange',progress.RECORD_FIELDS,{'before','first','last'}),('MaterialAudit',progress.AUDIT_FIELDS,{'records'})]:
+            body=s.split('sealed class '+name,1)[1].split('\n        }',1)[0];fields=set(extra)
+            for group in re.findall(r'public (?:int|long|bool|string) ([^;]+);',body):
+                fields.update(field.split('=')[0].strip() for field in group.split(','))
+            self.assertEqual(fields,expected)
+        stages=s.split('MaterialStages={',1)[1].split('};',1)[0];self.assertEqual(tuple(map(int,stages.split(','))),progress.MATERIAL_STAGES)
+    def test_material_duplicate_nested_key_rejected(self):
+        raw=json.dumps(changed_receipt());raw=raw.replace('"gi": 0','"gi": "PRIVATE", "gi": 0',1)
+        dest,_,ok=self.export(raw.encode());self.assertFalse(ok);self.assertFalse(dest.exists())
 
 
 if __name__=='__main__':unittest.main()

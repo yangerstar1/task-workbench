@@ -251,7 +251,7 @@ namespace Lottery.G3.Editor
         // Fixed observations only. No exception message, stack, file path, hardware
         // string, editor log or asset content enters this sidecar.
         // Stable diagnostic IDs only; never serialize file paths or asset text.
-        static readonly string[] DiagnosticMaterials={"Aged_Aluminium","Bone_Laminate","Brass_Worn","Ceramic_Glazed","Charcoal_Metal","CounterToolTag_1","CounterToolTag_2","CounterToolTag_3","Cream_Plaster","Dark_Green_Felt","Decoration_Print_Atlas","Display_Silver_Coating","Glass_Blue_Water","Glass_Clear","Grout","Heritage_Green_Paint","Ink","Leaves_Green","Newspaper","Oxblood_Enamel","Paper_Ivory","Plastic_Cream","Rubber","Service_Monitor","ShopSign","StreetBlur","Ticket_Swap_1","Ticket_Swap_2","Ticket_Type_Label","Warm_Light","Warm_Oak","Warm_Terrazzo","Tool_Dock_Liner"};
+        static readonly string[] DiagnosticMaterials={"Aged_Aluminium","Bone_Laminate","Brass_Worn","Ceramic_Glazed","Charcoal_Metal","CounterToolTag_1","CounterToolTag_2","CounterToolTag_3","Cream_Plaster","Dark_Green_Felt","Decoration_Print_Atlas","Display_Silver_Coating","Glass_Blue_Water","Glass_Clear","Grout","Heritage_Green_Paint","Ink","Leaves_Green","Newspaper","Oxblood_Enamel","Paper_Ivory","Plastic_Cream","Rubber","Service_Monitor","ShopSign","StreetBlur","Ticket_Swap_1","Ticket_Swap_2","Ticket_Type_Label","Warm_Light","Warm_Oak","Warm_Terrazzo","Tool_Dock_Liner","Nearfield_Tea"};
         static int DiagnosticMaterial(string path,out int role)
         {
             role=0;string prefix=G3ShopArtImporter.Root+"/Materials/";
@@ -265,6 +265,69 @@ namespace Lottery.G3.Editor
             }
             return -1;
         }
+        static readonly string[] DiagnosticKeywords={"_NORMALMAP","_METALLICSPECGLOSSMAP","_EMISSION","_SURFACE_TYPE_TRANSPARENT","_ALPHATEST_ON","_ALPHAPREMULTIPLY_ON","_ALPHAMODULATE_ON","_SPECULAR_SETUP","_SPECULARHIGHLIGHTS_OFF","_ENVIRONMENTREFLECTIONS_OFF","_RECEIVE_SHADOWS_OFF","_SMOOTHNESS_TEXTURE_ALBEDO_CHANNEL_A","_DETAIL_MULX2","_DETAIL_SCALED","_PARALLAXMAP","_OCCLUSIONMAP"};
+        static readonly int[] MaterialStages={20,21,71,101,102,104,106,112,212,322,323,325};
+        [Serializable] sealed class MaterialState
+        {
+            public int gi,queue,keywords,unknownKeywords,present,subCount,versionCount,otherSubCount,version=-1;
+            public bool instancing,doubleSided;
+            public long saved,floats,colors,textures,valid,invalid,tags,passes;
+            public string serialized,sub,disk;
+        }
+        [Serializable] sealed class MaterialChange
+        {
+            public int id,firstStage,lastStage,changeBits,lastBits;
+            public MaterialState before,first,last;
+        }
+        [Serializable] sealed class MaterialAudit
+        {
+            public bool ready,error;public long missingBits,stages,changedBits;public int overflow;
+            public System.Collections.Generic.List<MaterialChange> records=new System.Collections.Generic.List<MaterialChange>();
+        }
+        static string DiagnosticHash(string value)
+        {if(Encoding.UTF8.GetByteCount(value)>262144)throw new InvalidOperationException();using(var h=SHA256.Create())return Hex(h.ComputeHash(Encoding.UTF8.GetBytes(value)));}
+        static long PropertyHash(SerializedObject value,string name,int bit,MaterialState state)
+        {var p=value.FindProperty(name);if(p==null)return 0;state.present|=1<<bit;return p.contentHash;}
+        static MaterialState ReadMaterialState(Material material,ScriptableObject[] loadedSubassets,int id)
+        {
+            if(material==null)throw new InvalidOperationException();
+            var result=new MaterialState{gi=(int)material.globalIlluminationFlags,queue=material.renderQueue,instancing=material.enableInstancing,doubleSided=material.doubleSidedGI};
+            var keywords=material.shaderKeywords;if(keywords.Length>256)throw new InvalidOperationException();
+            foreach(string keyword in keywords){int bit=Array.IndexOf(DiagnosticKeywords,keyword);if(bit>=0)result.keywords|=1<<bit;else result.unknownKeywords++;}
+            using(var serialized=new SerializedObject(material))
+            {
+                result.saved=PropertyHash(serialized,"m_SavedProperties",0,result);result.floats=PropertyHash(serialized,"m_SavedProperties.m_Floats",1,result);
+                result.colors=PropertyHash(serialized,"m_SavedProperties.m_Colors",2,result);result.textures=PropertyHash(serialized,"m_SavedProperties.m_TexEnvs",3,result);
+                result.valid=PropertyHash(serialized,"m_ValidKeywords",4,result);result.invalid=PropertyHash(serialized,"m_InvalidKeywords",5,result);
+                result.tags=PropertyHash(serialized,"stringTagMap",6,result);result.passes=PropertyHash(serialized,"disabledShaderPasses",7,result);
+            }
+            // Hashes only leave this process, never serialized material or subasset text.
+            result.serialized=DiagnosticHash(EditorJsonUtility.ToJson(material,false));
+            string path=G3ShopArtImporter.Root+"/Materials/"+DiagnosticMaterials[id]+".mat";
+            if(!File.Exists(path)||new FileInfo(path).Length>262144)throw new InvalidOperationException();result.disk=HashFile(path);
+            var hashes=new System.Collections.Generic.List<string>();
+            foreach(var asset in loadedSubassets)
+            {
+                if(asset==null||AssetDatabase.GetAssetPath(asset)!=path)continue;
+                if(++result.subCount>8)throw new InvalidOperationException();
+                string type=asset.GetType().FullName;
+                bool known=type=="UnityEditor.Rendering.Universal.AssetVersion";
+                if(known){result.versionCount++;using(var serialized=new SerializedObject(asset)){var p=serialized.FindProperty("version");if(p!=null&&p.propertyType==SerializedPropertyType.Integer&&p.intValue>=0&&p.intValue<=1024)result.version=p.intValue;}}
+                else result.otherSubCount++;
+                hashes.Add(DiagnosticHash(EditorJsonUtility.ToJson(asset,false)));
+            }
+            hashes.Sort(StringComparer.Ordinal);result.sub=DiagnosticHash(string.Join("\n",hashes));return result;
+        }
+        static int MaterialDifference(MaterialState a,MaterialState b)
+        {
+            int bits=0;if(a.gi!=b.gi)bits|=1;if(a.instancing!=b.instancing||a.doubleSided!=b.doubleSided)bits|=2;if(a.queue!=b.queue)bits|=4;
+            if(a.keywords!=b.keywords||a.unknownKeywords!=b.unknownKeywords||a.valid!=b.valid||a.invalid!=b.invalid)bits|=8;
+            if(a.saved!=b.saved||a.floats!=b.floats||a.colors!=b.colors||a.textures!=b.textures)bits|=16;
+            if(a.tags!=b.tags||a.passes!=b.passes||a.present!=b.present)bits|=32;
+            if(a.serialized!=b.serialized)bits|=64;
+            if(a.sub!=b.sub||a.subCount!=b.subCount||a.versionCount!=b.versionCount||a.otherSubCount!=b.otherSubCount||a.version!=b.version)bits|=128;
+            if(a.disk!=b.disk)bits|=256;return bits;
+        }
         sealed class BakeTrace
         {
             readonly System.Diagnostics.Stopwatch clock=System.Diagnostics.Stopwatch.StartNew();
@@ -277,6 +340,7 @@ namespace Lottery.G3.Editor
             public long captureTriangles=-1,fileBytes=-1,metaBytes=-1;public float maxChannelRange=-1;
             public long matBits,metaBits,packBits,packMetaBits,dirtyMatBits=-1,dirtyPackBits=-1;
             public int changedOther,dirtyStage=-1;
+            readonly Material[] materialRefs=new Material[34];readonly MaterialState[] materialBefore=new MaterialState[34];
             int stageCode;
             BakeTrace(string commit,string run,string attempt)
             {
@@ -322,6 +386,42 @@ namespace Lottery.G3.Editor
                     changedInputKinds|=key.StartsWith("DEPENDENCY|",StringComparison.Ordinal)?64:key.Contains("/Generated/")?1:key.Contains("/Materials/")?2:key.Contains("/Textures/")?4:key.Contains("/Exterior/")?8:key.StartsWith("FILE|"+G3ShopArtImporter.Root+"/",StringComparison.Ordinal)?16:32;
                 }
             }
+            void ObserveMaterialState(int stage)
+            {
+                int stageBit=Array.IndexOf(MaterialStages,stage);if(stageBit<0)return;
+                var audit=receipt.materialAudit;if(audit.error)return;
+                try
+                {
+                    // Already-loaded owned references only: no load/import/validate/save.
+                    if(stage==20)
+                    {
+                        foreach(var material in Resources.FindObjectsOfTypeAll<Material>())
+                        {int role;int id=DiagnosticMaterial(AssetDatabase.GetAssetPath(material),out role);if(id>=0&&role==1){if(materialRefs[id]!=null&&materialRefs[id]!=material)throw new InvalidOperationException();materialRefs[id]=material;}}
+                        for(int i=0;i<34;i++)if(materialRefs[i]==null)audit.missingBits|=1L<<i;
+                        if(audit.missingBits!=0)throw new InvalidOperationException();
+                    }
+                    if(stage!=20&&!audit.ready)throw new InvalidOperationException();
+                    var subassets=Resources.FindObjectsOfTypeAll<ScriptableObject>();
+                    var snapshots=new MaterialState[34];for(int id=0;id<34;id++)snapshots[id]=ReadMaterialState(materialRefs[id],subassets,id);
+                    for(int id=0;id<34;id++)
+                    {
+                        var current=snapshots[id];
+                        if(stage==20){materialBefore[id]=current;continue;}
+                        int bits=MaterialDifference(materialBefore[id],current);
+                        var record=audit.records.FirstOrDefault(x=>x.id==id);
+                        if(bits!=0)
+                        {
+                            audit.changedBits|=1L<<id;
+                            if(record==null&&audit.records.Count<4){record=new MaterialChange{id=id,firstStage=stage,before=materialBefore[id],first=current};audit.records.Add(record);}
+                        }
+                        if(record!=null){record.lastStage=stage;record.last=current;record.lastBits=bits;record.changeBits|=bits;}
+                    }
+                    audit.ready=true;audit.stages|=1L<<stageBit;
+                    int count=0;for(int i=0;i<34;i++)if((audit.changedBits&(1L<<i))!=0)count++;
+                    audit.overflow=count-audit.records.Count;if(audit.overflow>0)writeFailed=true;
+                }
+                catch{audit.error=true;writeFailed=true;}
+            }
             void ObserveLoadedDirty(int stage)
             {
                 // Observe only already-loaded objects: do not load, save, refresh or repair assets.
@@ -332,7 +432,7 @@ namespace Lottery.G3.Editor
                     dirtyMatBits=materials;dirtyPackBits=packed;dirtyStage=stage;
                 } catch {dirtyMatBits=dirtyPackBits=-1;dirtyStage=-1;writeFailed=true;}
             }
-            public void Mark(int stage){stageCode=stage;if(stage==21||stage==71||stage==112||stage==212||stage==306||stage==310||stage==311||stage==320||stage==321||stage==322||stage==323||stage==324||stage==325)ObserveLoadedDirty(stage);Append(FailureCode.NONE,"NONE");}
+            public void Mark(int stage){stageCode=stage;ObserveMaterialState(stage);if(stage==21||stage==71||stage==112||stage==212||stage==306||stage==310||stage==311||stage==320||stage==321||stage==322||stage==323||stage==324||stage==325)ObserveLoadedDirty(stage);Append(FailureCode.NONE,"NONE");}
             bool AlreadyRecorded(Exception error)
             {return recorded.Contains(error)||(error is AggregateException aggregate&&aggregate.InnerExceptions.Count>0&&aggregate.InnerExceptions.All(AlreadyRecorded));}
             public void Failure(Exception error)
@@ -390,6 +490,7 @@ namespace Lottery.G3.Editor
             public string startedUtc;
             public string scope="REFLECTION_PREPARATION_DIAGNOSTIC_NOT_VISUAL_PASS",sourceCommit,runId,runAttempt,status="RUNNING",firstFailureCode="NONE",firstExceptionKind="NONE";
             public bool cacheHit,diagnosticWriteFailed;public long elapsedMs;
+            public MaterialAudit materialAudit=new MaterialAudit();
             public System.Collections.Generic.List<TraceEvent> events=new System.Collections.Generic.List<TraceEvent>();
         }
         [Serializable] sealed class TraceEvent

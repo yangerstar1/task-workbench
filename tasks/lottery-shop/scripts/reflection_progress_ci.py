@@ -22,14 +22,14 @@ def integer(value, low, high):
 STAGES = frozenset({324,325,10, 400, 20, 21, 30, 40, 300, 301, 302, 303, 304, 305, 50, 51, 306, 310, 311, 60, 61, 190, 320, 321, 322, 323, 70, 71, 200, 201, 202, 203, 204, 205, 206, 207, 80, 81, 208, 209, 210, 211, 212, 90, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 499})
 ERRORS = frozenset({'UNCLASSIFIED_NATIVE_EXCEPTION', 'SOURCE_INPUT_MISSING', 'BAKE_RETURNED_FALSE', 'EXR_DIMENSIONS', 'FIXED_FILE_MISSING_OR_SIZE', 'IN_PLAY_MODE', 'NONE', 'FINAL_TEXTURE_CONTRACT', 'HDR_NONFINITE', 'IMPORTER_EXTERNAL_REMAP', 'IMPORTER_MISSING', 'SOURCE_DEPENDENCY_MISSING', 'STATIC_FLAG_MISSING', 'RECEIPT_SIZE', 'HDR_FLAT_OR_RANGE', 'CACHE_ARTIFACT_MISMATCH', 'CLEANUP_PIPELINE_OR_SCENE', 'STATIC_MESH_MISSING', 'CLEANUP_LIGHTING', 'PROBE_CONFIG', 'GEOMETRY_BOUNDS', 'ISOLATION_CONFLICT', 'DIAGNOSTIC_WRITE_FAILURE', 'GUID_OWNERSHIP', 'CUBEMAP_LAYOUT', 'BUILD_IDENTITY_INVALID', 'STATIC_LAYER_MISMATCH', 'SOURCE_DIGEST_CHANGED', 'GUID_MISMATCH'})
 KINDS = frozenset({'UNITY', 'ACCESS', 'NONE', 'NULL_REFERENCE', 'ARGUMENT', 'AGGREGATE', 'REQUIRE', 'IO', 'OTHER', 'NOT_SUPPORTED', 'INVALID_OPERATION'})
-ROOT_FIELDS = frozenset({'startedUtc','elapsedMs', 'diagnosticWriteFailed', 'schemaVersion', 'events', 'scope', 'cacheHit', 'runId', 'runAttempt', 'sourceCommit', 'firstFailureCode', 'firstExceptionKind', 'failureCount', 'status', 'firstFailureStage'})
+ROOT_FIELDS = frozenset({'materialAudit','startedUtc','elapsedMs', 'diagnosticWriteFailed', 'schemaVersion', 'events', 'scope', 'cacheHit', 'runId', 'runAttempt', 'sourceCommit', 'firstFailureCode', 'firstExceptionKind', 'failureCount', 'status', 'firstFailureStage'})
 EVENT_FIELDS = frozenset({'stageCode', 'bakeAttempted', 'captureRenderers', 'textureExists', 'maxChannelRange', 'foreignProbes', 'sourceHeight', 'sceneObserved', 'sceneValid', 'errorCode', 'changedInputCount', 'elapsedMs', 'metaBytes', 'guidMatches', 'bakeReturned', 'rangeFinite', 'digestCompared', 'fileExists', 'width', 'activeMatches', 'foreignLights', 'guidObserved', 'guidPresent', 'sceneLoaded', 'fileObserved', 'exceptionKind', 'rangeObserved', 'textureObserved', 'mipCount', 'formatCode', 'foreignRenderers', 'sourceWidth', 'digestSame', 'pixelSampleCount', 'metaObserved', 'height', 'fileBytes', 'changedInputKinds', 'captureTriangles', 'metaExists', 'bakeIndex'})
 BOOL_FIELDS = frozenset({'bakeAttempted', 'textureExists', 'sceneObserved', 'sceneValid', 'guidMatches', 'bakeReturned', 'rangeFinite', 'digestCompared', 'fileExists', 'activeMatches', 'guidObserved', 'guidPresent', 'sceneLoaded', 'fileObserved', 'rangeObserved', 'textureObserved', 'digestSame', 'metaObserved', 'metaExists'})
 INT_FIELDS = frozenset({'stageCode', 'pixelSampleCount', 'height', 'captureRenderers', 'changedInputCount', 'changedInputKinds', 'mipCount', 'formatCode', 'foreignRenderers', 'foreignProbes', 'sourceWidth', 'width', 'sourceHeight', 'foreignLights', 'bakeIndex'})
 LONG_FIELDS = frozenset({'fileBytes', 'metaBytes', 'captureTriangles'})
 
 
-MATERIAL_IDS = ('Aged_Aluminium', 'Bone_Laminate', 'Brass_Worn', 'Ceramic_Glazed', 'Charcoal_Metal', 'CounterToolTag_1', 'CounterToolTag_2', 'CounterToolTag_3', 'Cream_Plaster', 'Dark_Green_Felt', 'Decoration_Print_Atlas', 'Display_Silver_Coating', 'Glass_Blue_Water', 'Glass_Clear', 'Grout', 'Heritage_Green_Paint', 'Ink', 'Leaves_Green', 'Newspaper', 'Oxblood_Enamel', 'Paper_Ivory', 'Plastic_Cream', 'Rubber', 'Service_Monitor', 'ShopSign', 'StreetBlur', 'Ticket_Swap_1', 'Ticket_Swap_2', 'Ticket_Type_Label', 'Warm_Light', 'Warm_Oak', 'Warm_Terrazzo', 'Tool_Dock_Liner')
+MATERIAL_IDS = ('Aged_Aluminium', 'Bone_Laminate', 'Brass_Worn', 'Ceramic_Glazed', 'Charcoal_Metal', 'CounterToolTag_1', 'CounterToolTag_2', 'CounterToolTag_3', 'Cream_Plaster', 'Dark_Green_Felt', 'Decoration_Print_Atlas', 'Display_Silver_Coating', 'Glass_Blue_Water', 'Glass_Clear', 'Grout', 'Heritage_Green_Paint', 'Ink', 'Leaves_Green', 'Newspaper', 'Oxblood_Enamel', 'Paper_Ivory', 'Plastic_Cream', 'Rubber', 'Service_Monitor', 'ShopSign', 'StreetBlur', 'Ticket_Swap_1', 'Ticket_Swap_2', 'Ticket_Type_Label', 'Warm_Light', 'Warm_Oak', 'Warm_Terrazzo', 'Tool_Dock_Liner', 'Nearfield_Tea')
 CHANGE_BITS = frozenset(('matBits','metaBits','packBits','packMetaBits'))
 DIRTY_BITS = frozenset(('dirtyMatBits','dirtyPackBits'))
 DIRTY_STAGES = frozenset((21,71,112,212,306,310,311,320,321,322,323,324,325))
@@ -37,6 +37,48 @@ EVENT_FIELDS |= CHANGE_BITS | DIRTY_BITS | {'changedOther','dirtyStage'}
 LONG_FIELDS |= CHANGE_BITS | DIRTY_BITS
 INT_FIELDS |= {'changedOther','dirtyStage'}
 BIT_LIMIT = (1 << len(MATERIAL_IDS)) - 1
+
+MATERIAL_STAGES = (20,21,71,101,102,104,106,112,212,322,323,325)
+AUDIT_FIELDS = frozenset(('ready','error','missingBits','stages','changedBits','overflow','records'))
+STATE_FIELDS = frozenset(('gi','queue','keywords','unknownKeywords','present','subCount','versionCount','otherSubCount','version','instancing','doubleSided','saved','floats','colors','textures','valid','invalid','tags','passes','serialized','sub','disk'))
+STATE_HASHES = ('saved','floats','colors','textures','valid','invalid','tags','passes')
+RECORD_FIELDS = frozenset(('id','firstStage','lastStage','changeBits','lastBits','before','first','last'))
+
+def material_difference(a,b):
+    groups=(('gi',),('instancing','doubleSided'),('queue',),('keywords','unknownKeywords','valid','invalid'),('saved','floats','colors','textures'),('tags','passes','present'),('serialized',),('sub','subCount','versionCount','otherSubCount','version'),('disk',))
+    return sum(1<<i for i,keys in enumerate(groups) if any(a[k]!=b[k] for k in keys))
+
+def validate_material_audit(receipt):
+    a=receipt['materialAudit'];require(isinstance(a,dict) and set(a)==AUDIT_FIELDS,'MATERIAL_AUDIT_FIELDS_REJECTED')
+    require(type(a['ready']) is bool and type(a['error']) is bool and all(integer(a[k],0,BIT_LIMIT) for k in ('missingBits','changedBits')) and integer(a['stages'],0,(1<<len(MATERIAL_STAGES))-1) and integer(a['overflow'],0,34),'MATERIAL_AUDIT_RANGE_REJECTED')
+    rows=a['records'];require(isinstance(rows,list) and len(rows)<=4,'MATERIAL_AUDIT_COUNT_REJECTED')
+    require(not (a['error'] or a['overflow']) or receipt['diagnosticWriteFailed'],'MATERIAL_AUDIT_INCOMPLETE_REJECTED')
+    require(not a['missingBits'] or a['error'] and not a['ready'],'MATERIAL_AUDIT_MISSING_REJECTED')
+    observed={e['stageCode'] for e in receipt['events']};expected=sum(1<<i for i,stage in enumerate(MATERIAL_STAGES) if stage in observed)
+    require(a['stages']&~expected==0,'MATERIAL_AUDIT_STAGE_REJECTED')
+    require(not a['ready'] or a['stages']&1 and not a['missingBits'],'MATERIAL_AUDIT_BASELINE_REJECTED')
+    require(a['ready'] or not (rows or a['changedBits'] or a['stages']),'MATERIAL_AUDIT_UNKNOWN_REJECTED')
+    if not a['error']:
+        require(a['stages']==expected and a['ready']==(20 in observed),'MATERIAL_AUDIT_OBSERVATION_REJECTED')
+    seen=set()
+    for r in rows:
+        require(isinstance(r,dict) and set(r)==RECORD_FIELDS,'MATERIAL_RECORD_FIELDS_REJECTED')
+        require(integer(r['id'],0,33) and r['id'] not in seen and a['changedBits']&(1<<r['id']),'MATERIAL_RECORD_ID_REJECTED');seen.add(r['id'])
+        require(type(r['firstStage']) is int and type(r['lastStage']) is int and r['firstStage'] in MATERIAL_STAGES[1:] and r['lastStage'] in MATERIAL_STAGES[1:] and r['firstStage']<=r['lastStage'] and all(a['stages']&(1<<MATERIAL_STAGES.index(r[k])) for k in ('firstStage','lastStage')),'MATERIAL_RECORD_STAGE_REJECTED')
+        require(integer(r['changeBits'],1,511) and integer(r['lastBits'],0,511),'MATERIAL_RECORD_BITS_REJECTED')
+        for key in ('before','first','last'):
+            v=r[key];require(isinstance(v,dict) and set(v)==STATE_FIELDS,'MATERIAL_STATE_FIELDS_REJECTED')
+            require(integer(v['gi'],0,7) and integer(v['queue'],-1,5000) and integer(v['keywords'],0,65535) and integer(v['unknownKeywords'],0,256) and integer(v['present'],0,255) and integer(v['version'],-1,1024),'MATERIAL_STATE_RANGE_REJECTED')
+            require(type(v['instancing']) is bool and type(v['doubleSided']) is bool,'MATERIAL_STATE_BOOL_REJECTED')
+            require(all(integer(v[k],0,8) for k in ('subCount','versionCount','otherSubCount')) and v['subCount']==v['versionCount']+v['otherSubCount'] and (v['versionCount']>0 or v['version']==-1),'MATERIAL_SUBASSET_REJECTED')
+            require(all(integer(v[k],0,4294967295) for k in STATE_HASHES),'MATERIAL_PROPERTY_HASH_REJECTED')
+            require(all(v['present']&(1<<i) or v[k]==0 for i,k in enumerate(STATE_HASHES)),'MATERIAL_PROPERTY_PRESENCE_REJECTED')
+            require(all(isinstance(v[k],str) and re.fullmatch('[0-9a-f]{64}',v[k]) for k in ('serialized','sub','disk')),'MATERIAL_ANONYMOUS_HASH_REJECTED')
+        first=material_difference(r['before'],r['first']);last=material_difference(r['before'],r['last'])
+        require(first>0 and last==r['lastBits'] and (first|last)&~r['changeBits']==0,'MATERIAL_RECORD_DIFFERENCE_REJECTED')
+    require(a['changedBits'].bit_count()==len(rows)+a['overflow'],'MATERIAL_AUDIT_TOTAL_REJECTED')
+    if receipt['status']=='COMPLETE' and not receipt['diagnosticWriteFailed']:
+        require(a['ready'] and not a['error'] and not a['overflow'],'MATERIAL_AUDIT_COMPLETE_REJECTED')
 
 def validate_progress(receipt, ident):
     require(isinstance(receipt,dict) and set(receipt)==ROOT_FIELDS, 'REFLECTION_PROGRESS_FIELDS_REJECTED')
@@ -108,6 +150,7 @@ def validate_progress(receipt, ident):
                 require(all(e[k] for k in ('bakeAttempted','bakeReturned','fileObserved','fileExists','textureObserved','textureExists','rangeObserved','rangeFinite','guidObserved','guidPresent','guidMatches','metaObserved','metaExists')), 'REFLECTION_PROGRESS_COMPLETE_CUBE_OBSERVATION_REJECTED')
                 require(e['width']==e['height']==128 and e['mipCount']==8 and e['formatCode']==17 and e['pixelSampleCount']==98304 and .01<e['maxChannelRange']<=65504 and 128<=e['sourceWidth']<=2048 and 128<=e['sourceHeight']<=2048 and 0<e['fileBytes']<=8388608 and 0<e['metaBytes']<=16384, 'REFLECTION_PROGRESS_COMPLETE_CUBE_REJECTED')
             require(by_stage[306]['sceneObserved'] and by_stage[306]['activeMatches'] and by_stage[311]['digestCompared'] and by_stage[311]['digestSame'], 'REFLECTION_PROGRESS_COMPLETE_RESTORE_OR_DIGEST_REJECTED')
+    validate_material_audit(receipt)
     return receipt
 
 
