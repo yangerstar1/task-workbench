@@ -1,0 +1,7 @@
+{
+  "name": "Lottery.G3.PerformanceDiagnostic.Tests",
+  "rootNamespace": "Lottery.G3.PerformanceDiagnostic.Tests",
+  "references": ["Lottery.G3.Core", "Lottery.G3.Interaction", "Lottery.G3.Rendering", "Unity.RenderPipelines.Universal.Runtime", "Unity.RenderPipelines.Core.Runtime"],
+  "optionalUnityReferences": ["TestAssemblies"],
+  "autoReferenced": false
+}

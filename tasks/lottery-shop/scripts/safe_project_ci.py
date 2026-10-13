@@ -147,8 +147,9 @@ def project_argv(phase, ident):
             '-enableCodeCoverage', '-debugCodeOptimization', '-coverageOptions', COVERAGE, '-assemblyNames', assemblies]
     if phase != 'regression-edit': argv += ['-force-glcore', '-screen-width', '1280', '-screen-height', '720']
     argv += ['-job-worker-count', '2', '-probeCommit', ident['sourceCommit'], '-probeRunId', ident['runId']]
-    if phase in ('capture', 'regression-play'): argv += ['-probeRunAttempt', ident['runAttempt']]
+    if phase in ('capture', 'regression-play', 'performance-probe'): argv += ['-probeRunAttempt', ident['runAttempt']]
     if phase == 'regression-play': argv += ['-g3RegressionProgress', '1', '-probeReviewedCommit', ident['reviewedCandidateCommit']]
+    if phase == 'performance-probe': argv += ['-g3PerformanceProbe', '1', '-probeReviewedCommit', ident['reviewedCandidateCommit']]
     return argv
 
 
@@ -212,6 +213,9 @@ def test(root, phase):
             # Only the two fixed progress destinations; no prior attempt can survive.
             for progress in (artifacts / 'test-progress.json', visual.outdir(root) / 'regression-play-progress.json'):
                 if progress.exists(): progress.unlink()
+        if phase == 'performance-probe':
+            for receipt in (artifacts / 'performance-receipt.json', visual.outdir(root) / 'performance-receipt.json'):
+                if receipt.exists(): receipt.unlink()
         native(ident, shell(shlex.join(project_argv(phase, ident))), seconds, record, compiler_assets(root, ident))
         # Normal NUnit/test failure still permits the other exact suites to run.
         # Missing exits, native licensing failures or synchronous timeouts do not.
@@ -251,8 +255,25 @@ def finish(root):
     return 0 if record['status'] == 'NATIVE_SUCCEEDED' else 1
 
 
+def configure_performance():
+    # Explicit independent profile only. No caller-supplied module/path/command.
+    global visual, PHASES
+    import performance_probe_ci
+    visual = performance_probe_ci
+    PHASES = {'performance-probe': ('playmode', 'performance-probe', 'Lottery.G3.PerformanceDiagnostic.Tests', 600)}
+
+
 def main():
-    parser = argparse.ArgumentParser(); parser.add_argument('phase', choices=('start', *PHASES, 'finish')); args = parser.parse_args()
+    parser = argparse.ArgumentParser()
+    parser.add_argument('phase', choices=('start', *PHASES, 'performance-probe', 'finish'))
+    parser.add_argument('--performance-only', action='store_true')
+    args = parser.parse_args()
+    if args.performance_only:
+        if args.phase not in ('start', 'performance-probe', 'finish'):
+            print('SAFE_PROJECT_PROFILE_REJECTED'); return 1
+        configure_performance()
+    elif args.phase == 'performance-probe':
+        print('SAFE_PROJECT_PROFILE_REJECTED'); return 1
     root = Path(__file__).resolve().parents[3]
     def stop(_signal, _frame): raise InterruptedError('CANCELLED')
     signal.signal(signal.SIGTERM, stop)

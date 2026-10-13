@@ -1,0 +1,110 @@
+name: Lottery bounded A-B-A performance diagnostic only
+on:
+  push:
+    branches: [lottery-shop-g0-20261011]
+    paths: [tasks/lottery-shop/ci/performance-probe-request.json]
+permissions:
+  contents: read
+concurrency:
+  group: unity-personal-proof
+  cancel-in-progress: false
+jobs:
+  performance-only:
+    if: >-
+      github.event_name == 'push' && github.repository == 'yangerstar1/task-workbench' &&
+      github.repository_owner == 'yangerstar1' && github.actor == 'yangerstar1' &&
+      github.triggering_actor == 'yangerstar1' && github.ref == 'refs/heads/lottery-shop-g0-20261011' &&
+      github.event.repository.private == false && github.event.repository.fork == false && github.event.deleted == false
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+          lfs: false
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /tasks/lottery-shop/
+            /.github/workflows/lottery-performance-probe.yml
+            /.github/workflows/lottery-visual-candidate.yml
+            /.github/workflows/lottery-activation-probe.yml
+      - name: Require fresh independent performance request and exact source
+        id: guard
+        run: PYTHONDONTWRITEBYTECODE=1 python3 tasks/lottery-shop/scripts/performance_probe_ci.py guard
+      - name: Synthetic boundary tests without secrets
+        run: |
+          PYTHONDONTWRITEBYTECODE=1 python3 tasks/lottery-shop/scripts/test_visual_candidate_ci.py -v
+          PYTHONDONTWRITEBYTECODE=1 python3 tasks/lottery-shop/scripts/test_activation_probe.py -v
+          PYTHONDONTWRITEBYTECODE=1 python3 tasks/lottery-shop/scripts/test_safe_project_ci.py -v
+          PYTHONDONTWRITEBYTECODE=1 python3 tasks/lottery-shop/scripts/test_performance_probe_ci.py -v
+      - name: Prepare same authorized disposable runner disk layout
+        run: |
+          PYTHONDONTWRITEBYTECODE=1 python3 tasks/lottery-shop/scripts/performance_probe_ci.py guard
+          sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/.ghcup /usr/local/lib/android /opt/hostedtoolcache/CodeQL
+          python3 - <<'PY'
+          import shutil
+          if shutil.disk_usage('.').free < 30*1024**3:
+              raise SystemExit('INSUFFICIENT_IMAGE_DISK_SPACE')
+          PY
+      - name: Read same pinned public activation and return mechanism
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          repository: game-ci/unity-test-runner
+          ref: 0ff419b913a3630032cbe0de48a0099b5a9f0ed9
+          path: .visual-safe-upstream
+          persist-credentials: false
+          lfs: false
+          sparse-checkout: |
+            dist/BlankProject
+            dist/unity-config
+            dist/platforms/ubuntu
+      - name: Verify licensed font and hash exact source metadata
+        run: PYTHONDONTWRITEBYTECODE=1 python3 tasks/lottery-shop/scripts/performance_probe_ci.py prepare
+      - name: Activate once in this attempt's private container
+        id: safestart
+        timeout-minutes: 14
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+        run: PYTHONDONTWRITEBYTECODE=1 python3 tasks/lottery-shop/scripts/safe_project_ci.py start --performance-only
+      - name: One A-B-A case with 180-second case and 600-second native cold-start bounds
+        id: performance
+        if: ${{ steps.safestart.outcome == 'success' }}
+        timeout-minutes: 12
+        run: PYTHONDONTWRITEBYTECODE=1 python3 tasks/lottery-shop/scripts/safe_project_ci.py performance-probe --performance-only
+      - name: Preserve exact single-case original NUnit XML and validate its result
+        if: ${{ always() && steps.guard.outcome == 'success' && steps.performance.outcome != 'skipped' }}
+        run: PYTHONDONTWRITEBYTECODE=1 python3 tasks/lottery-shop/scripts/performance_probe_ci.py tests
+      - name: Preserve fixed measurements and require A-B-A completeness and restored lights
+        if: ${{ always() && steps.guard.outcome == 'success' && steps.performance.outcome != 'skipped' }}
+        run: PYTHONDONTWRITEBYTECODE=1 python3 tasks/lottery-shop/scripts/performance_probe_ci.py measurements
+      - name: Return only this owned activation and verify container absence
+        if: ${{ always() && steps.guard.outcome == 'success' && steps.safestart.outcome != 'skipped' }}
+        timeout-minutes: 5
+        run: PYTHONDONTWRITEBYTECODE=1 python3 tasks/lottery-shop/scripts/safe_project_ci.py finish --performance-only
+      - name: Record bounded tracked-source mutation metadata
+        if: ${{ always() && steps.guard.outcome == 'success' && steps.performance.outcome != 'skipped' }}
+        run: PYTHONDONTWRITEBYTECODE=1 python3 tasks/lottery-shop/scripts/performance_probe_ci.py snapshot-after
+      - name: Upload only independent performance diagnostic evidence
+        if: ${{ always() && steps.guard.outcome == 'success' }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: lottery-performance-diagnostic-not-g3-pass-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            tasks/lottery-shop/evidence/performance-probe/source-receipt.json
+            tasks/lottery-shop/evidence/performance-probe/source-before.json
+            tasks/lottery-shop/evidence/performance-probe/source-after.json
+            tasks/lottery-shop/evidence/performance-probe/source-changes.json
+            tasks/lottery-shop/evidence/performance-probe/font-receipt.json
+            tasks/lottery-shop/evidence/performance-probe/safe-start.json
+            tasks/lottery-shop/evidence/performance-probe/safe-performance-probe.json
+            tasks/lottery-shop/evidence/performance-probe/safe-finish.json
+            tasks/lottery-shop/evidence/performance-probe/safe-session.json
+            tasks/lottery-shop/evidence/performance-probe/performance-receipt.json
+            tasks/lottery-shop/evidence/performance-probe/tests/raw-test-results.xml
+            tasks/lottery-shop/evidence/performance-probe/tests/raw-test-report-receipt.json
+            tasks/lottery-shop/evidence/performance-probe/tests/test-receipt.json
+          if-no-files-found: error
+          retention-days: 7
