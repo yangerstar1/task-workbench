@@ -1,0 +1,734 @@
+{
+  "version": "art-v1.2",
+  "coordinateContract": "Blender metres Z-up. FBX axis_forward=-Z axis_up=Y. Unity position = [Blender x, Blender z, -Blender y]. Floor origin at center. Entrance +Unity Z; face -Unity Z into shop.",
+  "interiorMeters": [
+    6,
+    5.2,
+    2.8
+  ],
+  "anchors": [
+    {
+      "name": "PlayerSpawn",
+      "position": [
+        0.3,
+        0,
+        1.69
+      ],
+      "rotation": [
+        0,
+        180,
+        0
+      ],
+      "purpose": ""
+    },
+    {
+      "name": "StandUp",
+      "position": [
+        0.7,
+        0,
+        0.78
+      ],
+      "rotation": [
+        0,
+        130,
+        0
+      ],
+      "purpose": ""
+    },
+    {
+      "name": "ScratchTicket",
+      "position": [
+        2.05,
+        0.824,
+        -0.1
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "purpose": ""
+    },
+    {
+      "name": "TableSurface",
+      "position": [
+        2.025,
+        0.8075,
+        -0.1
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "purpose": ""
+    },
+    {
+      "name": "ScratchPlayer",
+      "position": [
+        1.98,
+        0,
+        1.1
+      ],
+      "rotation": [
+        0,
+        180,
+        0
+      ],
+      "purpose": ""
+    },
+    {
+      "name": "ScratchCamera",
+      "position": [
+        2.05,
+        1.68,
+        0.91
+      ],
+      "rotation": [
+        49,
+        180,
+        0
+      ],
+      "purpose": ""
+    },
+    {
+      "name": "ScratchLookAt",
+      "position": [
+        2.05,
+        0.824,
+        -0.1
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "purpose": ""
+    },
+    {
+      "name": "EntranceCamera",
+      "position": [
+        0.37,
+        1.67,
+        2.22
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "purpose": ""
+    },
+    {
+      "name": "EntranceLookAt",
+      "position": [
+        -0.15,
+        1.14,
+        -0.72
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "purpose": ""
+    },
+    {
+      "name": "TicketRack",
+      "position": [
+        -1.37,
+        1.52,
+        -0.27
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "purpose": ""
+    },
+    {
+      "name": "Cashier",
+      "position": [
+        -0.6,
+        1,
+        -1.2
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "purpose": ""
+    },
+    {
+      "name": "RedeemCabinet",
+      "position": [
+        1.61,
+        1,
+        -1.65
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "purpose": ""
+    },
+    {
+      "name": "ToolSlot1",
+      "position": [
+        1.28,
+        0.881,
+        -0.38
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "purpose": ""
+    },
+    {
+      "name": "ToolSlot2",
+      "position": [
+        2.81,
+        0.881,
+        -0.34
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "purpose": ""
+    },
+    {
+      "name": "ToolSlot3",
+      "position": [
+        1.28,
+        0.881,
+        0.24
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "purpose": ""
+    },
+    {
+      "name": "Phone",
+      "position": [
+        -1.57,
+        1.01,
+        -1.68
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "purpose": ""
+    },
+    {
+      "name": "Drawer",
+      "position": [
+        1.18,
+        0.65,
+        0.0
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "purpose": ""
+    },
+    {
+      "name": "ticket",
+      "position": [
+        2.05,
+        0.824,
+        -0.1
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "purpose": ""
+    },
+    {
+      "name": "table_look_at",
+      "position": [
+        2.05,
+        0.824,
+        -0.1
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "purpose": ""
+    },
+    {
+      "name": "table_stand",
+      "position": [
+        0.7,
+        0,
+        0.78
+      ],
+      "rotation": [
+        0,
+        130,
+        0
+      ],
+      "purpose": ""
+    },
+    {
+      "name": "entry",
+      "position": [
+        0.3,
+        0,
+        1.69
+      ],
+      "rotation": [
+        0,
+        180,
+        0
+      ],
+      "purpose": ""
+    },
+    {
+      "name": "tool_1",
+      "position": [
+        1.28,
+        0.881,
+        -0.38
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "purpose": ""
+    },
+    {
+      "name": "tool_2",
+      "position": [
+        2.81,
+        0.881,
+        -0.34
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "purpose": ""
+    },
+    {
+      "name": "tool_3",
+      "position": [
+        1.28,
+        0.881,
+        0.24
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "purpose": ""
+    },
+    {
+      "name": "table_camera",
+      "position": [
+        2.05,
+        2.044,
+        0.5
+      ],
+      "rotation": [
+        63.8,
+        180,
+        0
+      ]
+    },
+    {
+      "name": "shelf_view",
+      "position": [
+        -0.7,
+        0,
+        0.1
+      ],
+      "rotation": [
+        8,
+        180,
+        0
+      ]
+    },
+    {
+      "name": "shelf_target",
+      "position": [
+        -0.7,
+        1.1,
+        -1.46
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ]
+    }
+  ],
+  "colliders": [
+    {
+      "name": "Floor_Substrate",
+      "position": [
+        0,
+        -0.07,
+        0
+      ],
+      "size": [
+        6.16,
+        0.14,
+        5.36
+      ],
+      "target": "none"
+    },
+    {
+      "name": "Wall_West",
+      "position": [
+        -3.07,
+        1.4,
+        0
+      ],
+      "size": [
+        0.14,
+        2.8,
+        5.34
+      ],
+      "target": "none"
+    },
+    {
+      "name": "Wall_East",
+      "position": [
+        3.07,
+        1.4,
+        0
+      ],
+      "size": [
+        0.14,
+        2.8,
+        5.34
+      ],
+      "target": "none"
+    },
+    {
+      "name": "Wall_North",
+      "position": [
+        0,
+        1.4,
+        -2.67
+      ],
+      "size": [
+        6.14,
+        2.8,
+        0.14
+      ],
+      "target": "none"
+    },
+    {
+      "name": "Front_Pier",
+      "position": [
+        -2.94,
+        1.4,
+        2.63
+      ],
+      "size": [
+        0.12,
+        2.8,
+        0.17
+      ],
+      "target": "none"
+    },
+    {
+      "name": "Front_Pier",
+      "position": [
+        -0.22,
+        1.4,
+        2.63
+      ],
+      "size": [
+        0.11,
+        2.8,
+        0.17
+      ],
+      "target": "none"
+    },
+    {
+      "name": "Front_Pier",
+      "position": [
+        1.03,
+        1.4,
+        2.63
+      ],
+      "size": [
+        0.11,
+        2.8,
+        0.17
+      ],
+      "target": "none"
+    },
+    {
+      "name": "Front_Pier",
+      "position": [
+        2.93,
+        1.4,
+        2.63
+      ],
+      "size": [
+        0.14,
+        2.8,
+        0.17
+      ],
+      "target": "none"
+    },
+    {
+      "name": "Front_Lintel",
+      "position": [
+        0,
+        2.55,
+        2.63
+      ],
+      "size": [
+        6,
+        0.5,
+        0.17
+      ],
+      "target": "none"
+    },
+    {
+      "name": "Window_Lowerwall",
+      "position": [
+        -1.58,
+        0.43,
+        2.63
+      ],
+      "size": [
+        2.6,
+        0.86,
+        0.17
+      ],
+      "target": "none"
+    },
+    {
+      "name": "Window_Lowerwall",
+      "position": [
+        1.99,
+        0.43,
+        2.63
+      ],
+      "size": [
+        1.78,
+        0.86,
+        0.17
+      ],
+      "target": "none"
+    },
+    {
+      "name": "Front_NoExit_Collider",
+      "position": [
+        0,
+        1.1,
+        2.63
+      ],
+      "size": [
+        6,
+        2.2,
+        0.04
+      ],
+      "target": "none"
+    },
+    {
+      "name": "Cashier_Base",
+      "position": [
+        -0.7,
+        0.455,
+        -1.86
+      ],
+      "size": [
+        2.6,
+        0.87,
+        0.68
+      ],
+      "target": "none"
+    },
+    {
+      "name": "Showcase_Plinth",
+      "position": [
+        -2.13,
+        0.1,
+        -0.32
+      ],
+      "size": [
+        0.98,
+        0.2,
+        2.05
+      ],
+      "target": "none"
+    },
+    {
+      "name": "Showcase_Base",
+      "position": [
+        -2.13,
+        0.44,
+        -0.32
+      ],
+      "size": [
+        0.97,
+        0.53,
+        2.02
+      ],
+      "target": "none"
+    },
+    {
+      "name": "Scratch_Desk_Top",
+      "position": [
+        2.025,
+        0.775,
+        -0.07
+      ],
+      "size": [
+        1.85,
+        0.065,
+        1.54
+      ],
+      "target": "none"
+    },
+    {
+      "name": "Redemption_Cabinet_Case",
+      "position": [
+        2.19,
+        0.74,
+        -2.25
+      ],
+      "size": [
+        1.22,
+        1.45,
+        0.58
+      ],
+      "target": "none"
+    },
+    {
+      "name": "Water_Dispenser_Body",
+      "position": [
+        2.53,
+        0.49,
+        1.93
+      ],
+      "size": [
+        0.5,
+        0.95,
+        0.48
+      ],
+      "target": "none"
+    },
+    {
+      "name": "Interaction_Tickets",
+      "position": [
+        -1.64,
+        0.91,
+        -0.32
+      ],
+      "size": [
+        0.13,
+        0.48,
+        2.02
+      ],
+      "target": "tickets"
+    },
+    {
+      "name": "Interaction_Table",
+      "position": [
+        2.025,
+        0.825,
+        -0.1
+      ],
+      "size": [
+        1.85,
+        0.08,
+        1.54
+      ],
+      "target": "table"
+    },
+    {
+      "name": "Interaction_Drawer",
+      "position": [
+        1.17,
+        0.65,
+        0
+      ],
+      "size": [
+        0.07,
+        0.26,
+        1.21
+      ],
+      "target": "drawer"
+    },
+    {
+      "name": "Interaction_Phone",
+      "position": [
+        -1.57,
+        1.0,
+        -1.68
+      ],
+      "size": [
+        0.1,
+        0.05,
+        0.18
+      ],
+      "target": "phone"
+    },
+    {
+      "name": "Interaction_Cashier",
+      "position": [
+        -0.7,
+        1.03,
+        -1.86
+      ],
+      "size": [
+        2.7,
+        0.2,
+        0.8
+      ],
+      "target": "shop"
+    },
+    {
+      "name": "Interaction_Inventory",
+      "position": [
+        -2.345,
+        0.75,
+        2.02
+      ],
+      "size": [
+        0.85,
+        1.35,
+        0.5
+      ],
+      "target": "inventory"
+    }
+  ],
+  "geometryStats": {
+    "evaluatedTriangles": 65086,
+    "sourceMeshAndCurveObjects": 540,
+    "materialCount": 32,
+    "budgetTargetTriangles": 150000,
+    "mobilePerformance": "Not verified on device. Modular repeated meshes, maximum 2048 maps, static bake-ready architecture; further batching and bake work needed in Unity.",
+    "exportedStaticTriangles": 61308,
+    "exportedMeshObjects": 520
+  },
+  "integrationNotes": "Runtime aliases preserve authored metre-space. The oblique table_camera is raised for the approved runtime numeral size. Shelf view points to the authored tool counter, separate from ticket showcase."
+}

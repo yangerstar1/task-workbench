@@ -1,0 +1,162 @@
+name: Lottery diagnostic 3D visual candidate (not G3 pass)
+on:
+  push:
+    branches: [lottery-shop-g0-20261011]
+    paths: [tasks/lottery-shop/ci/visual-candidate-request.json]
+permissions:
+  contents: read
+concurrency:
+  group: unity-personal-proof
+  cancel-in-progress: false
+jobs:
+  visual-candidate:
+    name: Native 3D candidate frames then unchanged regression identities
+    if: >-
+      github.event_name == 'push' && github.repository == 'yangerstar1/task-workbench' &&
+      github.repository_owner == 'yangerstar1' && github.actor == 'yangerstar1' &&
+      github.triggering_actor == 'yangerstar1' && github.ref == 'refs/heads/lottery-shop-g0-20261011' &&
+      github.event.repository.private == false && github.event.repository.fork == false && github.event.deleted == false
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+          lfs: false
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /tasks/lottery-shop/
+            /.github/workflows/lottery-visual-candidate.yml
+      - name: Validate separate diagnostic request, never old G3 source approval
+        id: guard
+        run: python3 tasks/lottery-shop/scripts/visual_candidate_ci.py guard
+      - name: Run diagnostic evidence validator synthetic tests
+        run: PYTHONDONTWRITEBYTECODE=1 python3 tasks/lottery-shop/scripts/test_visual_candidate_ci.py -v
+      - name: Prepare existing authorized disposable runner disk layout
+        run: |
+          python3 tasks/lottery-shop/scripts/visual_candidate_ci.py guard
+          sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/.ghcup /usr/local/lib/android /opt/hostedtoolcache/CodeQL
+          python3 - <<'PY'
+          import shutil
+          if shutil.disk_usage('.').free < 30*1024**3:
+              raise SystemExit('Need at least 30 GiB for cold pinned Unity image')
+          PY
+      - name: Restore same verified licensed font and hash source metadata
+        run: |
+          python3 tasks/lottery-shop/scripts/visual_candidate_ci.py restore-font
+          python3 tasks/lottery-shop/scripts/visual_candidate_ci.py snapshot
+      - name: Capture actual runtime with imported FBX, routed input, and visible HUD
+        id: capture
+        uses: game-ci/unity-test-runner@0ff419b913a3630032cbe0de48a0099b5a9f0ed9
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+        with:
+          unityVersion: 6000.3.19f1
+          projectPath: tasks/lottery-shop/unity
+          testMode: playmode
+          artifactsPath: tasks/lottery-shop/artifacts/visual-candidate
+          customParameters: >-
+            -assemblyNames Lottery.G3.VisualCandidate.Tests -force-glcore -screen-width 1280 -screen-height 720
+            -job-worker-count 2 -probeCommit ${{ github.sha }} -probeRunId ${{ github.run_id }} -probeRunAttempt ${{ github.run_attempt }}
+          dockerCpuLimit: 2
+          dockerMemoryLimit: 12g
+      - name: Preserve bounded capture NUnit XML, including real failures
+        if: ${{ always() && steps.guard.outcome == 'success' && steps.capture.outcome != 'skipped' }}
+        run: python3 tasks/lottery-shop/scripts/visual_candidate_ci.py tests --stage capture
+      - name: Preserve verified originals already captured if later interaction failed
+        if: ${{ always() && steps.guard.outcome == 'success' && steps.capture.outcome != 'skipped' }}
+        run: python3 tasks/lottery-shop/scripts/visual_candidate_ci.py partial-captures
+      - name: Require all six runtime visual groups, same-state shelf and same-camera day-night pair
+        if: ${{ always() && steps.guard.outcome == 'success' && steps.capture.outcome != 'skipped' }}
+        run: python3 tasks/lottery-shop/scripts/visual_candidate_ci.py captures
+      - name: Publish original candidate frames promptly for visual review
+        if: ${{ always() && steps.guard.outcome == 'success' }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: lottery-visual-candidate-not-g3-pass-captures-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            tasks/lottery-shop/evidence/visual-candidate/source-receipt.json
+            tasks/lottery-shop/evidence/visual-candidate/source-before.json
+            tasks/lottery-shop/evidence/visual-candidate/font-receipt.json
+            tasks/lottery-shop/evidence/visual-candidate/capture/raw-test-results.xml
+            tasks/lottery-shop/evidence/visual-candidate/capture/raw-test-report-receipt.json
+            tasks/lottery-shop/evidence/visual-candidate/capture/test-receipt.json
+            tasks/lottery-shop/evidence/visual-candidate/captures/capture-receipt.json
+            tasks/lottery-shop/evidence/visual-candidate/captures/entry-whole-shop.png
+            tasks/lottery-shop/evidence/visual-candidate/captures/table-empty.png
+            tasks/lottery-shop/evidence/visual-candidate/captures/number-half.png
+            tasks/lottery-shop/evidence/visual-candidate/captures/number-half-20x9.png
+            tasks/lottery-shop/evidence/visual-candidate/captures/challenge-two-safe-three-tools.png
+            tasks/lottery-shop/evidence/visual-candidate/captures/shelf-before-open.png
+            tasks/lottery-shop/evidence/visual-candidate/captures/shelf-after-open.png
+            tasks/lottery-shop/evidence/visual-candidate/captures/challenge-returned-from-shelf.png
+            tasks/lottery-shop/evidence/visual-candidate/captures/closing-day-table.png
+            tasks/lottery-shop/evidence/visual-candidate/captures/night-table.png
+            tasks/lottery-shop/evidence/visual-candidate/captures/night-bill.png
+          if-no-files-found: error
+          retention-days: 7
+      - name: Existing Probe, G2, and G3 EditMode suites without skipped cases
+        id: regressionedit
+        if: ${{ always() && steps.guard.outcome == 'success' && steps.capture.outcome != 'skipped' }}
+        uses: game-ci/unity-test-runner@0ff419b913a3630032cbe0de48a0099b5a9f0ed9
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+        with:
+          unityVersion: 6000.3.19f1
+          projectPath: tasks/lottery-shop/unity
+          testMode: editmode
+          artifactsPath: tasks/lottery-shop/artifacts/visual-regression-edit
+          customParameters: >-
+            -assemblyNames Lottery.Probe.Tests;Lottery.G2.EditMode.Tests;Lottery.G3.EditMode.Tests
+            -job-worker-count 2 -probeCommit ${{ github.sha }} -probeRunId ${{ github.run_id }}
+          dockerCpuLimit: 2
+          dockerMemoryLimit: 12g
+      - name: Verify existing exact EditMode identities and preserve bounded original XML
+        if: ${{ always() && steps.guard.outcome == 'success' && steps.regressionedit.outcome != 'skipped' }}
+        run: python3 tasks/lottery-shop/scripts/visual_candidate_ci.py tests --stage regression-edit
+      - name: Existing G2 and G3 PlayMode suites including original 75-step flow and captures
+        id: regressionplay
+        if: ${{ always() && steps.guard.outcome == 'success' && steps.capture.outcome != 'skipped' }}
+        uses: game-ci/unity-test-runner@0ff419b913a3630032cbe0de48a0099b5a9f0ed9
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+        with:
+          unityVersion: 6000.3.19f1
+          projectPath: tasks/lottery-shop/unity
+          testMode: playmode
+          artifactsPath: tasks/lottery-shop/artifacts/visual-regression-play
+          customParameters: >-
+            -assemblyNames Lottery.G2.PlayMode.Tests;Lottery.G3.PlayMode.Tests -force-glcore -screen-width 1280 -screen-height 720
+            -job-worker-count 2 -probeCommit ${{ github.sha }} -probeRunId ${{ github.run_id }}
+          dockerCpuLimit: 2
+          dockerMemoryLimit: 12g
+      - name: Verify existing exact PlayMode identities and preserve bounded original XML
+        if: ${{ always() && steps.guard.outcome == 'success' && steps.regressionplay.outcome != 'skipped' }}
+        run: python3 tasks/lottery-shop/scripts/visual_candidate_ci.py tests --stage regression-play
+      - name: Capture source mutation metadata without exporting project settings or logs
+        if: ${{ always() && steps.guard.outcome == 'success' && steps.capture.outcome != 'skipped' }}
+        run: python3 tasks/lottery-shop/scripts/visual_candidate_ci.py snapshot-after
+      - name: Upload bounded regression and source mutation evidence
+        if: ${{ always() && steps.guard.outcome == 'success' }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: lottery-visual-candidate-not-g3-pass-regressions-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            tasks/lottery-shop/evidence/visual-candidate/source-receipt.json
+            tasks/lottery-shop/evidence/visual-candidate/source-after.json
+            tasks/lottery-shop/evidence/visual-candidate/source-changes.json
+            tasks/lottery-shop/evidence/visual-candidate/regression-edit/raw-test-results.xml
+            tasks/lottery-shop/evidence/visual-candidate/regression-edit/raw-test-report-receipt.json
+            tasks/lottery-shop/evidence/visual-candidate/regression-edit/test-receipt.json
+            tasks/lottery-shop/evidence/visual-candidate/regression-play/raw-test-results.xml
+            tasks/lottery-shop/evidence/visual-candidate/regression-play/raw-test-report-receipt.json
+            tasks/lottery-shop/evidence/visual-candidate/regression-play/test-receipt.json
+          if-no-files-found: error
+          retention-days: 7

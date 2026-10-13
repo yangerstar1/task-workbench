@@ -26,11 +26,12 @@ namespace Lottery.G3.Editor
         public static void Prepare()
         {
             Lottery.Probe.Editor.ProbeBuild.Prepare();
+            G3ShopArtImporter.Prepare();
             var number=AssetDatabase.LoadAssetAtPath<ApprovedArtworkBinding>("Assets/G3/Rendering/Resources/G3/number.asset");
             var challenge=AssetDatabase.LoadAssetAtPath<ApprovedArtworkBinding>("Assets/G3/Rendering/Resources/G3/challenge.asset");
             ValidateArtwork(number,"number");ValidateArtwork(challenge,"challenge");
             var scene=EditorSceneManager.NewScene(NewSceneSetup.EmptyScene,NewSceneMode.Single);
-            var bootstrap=new GameObject("G3 One Day Whitebox").AddComponent<G3SliceBootstrap>();
+            var bootstrap=new GameObject("G3 Original Shop Visual Candidate").AddComponent<G3SliceBootstrap>();
             bootstrap.chineseFont=AssetDatabase.LoadAssetAtPath<Font>("Assets/Resources/ProbeChinese.otf");
             bootstrap.paperShader=AssetDatabase.LoadAssetAtPath<Shader>("Assets/G3/Rendering/TicketPaper.shader");
             bootstrap.silverShader=AssetDatabase.LoadAssetAtPath<Shader>("Assets/G3/Rendering/TicketLocalSilver.shader");
@@ -53,7 +54,7 @@ namespace Lottery.G3.Editor
             if(!System.Text.RegularExpressions.Regex.IsMatch(commit,"^[0-9a-f]{40}$") || !System.Text.RegularExpressions.Regex.IsMatch(run,"^[1-9][0-9]*$"))throw new InvalidOperationException("Invalid source/run identity");
             G3ArtworkValidation.WriteAndroidDiagnostic(commit,run,Arg("-probeRunAttempt"));
             Prepare();
-            PlayerSettings.companyName="BuYuQi";PlayerSettings.productName="Lottery G3 One Day Whitebox";
+            PlayerSettings.companyName="BuYuQi";PlayerSettings.productName="Lottery G3 Original Shop Visual Candidate";
             PlayerSettings.bundleVersion="0.0.3";PlayerSettings.Android.bundleVersionCode=3;
             PlayerSettings.SetApplicationIdentifier(UnityEditor.Build.NamedBuildTarget.Android,"com.buyuqi.lotteryprobe");
             PlayerSettings.SetScriptingBackend(UnityEditor.Build.NamedBuildTarget.Android,ScriptingImplementation.IL2CPP);

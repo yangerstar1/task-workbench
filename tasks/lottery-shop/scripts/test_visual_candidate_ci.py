@@ -1,0 +1,186 @@
+#!/usr/bin/env python3
+"""Synthetic validator tests, never native rendering or gameplay evidence."""
+import copy
+import unittest
+import json
+import os
+from pathlib import Path
+import subprocess
+import tempfile
+from unittest.mock import patch
+import xml.etree.ElementTree as ET
+import visual_candidate_ci as candidate
+
+
+def receipt():
+    frames = []
+    for name in candidate.FRAMES:
+        frames.append(dict(stage=name, file=name + ".png", sha256="a" * 64,
+            width=1600 if name.endswith("20x9") else 1280, height=720,
+            stateSha256="b" * 64, seedSha256="c" * 64, hudVisible=True, hudFits=True,
+            cameraOrthographic=False, hudFrustumRendererCount=20, importedRendererCount=200, inputUpdates=123,
+            cameraPosition=dict(x=1, y=2, z=3), cameraEuler=dict(x=60, y=180, z=0), cameraFov=64, dayPhase="NIGHT_BILL" if name == "night-table" else "DAY_OPEN",
+            panel="None", currentTools=["small_prize_box", "inspection_lamp", "large_prize_stamp"], revealedCells=3))
+    return dict(scope=candidate.SCOPE, sourceCommit="1" * 40, runId="12345", runAttempt="1", unityVersion="6000.3.19f1",
+                graphicsDeviceType="OpenGLCore", inputEvidence="SIMULATED_INPUT_SYSTEM",
+                captureMethod="URP_STANDARD_REQUEST_READPIXELS", hudVisibilityBasis="ENABLED_CAMERA_LAYER_AND_FRUSTUM_TEST_NOT_PIXEL_OCCLUSION", complete=True, frames=frames, actions=[])
+
+
+class VisualCandidateEvidenceTests(unittest.TestCase):
+    def validate(self, value, complete=True):
+        return candidate.validate_capture(value, "1" * 40, "12345", "1", complete)
+
+    def test_synthetic_complete_shape(self):
+        self.assertEqual(len(self.validate(receipt())), 11)
+
+    def test_missing_six_group_evidence_is_not_complete(self):
+        value = receipt(); value["frames"].pop()
+        with self.assertRaises(ValueError): self.validate(value)
+
+    def test_valid_partial_is_preserved_but_never_complete(self):
+        value = receipt(); value["complete"] = False; value["frames"] = value["frames"][:3]
+        self.assertEqual(len(self.validate(value, False)), 3)
+        with self.assertRaises(ValueError): self.validate(value)
+
+    def test_old_source_cannot_be_relabelled(self):
+        value = receipt(); value["sourceCommit"] = "2" * 40
+        with self.assertRaises(ValueError): self.validate(value)
+
+    def test_other_attempt_cannot_be_mixed(self):
+        value = receipt(); value["runAttempt"] = "2"
+        with self.assertRaises(ValueError): self.validate(value)
+
+    def test_fake_capture_or_null_gpu_is_rejected(self):
+        for key, bad in (("captureMethod", "BLENDER"), ("graphicsDeviceType", "Null"), ("scope", "G3_PASS"), ("unityVersion", "6000.0.1f1")):
+            value = receipt(); value[key] = bad
+            with self.subTest(key=key), self.assertRaises(ValueError): self.validate(value)
+
+    def test_hidden_hud_or_non_native_framing_is_rejected(self):
+        for key, bad in (("hudVisible", False), ("hudFits", False), ("cameraOrthographic", True), ("inputUpdates", 0), ("importedRendererCount", 0), ("width", 1920)):
+            value = receipt(); value["frames"][0][key] = bad
+            with self.subTest(key=key), self.assertRaises(ValueError): self.validate(value)
+
+    def test_shelf_and_return_must_preserve_ticket(self):
+        value = receipt(); value["frames"][6]["stateSha256"] = "d" * 64
+        with self.assertRaises(ValueError): self.validate(value)
+
+    def test_day_night_must_use_same_camera(self):
+        value = receipt(); value["frames"][9]["cameraPosition"]["x"] = 8
+        with self.assertRaises(ValueError): self.validate(value)
+
+    def test_same_position_different_rotation_or_fov_is_rejected(self):
+        for key, bad in (("cameraEuler", dict(x=0, y=0, z=0)), ("cameraFov", 90)):
+            value = receipt(); value["frames"][9][key] = bad
+            with self.subTest(key=key), self.assertRaises(ValueError): self.validate(value)
+
+    def test_aspect_pair_and_seed_cannot_be_mixed(self):
+        for key in ("stateSha256", "seedSha256"):
+            value = receipt(); value["frames"][3][key] = "d" * 64
+            with self.subTest(key=key), self.assertRaises(ValueError): self.validate(value)
+
+    def test_night_must_be_real_phase_with_closed_bill(self):
+        for key, bad in (("dayPhase", "DAY_OPEN"), ("panel", "Bill")):
+            value = receipt(); value["frames"][9][key] = bad
+            with self.subTest(key=key), self.assertRaises(ValueError): self.validate(value)
+
+    def test_no_unlisted_output_paths(self):
+        value = receipt(); value["frames"][0]["file"] = "../../../ProjectSettings/ProjectSettings.asset"
+        with self.assertRaises(ValueError): self.validate(value)
+
+    def test_duplicate_captures_rejected(self):
+        value = receipt(); value["frames"].append(copy.deepcopy(value["frames"][0]))
+        with self.assertRaises(ValueError): self.validate(value)
+
+
+class NativeReportShapeTests(unittest.TestCase):
+    def test_existing_contract_union_has_287_edit_and_32_play_cases(self):
+        task = Path(candidate.__file__).resolve().parents[1]
+        contracts = [json.loads((task / "ci" / (name + "-test-contract.json")).read_text()) for name in ("g2", "g3")]
+        for stage, expected in (("edit", 287), ("play", 32)):
+            names = {case for contract in contracts for cases in contract["profiles"][stage].values() for case in cases}
+            self.assertEqual(len(names), expected)
+
+    def test_original_candidate_report_is_preserved_and_checked(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory); output = candidate.outdir(root)
+            candidate.write(output / "source-receipt.json", dict(scope=candidate.SCOPE, sourceCommit="1"*40))
+            folder = root / candidate.TASK / "artifacts/visual-candidate"; folder.mkdir(parents=True)
+            report = ET.Element("test-run", result="Passed", total="1", passed="1", failed="0", skipped="0", inconclusive="0")
+            suite = ET.SubElement(report, "test-suite", type="Assembly", name=candidate.ASSEMBLY, result="Passed")
+            ET.SubElement(suite, "test-case", fullname=candidate.CASE, result="Passed")
+            original = ET.tostring(report); (folder / "results.xml").write_bytes(original)
+            with patch.dict(os.environ, GITHUB_SHA="1"*40): candidate.export_tests(root, "capture")
+            self.assertEqual((output / "capture/raw-test-results.xml").read_bytes(), original)
+            report = json.loads((output / "capture/test-receipt.json").read_text())
+            self.assertTrue(report["allExpectedPassed"])
+            self.assertEqual(report["scope"], candidate.SCOPE)
+
+    def test_bad_native_report_is_not_passing_but_retains_safe_original(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory); output = candidate.outdir(root)
+            candidate.write(output / "source-receipt.json", dict(scope=candidate.SCOPE, sourceCommit="1"*40))
+            folder = root / candidate.TASK / "artifacts/visual-candidate"; folder.mkdir(parents=True)
+            report = ET.Element("test-run", result="Failed", total="1", passed="0", failed="1", skipped="0", inconclusive="0")
+            suite = ET.SubElement(report, "test-suite", type="Assembly", name=candidate.ASSEMBLY, result="Failed")
+            ET.SubElement(suite, "test-case", fullname=candidate.CASE, result="Failed")
+            original = ET.tostring(report); (folder / "results.xml").write_bytes(original)
+            with patch.dict(os.environ, GITHUB_SHA="1"*40), self.assertRaises(ValueError): candidate.export_tests(root, "capture")
+            self.assertEqual((output / "capture/raw-test-results.xml").read_bytes(), original)
+
+    def test_duplicate_empty_assemblies_or_orphan_case_are_rejected(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory); output = candidate.outdir(root)
+            candidate.write(output / "source-receipt.json", dict(scope=candidate.SCOPE, sourceCommit="1"*40))
+            folder = root / candidate.TASK / "artifacts/visual-candidate"; folder.mkdir(parents=True)
+            report = ET.Element("test-run", result="Passed", total="777", passed="777", failed="0", skipped="0", inconclusive="0")
+            for unused in range(2): ET.SubElement(report, "test-suite", type="Assembly", name=candidate.ASSEMBLY, result="Passed")
+            ET.SubElement(report, "test-case", fullname=candidate.CASE, result="Passed")
+            (folder / "results.xml").write_bytes(ET.tostring(report))
+            with patch.dict(os.environ, GITHUB_SHA="1"*40), self.assertRaises(ValueError): candidate.export_tests(root, "capture")
+            self.assertTrue((output / "capture/raw-test-results.xml").exists())
+
+    def test_wrong_root_counts_and_failed_nested_suite_rejected(self):
+        for defect in ("counts", "suite"):
+            with self.subTest(defect=defect), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory); output = candidate.outdir(root)
+                candidate.write(output / "source-receipt.json", dict(scope=candidate.SCOPE, sourceCommit="1"*40))
+                folder = root / candidate.TASK / "artifacts/visual-candidate"; folder.mkdir(parents=True)
+                report = ET.Element("test-run", result="Passed", total="777" if defect == "counts" else "1", passed="777" if defect == "counts" else "1", failed="0", skipped="0", inconclusive="0")
+                assembly = ET.SubElement(report, "test-suite", type="Assembly", name=candidate.ASSEMBLY, result="Passed")
+                fixture = ET.SubElement(assembly, "test-suite", type="TestFixture", result="Failed" if defect == "suite" else "Passed")
+                ET.SubElement(fixture, "test-case", fullname=candidate.CASE, result="Passed")
+                (folder / "results.xml").write_bytes(ET.tostring(report))
+                with patch.dict(os.environ, GITHUB_SHA="1"*40), self.assertRaises(ValueError): candidate.export_tests(root, "capture")
+
+    def test_private_like_output_is_never_exported(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory); folder = root / candidate.TASK / "artifacts/visual-candidate"; folder.mkdir(parents=True)
+            (folder / "results.xml").write_text('<test-run><output>password=synthetic</output></test-run>')
+            with self.assertRaises(ValueError): candidate.export_tests(root, "capture")
+            self.assertFalse((candidate.outdir(root) / "capture/raw-test-results.xml").exists())
+
+
+class SeparateRequestTests(unittest.TestCase):
+    def test_only_new_diagnostic_trigger_following_source_is_admitted(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            def git(*args):
+                return subprocess.check_output(["git", "-C", directory, *args], stderr=subprocess.DEVNULL).decode().strip()
+            git("init"); git("config", "user.name", "Synthetic Test"); git("config", "user.email", "synthetic@example.invalid")
+            (root / "source.txt").write_text("synthetic candidate")
+            git("add", "."); git("commit", "-m", "Synthetic source")
+            source = git("rev-parse", "HEAD")
+            candidate.write(root / candidate.REQUEST, dict(schemaVersion=1, requestId="lottery-visual-20261013-01", sourceCommit=source, purpose=candidate.SCOPE, sourceReview=dict(sourceCommit=source, status="APPROVED_FOR_DIAGNOSTIC_CAPTURE_ONLY", reviewedAtUtc="2026-10-13T01:00:00Z", reviewId="visual-source-20261013-01", reviewer="independent-source-review")))
+            git("add", "."); git("commit", "-m", "Synthetic diagnostic request")
+            event = root / "event.json"; event.write_text(json.dumps(dict(repository=dict(private=False, fork=False), deleted=False)))
+            env = dict(GITHUB_EVENT_NAME="push", GITHUB_REPOSITORY="yangerstar1/task-workbench", GITHUB_REPOSITORY_OWNER="yangerstar1", GITHUB_ACTOR="yangerstar1", GITHUB_TRIGGERING_ACTOR="yangerstar1", GITHUB_REF="refs/heads/lottery-shop-g0-20261011", GITHUB_SHA=git("rev-parse", "HEAD"), GITHUB_EVENT_PATH=str(event), GITHUB_RUN_ID="123", GITHUB_RUN_ATTEMPT="1")
+            with patch.dict(os.environ, env):
+                observed = candidate.guard(root)
+                self.assertEqual(observed["reviewedCandidateCommit"], source)
+                self.assertEqual(observed["g3Gate"], "NOT_EVALUATED")
+            env["GITHUB_ACTOR"] = "other"
+            with patch.dict(os.environ, env), self.assertRaises(ValueError): candidate.guard(root)
+
+
+if __name__ == "__main__":
+    unittest.main()

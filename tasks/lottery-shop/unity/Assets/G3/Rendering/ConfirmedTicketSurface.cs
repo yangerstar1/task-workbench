@@ -30,6 +30,13 @@ namespace Lottery.G3.Rendering
             var paperMat=Own(new Material(paper));paperMat.SetTexture("_BaseMap",binding.Albedo);
             var paperObject=Quad("Approved printed paper",new PixelRect(0,0,Layout.Width,Layout.Height),PaperY,paperMat);
             collider=paperObject.AddComponent<MeshCollider>();collider.sharedMesh=paperObject.GetComponent<MeshFilter>().sharedMesh;
+            // Thin paper edge and contact shadow share the atomic display body, so
+            // neither survives a failed save or leaks an unconfirmed ticket.
+            var edge=GameObject.CreatePrimitive(PrimitiveType.Cube);edge.name="Fine paper stock edge";edge.transform.SetParent(body.transform,false);edge.transform.localPosition=new Vector3(0,-.0013f,0);edge.transform.localScale=new Vector3(width,.0025f,depth);Destroy(edge.GetComponent<Collider>());
+            var edgeMat=Own(new Material(Shader.Find("Universal Render Pipeline/Lit")));edgeMat.color=new Color(.78f,.74f,.62f);edgeMat.SetFloat("_Smoothness",.1f);edge.GetComponent<Renderer>().sharedMaterial=edgeMat;
+            var shadow=GameObject.CreatePrimitive(PrimitiveType.Cube);shadow.name="Paper contact shadow";shadow.transform.SetParent(body.transform,false);shadow.transform.localPosition=new Vector3(.003f,-.0029f,-.001f);shadow.transform.localScale=new Vector3(width+.008f,.0004f,depth+.006f);Destroy(shadow.GetComponent<Collider>());
+            var shadowMat=Own(new Material(Shader.Find("Universal Render Pipeline/Lit")));shadowMat.color=new Color(.028f,.042f,.030f);shadowMat.SetFloat("_Smoothness",0);shadow.GetComponent<Renderer>().sharedMaterial=shadowMat;
+
             masks=new Texture2D[Layout.Cells.Count];cellText=new BoundedGlyphLabel[Layout.Cells.Count];cellNumbers=new BoundedGlyphLabel[Layout.Id=="challenge"?8:0];
             var publicFont=Own(new Material(ordinaryFont));
             for(int i=0;i<Layout.Cells.Count;i++)

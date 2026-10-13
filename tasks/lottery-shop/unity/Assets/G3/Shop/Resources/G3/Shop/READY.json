@@ -1,0 +1,12 @@
+{
+  "version": "art-v1.2",
+  "fbx": "LotteryShop_Interior.fbx",
+  "sha256": "c1bca323479949be459b90d97a19f7deb8f5b56092157572598c0e146e39cbf2",
+  "staticTriangles": 61308,
+  "staticMeshObjects": 520,
+  "tools": [
+    "Tool_small_prize_box.fbx",
+    "Tool_inspection_lamp.fbx",
+    "Tool_large_prize_stamp.fbx"
+  ]
+}

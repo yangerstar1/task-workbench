@@ -1,0 +1,7 @@
+{
+  "name": "Lottery.G3.VisualCandidate.Tests",
+  "rootNamespace": "Lottery.G3.VisualCandidate.Tests",
+  "references": ["Lottery.G3.Core", "Lottery.G2.Core", "Lottery.G3.Interaction", "Lottery.G3.Rendering", "Unity.InputSystem", "Unity.RenderPipelines.Universal.Runtime", "Unity.RenderPipelines.Core.Runtime"],
+  "optionalUnityReferences": ["TestAssemblies"],
+  "autoReferenced": false
+}

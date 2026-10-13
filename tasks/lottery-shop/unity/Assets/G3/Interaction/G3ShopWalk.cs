@@ -8,16 +8,21 @@ namespace Lottery.G3.Interaction
         CharacterController body;Camera camera;float yaw,pitch=8;bool initialized;
         public Vector3 SavedPosition=>transform.position;
         public Quaternion SavedRotation=>Quaternion.Euler(pitch,yaw,0);
-        public void Initialize(Camera sceneCamera)
+        public void Initialize(Camera sceneCamera,Vector3 position,float startYaw)
         {
-            camera=sceneCamera;transform.position=new Vector3(0,0,-1.65f);body=gameObject.AddComponent<CharacterController>();
+            camera=sceneCamera;transform.position=position;yaw=startYaw;body=gameObject.AddComponent<CharacterController>();
             body.height=1.72f;body.radius=.18f;body.center=new Vector3(0,.86f,0);body.stepOffset=.15f;body.skinWidth=.025f;initialized=true;
         }
+        public void SetPose(Vector3 position,float heading,float lookPitch=8)
+        {if(body!=null)body.enabled=false;transform.position=position;yaw=heading;pitch=lookPitch;if(body!=null)body.enabled=true;ApplyCamera();}
         public void Move(Vector2 local,float turn,float delta)
         {
             if(!initialized)return;yaw+=turn*75*delta;
             Vector3 direction=Quaternion.Euler(0,yaw,0)*new Vector3(local.x,0,local.y);if(direction.sqrMagnitude>1)direction.Normalize();
-            body.Move((direction*1.15f+Vector3.down*2)*delta);ApplyCamera();
+            body.Move((direction*1.15f+Vector3.down*2)*delta);
+            // The closed single room has a second hard boundary fence, including the doorway.
+            var p=transform.position;var bounded=new Vector3(Mathf.Clamp(p.x,-2.72f,2.72f),Mathf.Max(0,p.y),Mathf.Clamp(p.z,-2.32f,2.32f));
+            if(p!=bounded){body.enabled=false;transform.position=bounded;body.enabled=true;}ApplyCamera();
         }
         public void Look(Vector2 pixels)
         {yaw+=pixels.x*.13f;pitch=Mathf.Clamp(pitch-pixels.y*.10f,-30,45);ApplyCamera();}
