@@ -38,6 +38,7 @@ jobs:
           PYTHONDONTWRITEBYTECODE=1 python3 tasks/lottery-shop/scripts/test_activation_probe.py -v
           PYTHONDONTWRITEBYTECODE=1 python3 tasks/lottery-shop/scripts/test_safe_project_ci.py -v
           PYTHONDONTWRITEBYTECODE=1 python3 tasks/lottery-shop/scripts/test_reflection_bake_ci.py -v
+          PYTHONDONTWRITEBYTECODE=1 python3 tasks/lottery-shop/scripts/test_reflection_progress_ci.py -v
       - name: Prepare existing authorized disposable runner disk layout
         run: |
           python3 tasks/lottery-shop/scripts/visual_candidate_ci.py guard
@@ -82,6 +83,9 @@ jobs:
       - name: Verify source-bound offline day and night reflection originals
         if: ${{ always() && steps.guard.outcome == 'success' && steps.capture.outcome != 'skipped' }}
         run: PYTHONDONTWRITEBYTECODE=1 python3 tasks/lottery-shop/scripts/reflection_bake_ci.py
+      - name: Preserve bounded reflection preparation stages and fixed failure codes
+        if: ${{ always() && steps.guard.outcome == 'success' && steps.capture.outcome != 'skipped' }}
+        run: PYTHONDONTWRITEBYTECODE=1 python3 tasks/lottery-shop/scripts/reflection_progress_ci.py
       - name: Preserve bounded capture NUnit XML, including real failures
         if: ${{ always() && steps.guard.outcome == 'success' && steps.capture.outcome != 'skipped' }}
         run: python3 tasks/lottery-shop/scripts/visual_candidate_ci.py tests --stage capture
@@ -105,6 +109,7 @@ jobs:
             tasks/lottery-shop/evidence/visual-candidate/reflections/Night.exr
             tasks/lottery-shop/evidence/visual-candidate/reflections/Night.exr.meta
             tasks/lottery-shop/evidence/visual-candidate/reflections/reflection-receipt.json
+            tasks/lottery-shop/evidence/visual-candidate/reflection-progress.json
             tasks/lottery-shop/evidence/visual-candidate/safe-start.json
             tasks/lottery-shop/evidence/visual-candidate/safe-capture.json
             tasks/lottery-shop/evidence/visual-candidate/prebuild-progress.json

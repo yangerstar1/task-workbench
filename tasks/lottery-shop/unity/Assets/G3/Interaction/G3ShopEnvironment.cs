@@ -19,7 +19,7 @@ namespace Lottery.G3.Interaction
         Material exteriorMaterial;Texture2D exteriorDay,exteriorNight;Mesh exteriorNearMesh;
         ReflectionProbe roomReflection;bool capturedLighting,bakingReflection;
         Cubemap dayReflection,nightReflection;
-        public const string ReflectionRecipe="G3_SHOP_STATIC_REFLECTION_V1";
+        public const string ReflectionRecipe="G3_SHOP_STATIC_REFLECTION_V2";
         public const int ReflectionFaceSize=128,ReflectionMipCount=8;
         [Serializable] public sealed class ReflectionReceipt
         {
@@ -33,6 +33,8 @@ namespace Lottery.G3.Interaction
         }
         AmbientMode previousAmbientMode;Color previousSky,previousEquator,previousGround,previousAmbient;
         SphericalHarmonicsL2 previousAmbientProbe;Light previousSun;float previousReflectionIntensity;
+        // User layer 30 is reserved for this isolated offline bake; 31 belongs to Editor previews.
+        public const int ReflectionBakeLayer=30;
         const int ReflectionGeometryLayer=10;
         // Run08 clipped walnut/printed stock under the additive direct sources.
         // Keep authored texture factors and ambient bounce; reduce source energy
@@ -85,7 +87,7 @@ namespace Lottery.G3.Interaction
             previousAmbient=RenderSettings.ambientLight;previousAmbientProbe=RenderSettings.ambientProbe;
             previousSun=RenderSettings.sun;previousReflectionIntensity=RenderSettings.reflectionIntensity;capturedLighting=true;
             art=Instantiate(source,transform);art.name="Original authored lottery shop";
-            foreach(var child in art.GetComponentsInChildren<Transform>())child.gameObject.layer=bakingReflection?31:ReflectionGeometryLayer;
+            foreach(var child in art.GetComponentsInChildren<Transform>())child.gameObject.layer=bakingReflection?ReflectionBakeLayer:ReflectionGeometryLayer;
             foreach(var r in art.GetComponentsInChildren<Renderer>())
             {r.shadowCastingMode=r.sharedMaterials.Any(m=>m.renderQueue>=(int)RenderQueue.Transparent)?ShadowCastingMode.Off:ShadowCastingMode.On;r.receiveShadows=true;r.reflectionProbeUsage=ReflectionProbeUsage.BlendProbes;}
             foreach(var box in layout.colliders)
@@ -122,7 +124,7 @@ namespace Lottery.G3.Interaction
             roomReflection.resolution=ReflectionFaceSize;roomReflection.size=new Vector3(6.4f,3.1f,5.6f);roomReflection.center=new Vector3(.4f,0,.2f);
             roomReflection.boxProjection=true;roomReflection.shadowDistance=12;roomReflection.nearClipPlane=.08f;roomReflection.farClipPlane=12;roomReflection.intensity=.85f;
             // Only authored room geometry enters reflections, never camera-attached HUD.
-            roomReflection.cullingMask=1<<(bakingReflection?31:ReflectionGeometryLayer);roomReflection.clearFlags=ReflectionProbeClearFlags.SolidColor;
+            roomReflection.cullingMask=1<<(bakingReflection?ReflectionBakeLayer:ReflectionGeometryLayer);roomReflection.clearFlags=ReflectionProbeClearFlags.SolidColor;
             BuildExteriorDepth();SetNight(false);Physics.SyncTransforms();
         }
         // V19 presentation-only depth; no colliders, interaction targets or Update loop.
@@ -154,7 +156,7 @@ namespace Lottery.G3.Interaction
             AddExteriorBox(vertices,triangles,new Vector3(0,2.83f,3.25f),new Vector3(9.1f,.14f,1.26f));
             exteriorNearMesh=new Mesh{name="V19 static exterior sidewalk and threshold"};
             exteriorNearMesh.SetVertices(vertices);exteriorNearMesh.SetTriangles(triangles,0);exteriorNearMesh.RecalculateNormals();exteriorNearMesh.RecalculateBounds();
-            var go=new GameObject("Exterior near-field sidewalk and threshold");go.transform.SetParent(transform,false);go.layer=bakingReflection?31:ReflectionGeometryLayer;
+            var go=new GameObject("Exterior near-field sidewalk and threshold");go.transform.SetParent(transform,false);go.layer=bakingReflection?ReflectionBakeLayer:ReflectionGeometryLayer;
             go.AddComponent<MeshFilter>().sharedMesh=exteriorNearMesh;var r=go.AddComponent<MeshRenderer>();
             var stone=new Material(Shader.Find("Universal Render Pipeline/Lit")){name="V19 warm pavement"};stone.SetColor("_BaseColor",new Color(.39f,.36f,.30f));stone.SetFloat("_Smoothness",.13f);instantiatedMaterials.Add(stone);
             r.sharedMaterial=stone;r.shadowCastingMode=ShadowCastingMode.Off;r.receiveShadows=true;
