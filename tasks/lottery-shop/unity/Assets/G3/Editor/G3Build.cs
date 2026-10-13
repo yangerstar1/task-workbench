@@ -44,7 +44,6 @@ namespace Lottery.G3.Editor
             // All importer temporary GameObjects live in this owned scene, too;
             // create/destroy must not dirty the framework's saved runner scene.
             if(preserveLoadedScenes)PrepareShopBindings(out number,out challenge);
-            G3ShopReflectionBaker.Prepare();
             var bootstrap=new GameObject("G3 Original Shop Visual Candidate").AddComponent<G3SliceBootstrap>();
             bootstrap.chineseFont=AssetDatabase.LoadAssetAtPath<Font>("Assets/Resources/ProbeChinese.otf");
             bootstrap.paperShader=AssetDatabase.LoadAssetAtPath<Shader>("Assets/G3/Rendering/TicketPaper.shader");
@@ -60,6 +59,10 @@ namespace Lottery.G3.Editor
             Directory.CreateDirectory("Assets/G3/Scenes");
             if(!EditorSceneManager.SaveScene(scene,ScenePath))throw new IOException("G3 scene save failed");
             AssetDatabase.SaveAssets();
+            // The bake opens its own additive scene. Persist this owned G3 scene
+            // first: Unity rejects a second additive scene while it is untitled.
+            // No existing runner/user scene is saved, closed or replaced here.
+            G3ShopReflectionBaker.Prepare();
             if(!preserveLoadedScenes)EditorBuildSettings.scenes=new[]{new EditorBuildSettingsScene(ScenePath,true)};
             };
             if(preserveLoadedScenes)
