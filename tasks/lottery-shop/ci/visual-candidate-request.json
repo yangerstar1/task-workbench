@@ -1,13 +1,13 @@
 {
   "schemaVersion": 1,
-  "requestId": "lottery-visual-20261013-10",
-  "sourceCommit": "d9f4150eb8695cfbd197f4492c2059f5b19aa917",
+  "requestId": "lottery-visual-20261013-11",
+  "sourceCommit": "43c2c04dcd7a790621fbd236f2c8f1d971a62cfb",
   "purpose": "DIAGNOSTIC_VISUAL_CANDIDATE_NOT_G3_PASS",
   "sourceReview": {
-    "sourceCommit": "d9f4150eb8695cfbd197f4492c2059f5b19aa917",
+    "sourceCommit": "43c2c04dcd7a790621fbd236f2c8f1d971a62cfb",
     "status": "APPROVED_FOR_DIAGNOSTIC_CAPTURE_ONLY",
-    "reviewedAtUtc": "2026-10-13T12:48:47Z",
-    "reviewId": "visual-source-20261013-10",
+    "reviewedAtUtc": "2026-10-13T15:25:32Z",
+    "reviewId": "visual-source-20261013-11",
     "reviewer": "independent-source-review"
   }
 }
