@@ -28,6 +28,7 @@ jobs:
           sparse-checkout: |
             /tasks/lottery-shop/
             /.github/workflows/lottery-visual-candidate.yml
+            /.github/workflows/lottery-activation-probe.yml
       - name: Validate separate diagnostic request, never old G3 source approval
         id: guard
         run: python3 tasks/lottery-shop/scripts/visual_candidate_ci.py guard
