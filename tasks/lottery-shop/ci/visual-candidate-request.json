@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "requestId": "lottery-visual-20261013-01",
+  "sourceCommit": "713ff27d3d35d9fa37a6c11d150814546e2947ff",
+  "purpose": "DIAGNOSTIC_VISUAL_CANDIDATE_NOT_G3_PASS",
+  "sourceReview": {
+    "sourceCommit": "713ff27d3d35d9fa37a6c11d150814546e2947ff",
+    "status": "APPROVED_FOR_DIAGNOSTIC_CAPTURE_ONLY",
+    "reviewedAtUtc": "2026-10-13T02:15:52Z",
+    "reviewId": "visual-source-20261013-01",
+    "reviewer": "independent-source-review"
+  }
+}
