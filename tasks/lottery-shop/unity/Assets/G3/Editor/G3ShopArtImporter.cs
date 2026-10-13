@@ -31,6 +31,13 @@ namespace Lottery.G3.Editor
                 if(string.IsNullOrEmpty(item.name)||item.baseColor==null||item.baseColor.Length<3)throw new InvalidOperationException("Invalid material entry");
                 string path=Root+"/Materials/"+item.name+".mat";var material=AssetDatabase.LoadAssetAtPath<Material>(path);
                 if(material==null){material=new Material(shader);AssetDatabase.CreateAsset(material,path);}else material.shader=shader;
+                // Finish URP's .mat creation/version postprocessor before authoring
+                // final parameters. Materials absent from FBX slots need this too.
+                // Test-suite URP upgrade callbacks do not save their dirty assets.
+                EditorUtility.SetDirty(material);AssetDatabase.SaveAssetIfDirty(material);
+                AssetDatabase.ImportAsset(path,ImportAssetOptions.ForceSynchronousImport|ImportAssetOptions.ForceUpdate);
+                material=AssetDatabase.LoadAssetAtPath<Material>(path);
+                if(material==null||material.shader!=shader)throw new InvalidOperationException("Owned material initialization failed");
                 // Factors describe actual Blender node multiplication, not a second tint
                 // guessed from the texture's average colour. Direct textures use white.
                 var factor=item.baseColorFactor;
@@ -52,7 +59,7 @@ namespace Lottery.G3.Editor
                 if(item.transmission>0){material.SetFloat("_Surface",1);material.SetFloat("_SrcBlend",(float)BlendMode.SrcAlpha);material.SetFloat("_DstBlend",(float)BlendMode.OneMinusSrcAlpha);material.SetFloat("_ZWrite",0);material.EnableKeyword("_SURFACE_TYPE_TRANSPARENT");material.renderQueue=(int)RenderQueue.Transparent;}
                 material.DisableKeyword("_EMISSION");material.SetColor("_EmissionColor",Color.black);material.SetTexture("_EmissionMap",null);
                 if(item.emission>0){var e=item.emissionColor??item.baseColor;material.EnableKeyword("_EMISSION");material.SetColor("_EmissionColor",(new Color(e[0],e[1],e[2])*Mathf.Min(item.emission,2)).gamma);if(!string.IsNullOrEmpty(item.emissionTexture))material.SetTexture("_EmissionMap",Texture(item.emissionTexture,false));}
-                EditorUtility.SetDirty(material);importer.AddRemap(new AssetImporter.SourceAssetIdentifier(typeof(Material),item.name),material);
+                EditorUtility.SetDirty(material);AssetDatabase.SaveAssetIfDirty(material);importer.AddRemap(new AssetImporter.SourceAssetIdentifier(typeof(Material),item.name),material);
             }
             importer.SaveAndReimport();
             foreach(string toolFile in Directory.GetFiles(Root,"Tool_*.fbx"))
@@ -72,6 +79,16 @@ namespace Lottery.G3.Editor
             if(renderers.Length<30||renderers.Any(r=>r.sharedMaterials.Any(m=>m==null||m.shader!=shader)))throw new InvalidOperationException("Shop import has too few authored renderers or unresolved URP materials");
             BuildRuntimePrefab(loaded,"LotteryShop_Runtime",true);
             foreach(string toolFile in Directory.GetFiles(Root,"Tool_*.fbx"))BuildRuntimePrefab(AssetDatabase.LoadAssetAtPath<GameObject>(toolFile),Path.GetFileNameWithoutExtension(toolFile)+"_Runtime",false);
+            // This is still importer preparation, before Baker's first digest.
+            // Never accept a dirty authored material as a stable source baseline.
+            AssetDatabase.SaveAssets();
+            foreach(var item in data.materials)
+            {
+                string path=Root+"/Materials/"+item.name+".mat";
+                var assets=AssetDatabase.LoadAllAssetsAtPath(path);
+                if(assets.Length==0||assets.Any(asset=>EditorUtility.IsDirty(asset)))
+                    throw new InvalidOperationException("Owned material preparation remains dirty");
+            }
             Debug.Log("G3_SHOP_IMPORT original_authored_meshes="+renderers.Length+" materials="+data.materials.Length+" pipeline="+PipelinePath+" DEVICE_QA_NOT_RUN");
         }
         static void BuildRuntimePrefab(GameObject source,string outputName,bool validateRoom)

@@ -139,14 +139,25 @@ namespace Lottery.G3.Editor
             importer.textureType=TextureImporterType.Default;importer.textureShape=TextureImporterShape.TextureCube;
             importer.sRGBTexture=false;importer.mipmapEnabled=true;importer.isReadable=true;importer.wrapMode=TextureWrapMode.Clamp;importer.filterMode=FilterMode.Trilinear;
             importer.textureCompression=TextureImporterCompression.Uncompressed;importer.maxTextureSize=G3ShopEnvironment.ReflectionFaceSize;
-            importer.userData="";importer.assetBundleName="";importer.assetBundleVariant="";
+            importer.userData="";
+            // An already unbundled owned cube needs no setter. When clearing a
+            // prior assignment, use the paired API instead of setting a variant
+            // after first clearing its name; still fail if either value remains.
+            if(!string.IsNullOrEmpty(importer.assetBundleName)||!string.IsNullOrEmpty(importer.assetBundleVariant))
+                importer.SetAssetBundleNameAndVariant("","");
+            if(!string.IsNullOrEmpty(importer.assetBundleName)||!string.IsNullOrEmpty(importer.assetBundleVariant))
+                throw new BakeFailure(FailureCode.FINAL_TEXTURE_CONTRACT);
             if(importer.GetExternalObjectMap().Count!=0)throw new BakeFailure(FailureCode.IMPORTER_EXTERNAL_REMAP);
             var settings=new TextureImporterSettings();importer.ReadTextureSettings(settings);settings.generateCubemap=TextureImporterGenerateCubemap.AutoCubemap;settings.cubemapConvolution=TextureImporterCubemapConvolution.Specular;importer.SetTextureSettings(settings);
             var platform=importer.GetDefaultPlatformTextureSettings();platform.maxTextureSize=G3ShopEnvironment.ReflectionFaceSize;platform.format=TextureImporterFormat.RGBAHalf;platform.textureCompression=TextureImporterCompression.Uncompressed;importer.SetPlatformTextureSettings(platform);
             trace?.Mark(stage+5);importer.SaveAndReimport();
             var readable=AssetDatabase.LoadAssetAtPath<Cubemap>(path);trace?.ObserveCube(readable);trace?.Mark(stage+6);
             trace?.Mark(stage+7);float contentRange=RequireNonUniformContent(readable,trace);trace?.Mark(stage+8);
-            trace?.Mark(stage+9);importer.isReadable=false;importer.SaveAndReimport();trace?.ObserveCube(AssetDatabase.LoadAssetAtPath<Cubemap>(path));trace?.Mark(stage+10);
+            trace?.Mark(stage+9);importer.isReadable=false;importer.SaveAndReimport();
+            var finalImporter=AssetImporter.GetAtPath(path) as TextureImporter;
+            if(finalImporter==null||!string.IsNullOrEmpty(finalImporter.assetBundleName)||!string.IsNullOrEmpty(finalImporter.assetBundleVariant))
+                throw new BakeFailure(FailureCode.FINAL_TEXTURE_CONTRACT);
+            trace?.ObserveCube(AssetDatabase.LoadAssetAtPath<Cubemap>(path));trace?.Mark(stage+10);
             trace?.Mark(stage+11);
             string actualGuid=AssetDatabase.AssetPathToGUID(path);trace?.ObserveMeta(path+".meta");if(trace!=null){trace.guidObserved=true;trace.guidPresent=!string.IsNullOrEmpty(actualGuid);trace.guidMatches=actualGuid==guid;}
             if(actualGuid!=guid)throw new BakeFailure(FailureCode.GUID_MISMATCH);
