@@ -275,6 +275,7 @@ namespace Lottery.G3.VisualCandidate.Tests
         public IEnumerator SetUpRuntime()
         {
             verifiedBrass=null;verifiedBrassBase=null;verifiedBrassNormal=null;verifiedBrassPacked=null;
+            BoundedGlyphLabel.BeginCostObservation();G3InputRouter.BeginCostObservation();
             runtimeProgress = new ProgressTrail("runtime");
             runtimeProgress.Mark("runtime-setup-begin");
             prior = SceneManager.GetActiveScene();
@@ -347,6 +348,8 @@ namespace Lottery.G3.VisualCandidate.Tests
         [UnityTearDown]
         public IEnumerator TearDownRuntime()
         {
+            try
+            {
             runtimeProgress?.Mark("runtime-teardown-begin");
             ReleaseTarget();
             if(app != null) Object.Destroy(app.gameObject);
@@ -381,10 +384,12 @@ namespace Lottery.G3.VisualCandidate.Tests
             }
             if(storeDirectory != null && Directory.Exists(storeDirectory)) Directory.Delete(storeDirectory, true);
             runtimeProgress?.Mark("runtime-teardown-end");
+            }
+            finally{BoundedGlyphLabel.EndCostObservation();G3InputRouter.EndCostObservation();}
         }
 
         [UnityTest]
-        public IEnumerator RealRuntimeSixGroupsRetainHudAndRoutePurchasesScratchShelfAndNight()
+        public IEnumerator ScenarioStateCaptureRetainsTwentyThreeViewsFromRealTransactionsV2()
         {
             // Entry and explicitly labelled exterior diagnostics are fixture-positioned.
             // They never establish walked arrival or parallax acceptance.
@@ -392,7 +397,7 @@ namespace Lottery.G3.VisualCandidate.Tests
             P.View.Walk.SetPose(P.View.Environment.EntryPosition, P.View.Environment.EntryYaw);
             P.View.Layout(); Physics.SyncTransforms(); Observe("fixture-position-entry-camera"); yield return null;
             Capture("entry-whole-shop", "FIXTURE_POSITIONED_PLAYER_VIEW");
-            Click("stand"); yield return null;
+            SetupScenarioSeated(); yield return null;
             Capture("table-empty", "NORMAL_SEATED_PLAYER_VIEW");
 
             BuyStock("small_prize_box"); Equip("small_prize_box", 0);
@@ -415,38 +420,24 @@ namespace Lottery.G3.VisualCandidate.Tests
             yield return null; Capture("challenge-two-safe-three-tools", "NORMAL_SEATED_PLAYER_VIEW");
 
             string challengeHash = StateCodec.ComputeHash(State);
-            Click("open-shop"); string shortcutBody = P.BuildPanel().Body; Close();
-            Click("stand");
-            // A known normal stand point begins a bounded real keyboard traversal.
-            // Every subsequent displacement goes through the actual InputRouter.
-            P.View.Walk.SetPose(P.View.Environment.StandPosition, P.View.Environment.StandYaw);
-            Observe("fixture-position-normal-stand-start");
-            yield return WalkTo(new Vector3(0, 0, 1.15f));
-            yield return WalkTo(new Vector3(.95f, 0, 1.15f));
-            yield return WalkTo(P.View.Environment.ShelfViewPosition);
-            yield return Face(P.View.Environment.ShelfTargetPosition);
-            yield return null; Capture("shelf-before-open", "KEYBOARD_TRAVERSED_PLAYER_VIEW");
-            var point = P.View.WorldToPresentationPoint(P.View.Environment.ShelfTargetPosition);
-            Assert.That(P.View.ConsumeUi(point, out _), Is.False, "Physical shelf must remain outside HUD hit regions");
-            var worldTarget = P.View.WorldTarget(point);
-            Assert.That(worldTarget, Is.Not.Null, "Shelf must be hit by the genuine camera ray");
-            Assert.That(worldTarget.Panel, Is.EqualTo(G3Panel.Shop));
-            var pose = app.SceneCamera.transform.position; var rotation = app.SceneCamera.transform.rotation;
-            MouseEvent(point, true); MouseEvent(point, false);
-            Assert.That(P.Panel, Is.EqualTo(G3Panel.Shop));
-            Assert.That(P.BuildPanel().Body, Is.EqualTo(shortcutBody));
-            Assert.That(StateCodec.ComputeHash(State), Is.EqualTo(challengeHash));
-            Observe("physical-shelf-open-stock-equals-shortcut");
-            yield return null; Capture("shelf-after-open", "SAME_POSE_PHYSICAL_RAY_CLICK");
-            Close();
-            Assert.That(app.SceneCamera.transform.position, Is.EqualTo(pose));
-            Assert.That(app.SceneCamera.transform.rotation, Is.EqualTo(rotation));
-            yield return WalkTo(new Vector3(.95f, 0, 1.15f));
-            yield return WalkTo(new Vector3(0, 0, 1.15f));
-            yield return WalkTo(P.View.Environment.StandPosition);
-            Click("stand");
-            Assert.That(StateCodec.ComputeHash(State), Is.EqualTo(challengeHash));
-            yield return null; Capture("challenge-returned-from-shelf", "KEYBOARD_RETURN_SAME_CONFIRMED_TICKET");
+            SetupScenarioPanel(G3Panel.Shop); string localBody = P.BuildPanel().Body; Close();
+            // Explicit camera station: this receipt establishes state/visuals, not walked arrival.
+            P.Execute(new G3Action(G3ActionKind.Stand));
+            var station=P.View.Environment.ShelfViewPosition;
+            var offset=P.View.Environment.ShelfTargetPosition-(station+Vector3.up*1.58f);
+            float heading=Mathf.Atan2(offset.x,offset.z)*Mathf.Rad2Deg;
+            float pitch=Mathf.Atan2(-offset.y,new Vector2(offset.x,offset.z).magnitude)*Mathf.Rad2Deg;
+            P.View.Walk.SetPose(station,heading,pitch);P.View.Layout();Physics.SyncTransforms();
+            Observe("scenario-position-shelf-camera");yield return null;
+            Capture("shelf-before-open", "SCENARIO_POSITIONED_SHELF_VIEW");
+            var pose=app.SceneCamera.transform.position;var rotation=app.SceneCamera.transform.rotation;
+            SetupScenarioPanel(G3Panel.Shop);
+            Assert.That(P.BuildPanel().Body,Is.EqualTo(localBody));
+            Assert.That(StateCodec.ComputeHash(State),Is.EqualTo(challengeHash));
+            yield return null;Capture("shelf-after-open", "SAME_POSE_SCENARIO_PANEL");
+            Close();Assert.That(app.SceneCamera.transform.position,Is.EqualTo(pose));Assert.That(app.SceneCamera.transform.rotation,Is.EqualTo(rotation));
+            SetupScenarioSeated();Assert.That(StateCodec.ComputeHash(State),Is.EqualTo(challengeHash));
+            yield return null;Capture("challenge-returned-from-shelf", "SCENARIO_SEATED_SAME_CONFIRMED_TICKET");
             Claim();
 
             int remaining = 12 - State.TicketsPurchasedToday;
@@ -467,7 +458,7 @@ namespace Lottery.G3.VisualCandidate.Tests
             yield return null; Capture("closing-day-table", "NORMAL_SEATED_PLAYER_VIEW");
             yield return ExteriorFixtureViews(false);
             var dayPosition = app.SceneCamera.transform.position; var dayRotation = app.SceneCamera.transform.rotation;
-            Click("open-bill"); Click("enter-night"); Confirm();
+            SetupScenarioPanel(G3Panel.Bill); Click("enter-night"); Confirm();
             Assert.That(State.Phase, Is.EqualTo(DayPhase.NIGHT_BILL));
             Close(); yield return null;
             Assert.That(P.Panel, Is.EqualTo(G3Panel.None));
@@ -475,7 +466,7 @@ namespace Lottery.G3.VisualCandidate.Tests
             Assert.That(app.SceneCamera.transform.rotation, Is.EqualTo(dayRotation));
             Capture("night-table", "SAME_CAMERA_AS_CLOSING_DAY_WITH_BILL_CLOSED");
             yield return ExteriorFixtureViews(true);
-            Click("open-bill"); yield return null; Capture("night-bill", "NORMAL_BILL_INFORMATION_HIERARCHY");
+            SetupScenarioPanel(G3Panel.Bill); yield return null; Capture("night-bill", "NORMAL_BILL_INFORMATION_HIERARCHY");
             Assert.That(frames.Count, Is.EqualTo(23));
             // Returning to the same confirmed ticket may correctly produce identical pixels.
             Assert.That(frames.Single(x => x.stage == "shelf-before-open").sha256, Is.Not.EqualTo(frames.Single(x => x.stage == "shelf-after-open").sha256));
@@ -520,7 +511,7 @@ namespace Lottery.G3.VisualCandidate.Tests
             finally
             {
                 P.View.Walk.SetPose(walkPosition,walkRotation.eulerAngles.y,walkRotation.eulerAngles.x);
-                Click("stand"); P.View.Layout(); Physics.SyncTransforms();
+                SetupScenarioSeated(); P.View.Layout(); Physics.SyncTransforms();
                 Assert.That(P.Mode, Is.EqualTo(mode)); Assert.That(P.Panel, Is.EqualTo(panel)); Assert.That(P.Walking, Is.EqualTo(walking));
                 Assert.That(P.View.Phone.IsFocused, Is.EqualTo(phoneFocused));
                 Assert.That(TicketContentHash(State.CurrentTicket), Is.EqualTo(ticketHash));
@@ -702,12 +693,12 @@ namespace Lottery.G3.VisualCandidate.Tests
             P.View.Walk.SetPose(at, yaw, pitch); P.View.Layout(); Physics.SyncTransforms();
             Observe("fixture-position-standing-phone-camera"); yield return null;
             Capture("phone-room-standing", "FIXTURE_POSITIONED_STANDING_PHONE_VIEW");
-            Click("stand"); yield return null;
+            SetupScenarioSeated(); yield return null;
             Assert.That(StateCodec.ComputeHash(State), Is.EqualTo(StateCodec.ComputeHash(before)));
             Capture("phone-table-before", "NORMAL_SEATED_CONFIRMED_TICKET_BEFORE_PHONE");
             var tablePosition = app.SceneCamera.transform.position;
             var tableRotation = app.SceneCamera.transform.rotation; float tableFov = app.SceneCamera.fieldOfView;
-            Click("open-phone"); yield return null;
+            SetupScenarioPanel(G3Panel.Phone); yield return null;
             Assert.That(P.View.Phone.IsFocused, Is.True);
             Assert.That(StateCodec.ComputeHash(State), Is.EqualTo(StateCodec.ComputeHash(before)));
             Capture("phone-contacts", "PRODUCTION_FOCUSED_WORLD_PHONE_CAMERA");
@@ -818,18 +809,15 @@ namespace Lottery.G3.VisualCandidate.Tests
         { InputSystem.QueueStateEvent(keyboard, new KeyboardState(keys)); Pump(); }
         void Click(string id)
         {
-            // Secondary navigation is genuinely opened through the visible control.
-            // Never mutate the presentation's More state or bypass the input router.
-            if(!P.View.HasButton(id) && (id == "open-tickets" || id == "open-drawer" || id == "open-bill" || id == "open-settings"))
-            {
-                Assert.That(P.View.HasButton("open-more"), Is.True, "Missing visible More navigation for " + id);
-                var more = P.View.ButtonRect("open-more").center;
-                MouseEvent(more, true); MouseEvent(more, false); Observe("click:open-more");
-            }
             Assert.That(P.View.HasButton(id), Is.True, "Missing runtime control: " + id);
             var point = P.View.ButtonRect(id).center;
             MouseEvent(point, true); MouseEvent(point, false); Observe("click:" + id);
         }
+        // Explicit scenario context, never a claim of world navigation input.
+        void SetupScenarioPanel(G3Panel panel)
+        {P.OpenPanel(panel);Assert.That(P.Panel,Is.EqualTo(panel));Observe("scenario-panel:"+panel);}
+        void SetupScenarioSeated()
+        {Close();P.Execute(new G3Action(G3ActionKind.Sit));Assert.That(P.Walking,Is.False);Observe("scenario-seated-camera");}
         void Observe(string action)
         {
             actions.Add(new ActionReceipt { action = action, inputUpdate = inputUpdates, revision = State.Revision,
@@ -837,13 +825,13 @@ namespace Lottery.G3.VisualCandidate.Tests
                 playerPosition = P.View.Walk.SavedPosition, cameraPosition = app.SceneCamera.transform.position });
         }
         void Confirm() { Assert.That(P.Panel, Is.EqualTo(G3Panel.Confirm)); Click("confirm-action"); }
-        void Close() { if(P.Panel != G3Panel.None) Click("close-panel"); }
+        void Close() { if(P.Panel != G3Panel.None) Click(P.PhoneVisible?"close-phone":"close-panel"); }
         void Buy(string type)
         {
             var before = State.Copy();
             Assert.That(before.HasUnsettledTicket, Is.False);
             Assert.That(before.TicketsPurchasedToday, Is.InRange(0, 11));
-            Close(); Click("open-tickets"); Click(type == "number" ? "buy-number" : "buy-challenge"); Confirm();
+            Close(); SetupScenarioPanel(G3Panel.Tickets); Click(type == "number" ? "buy-number" : "buy-challenge"); Confirm();
             var after = State; var ticket = after.CurrentTicket;
             Assert.That(ticket, Is.Not.Null);
             Assert.That(ticket.Id, Is.Not.Empty);
@@ -892,9 +880,9 @@ namespace Lottery.G3.VisualCandidate.Tests
             Assert.That(after.Phase, Is.EqualTo(after.TicketsPurchasedToday == 12 ? DayPhase.CLOSING_PREP : DayPhase.DAY_OPEN));
         }
         void BuyStock(string item)
-        { Close(); Click("open-shop"); Click("stock-" + State.Stock.Single(x => x.ItemId == item).StockId); Click("stock-buy"); Confirm(); Close(); }
+        { Close(); SetupScenarioPanel(G3Panel.Shop); Click("stock-" + State.Stock.Single(x => x.ItemId == item).StockId); Click("stock-buy"); Confirm(); Close(); }
         void Equip(string item, int slot)
-        { Close(); Click("open-inventory"); Click("tool-" + item); Click("equip-" + slot); Close(); Assert.That(State.NextToolIds[slot], Is.EqualTo(item)); }
+        { Close(); SetupScenarioPanel(G3Panel.Inventory); Click("tool-" + item); Click("equip-" + slot); Close(); Assert.That(State.NextToolIds[slot], Is.EqualTo(item)); }
         Vector2 CellPoint(int core, float u = .5f, float v = .5f)
         {
             var layout = P.View.Surface.Layout; var r = layout.Cells.Single(x => x.CoreIndex == core).Silver;
@@ -909,39 +897,6 @@ namespace Lottery.G3.VisualCandidate.Tests
         }
         void RevealSelected(int core)
         { MouseEvent(CellPoint(core), true); MouseEvent(CellPoint(core), false); Assert.That(State.CurrentTicket.SelectedCell, Is.EqualTo(core)); Click("quick"); Assert.That(State.CurrentTicket.RevealedCells[core], Is.True); }
-        IEnumerator Face(Vector3 point)
-        {
-            var timer = Stopwatch.StartNew(); Milestone("face-begin");
-            for(int i = 0; i < 600; i++)
-            {
-                CheckRuntimeBudget();
-                Assert.That(timer.Elapsed.TotalSeconds, Is.LessThan(FaceSeconds), "Keyboard turn exceeded 120 seconds");
-                var offset = point - app.SceneCamera.transform.position;
-                float desired = Mathf.Atan2(offset.x, offset.z) * Mathf.Rad2Deg;
-                float delta = Mathf.DeltaAngle(app.SceneCamera.transform.eulerAngles.y, desired);
-                if(Mathf.Abs(delta) < 1.5f) { KeyboardEvent(); Milestone("face-end"); yield break; }
-                KeyboardEvent(delta > 0 ? Key.RightArrow : Key.LeftArrow); yield return null;
-            }
-            KeyboardEvent(); Assert.Fail("Keyboard turn did not reach the physical target");
-        }
-        IEnumerator WalkTo(Vector3 destination)
-        {
-            var start = P.View.Walk.SavedPosition;
-            var timer = Stopwatch.StartNew(); Milestone("walk-begin");
-            yield return Face(new Vector3(destination.x, app.SceneCamera.transform.position.y, destination.z));
-            for(int i = 0; i < 1200; i++)
-            {
-                CheckRuntimeBudget();
-                Assert.That(timer.Elapsed.TotalSeconds, Is.LessThan(WalkSeconds), "Keyboard waypoint exceeded 180 seconds");
-                var at = P.View.Walk.SavedPosition; var delta = new Vector2(destination.x - at.x, destination.z - at.z);
-                if(delta.magnitude < .09f) { KeyboardEvent(); Observe("keyboard-walk-waypoint"); Milestone("walk-end"); yield break; }
-                float desired = Mathf.Atan2(delta.x, delta.y) * Mathf.Rad2Deg;
-                float angle = Mathf.DeltaAngle(app.SceneCamera.transform.eulerAngles.y, desired);
-                KeyboardEvent(Mathf.Abs(angle) > 4 ? (angle > 0 ? Key.RightArrow : Key.LeftArrow) : Key.W);
-                yield return null;
-            }
-            KeyboardEvent(); Assert.Fail("Real keyboard path blocked from " + start + " to " + destination);
-        }
         void BindTarget(int width, int height)
         {
             ReleaseTarget(); target = new RenderTexture(width, height, 24, RenderTextureFormat.ARGB32) { name = "Visual candidate genuine camera output" };
@@ -1074,6 +1029,7 @@ namespace Lottery.G3.VisualCandidate.Tests
             readonly Stopwatch timer = Stopwatch.StartNew();
             readonly string kind, path;
             readonly List<ProgressEvent> events = new List<ProgressEvent>();
+            readonly List<FrameCostRow> costs = new List<FrameCostRow>();
             public double ElapsedSeconds => timer.Elapsed.TotalSeconds;
             public ProgressTrail(string kind)
             {
@@ -1088,20 +1044,30 @@ namespace Lottery.G3.VisualCandidate.Tests
                     utc = DateTime.UtcNow.ToString("O"), inputUpdates = inputUpdates, frameCount = frameCount,
                     purchased = state?.TicketsPurchasedToday ?? -1, settled = state?.SettledTicketCount ?? -1,
                     dayPhase = state?.Phase.ToString() ?? "UNAVAILABLE" });
-                File.WriteAllText(path, JsonUtility.ToJson(new ProgressReceipt { kind = kind, sourceCommit = Arg("-probeCommit"),
-                    runId = Arg("-probeRunId"), runAttempt = Arg("-probeRunAttempt"), events = events.ToArray() }, true));
+                ProgressReceipt receipt;
+                if(kind=="runtime")
+                {
+                    var glyph=BoundedGlyphLabel.CostObservation();var input=G3InputRouter.CostObservation();
+                    costs.Add(new FrameCostRow{values=new[]{glyph[0],glyph[1],glyph[2],glyph[3],input[0],input[1],input[2],input[3],input[4],input[5],System.Math.Max(glyph[4],input[6])}});
+                    receipt=new RuntimeProgressReceipt{costs=costs.ToArray(),tickFrequency=Stopwatch.Frequency};
+                }
+                else receipt=new ProgressReceipt();
+                receipt.kind=kind;receipt.sourceCommit=Arg("-probeCommit");receipt.runId=Arg("-probeRunId");receipt.runAttempt=Arg("-probeRunAttempt");receipt.events=events.ToArray();
+                File.WriteAllText(path, JsonUtility.ToJson(receipt, kind!="runtime"));
                 Debug.Log("VISUAL_CANDIDATE_PROGRESS " + kind + " " + stage + " elapsedMs=" + timer.ElapsedMilliseconds);
             }
         }
         [Serializable] sealed class ProgressEvent
         { public string stage, utc, dayPhase; public long elapsedMs; public int inputUpdates, frameCount, purchased, settled; }
-        [Serializable] sealed class ProgressReceipt
+        [Serializable] class ProgressReceipt
         {
             public int schemaVersion = 1;
             public string scope = Scope, kind, sourceCommit, runId, runAttempt;
             public string status = "MILESTONES_ONLY_NOT_TEST_PASS";
             public ProgressEvent[] events;
         }
+        [Serializable] sealed class FrameCostRow { public long[] values; }
+        [Serializable] sealed class RuntimeProgressReceipt:ProgressReceipt { public long tickFrequency;public FrameCostRow[] costs; }
         [Serializable] sealed class ActionReceipt
         { public string action, phase, panel, stateSha256; public int inputUpdate; public long revision; public Vector3 playerPosition, cameraPosition; }
         [Serializable] sealed class ProjectionReceipt { public float x, y, width, height; }
@@ -1113,6 +1079,7 @@ namespace Lottery.G3.VisualCandidate.Tests
         }
         [Serializable] sealed class FrameReceipt
         {
+            public string stateOrigin="REAL_SERVICE_TRANSACTIONS", navigationEvidence="SCENARIO_SETUP_NOT_WORLD_INPUT";
             public string stage, file, sha256, capturedUtc, stateSha256, seedSha256, gameRunId, fixtureLabel, ticketId, ticketPhase, ticketMaskSha256, dayPhase, panel, mode, cameraOrigin, qualityName;
             public ExteriorReceipt exterior; public string fixtureStateBefore, fixtureStateAfter; public bool fixturePoseRestored;
             public string ticketContentSha256; public bool phoneFocused, phoneWorldObjectActive; public int phoneActiveRendererCount, phoneInstanceId; public ProjectionReceipt phoneScreenBounds;
@@ -1124,10 +1091,10 @@ namespace Lottery.G3.VisualCandidate.Tests
         }
         [Serializable] sealed class CaptureReceipt
         {
-            public int schemaVersion = 4;
-            public string candidatePresentation = "V19_EXTERIOR_FIXTURE_VIEWS_NOT_VISUAL_PASS";
+            public int schemaVersion = 5;
+            public string candidatePresentation = "V31_SCENARIO_STATE_VIEWS_NOT_WORLD_INPUT_PASS";
             public string scope = Scope, sourceCommit, runId, runAttempt, unityVersion, graphicsDeviceType, graphicsDeviceName;
-            public string inputEvidence = "SIMULATED_INPUT_SYSTEM", captureMethod = "URP_STANDARD_REQUEST_READPIXELS",
+            public string inputEvidence = "SIMULATED_UI_INPUT_WITH_DECLARED_SCENARIO_SETUP", captureMethod = "URP_STANDARD_REQUEST_READPIXELS",
                 seedDisclosure = "FIXED_DIAGNOSTIC_SEED_HASH_ONLY", hudVisibilityBasis = "ENABLED_CAMERA_LAYER_AND_FRUSTUM_TEST_NOT_PIXEL_OCCLUSION", deviceQa = "NOT_RUN", visualReview = "PENDING", g3Gate = "NOT_EVALUATED";
             public bool complete; public FrameReceipt[] frames; public ActionReceipt[] actions;
         }

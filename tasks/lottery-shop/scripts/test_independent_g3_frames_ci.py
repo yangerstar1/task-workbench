@@ -35,20 +35,31 @@ class IndependentFrameTests(unittest.TestCase):
         self.assertFalse(any((self.output()/name).exists() for name in (*frames.FILES,frames.EXPORT)))
     def fail_other(self):
         other=next(c for c in self.xml.iter('test-case') if c.get('fullname')!=frames.visual.ORIGINAL_G3_CASE);other.set('result','Failed')
-        self.xml.set('result','Failed(Child)');self.xml.set('passed','34');self.xml.set('failed','1');self.save_xml()
+        self.xml.set('result','Failed(Child)');self.xml.set('passed','36');self.xml.set('failed','1');self.save_xml()
         self.native.update(status='NATIVE_FAILED',nativeExitCode=2,dockerExitCode=2);self.save_native()
     def test_full_suite_success_exports_exact_originals(self):
         self.export();self.assertTrue(self.proof()['suiteAllPassed']);self.assertEqual({p.name for p in self.output().iterdir()},set(frames.FILES)|{frames.EXPORT})
         for name in frames.FILES:self.assertEqual((self.output()/name).read_bytes(),(self.source/name).read_bytes())
+    def test_v2_missing_world_case_rejected(self):
+        case=next(c for c in self.xml.iter('test-case') if '.WorldInput' in c.get('fullname',''))
+        parent=next(e for e in self.xml.iter() if case in list(e));parent.remove(case);self.save_xml();self.reject()
+    def test_v2_renamed_world_case_rejected(self):
+        case=next(c for c in self.xml.iter('test-case') if '.WorldInput' in c.get('fullname',''));case.set('fullname',case.get('fullname')+'Wrong');self.save_xml();self.reject()
+    def test_v2_duplicate_world_case_rejected(self):
+        case=next(c for c in self.xml.iter('test-case') if '.WorldInput' in c.get('fullname',''));parent=next(e for e in self.xml.iter() if case in list(e));parent.append(copy.deepcopy(case));self.save_xml();self.reject()
+    def test_old_35_case_receipt_rejected(self):
+        worlds=[c for c in self.xml.iter('test-case') if '.WorldInput' in c.get('fullname','')]
+        for case in worlds[1:]:next(e for e in self.xml.iter() if case in list(e)).remove(case)
+        worlds[0].set('fullname','Lottery.G3.PlayMode.Tests.G3PlayTests.WalkingIsOptionalAndPhysicalAndQuickShopShareStockAndReturnPose');self.xml.set('total','35');self.xml.set('passed','35');self.save_xml();self.reject()
     def test_other_failure_allows_only_target_evidence_and_discloses_counts(self):
-        self.fail_other();self.export();p=self.proof();self.assertFalse(p['suiteAllPassed']);self.assertEqual(p['suiteCounts'],dict(total=35,passed=34,failed=1,skipped=0));self.assertEqual(p['visual23FrameGate'],'NOT_EVALUATED_BY_THIS_EXPORT');self.assertEqual(p['g3Gate'],'NOT_EVALUATED')
+        self.fail_other();self.export();p=self.proof();self.assertFalse(p['suiteAllPassed']);self.assertEqual(p['suiteCounts'],dict(total=37,passed=36,failed=1,skipped=0));self.assertEqual(p['visual23FrameGate'],'NOT_EVALUATED_BY_THIS_EXPORT');self.assertEqual(p['g3Gate'],'NOT_EVALUATED')
         self.assertFalse((frames.visual.outdir(self.root)/'captures/capture-receipt.json').exists())
     def test_two_other_failures_disclosed_as_run12_shape(self):
-        self.fail_other();other=next(c for c in self.xml.iter('test-case') if c.get('fullname')!=frames.visual.ORIGINAL_G3_CASE and c.get('result')=='Passed');other.set('result','Failed');self.xml.set('passed','33');self.xml.set('failed','2');self.save_xml();self.export();self.assertEqual(self.proof()['suiteCounts'],dict(total=35,passed=33,failed=2,skipped=0))
+        self.fail_other();other=next(c for c in self.xml.iter('test-case') if c.get('fullname')!=frames.visual.ORIGINAL_G3_CASE and c.get('result')=='Passed');other.set('result','Failed');self.xml.set('passed','35');self.xml.set('failed','2');self.save_xml();self.export();self.assertEqual(self.proof()['suiteCounts'],dict(total=37,passed=35,failed=2,skipped=0))
     def test_png_text_payload_rejected_even_with_matching_receipt_hash(self):
         p=self.source/'empty.png';raw=p.read_bytes();raw=raw[:33]+self.chunk(b'tEXt',b'PRIVATE_SENTINEL')+raw[33:];p.write_bytes(raw);self.receipt['frames'][0].update(bytes=len(raw),sha256=hashlib.sha256(raw).hexdigest());self.save_receipt();self.reject()
     def test_target_failure_never_exports(self):
-        target=next(c for c in self.xml.iter('test-case') if c.get('fullname')==frames.visual.ORIGINAL_G3_CASE);target.set('result','Failed');self.xml.set('result','Failed(Child)');self.xml.set('passed','34');self.xml.set('failed','1');self.save_xml();self.native.update(status='NATIVE_FAILED',nativeExitCode=2,dockerExitCode=2);self.save_native();self.reject()
+        target=next(c for c in self.xml.iter('test-case') if c.get('fullname')==frames.visual.ORIGINAL_G3_CASE);target.set('result','Failed');self.xml.set('result','Failed(Child)');self.xml.set('passed','36');self.xml.set('failed','1');self.save_xml();self.native.update(status='NATIVE_FAILED',nativeExitCode=2,dockerExitCode=2);self.save_native();self.reject()
     def test_missing_duplicate_wrong_identity_never_exports(self):
         original=ET.tostring(self.xml)
         for mode in ('missing','duplicate','wrong'):
@@ -87,7 +98,7 @@ class IndependentFrameTests(unittest.TestCase):
         for changes in [dict(stage='../private'),dict(file='../private.png'),dict(fixtureLabel='SYNTHETIC_PRIVATE'),dict(gameRunId='private-run')]:
             self.receipt=copy.deepcopy(original);self.receipt['frames'][0].update(changes);self.save_receipt();self.reject()
     def test_raw_receipt_duplicate_key_and_secret_bait_rejected(self):
-        p=self.source/'render-receipt.json';raw=p.read_text();p.write_text(raw.replace('"schemaVersion": 1','"schemaVersion": "PRIVATE_SENTINEL", "schemaVersion": 1'));self.reject()
+        p=self.source/'render-receipt.json';raw=p.read_text();p.write_text(raw.replace('"schemaVersion": 2','"schemaVersion": "PRIVATE_SENTINEL", "schemaVersion": 2'));self.reject()
         self.receipt['graphicsDeviceName']='UNITY_PASSWORD PRIVATE_SENTINEL';self.save_receipt();self.reject()
     def test_raw_xml_secret_and_dtd_rejected(self):
         self.xmlpath.write_text('<!DOCTYPE test-run><test-run/>');self.reject()

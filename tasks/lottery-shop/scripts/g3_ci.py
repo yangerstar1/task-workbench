@@ -411,7 +411,7 @@ def inspect_captures(source,identity,frames):
     data=json.loads(bounded_read(source/'render-receipt.json',128*1024))
     required={'schemaVersion','scope','sourceCommit','runId','unityVersion','rulesSha256','captureMethod','graphicsDeviceType','graphicsDeviceName','width','height','sourceViewportWidth','sourceViewportHeight','inputEvidence','deviceQa','visualReview','frames'}
     require(set(data)==required,'G3 render receipt schema mismatch')
-    expected=dict(schemaVersion=1,scope='G3_CAMERA_RENDER_NOT_DEVICE_TESTED',sourceCommit=identity['sourceCommit'],runId=identity['runId'],unityVersion=legacy.VERSION,rulesSha256=RULES_SHA,captureMethod='URP_STANDARD_REQUEST_READPIXELS',width=1280,height=720,inputEvidence='SIMULATED_INPUT_SYSTEM',deviceQa='NOT_RUN',visualReview='PENDING')
+    expected=dict(schemaVersion=2,scope='G3_CAMERA_RENDER_NOT_DEVICE_TESTED',sourceCommit=identity['sourceCommit'],runId=identity['runId'],unityVersion=legacy.VERSION,rulesSha256=RULES_SHA,captureMethod='URP_STANDARD_REQUEST_READPIXELS',width=1280,height=720,inputEvidence='SIMULATED_UI_INPUT_WITH_DECLARED_SCENARIO_SETUP',deviceQa='NOT_RUN',visualReview='PENDING')
     require(all(data.get(k)==v for k,v in expected.items()) and type(data['schemaVersion']) is int,'G3 render identity mismatch')
     require(all(type(data[k]) is int and 64<=data[k]<=8192 for k in ('sourceViewportWidth','sourceViewportHeight')), 'Viewport absent')
     for k in ('graphicsDeviceType','graphicsDeviceName'):

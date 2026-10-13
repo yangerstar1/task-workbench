@@ -365,7 +365,7 @@
         "Lottery.G3.PlayMode.Tests.G3PlayTests.DayFlowUsesInputSystemForBothTicketsShoppingConfigurationPhoneAndNight",
         "Lottery.G3.PlayMode.Tests.G3PlayTests.DisplayTokensRejectStaleCallbacksAndInvalidateOnDisable",
         "Lottery.G3.PlayMode.Tests.G3PlayTests.ExistingStoreOrIncompleteFilesCannotBeReplacedByDiagnosticStart",
-        "Lottery.G3.PlayMode.Tests.G3PlayTests.FixedSeventyFiveStepDayRunsContinuouslyFromMarkedApkEntryThroughInputSystem",
+        "Lottery.G3.PlayMode.Tests.G3PlayTests.FixedSeventyFiveStepEconomyUsesDeclaredLocalContextsAndRealTransactionsV2",
         "Lottery.G3.PlayMode.Tests.G3PlayTests.MaximumAmountGlyphsStayInsideReviewedTextSafeBounds",
         "Lottery.G3.PlayMode.Tests.G3PlayTests.NoChangeRejectionAndRecoveredReceiptHaveDistinctAccurateFeedback",
         "Lottery.G3.PlayMode.Tests.G3PlayTests.NormalNewRunUsesUninjectedStartupRandomStockWholeDayAndSavedResume",
@@ -375,7 +375,6 @@
         "Lottery.G3.PlayMode.Tests.G3PlayTests.SaveFailureAndUnknownBuyHideUnconfirmedPixelsAndRecoverOneTransaction",
         "Lottery.G3.PlayMode.Tests.G3PlayTests.SecondaryTouchFocusPauseAndBackNeverTransferCapturedStroke",
         "Lottery.G3.PlayMode.Tests.G3PlayTests.UiConsumesWholeGestureAndTableScratchCannotRotateCamera",
-        "Lottery.G3.PlayMode.Tests.G3PlayTests.WalkingIsOptionalAndPhysicalAndQuickShopShareStockAndReturnPose",
         "Lottery.G3.PlayMode.Tests.G3PlayTests.QaEvidenceDayEndExportsAllTwentyNineLedgerRowsAndCommandReceipts",
         "Lottery.G3.PlayMode.Tests.G3PlayTests.QaEvidenceInvalidSchemaAndInvariantSnapshotsFailClosed",
         "Lottery.G3.PlayMode.Tests.G3PlayTests.QaEvidenceNumberCopyPreservesConfirmedMaskConfigurationAndStore",
@@ -384,7 +383,10 @@
         "Lottery.G3.PlayMode.Tests.G3PlayTests.QaEvidenceUnknownCommitAndCorruptStoreWithholdStateWithoutRecoveryWrites",
         "Lottery.G3.PlayMode.Tests.G3PlayTests.PhysicalPhoneProjectsRealGlassAndRestoresCameraWithoutChangingTicket",
         "Lottery.G3.PlayMode.Tests.G3PlayTests.PhoneSendRequiresReleaseAndSavedPendingPacketSurvivesReload",
-        "Lottery.G3.PlayMode.Tests.G3PlayTests.PhysicalPhoneKeysMeetProjectedReferenceTargetsAndOcclusionBlocksTap"
+        "Lottery.G3.PlayMode.Tests.G3PlayTests.PhysicalPhoneKeysMeetProjectedReferenceTargetsAndOcclusionBlocksTap",
+        "Lottery.G3.PlayMode.Tests.G3PlayTests.WorldInputEntryToTicketRackAndTableUsesConcurrentMoveLookAndRelease",
+        "Lottery.G3.PlayMode.Tests.G3PlayTests.WorldInputTableToPhysicalPhoneAndBackPreservesTicketAndCamera",
+        "Lottery.G3.PlayMode.Tests.G3PlayTests.WorldInputStorageToolShelfDrawerAndPointerOwnershipArePhysical"
       ]
     }
   },

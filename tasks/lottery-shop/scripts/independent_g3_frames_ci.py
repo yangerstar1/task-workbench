@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Separate 14-frame evidence from one exact PASS; never the 23/35/G3 gate."""
+"""Separate 14-frame evidence from one exact PASS; never the 23/37/G3 gate."""
 from datetime import datetime
 import hashlib
 import json
@@ -72,7 +72,7 @@ def exact_case(root, ident, prepared_ns):
         require(not set(expected).intersection(profile), 'INDEPENDENT_FRAME_CONTRACT_REJECTED'); expected.update(profile)
     assemblies = [s for s in tree.iter('test-suite') if s.get('type') == 'Assembly']
     cases = list(tree.iter('test-case')); all_names = [name for names in expected.values() for name in names]
-    require(tree.tag == 'test-run' and len(all_names) == len(set(all_names)) == 35 and len(cases) == 35 and {c.get('fullname') for c in cases} == set(all_names), 'INDEPENDENT_FRAME_EXACT_CASES_REJECTED')
+    require(tree.tag == 'test-run' and len(all_names) == len(set(all_names)) == 37 and len(cases) == 37 and {c.get('fullname') for c in cases} == set(all_names), 'INDEPENDENT_FRAME_EXACT_CASES_REJECTED')
     require(len(assemblies) == len(expected) and {a.get('name') for a in assemblies} == set(expected), 'INDEPENDENT_FRAME_ASSEMBLY_REJECTED')
     owned = []
     for assembly in assemblies:
@@ -80,8 +80,8 @@ def exact_case(root, ident, prepared_ns):
         require(len(children) == len(names) and {c.get('fullname') for c in children} == set(names), 'INDEPENDENT_FRAME_OWNERSHIP_REJECTED'); owned.extend(children)
     require(len(owned) == len(cases) and set(owned) == set(cases), 'INDEPENDENT_FRAME_OWNERSHIP_REJECTED')
     require(all(c.get('result') in ('Passed','Failed') for c in cases), 'INDEPENDENT_FRAME_SKIPPED_OR_INCOMPLETE')
-    passed = sum(c.get('result') == 'Passed' for c in cases); failed = 35-passed
-    require(all(tree.get(k) == str(v) for k,v in {'total':35,'passed':passed,'failed':failed,'skipped':0,'inconclusive':0}.items()), 'INDEPENDENT_FRAME_COUNTS_REJECTED')
+    passed = sum(c.get('result') == 'Passed' for c in cases); failed = 37-passed
+    require(all(tree.get(k) == str(v) for k,v in {'total':37,'passed':passed,'failed':failed,'skipped':0,'inconclusive':0}.items()), 'INDEPENDENT_FRAME_COUNTS_REJECTED')
     require(tree.get('result') in (('Passed',) if failed == 0 else ('Failed','Failed(Child)')), 'INDEPENDENT_FRAME_ROOT_RESULT_REJECTED')
     target = [c for c in cases if c.get('fullname') == visual.ORIGINAL_G3_CASE]
     require(len(target) == 1 and target[0].get('result') == 'Passed' and target[0].find('failure') is None, 'INDEPENDENT_FRAME_TARGET_NOT_PASSED')
@@ -91,7 +91,7 @@ def exact_case(root, ident, prepared_ns):
     code = 2 if failed else 0
     require(type(native['nativeExitMarkerCount']) is int and native['nativeExitMarkerCount'] == 1 and type(native['nativeExitCode']) is int and type(native['dockerExitCode']) is int and native['nativeExitCode'] == native['dockerExitCode'] == code and native['status'] == ('NATIVE_FAILED' if failed else 'NATIVE_SUCCEEDED'), 'INDEPENDENT_FRAME_NATIVE_RESULT_REJECTED')
     require(native['observations']['invalidLicenseXml400'] == 0 and native['observations']['nativeActivationAborted'] == 0, 'INDEPENDENT_FRAME_NATIVE_LICENSE_REJECTED')
-    return dict(total=35,passed=passed,failed=failed,skipped=0), hashlib.sha256(raw).hexdigest()
+    return dict(total=37,passed=passed,failed=failed,skipped=0), hashlib.sha256(raw).hexdigest()
 
 
 def export(root):

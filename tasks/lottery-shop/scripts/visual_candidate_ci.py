@@ -26,7 +26,7 @@ SCOPE = "DIAGNOSTIC_VISUAL_CANDIDATE_NOT_G3_PASS"
 REQUEST = TASK + "/ci/visual-candidate-request.json"
 WORKFLOW = ".github/workflows/lottery-visual-candidate.yml"
 ASSEMBLY = "Lottery.G3.VisualCandidate.Tests.dll"
-CASE = "Lottery.G3.VisualCandidate.Tests.VisualCandidateCaptureTests.RealRuntimeSixGroupsRetainHudAndRoutePurchasesScratchShelfAndNight"
+CASE = "Lottery.G3.VisualCandidate.Tests.VisualCandidateCaptureTests.ScenarioStateCaptureRetainsTwentyThreeViewsFromRealTransactionsV2"
 BASE_FRAMES = ["entry-whole-shop", "table-empty", "number-half", "number-half-20x9",
           "challenge-two-safe-three-tools", "shelf-before-open", "shelf-after-open",
           "challenge-returned-from-shelf", "closing-day-table", "night-table", "night-bill"]
@@ -41,6 +41,8 @@ EXTERIOR_DAY_FRAMES = ["exterior-day-" + station for station in EXTERIOR_STATION
 EXTERIOR_NIGHT_FRAMES = ["exterior-night-" + station for station in EXTERIOR_STATIONS]
 EXTERIOR_FRAMES = EXTERIOR_DAY_FRAMES + EXTERIOR_NIGHT_FRAMES
 FRAMES = ORIGINAL_VISUAL_FRAMES[:-2] + EXTERIOR_DAY_FRAMES + ["night-table"] + EXTERIOR_NIGHT_FRAMES + ["night-bill"]
+FRAME_CAMERA_ORIGINS = {'entry-whole-shop': 'FIXTURE_POSITIONED_PLAYER_VIEW', 'table-empty': 'NORMAL_SEATED_PLAYER_VIEW', 'number-half': 'NORMAL_SEATED_PLAYER_VIEW', 'number-half-20x9': 'SAME_STATE_ALTERNATE_ASPECT', 'challenge-two-safe-three-tools': 'NORMAL_SEATED_PLAYER_VIEW', 'shelf-before-open': 'SCENARIO_POSITIONED_SHELF_VIEW', 'shelf-after-open': 'SAME_POSE_SCENARIO_PANEL', 'challenge-returned-from-shelf': 'SCENARIO_SEATED_SAME_CONFIRMED_TICKET', 'closing-day-table': 'NORMAL_SEATED_PLAYER_VIEW', 'night-table': 'SAME_CAMERA_AS_CLOSING_DAY_WITH_BILL_CLOSED', 'night-bill': 'NORMAL_BILL_INFORMATION_HIERARCHY', 'phone-room-standing': 'FIXTURE_POSITIONED_STANDING_PHONE_VIEW', 'phone-table-before': 'NORMAL_SEATED_CONFIRMED_TICKET_BEFORE_PHONE', 'phone-contacts': 'PRODUCTION_FOCUSED_WORLD_PHONE_CAMERA', 'phone-mom-pending': 'PRODUCTION_WORLD_PHONE_PERSISTED_REQUEST_NOT_MONEY', 'phone-mom-claimed': 'PRODUCTION_WORLD_PHONE_SINGLE_COMMITTED_LOAN', 'phone-table-return': 'NORMAL_SEATED_SAME_TICKET_AFTER_PHONE'}
+FRAME_CAMERA_ORIGINS.update({name: "FIXTURE_VIEW_NOT_WALKED" for name in EXTERIOR_FRAMES})
 PHONE_VISIBLE_FRAMES = {"phone-room-standing", "phone-contacts", "phone-mom-pending", "phone-mom-claimed"}
 ORIGINAL_G3_FRAMES = ["empty", "number-half", "number-revealed", "number-copy", "number-settled", "configuration", "phone",
                       "challenge-two-safe", "challenge-selected", "shop-shortcut", "shop-physical", "night", "day-end", "challenge-protected"]
@@ -203,11 +205,11 @@ def export_tests(root, stage):
 
 
 def validate_capture(receipt, source, run, attempt, require_complete=True):
-    require(receipt.get("schemaVersion") == 4 and receipt.get("candidatePresentation") == "V19_EXTERIOR_FIXTURE_VIEWS_NOT_VISUAL_PASS", "V19 measured exterior and physical-phone receipt required")
+    require(receipt.get("schemaVersion") == 5 and receipt.get("candidatePresentation") == "V31_SCENARIO_STATE_VIEWS_NOT_WORLD_INPUT_PASS", "V31 scenario-state capture receipt required")
     require(receipt.get("scope") == SCOPE and receipt.get("sourceCommit") == source and receipt.get("runId") == run and receipt.get("runAttempt") == attempt, "Capture source/run/attempt mismatch")
     require(receipt.get("unityVersion") == "6000.3.19f1" and receipt.get("graphicsDeviceType") not in (None, "Null"), "Pinned native GPU capture required")
     require(receipt.get("hudVisibilityBasis") == "ENABLED_CAMERA_LAYER_AND_FRUSTUM_TEST_NOT_PIXEL_OCCLUSION", "HUD visibility observation basis missing")
-    require(receipt.get("inputEvidence") == "SIMULATED_INPUT_SYSTEM" and receipt.get("captureMethod") == "URP_STANDARD_REQUEST_READPIXELS", "Unexpected capture provenance")
+    require(receipt.get("inputEvidence") == "SIMULATED_UI_INPUT_WITH_DECLARED_SCENARIO_SETUP" and receipt.get("captureMethod") == "URP_STANDARD_REQUEST_READPIXELS", "Unexpected capture provenance")
     frames = receipt.get("frames", [])
     names = [f.get("stage") for f in frames]
     require(len(names) == len(set(names)) and all(name in FRAMES for name in names), "Unexpected/duplicate capture names")
@@ -215,6 +217,8 @@ def validate_capture(receipt, source, run, attempt, require_complete=True):
     if require_complete:
         require(receipt.get("complete") is True and names == FRAMES, "Original seventeen and additional six exterior frames are incomplete")
     for f in frames:
+        require(f.get("stateOrigin") == "REAL_SERVICE_TRANSACTIONS" and f.get("navigationEvidence") == "SCENARIO_SETUP_NOT_WORLD_INPUT", "Frame setup/state provenance missing")
+        require(f.get("cameraOrigin") == FRAME_CAMERA_ORIGINS[f["stage"]], "Frame camera source mismatch")
         require(f.get("file") == f["stage"] + ".png" and HEX64.fullmatch(f.get("sha256", "")), "Invalid frame identity")
         require((f.get("width"), f.get("height")) == ((1600, 720) if f["stage"].endswith("20x9") else (1280, 720)), "Incorrect capture dimensions")
         require(all(HEX64.fullmatch(f.get(k, "")) for k in ("stateSha256", "seedSha256")), "State/seed hash missing")
@@ -229,6 +233,7 @@ def validate_capture(receipt, source, run, attempt, require_complete=True):
         controls = f.get("visibleControlIds")
         require(isinstance(controls, list) and len(controls) <= 64 and len(controls) == len(set(controls)) and all(isinstance(x, str) for x in controls), "Visible control identity observation invalid")
         require(type(f.get("moreVisible")) is bool and type(f.get("paperVisible")) is bool, "More/paper visibility observation missing")
+        require(f["moreVisible"] is False and not ({"open-more","open-shop","open-inventory","open-phone","open-tickets","open-drawer","open-bill"} & set(controls)), "Removed global navigation reappeared")
         require(all(type(f.get(key)) is int and f[key] >= 0 for key in ("renderedShopRendererCount", "renderedShopMaterialCount")), "Rendered shop resource counts missing")
         tool_bounds = f.get("toolPresentationBounds")
         require(isinstance(tool_bounds, list) and len(tool_bounds) == 3, "Three tool projection observations required")
@@ -432,7 +437,8 @@ PROGRESS_STAGES = {
 
 
 def validate_progress(value, kind, source, run, attempt):
-    require(isinstance(value, dict) and set(value) == {"schemaVersion", "scope", "kind", "sourceCommit", "runId", "runAttempt", "status", "events"}, "Unexpected progress receipt fields")
+    extra={"costs","tickFrequency"} if kind=="runtime" else set()
+    require(isinstance(value, dict) and set(value) == {"schemaVersion", "scope", "kind", "sourceCommit", "runId", "runAttempt", "status", "events"}|extra, "Unexpected progress receipt fields")
     require(value["schemaVersion"] == 1 and value["scope"] == SCOPE and value["kind"] == kind and kind in PROGRESS_STAGES, "Invalid progress kind/scope")
     require((value["sourceCommit"], value["runId"], value["runAttempt"]) == (source, run, attempt), "Progress source/run/attempt mismatch")
     require(value["status"] == "MILESTONES_ONLY_NOT_TEST_PASS", "Progress cannot claim a test pass")
@@ -450,6 +456,17 @@ def validate_progress(value, kind, source, run, attempt):
         for key, low, high in (("inputUpdates", 0, 100000), ("frameCount", 0, len(FRAMES)), ("purchased", -1, 12), ("settled", -1, 12)):
             require(type(event[key]) is int and low <= event[key] <= high, "Invalid bounded progress counter")
         require(event["dayPhase"] in {"UNAVAILABLE", "DAY_OPEN", "CLOSING_PREP", "NIGHT_BILL", "DAY_COMPLETE", "RUN_FAILED"}, "Invalid progress day phase")
+    if kind=="runtime":
+        require(type(value['tickFrequency']) is int and 1<=value['tickFrequency']<=1000000000000,'Invalid frame cost tick frequency')
+        costs=value['costs'];require(type(costs) is list and len(costs)==len(events),'Invalid frame cost row count')
+        previous=[0]*11
+        for row in costs:
+            require(type(row) is dict and set(row)=={'values'} and type(row['values']) is list and len(row['values'])==11,'Invalid frame cost fields')
+            vals=row['values'];limits=[1000000,10**15,10**15,1000000,1000000,10**15,10**15,1000000,10**15,10**15,1]
+            require(all(type(x) is int and 0<=x<=limit and x>=old for x,limit,old in zip(vals,limits,previous)),'Invalid or regressing frame cost number')
+            for count,total,maximum in ((0,1,2),(4,5,6),(7,8,9)):
+                require(vals[maximum]<=vals[total] and (vals[count]>0 or vals[total]==vals[maximum]==0),'Invalid frame cost totals')
+            previous=vals
     require(events[0]["stage"] == {"prebuild": "prebuild-begin", "runtime": "runtime-setup-begin", "lifecycle": "editor-exiting-edit-mode"}[kind], "Missing initial progress milestone")
     return value
 

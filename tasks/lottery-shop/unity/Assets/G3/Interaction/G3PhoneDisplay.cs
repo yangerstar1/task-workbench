@@ -18,6 +18,7 @@ namespace Lottery.G3.Interaction
         sealed class Hit {public Rect Rect;public G3Action Action;public bool Enabled;}
         Transform body,screen,content;Collider glass;Camera camera;Font font;Shader flat,glyph;Material textMaterial;G3Presenter presenter;
         static readonly Color Ink=new Color(.08f,.10f,.11f),Quiet=new Color(.42f,.45f,.48f),Background=new Color(.925f,.93f,.935f),Green=new Color(.66f,.92f,.46f),Packet=new Color(1,.30f,.12f);
+        bool tapCancelled;string pressedControl="";long pointerViewRevision;G3Mode pointerMode;float pointerSlop;
         string signature="";int drawOrder;float scrollOffset,maxScroll;bool gesture,dragging;Vector2 pointerStart,pointerLast;G3Action tapped;G3PanelModel lastModel;Rect lastSafe,scrollViewport;string scrollContact="";G3Panel scrollPanel;readonly Rect chatViewport=new Rect(0,164,390,514);
         public Rect ChatViewportLogical=>chatViewport;
         public string[] WholeVisibleMessageIds=>wholeMessages.ToArray();
@@ -116,8 +117,8 @@ namespace Lottery.G3.Interaction
             {
                 var r=new Rect(8,y,374,172);Surface(c.Id+" row",r,new Color(.98f,.985f,.98f),6);Avatar(c.Id,new Rect(22,y+24,68,68));var parts=c.Text.Split('\n');
                 Text(c.Id+" name",parts[0],new Rect(112,y+12,250,52),42,Ink);
-                bool decision=parts.Length>1&&parts[1].Contains("红包");float previewSize=42;
-                string preview=decision?(parts[1].Contains("待领取")?"红包待领":"红包已领"):(parts.Length>1?parts[1]:"");
+                bool decision=parts.Length>1&&parts[1].Contains("转账");float previewSize=42;
+                string preview=decision?(parts[1].Contains("待收款")?"转账待收":"转账已收"):(parts.Length>1?parts[1]:"");
                 Text(c.Id+" preview",ContactSummary(preview,250,previewSize),new Rect(112,y+66,250,100),previewSize,Quiet,wordWrap:false);
                 hits[c.Id]=new Hit{Rect=r,Action=c.Action,Enabled=c.Enabled};y+=180;
             }
@@ -127,14 +128,14 @@ namespace Lottery.G3.Interaction
         }
         void DrawPacket(G3PanelModel model)
         {
-            Surface("Packet opening face",new Rect(12,168,366,496),new Color(.82f,.17f,.10f),22);
-            Text("Packet disclosure",model.Body,new Rect(30,184,330,300),42,new Color(1,.91f,.73f),TextAnchor.MiddleCenter);
-            var claim=model.Cards.FirstOrDefault(x=>x.Id=="phone-claim");if(claim!=null)Button(claim.Id,claim.Text,claim.Action,new Rect(133,502,124,124),claim.Enabled,new Color(.96f,.77f,.39f),new Color(.49f,.16f,.08f),52,62);
-            var cancel=model.Cards.FirstOrDefault(x=>x.Id=="phone-cancel-request");if(cancel!=null)Card(cancel,new Rect(8,678,374,124),"取消红包");
+            Surface("Transfer confirmation face",new Rect(12,168,366,496),Color.white,16);
+            Text("Transfer details",model.Body,new Rect(30,190,330,290),42,Ink,TextAnchor.MiddleCenter);
+            var claim=model.Cards.FirstOrDefault(x=>x.Id=="phone-claim");if(claim!=null)Button(claim.Id,claim.Text,claim.Action,new Rect(38,502,314,124),claim.Enabled,new Color(.08f,.65f,.32f),Color.white,42,12);
+            var cancel=model.Cards.FirstOrDefault(x=>x.Id=="phone-cancel-request");if(cancel!=null)Card(cancel,new Rect(8,678,374,124),"退回转账");
         }
         void DrawKeypad(G3PanelModel model)
         {
-            Text("Chosen amount",model.Body.Split('\n')[0].Replace("游戏金币：",""),new Rect(12,156,366,44),42,Ink,TextAnchor.MiddleCenter);
+            Text("Chosen amount",model.Body.Split('\n')[0].Replace("金额（元）：",""),new Rect(12,156,366,44),42,Ink,TextAnchor.MiddleCenter);
             for(int i=0;i<model.Cards.Count;i++){var c=model.Cards[i];if(i<12)Button(c.Id,c.Text,c.Action,new Rect((i%3)*130,200+(i/3)*124,124,124),c.Enabled,Color.white,Ink,42);else Card(c,new Rect(3,704,384,124),"下一步",42);}
         }
         void DrawConversation(G3PanelModel model)
@@ -143,7 +144,7 @@ namespace Lottery.G3.Interaction
             float y=170;var cards=model.Cards;
             if(standard)
             {
-                var heights=model.Messages.Select(m=>m.Packet?244:Wrap(m.Text,270,42).Count*(42)*1.16f+20).ToArray();
+                var heights=model.Messages.Select(m=>m.Packet?208:Wrap(m.Text,270,42).Count*(42)*1.16f+20).ToArray();
                 scrollViewport=chatViewport;float total=heights.Sum()+Mathf.Max(0,heights.Length-1)*14;
                 float naturalTop=Mathf.Max(0,total-chatViewport.height),alignedTop=0;
                 // On entry show complete recent messages instead of a clipped last syllable.
@@ -156,18 +157,16 @@ namespace Lottery.G3.Interaction
                     {
                         if(rect.yMin>=chatViewport.yMin&&rect.yMax<=chatViewport.yMax)wholeMessages.Add(msg.Id);
                         var avatar=new Rect(msg.Player?336:8,y+4,46,46);if(avatar.yMin>=chatViewport.yMin&&avatar.yMax<=chatViewport.yMax)Avatar(msg.Player?"player":presenter.PhoneContact,avatar);
-                        bool claimed=msg.Packet&&msg.Caption.StartsWith("已领取",StringComparison.Ordinal);Color packetColor=claimed?new Color(.82f,.46f,.29f):new Color(.96f,.34f,.15f);
+                        bool claimed=msg.Packet&&msg.Caption.StartsWith("已收款",StringComparison.Ordinal);Color packetColor=claimed?new Color(.91f,.69f,.43f):new Color(.96f,.59f,.22f);
                         Surface(msg.Id+" bubble",Clip(rect,chatViewport),msg.Packet?packetColor:msg.Player?Green:Color.white,msg.Packet?14:10);
                         if(msg.Packet)
                         {
-                            if(y+12>=chatViewport.yMin&&y+60<=chatViewport.yMax)Envelope(msg.Id,new Rect(x+16,y+16,40,44),claimed);
-                            ChatText(msg.Id+" heading",claimed?"已领取":"借款红包",new Rect(x+68,y+12,w-84,49),42,Color.white);
-                            string amount=msg.Text.Split('\n').Last().Replace("游戏金币","金币");
-                            ChatText(msg.Id+" value",amount,new Rect(x+18,y+66,w-36,49),42,Color.white);
-                            string status=claimed&&msg.Caption.Contains("第")?msg.Caption.Substring(msg.Caption.IndexOf("第",StringComparison.Ordinal)):"拆开领取";
-                            ChatText(msg.Id+" status",status,new Rect(x+18,y+120,w-36,49),42,Color.white);
-                            if(y+177>=chatViewport.yMin&&y+178<=chatViewport.yMax)Surface(msg.Id+" footer rule",new Rect(x+14,y+177,w-28,1),new Color(1,.77f,.56f),0);
-                            ChatText(msg.Id+" type","游戏虚拟红包",new Rect(x+18,y+184,w-36,49),42,new Color(1,.92f,.82f));
+                            if(y+16>=chatViewport.yMin&&y+60<=chatViewport.yMax)TransferMark(msg.Id,new Rect(x+16,y+20,40,40));
+                            string amount=msg.Text.Split('\n').Last();
+                            ChatText(msg.Id+" value",amount,new Rect(x+68,y+16,w-84,49),42,Color.white);
+                            ChatText(msg.Id+" status",claimed?"已收款":"待收款",new Rect(x+68,y+76,w-84,49),42,Color.white);
+                            if(y+137>=chatViewport.yMin&&y+138<=chatViewport.yMax)Surface(msg.Id+" footer rule",new Rect(x+14,y+137,w-28,1),new Color(1,.83f,.66f),0);
+                            ChatText(msg.Id+" type","转账",new Rect(x+18,y+150,w-36,49),42,Color.white);
                         }
                         else ChatText(msg.Id+" text",msg.Text,new Rect(x+14,y+10,w-28,h-20),size,Ink);
                         if(msg.Enabled)hits[msg.Id]=new Hit{Rect=Clip(rect,chatViewport),Action=msg.Action,Enabled=true};
@@ -180,7 +179,7 @@ namespace Lottery.G3.Interaction
                 if(phrase!=null)
                 {
                     Surface("Fixed phrase input",new Rect(8,702,242,80),Color.white,13);
-                    Text("phone-choose label",phrase.Enabled?"说一句话":"待领红包",new Rect(20,707,218,68),42,phrase.Enabled?Quiet:new Color(.55f,.56f,.57f),TextAnchor.MiddleCenter);
+                    Text("phone-choose label",phrase.Enabled?"说一句话":"待收转账",new Rect(20,707,218,68),42,phrase.Enabled?Quiet:new Color(.55f,.56f,.57f),TextAnchor.MiddleCenter);
                     hits[phrase.Id]=new Hit{Rect=new Rect(8,684,242,124),Action=phrase.Action,Enabled=phrase.Enabled};
                 }
                 var more=cards.FirstOrDefault(c=>c.Id=="phone-more");
@@ -210,12 +209,13 @@ namespace Lottery.G3.Interaction
                 Card(cards[i],new Rect(8,start+i*(cardHeight+gap),374,cardHeight),caption,42);
             }
         }
-        void Envelope(string id,Rect r,bool muted)
+        void TransferMark(string id,Rect r)
         {
-            Surface(id+" envelope body",r,muted?new Color(.66f,.29f,.15f):new Color(.83f,.18f,.08f),5);
-            var a=Surface(id+" envelope flap left",new Rect(r.x+2,r.y+17,r.width*.53f,2),new Color(1,.78f,.44f),0);a.localRotation=Quaternion.Euler(0,0,-24);
-            var b=Surface(id+" envelope flap right",new Rect(r.x+r.width*.47f,r.y+17,r.width*.49f,2),new Color(1,.78f,.44f),0);b.localRotation=Quaternion.Euler(0,0,24);
-            Surface(id+" envelope seal",new Rect(r.center.x-5,r.y+20,10,10),new Color(1,.80f,.48f),5);
+            // Original neutral transfer glyph, no payment-provider logo or real link.
+            Surface(id+" transfer right",new Rect(r.x+2,r.y+10,34,3),Color.white,1);
+            Surface(id+" transfer left",new Rect(r.x+4,r.y+28,34,3),Color.white,1);
+            var a=Surface(id+" right tip",new Rect(r.x+28,r.y+6,10,3),Color.white,1);a.localRotation=Quaternion.Euler(0,0,-40);
+            var b=Surface(id+" left tip",new Rect(r.x+2,r.y+32,10,3),Color.white,1);b.localRotation=Quaternion.Euler(0,0,-40);
         }
         string ContactSummary(string value,float width,float size)
         {
@@ -252,19 +252,37 @@ namespace Lottery.G3.Interaction
             if(!Physics.Raycast(ray,out var hit,30,~0,QueryTriggerInteraction.Ignore)||hit.collider!=glass)return false;
             var p=screen.InverseTransformPoint(hit.point);local=new Vector2(p.x+Width*.5f,Height*.5f-p.y);return true;
         }
+        string PointerControl(Vector2 pixel)
+        {
+            if(presenter==null||!presenter.View.IsSafePointer(pixel)||!ScreenLocal(pixel,out var point))return "";
+            foreach(var pair in hits.Reverse())if(pair.Value.Rect.Contains(point))return pair.Value.Enabled?pair.Key:"";
+            return "";
+        }
+        bool PointerContextValid()=>IsFocused&&presenter!=null&&presenter.Mode==pointerMode&&presenter.View.InteractionRevision==pointerViewRevision;
         public void BeginPointer(Vector2 pixel)
-        {gesture=IsFocused;dragging=false;pointerStart=pointerLast=pixel;TryConsumeUi(pixel,out tapped);}
+        {
+            gesture=IsFocused&&presenter!=null&&presenter.View.IsSafePointer(pixel);dragging=false;tapCancelled=false;
+            pointerStart=pointerLast=pixel;tapped=default;pressedControl="";
+            if(!gesture)return;
+            pointerMode=presenter.Mode;pointerViewRevision=presenter.View.InteractionRevision;pointerSlop=8*presenter.View.TouchPixelsPerDp;
+            pressedControl=PointerControl(pixel);TryConsumeUi(pixel,out tapped);
+            tapCancelled=string.IsNullOrEmpty(pressedControl)||tapped.Kind==G3ActionKind.None;
+        }
         public void MovePointer(Vector2 pixel)
         {
-            if(!gesture)return;if((pixel-pointerStart).sqrMagnitude>144)dragging=true;
+            if(!gesture)return;
+            if(!PointerContextValid()||!presenter.View.IsSafePointer(pixel)){tapCancelled=true;pointerLast=pixel;return;}
+            if(PointerControl(pixel)!=pressedControl)tapCancelled=true;
+            if((pixel-pointerStart).sqrMagnitude>pointerSlop*pointerSlop)dragging=true;
             if(dragging&&presenter.Panel!=G3Panel.Phone&&presenter.Panel!=G3Panel.CustomAmount&&presenter.Panel!=G3Panel.PhonePacket&&presenter.Panel!=G3Panel.PhoneRecords&&ScreenLocal(pointerStart,out var start)&&scrollViewport.Contains(start)&&ScreenLocal(pointerLast,out var previous)&&ScreenLocal(pixel,out var now))
             {scrollOffset=Mathf.Clamp(scrollOffset+(presenter.Panel==G3Panel.Contact?now.y-previous.y:previous.y-now.y),0,maxScroll);signature="";Show(presenter,lastModel,camera,lastSafe);}
             pointerLast=pixel;
         }
         public G3Action EndPointer(bool cancelled=false)
         {
-            var action=default(G3Action);if(gesture&&!dragging&&!cancelled&&TryConsumeUi(pointerLast,out var release)&&release.Id==tapped.Id)action=tapped;
-            gesture=false;dragging=false;tapped=default;return action;
+            var action=default(G3Action);
+            if(gesture&&!dragging&&!tapCancelled&&!cancelled&&PointerContextValid()&&presenter.View.IsSafePointer(pointerLast)&&!string.IsNullOrEmpty(pressedControl)&&PointerControl(pointerLast)==pressedControl&&TryConsumeUi(pointerLast,out var release)&&release.Id==tapped.Id)action=tapped;
+            gesture=false;dragging=false;tapCancelled=false;tapped=default;pressedControl="";return action;
         }
         void Avatar(string who,Rect r)
         {

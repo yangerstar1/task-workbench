@@ -153,7 +153,7 @@ namespace Lottery.G3.Rendering
                 for(int i=0;i<masks.Length;i++){WriteMask(i,crops[i]);cellText[i].SetText(values[i]);}
                 legends["title_cartouche"].SetText(t.TicketType=="number"?"号码票 · 中奖号 →":"挑战票 · 六安两险");
                 if(t.TicketType=="number")
-                {legends["winning_number_value_only"].SetText(publicNumber);legends["rule_strip"].SetText("号码相同中奖 · 奖金单位：金币");}
+                {legends["winning_number_value_only"].SetText(publicNumber);legends["rule_strip"].SetText("号码相同中奖 · 奖金单位：元");}
                 else legends["rule_status_strip"].SetText(t.SelectedCell>=0?"本格已承诺 · 擦开后再决定":t.Busted?"遇到危险 · 按事前保护结算":"选择一格，或在安全后收手");
                 body.SetActive(true);return true;
             }

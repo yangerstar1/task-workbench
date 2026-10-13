@@ -207,25 +207,25 @@ class ReflectionProgressTests(unittest.TestCase):
     def test_material_ids_exact_frozen_source_table(self):
         root=Path(__file__).resolve().parents[3];shop=root/progress.visual.TASK/'unity/Assets/G3/Shop/Resources/G3/Shop'
         names=tuple(x['name'] for x in json.loads((shop/'materials.json').read_text())['materials'])
-        self.assertTrue(set(progress.MATERIAL_IDS)<=set(names));self.assertEqual(len(progress.MATERIAL_IDS),34);self.assertEqual(len(set(progress.MATERIAL_IDS)),34)
+        self.assertTrue(set(progress.MATERIAL_IDS)<=set(names));self.assertEqual(len(progress.MATERIAL_IDS),35);self.assertEqual(len(set(progress.MATERIAL_IDS)),35)
         source=(root/progress.visual.TASK/'unity/Assets/G3/Editor/G3ShopReflectionBaker.cs').read_text()
         table=source.split('DiagnosticMaterials={',1)[1].split('};',1)[0]
         self.assertEqual(tuple(re.findall(r'"([A-Za-z0-9_]+)"',table)),progress.MATERIAL_IDS)
     def test_all_fixed_material_roles_and_high_bit_export(self):
         for key in progress.CHANGE_BITS:
-            for idx in (0,32,33):
+            for idx in (0,32,33,34):
                 value=receipt('FAILED');value['events']=[event(10),event(325,70,digestCompared=True,digestSame=False,changedInputCount=1,changedInputKinds=2,changedOther=0,**{key:1<<idx},errorCode='SOURCE_DIGEST_CHANGED',exceptionKind='REQUIRE')]
                 value.update(firstFailureStage=325,firstFailureCode='SOURCE_DIGEST_CHANGED',firstExceptionKind='REQUIRE',failureCount=1)
                 audit_for(value);self.validate(value);dest,raw,ok=self.export(value);self.assertFalse(ok);self.assertEqual(dest.read_bytes(),raw)
     def test_input_id_bounds_and_count_rejected(self):
-        for patch_event in [dict(matBits=-1),dict(matBits=True),dict(matBits=1<<34),dict(packBits=1),dict(changedOther=1),dict(changedOther='RAW_PRIVATE_PATH')]:
+        for patch_event in [dict(matBits=-1),dict(matBits=True),dict(matBits=1<<35),dict(packBits=1),dict(changedOther=1),dict(changedOther='RAW_PRIVATE_PATH')]:
             value=receipt();value['events'][0].update(patch_event)
             with self.assertRaises(ValueError):self.validate(value)
     def test_material_bit_requires_material_category(self):
         value=receipt('FAILED');value['events']=[event(10),event(325,70,digestCompared=True,changedInputCount=1,changedInputKinds=1,matBits=1,changedOther=0)]
         with self.assertRaises(ValueError):self.validate(value)
     def test_dirty_unknown_bounds_stage_and_bool_rejected(self):
-        for patch_event in [dict(dirtyMatBits=0),dict(dirtyStage=325,dirtyMatBits=0,dirtyPackBits=0),dict(dirtyStage=30,dirtyMatBits=0,dirtyPackBits=0),dict(dirtyStage=21,dirtyMatBits=1<<34,dirtyPackBits=0),dict(dirtyStage=21,dirtyMatBits=True,dirtyPackBits=0)]:
+        for patch_event in [dict(dirtyMatBits=0),dict(dirtyStage=325,dirtyMatBits=0,dirtyPackBits=0),dict(dirtyStage=30,dirtyMatBits=0,dirtyPackBits=0),dict(dirtyStage=21,dirtyMatBits=1<<35,dirtyPackBits=0),dict(dirtyStage=21,dirtyMatBits=True,dirtyPackBits=0)]:
             value=receipt();value['events'][1].update(patch_event)
             with self.assertRaises(ValueError):self.validate(value)
     def test_dirty_observation_is_not_success_or_changed_bytes(self):
@@ -260,9 +260,9 @@ class ReflectionProgressTests(unittest.TestCase):
         event=source.split('[Serializable] sealed class TraceEvent',1)[1]
         self.assertNotIn('startedUtc',event)
 
-    def test_material_fixed_ids_34_and_appended_tea(self):
-        self.assertEqual(progress.MATERIAL_IDS[32:],('Tool_Dock_Liner','Nearfield_Tea'))
-        self.assertEqual(len(set(progress.MATERIAL_IDS)),34)
+    def test_material_fixed_ids_35_append_only_stem(self):
+        self.assertEqual(progress.MATERIAL_IDS[32:],('Tool_Dock_Liner','Nearfield_Tea','Plant_Stem_Green'))
+        self.assertEqual(len(set(progress.MATERIAL_IDS)),35)
     def test_material_two_changed_ids_gi_diagnostic_not_gate_repair(self):
         value=changed_receipt();self.validate(value)
         self.assertEqual(value['materialAudit']['changedBits'],(1<<32)|(1<<33))
@@ -279,7 +279,7 @@ class ReflectionProgressTests(unittest.TestCase):
         for mutate in [lambda v:v['materialAudit'].update(rawPath='PRIVATE'),lambda v:v['materialAudit']['records'][0].update(name='PRIVATE'),lambda v:v['materialAudit']['records'][0]['before'].update(yaml='PRIVATE'),lambda v:v['materialAudit']['records'][0]['before'].update(serialized='PRIVATE')]:
             v=changed_receipt();mutate(v);dest,raw,ok=self.export(v);self.assertFalse(ok);self.assertFalse(dest.exists())
     def test_material_ids_duplicates_count_and_masks_rejected(self):
-        for mutate in [lambda a:a['records'][0].update(id=34),lambda a:a['records'][0].update(id=True),lambda a:a['records'][1].update(id=32),lambda a:a.update(changedBits=0),lambda a:a.update(records=a['records']*3),lambda a:a.update(overflow=1),lambda a:a.update(changedBits=1<<34)]:
+        for mutate in [lambda a:a['records'][0].update(id=35),lambda a:a['records'][0].update(id=True),lambda a:a['records'][1].update(id=32),lambda a:a.update(changedBits=0),lambda a:a.update(records=a['records']*3),lambda a:a.update(overflow=1),lambda a:a.update(changedBits=1<<35)]:
             v=changed_receipt();mutate(v['materialAudit'])
             with self.assertRaises(ValueError):self.validate(v)
     def test_material_numeric_state_and_hash_bounds_rejected(self):
@@ -368,6 +368,28 @@ class ReflectionProgressTests(unittest.TestCase):
     def test_texture_slots_oversized_receipt_still_rejected(self):
         v=changed_receipt((0,1,32,33));v['events']+= [event(400,100)]*7
         raw=json.dumps(v).encode();self.assertGreater(len(raw),65536)
+        dest,_,ok=self.export(raw);self.assertFalse(ok);self.assertFalse(dest.exists())
+
+
+    def test_plant_stem_record_and_missing_high_bit(self):
+        v=changed_receipt((34,));self.validate(v);self.assertEqual(v['materialAudit']['changedBits'],1<<34)
+        v=receipt();v.update(diagnosticWriteFailed=True,status='RUNNING');v['materialAudit'].update(ready=False,error=True,missingBits=1<<34,stages=0);self.validate(v)
+    def test_plant_stem_loaded_reference_array_bounds(self):
+        root=Path(__file__).resolve().parents[3];s=(root/progress.visual.TASK/'unity/Assets/G3/Editor/G3ShopReflectionBaker.cs').read_text()
+        for token in ('new Material[35]','new MaterialState[35]','for(int i=0;i<35;i++)','for(int id=0;id<35;id++)'):self.assertIn(token,s)
+        for token in ('new Material[34]','new MaterialState[34]','<34;'):self.assertNotIn(token,s)
+
+
+    def test_35_ids_saturated_64_events_keeps_original_byte_rejection(self):
+        v=changed_receipt((0,32,33,34));v['events'] += [event(400,100)]*7
+        for e in v['events']:
+            if e['stageCode']>=21:e.update(dirtyStage=21,dirtyMatBits=progress.BIT_LIMIT,dirtyPackBits=progress.BIT_LIMIT)
+        for r in v['materialAudit']['records']:
+            for key in ('before','first','last'):
+                z=r[key];z.update(textureSlots=('5'+'f'*24)*9,baseAliases=511,present=255,keywords=65535,unknownKeywords=256,queue=5000,version=1024,subCount=8,versionCount=1,otherSubCount=7)
+                for k in progress.STATE_HASHES:z[k]=4294967295
+        self.validate(v);self.assertEqual(len(v['events']),64)
+        raw=json.dumps(v,separators=(',',':')).encode();self.assertGreater(len(raw),65536)
         dest,_,ok=self.export(raw);self.assertFalse(ok);self.assertFalse(dest.exists())
 
 

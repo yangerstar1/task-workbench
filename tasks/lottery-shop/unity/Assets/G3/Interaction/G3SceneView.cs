@@ -20,6 +20,10 @@ namespace Lottery.G3.Interaction
             public bool Enabled,Primary,Selected,Navigation,Movement,Pressed,Catalog;public G3HudSymbol Symbol;
         }
         readonly List<UnityEngine.Object> owned=new List<UnityEngine.Object>();readonly List<BoundedGlyphLabel> labels=new List<BoundedGlyphLabel>();readonly List<ButtonVisual> pool=new List<ButtonVisual>();
+        Transform joystickBase,joystickKnob,aimDot;BoundedGlyphLabel worldHint;Vector2 joystickValue;float androidDensity;
+        bool walkHudActive;Rect walkHudSafe;float walkHudFov;int walkHudHeight;Vector2 lastJoystick;string lastWorldHint="";
+        public long InteractionRevision {get;private set;}
+        public bool HasMeasuredAndroidDensity=>androidDensity>0;
         Font font;Shader flat;Material fontMat;Transform hud,header,dayHeader,qaTag,headerDivider,footer,modal,feedbackPlate,modalRule;
         BoundedGlyphLabel headerText,cashValue,nightCaption,nightValue,dayText,qaText,statusText,resultText,panelTitle,panelBody,panelFoot,emptyText;
         G3HudIcon walletIcon,nightIcon;bool headerFallback,phoneOwnsCamera;Vector3 beforePhonePosition;Quaternion beforePhoneRotation;float beforePhoneFov;bool beforePhoneOrthographic;
@@ -37,6 +41,11 @@ namespace Lottery.G3.Interaction
         public G3PhoneDisplay Phone {get;private set;}
         public Rect TableInteractionRect=>new Rect(Safe.center.x-360*Safe.height/720f,Safe.y+150*Safe.height/720f,760*Safe.height/720f,440*Safe.height/720f);
         public bool MoreVisible=>moreVisible;
+        public float TouchPixelsPerDp=>androidDensity>0?androidDensity:Mathf.Max(1,Safe.height/360f);
+        public Rect JoystickRect=>new Rect(Safe.x+16*TouchPixelsPerDp,Safe.y+16*TouchPixelsPerDp,112*TouchPixelsPerDp,112*TouchPixelsPerDp);
+        public bool TouchWalkEnabled=>current!=null&&current.Mode==G3Mode.WALK&&!PanelVisible;
+        public void SetJoystick(Vector2 value){joystickValue=Vector2.ClampMagnitude(value,1);}
+
         public string[] VisibleControlIds=>pool.Take(used).Where(b=>b.Root.activeInHierarchy).Select(b=>b.Id).Concat(Phone!=null?Phone.VisibleControlIds:new string[0]).Distinct().ToArray();
         public Rect ToolPresentationBounds(int slot)
         {
@@ -49,7 +58,7 @@ namespace Lottery.G3.Interaction
             get
             {
                 // Conservative visible-face coverage; translucent chrome is deliberately not counted as zero.
-                var rects=pool.Take(used).Where(b=>b.Root.activeInHierarchy).Select(b=>b.FaceRect).ToList();
+                var rects=pool.Take(used).Where(b=>b.Root.activeInHierarchy).Select(b=>b.FaceRect).ToList();if(joystickBase!=null&&joystickBase.gameObject.activeInHierarchy)rects.Add(JoystickRect);
                 for(int i=0;i<toolChipPlates.Count;i++)if(toolChipPlates[i].gameObject.activeInHierarchy)rects.Add(toolChipRects[i]);if(dayHeader.gameObject.activeInHierarchy)rects.Add(dayRect);if(qaTag.gameObject.activeInHierarchy)rects.Add(qaRect);if(feedbackPlate.gameObject.activeInHierarchy)rects.Add(feedbackRect);if(header.gameObject.activeInHierarchy)rects.Add(headerRect);if(footer.gameObject.activeInHierarchy)rects.Add(footerRect);if(modal.gameObject.activeInHierarchy)rects.Add(modalRect);
                 var xs=rects.SelectMany(r=>new[]{Mathf.Clamp(r.xMin,Safe.xMin,Safe.xMax),Mathf.Clamp(r.xMax,Safe.xMin,Safe.xMax)}).Distinct().OrderBy(x=>x).ToArray();float area=0;
                 for(int i=1;i<xs.Length;i++){float mid=(xs[i-1]+xs[i])*.5f,end=Safe.yMin,total=0;foreach(var r in rects.Where(r=>r.xMin<mid&&r.xMax>mid).OrderBy(r=>r.yMin)){float lo=Mathf.Max(end,Mathf.Max(Safe.yMin,r.yMin)),hi=Mathf.Min(Safe.yMax,r.yMax);if(hi>lo){total+=hi-lo;end=hi;}}area+=(xs[i]-xs[i-1])*total;}
@@ -72,16 +81,25 @@ namespace Lottery.G3.Interaction
         public bool LayoutChanged=>lastWidth!=PresentationWidth||lastHeight!=PresentationHeight||lastSafe!=Safe;
         public void Initialize(Font chinese,Shader flatShader,Shader glyph,Shader lit,Shader paper,Shader silver,Shader maskedFont,ApprovedArtworkBinding numberArt,ApprovedArtworkBinding challengeArt)
         {
+#if UNITY_ANDROID && !UNITY_EDITOR
+            try
+            {using(var player=new AndroidJavaClass("com.unity3d.player.UnityPlayer"))using(var activity=player.GetStatic<AndroidJavaObject>("currentActivity"))
+                {if(activity!=null)using(var resources=activity.Call<AndroidJavaObject>("getResources"))
+                    {if(resources!=null)using(var metrics=resources.Call<AndroidJavaObject>("getDisplayMetrics")){if(metrics!=null)androidDensity=metrics.Get<float>("density");}}}}
+            catch(AndroidJavaException){androidDensity=0;}catch(NullReferenceException){androidDensity=0;}
+            if(float.IsNaN(androidDensity)||float.IsInfinity(androidDensity)||androidDensity<=0)androidDensity=0;
+#endif
             font=chinese;flat=flatShader;if(font==null||flat==null||glyph==null||lit==null)throw new InvalidOperationException("Missing G3 licensed font or URP shaders");
             fontMat=Own(new Material(glyph));var go=new GameObject("G3 single scene camera");go.transform.SetParent(transform,false);SceneCamera=go.AddComponent<Camera>();SceneCamera.nearClipPlane=.02f;SceneCamera.farClipPlane=30;SceneCamera.fieldOfView=64;
             SceneCamera.clearFlags=CameraClearFlags.SolidColor;SceneCamera.backgroundColor=new Color(.48f,.58f,.62f);SceneCamera.GetUniversalAdditionalCameraData().renderPostProcessing=false;
             BuildShop(lit);
-            var phoneObject=new GameObject("Persistent physical chat phone");phoneObject.transform.SetParent(transform,false);Phone=phoneObject.AddComponent<G3PhoneDisplay>();Phone.Initialize(font,flat,glyph,lit,Environment);
+            var phoneObject=new GameObject("Persistent physical chat phone");phoneObject.transform.SetParent(transform,false);Phone=phoneObject.AddComponent<G3PhoneDisplay>();Phone.Initialize(font,flat,glyph,lit,Environment);var phoneTarget=phoneObject.AddComponent<G3WorldTarget>();phoneTarget.Panel=G3Panel.Phone;
             var n=new GameObject("Approved number ticket");n.transform.SetParent(transform,false);n.transform.position=Environment.TicketPosition;n.transform.rotation=Quaternion.Euler(0,180,0);number=n.AddComponent<ConfirmedTicketSurface>();number.Build(numberArt,font,paper,silver,maskedFont,glyph,Environment.TicketWidth);
             var c=new GameObject("Approved challenge ticket");c.transform.SetParent(transform,false);c.transform.position=n.transform.position;c.transform.rotation=n.transform.rotation;challenge=c.AddComponent<ConfirmedTicketSurface>();challenge.Build(challengeArt,font,paper,silver,maskedFont,glyph,Environment.TicketWidth);
             var empty=new GameObject("Empty table prompt");empty.transform.SetParent(transform,false);empty.transform.position=Environment.TicketPosition+Vector3.up*.005f;empty.transform.rotation=Quaternion.Euler(90,180,0);emptyText=empty.AddComponent<BoundedGlyphLabel>();emptyText.Initialize(font,fontMat,new Color(.94f,.92f,.78f));emptyText.SetBox(.38f,.14f,.022f,true);emptyText.SetText("今日的第一张好运\n从柜台挑一张票");labels.Add(emptyText);
             var walker=new GameObject("Player short-distance body");walker.transform.SetParent(transform,false);Walk=walker.AddComponent<G3ShopWalk>();Walk.Initialize(SceneCamera,Environment.StandPosition,Environment.StandYaw);
             hud=new GameObject("Same-camera readable HUD").transform;hud.SetParent(SceneCamera.transform,false);
+            joystickBase=Plate("Touch movement ring",hud,new Color(.10f,.13f,.12f,.42f));joystickKnob=Plate("Touch movement thumb",hud,new Color(.85f,.87f,.80f,.7f));aimDot=Plate("Near interaction aim",hud,G3HudTheme.Paper);worldHint=Label("Near physical target hint",hud,G3HudTheme.Paper,TextAnchor.MiddleCenter);
             header=Plate("Header",hud,G3HudTheme.Ink);dayHeader=Plate("Compact day progress",hud,G3HudTheme.Ink);qaTag=Plate("Isolated diagnostic run badge",hud,G3HudTheme.Ink);headerDivider=Plate("Wallet separator",hud,G3HudTheme.Rule);
             footer=Plate("Compact ticket detail chip",hud,G3HudTheme.Ink);modal=Plate("Context drawer background",hud,G3HudTheme.Ink);
             feedbackPlate=Plate("High contrast saved operation message",hud,G3HudTheme.Ink);modalRule=Plate("Modal copper section rule",hud,G3HudTheme.Copper);modalRule.GetComponent<G3HudSurface>().Tint(G3HudTheme.Rule,G3HudTheme.Rule);
@@ -91,7 +109,7 @@ namespace Lottery.G3.Interaction
             panelTitle=Label("Panel title",hud,G3HudTheme.Card);panelBody=Label("Panel explanation",hud,G3HudTheme.Paper);panelFoot=Label("Panel status",hud,G3HudTheme.QuietInk);
             for(int i=0;i<32;i++){var root=new GameObject("Routed control "+i);root.transform.SetParent(hud,false);pool.Add(new ButtonVisual{Root=root,Plate=Plate("Button surface",root.transform,G3HudTheme.Ink),Icon=G3HudIcon.Create(root.transform,flat),Label=Label("Button text",root.transform,G3HudTheme.Card,TextAnchor.MiddleCenter),Title=Label("Catalog item name",root.transform,G3HudTheme.Card,TextAnchor.UpperLeft),Detail=Label("Catalog price stock or placement",root.transform,G3HudTheme.QuietInk,TextAnchor.MiddleLeft)});}
             for(int i=0;i<toolLabels.Count;i++){toolLabels[i].transform.SetParent(hud,false);toolLabels[i].transform.localRotation=Quaternion.identity;toolChipPlates.Add(Plate("Confirmed configuration chip "+(i+1),hud,G3HudTheme.Ink));toolChipRects.Add(new Rect());}
-            SetWalking(false);Layout();Physics.SyncTransforms();
+            walkHudActive=true;SetWalking(false);Layout();UpdateWalkHud();Physics.SyncTransforms();
         }
         T Own<T>(T item)where T:UnityEngine.Object{owned.Add(item);return item;}
         GameObject Box(string name,Vector3 p,Vector3 size,Color color,Shader shader,bool collision=true)
@@ -160,7 +178,7 @@ namespace Lottery.G3.Interaction
         public void InvalidateTicket(){number?.Invalidate();challenge?.Invalidate();}
         public void Show(G3Presenter presenter,G3PanelModel model)
         {
-            current=presenter;panelModel=model;if(LayoutChanged){Layout();return;}used=0;float s=lastSafe.height/720f;
+            current=presenter;panelModel=model;if(LayoutChanged){Layout();return;}InteractionRevision++;used=0;float s=lastSafe.height/720f;
             if(PanelVisible)moreVisible=false;
             SyncPhoneCamera(presenter,model);
             
@@ -168,12 +186,12 @@ namespace Lottery.G3.Interaction
             for(int i=0;i<shopPriceLabels.Count;i++)
             {
                 var stock=state.Stock.FirstOrDefault(x=>x.ItemId==DisplayStockIds[i]&&!x.IsConsumable&&x.Quantity>0);
-                shopPriceLabels[i].SetText(state.RecoveryRequired?"库存待确认":G3Text.Tool(DisplayStockIds[i])+"\n"+(stock==null?"样品 · 暂无现货":G3Text.Money(stock.PriceMinor)+" 金币 · 库存 "+stock.Quantity));
+                shopPriceLabels[i].SetText(state.RecoveryRequired?"库存待确认":G3Text.Tool(DisplayStockIds[i])+"\n"+(stock==null?"样品 · 暂无现货":G3Text.Money(stock.PriceMinor)+" 元 · 库存 "+stock.Quantity));
             }
             LayoutHeader(state,bill,s);
             string summary;
             if(state.RecoveryRequired)summary="存档待恢复";
-            else if(t==null)summary="两种票 · 100 金币";
+            else if(t==null)summary="两种票 · 100 元";
             else if(t.Phase==TicketPhase.SETTLED){var record=state.Settlements.LastOrDefault(x=>x.TicketId==t.Id);summary=record==null?"已结算":"已收 "+G3Text.Money(record.TotalMinor)+" · 明细";}
             else{var p=presenter.Service.PreviewSettlement();summary=p==null?(t.TicketType=="number"?"已揭 "+t.Scratch.RevealedCellCount+" / 6":"安全 "+t.SafeCount+" 格")+" · 明细":"可收 "+G3Text.Money(p.TotalMinor)+" · 明细";}
             resultText.SetText(summary);
@@ -210,22 +228,10 @@ namespace Lottery.G3.Interaction
             LayoutToolChips(s);
             if(!PanelVisible)
             {
-                // Four contract-required routes stay visible; secondary routes use a
-                // real, input-routed More drawer instead of eight equal-weight blocks.
-                float w=112*s,h=112*s,x=lastSafe.x+16*s,y=lastSafe.y+12*s;
-                AddButton("stand",walking?"坐下":"起身",new G3Action(walking?G3ActionKind.Sit:G3ActionKind.Stand),new Rect(x,y+h,w,h));
-                AddButton("open-shop","货架",new G3Action(G3ActionKind.Open,slot:(int)G3Panel.Shop),new Rect(x+w,y+h,w,h));
-                AddButton("open-inventory","收纳",new G3Action(G3ActionKind.Open,slot:(int)G3Panel.Inventory),new Rect(x,y,w,h));
-                AddButton("open-phone","手机",new G3Action(G3ActionKind.Open,slot:(int)G3Panel.Phone),new Rect(x+w,y,w,h));
-                AddButton("open-more",moreVisible?"收起":"更多",new G3Action(G3ActionKind.ToggleMore),new Rect(x+2*w+8*s,y,112*s,96*s));
-                if(moreVisible)
-                {
-                    float mx=x+2*w+8*s,mw=168*s;
-                    AddButton("open-tickets","购票",new G3Action(G3ActionKind.Open,slot:(int)G3Panel.Tickets),new Rect(mx,y+104*s,mw,96*s));
-                    AddButton("open-drawer","抽屉",new G3Action(G3ActionKind.Open,slot:(int)G3Panel.Drawer),new Rect(mx,y+208*s,mw,96*s));
-                    AddButton("open-bill","账单",new G3Action(G3ActionKind.Open,slot:(int)G3Panel.Bill),new Rect(mx,y+312*s,mw,96*s));
-                    AddButton("open-settings","设置",new G3Action(G3ActionKind.Open,slot:(int)G3Panel.Settings),new Rect(mx,y+416*s,mw,96*s));
-                }
+                // Navigation belongs to physical world targets, never global shortcuts.
+                float d=TouchPixelsPerDp,w=56*d,h=56*d,x=lastSafe.x+16*d,y=lastSafe.y+12*d;
+                if(!walking)AddButton("stand","起身",new G3Action(G3ActionKind.Stand),new Rect(x,y,w,h));
+                AddButton("open-settings","设置",new G3Action(G3ActionKind.Open,slot:(int)G3Panel.Settings),new Rect(lastSafe.xMax-56*d,lastSafe.yMax-88*d,48*d,48*d));
                 x=lastSafe.xMax-244*s;y=lastSafe.y+12*s;w=232*s;h=96*s;
                 if(presenter.IsCommitting)AddButton("retry","确认交易",new G3Action(G3ActionKind.Retry),new Rect(x,y,w,h));
                 else if(!walking&&t!=null&&t.Phase!=TicketPhase.SETTLED)
@@ -235,7 +241,7 @@ namespace Lottery.G3.Interaction
                     if(claim&&state.TicketsPurchasedToday<12)AddButton("claim-next","收下再买\n同型 100",new G3Action(G3ActionKind.ClaimThenBuy,t.TicketType),new Rect(x-240*s,y,w,h));
                     else if(presenter.QuickEnabled)AddButton("quick",t.TicketType=="challenge"?"揭晓本格":"快速揭晓",new G3Action(G3ActionKind.QuickReveal),new Rect(x-240*s,y,w,h),t.TicketType=="number"||t.SelectedCell>=0);
                 }
-                if(walking&&!moreVisible)WalkControls(s);
+                UpdateWalkHud();
             }
             bool clearHud=!PanelVisible;bool showFeedback=clearHud&&!moreVisible&&!string.IsNullOrEmpty(feedback)&&(persistentFeedback||Time.unscaledTime<feedbackUntil);
             feedbackPlate.gameObject.SetActive(showFeedback);statusText.gameObject.SetActive(showFeedback);
@@ -459,15 +465,26 @@ namespace Lottery.G3.Interaction
             if(!down&&Mouse.current!=null&&Mouse.current.leftButton.isPressed){down=true;point=Mouse.current.position.ReadValue();}
             for(int i=0;i<used;i++){var b=pool[i];bool pressed=down&&b.Enabled&&b.Root.activeInHierarchy&&b.Rect.Contains(point);if(pressed!=b.Pressed)StyleButton(b,pressed);}
         }
-        void WalkControls(float s)
+        void UpdateWalkHud()
         {
-            float x=lastSafe.x+12*s,w=96*s,h=96*s,y=lastSafe.y+252*s,gap=8*s;
-            AddButton("walk-forward","前",new G3Action(G3ActionKind.MoveForward),new Rect(x+w+gap,y+h+gap,w,h));
-            AddButton("walk-back","后",new G3Action(G3ActionKind.MoveBack),new Rect(x+w+gap,y,w,h));
-            AddButton("walk-left","左",new G3Action(G3ActionKind.MoveLeft),new Rect(x,y,w,h));
-            AddButton("walk-right","右",new G3Action(G3ActionKind.MoveRight),new Rect(x+2*(w+gap),y,w,h));
-            AddButton("turn-left","转左",new G3Action(G3ActionKind.TurnLeft),new Rect(lastSafe.xMax-220*s,y,w,h));
-            AddButton("turn-right","转右",new G3Action(G3ActionKind.TurnRight),new Rect(lastSafe.xMax-116*s,y,w,h));
+            bool active=TouchWalkEnabled;bool changed=active!=walkHudActive;
+            if(changed){joystickBase.gameObject.SetActive(active);joystickKnob.gameObject.SetActive(active);aimDot.gameObject.SetActive(active);worldHint.gameObject.SetActive(active);walkHudActive=active;}
+            if(!active){joystickValue=Vector2.zero;return;}
+            var rect=JoystickRect;float d=TouchPixelsPerDp;bool layout=changed||walkHudSafe!=Safe||walkHudFov!=SceneCamera.fieldOfView||walkHudHeight!=PresentationHeight;
+            if(layout)
+            {
+                walkHudSafe=Safe;walkHudFov=SceneCamera.fieldOfView;walkHudHeight=PresentationHeight;
+                PlacePlate(joystickBase,rect,.56f);joystickBase.GetComponent<G3HudSurface>().Configure(rect.width,rect.height,rect.width*.5f,d);
+                PlacePlate(aimDot,new Rect(Safe.center.x-2*d,Safe.center.y-2*d,4*d,4*d),.5f);
+                PlaceLabel(worldHint,new Rect(Safe.center.x-160*d,Safe.center.y-64*d,320*d,40*d),16*d,.47f,false);
+            }
+            if(layout||lastJoystick!=joystickValue)
+            {
+                lastJoystick=joystickValue;var center=rect.center+joystickValue*(rect.width*.3f);var knob=new Rect(center.x-20*d,center.y-20*d,40*d,40*d);
+                PlacePlate(joystickKnob,knob,.53f);if(layout)joystickKnob.GetComponent<G3HudSurface>().Configure(knob.width,knob.height,knob.width*.5f,d);
+            }
+            var target=WorldTarget(Safe.center);string hint=target==null?"":target.IsTable?"轻点桌面 · 坐下刮票":target.Panel==G3Panel.Phone?"轻点手机 · 拿起":target.Panel==G3Panel.Tickets?"轻点票架 · 挑选彩票":target.Panel==G3Panel.Shop?"轻点工具架 · 查看":target.Panel==G3Panel.Inventory?"轻点收纳柜 · 打开":"轻点抽屉 · 打开";
+            if(layout||hint!=lastWorldHint){lastWorldHint=hint;worldHint.SetText(hint);}
         }
         static Rect Inset(Rect r,float x,float y)=>new Rect(r.x+x,r.y+y,Mathf.Max(.1f,r.width-2*x),Mathf.Max(.1f,r.height-2*y));
         public Rect ButtonRect(string id){if(Phone!=null&&Phone.HasButton(id))return Phone.ButtonRect(id);foreach(var b in pool.Take(used))if(b.Root.activeInHierarchy&&b.Id==id)return b.Rect;throw new KeyNotFoundException(id);}
@@ -486,10 +503,22 @@ namespace Lottery.G3.Interaction
             if(pixel.x<0||pixel.y<0||pixel.x>=PresentationWidth||pixel.y>=PresentationHeight){uv=default;return false;}
             return Surface.TryPaperUv(SceneCamera.ViewportPointToRay(new Vector3(pixel.x/PresentationWidth,pixel.y/PresentationHeight,0)),out uv);
         }
+        public bool IsSafePointer(Vector2 pixel)=>!float.IsNaN(pixel.x)&&!float.IsNaN(pixel.y)&&!float.IsInfinity(pixel.x)&&!float.IsInfinity(pixel.y)&&pixel.x>=0&&pixel.y>=0&&pixel.x<PresentationWidth&&pixel.y<PresentationHeight&&Safe.Contains(pixel);
+        public string UiControlId(Vector2 pixel)
+        {
+            if(!IsSafePointer(pixel))return "";
+            for(int i=used-1;i>=0;i--){var b=pool[i];if(b.Root.activeInHierarchy&&b.Enabled&&b.Rect.Contains(pixel))return b.Id;}
+            return !PanelVisible&&!moreVisible&&footerHitRect.Contains(pixel)&&current.Snapshot.CurrentTicket!=null?"ticket-detail":"";
+        }
         public G3WorldTarget WorldTarget(Vector2 pixel)
         {
+            if(!IsSafePointer(pixel))return null;
             var ray=SceneCamera.ViewportPointToRay(new Vector3(pixel.x/PresentationWidth,pixel.y/PresentationHeight,0));
-            if(Physics.Raycast(ray,out RaycastHit hit,5,Physics.DefaultRaycastLayers,QueryTriggerInteraction.Collide))return hit.collider.GetComponent<G3WorldTarget>();return null;
+            // Nearest collider wins: an opaque counter/wall blocks the target.
+            if(!Physics.Raycast(ray,out RaycastHit hit,5,Physics.DefaultRaycastLayers,QueryTriggerInteraction.Collide))return null;
+            var target=hit.collider.GetComponentInParent<G3WorldTarget>();if(target==null)return null;
+            var body=Walk.SavedPosition;var delta=new Vector2(hit.point.x-body.x,hit.point.z-body.z);
+            return delta.sqrMagnitude<=target.ReachMeters*target.ReachMeters?target:null;
         }
         public Vector2 WorldToPresentationPoint(Vector3 point){var v=SceneCamera.WorldToViewportPoint(point);return new Vector2(v.x*PresentationWidth,v.y*PresentationHeight);}
         public void RefreshGlyphGeometry(){Phone?.RefreshGlyphGeometry();foreach(var label in labels)label.RebuildIfNeeded();if(number.CellLabels!=null)foreach(var label in number.CellLabels)label.RebuildIfNeeded();if(challenge.CellLabels!=null)foreach(var label in challenge.CellLabels)label.RebuildIfNeeded();}
@@ -498,7 +527,7 @@ namespace Lottery.G3.Interaction
         public void SettlementFeedback(bool reduceFlash){pulseReduced=reduceFlash;settlementPulse=reduceFlash?0:.22f;}
         void Update()
         {
-            if(footer==null)return;RefreshPressedState();if(!persistentFeedback&&Time.unscaledTime>=feedbackUntil){feedbackPlate.gameObject.SetActive(false);statusText.gameObject.SetActive(false);}if(settlementPulse<=0)return;settlementPulse=Mathf.Max(0,settlementPulse-Time.unscaledDeltaTime);
+            if(footer==null)return;UpdateWalkHud();RefreshPressedState();if(!persistentFeedback&&Time.unscaledTime>=feedbackUntil){feedbackPlate.gameObject.SetActive(false);statusText.gameObject.SetActive(false);}if(settlementPulse<=0)return;settlementPulse=Mathf.Max(0,settlementPulse-Time.unscaledDeltaTime);
             var baseColor=G3HudTheme.Ink;var tint=G3HudTheme.InkLift;
             footer.GetComponent<G3HudSurface>().Tint(Color.Lerp(baseColor,tint,settlementPulse/.22f),G3HudTheme.Rule);
         }

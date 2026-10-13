@@ -28,7 +28,7 @@ namespace Lottery.G3.Interaction
             var fontMaterial=Own(new Material(glyph));title=Label("New game title",font,fontMaterial);body=Label("New game scope",font,fontMaterial);status=Label("New game status",font,fontMaterial);
             normalLabel=Label("Normal route",font,fontMaterial,TextAnchor.MiddleCenter);qaLabel=Label("Explicit diagnostic route",font,fontMaterial,TextAnchor.MiddleCenter);
             normalPlate=Plate("Start normal new run",flat);qaPlate=Plate("Start marked diagnostic new run",flat);
-            title.SetText("彩票小店");body.SetText("一间小店，一天经营。\n所有金额为虚构金币，不能兑换现金。\n普通新局随机生成票与今日货架。\nQA 诊断局固定种子，不代表自然概率。\n已有存档将直接恢复，不能在此替换。");
+            title.SetText("彩票小店");body.SetText("一间小店，一天经营。\n金额单位为元，仅为游戏内模拟，不可充值或提现。\n普通新局随机生成票与今日货架。\nQA 诊断局固定种子，不代表自然概率。\n已有存档将直接恢复，不能在此替换。");
             normalLabel.SetText("开始普通新局");qaLabel.SetText("开始 QA 固定诊断新局");status.SetText("请选择开局方式。尚未创建存档。");title.SetColor(G3HudTheme.Paper);normalLabel.SetColor(G3HudTheme.Card);Layout();
         }
         T Own<T>(T o)where T:UnityEngine.Object{owned.Add(o);return o;}

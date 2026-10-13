@@ -251,7 +251,7 @@ namespace Lottery.G3.Editor
         // Fixed observations only. No exception message, stack, file path, hardware
         // string, editor log or asset content enters this sidecar.
         // Stable diagnostic IDs only; never serialize file paths or asset text.
-        static readonly string[] DiagnosticMaterials={"Aged_Aluminium","Bone_Laminate","Brass_Worn","Ceramic_Glazed","Charcoal_Metal","CounterToolTag_1","CounterToolTag_2","CounterToolTag_3","Cream_Plaster","Dark_Green_Felt","Decoration_Print_Atlas","Display_Silver_Coating","Glass_Blue_Water","Glass_Clear","Grout","Heritage_Green_Paint","Ink","Leaves_Green","Newspaper","Oxblood_Enamel","Paper_Ivory","Plastic_Cream","Rubber","Service_Monitor","ShopSign","StreetBlur","Ticket_Swap_1","Ticket_Swap_2","Ticket_Type_Label","Warm_Light","Warm_Oak","Warm_Terrazzo","Tool_Dock_Liner","Nearfield_Tea"};
+        static readonly string[] DiagnosticMaterials={"Aged_Aluminium","Bone_Laminate","Brass_Worn","Ceramic_Glazed","Charcoal_Metal","CounterToolTag_1","CounterToolTag_2","CounterToolTag_3","Cream_Plaster","Dark_Green_Felt","Decoration_Print_Atlas","Display_Silver_Coating","Glass_Blue_Water","Glass_Clear","Grout","Heritage_Green_Paint","Ink","Leaves_Green","Newspaper","Oxblood_Enamel","Paper_Ivory","Plastic_Cream","Rubber","Service_Monitor","ShopSign","StreetBlur","Ticket_Swap_1","Ticket_Swap_2","Ticket_Type_Label","Warm_Light","Warm_Oak","Warm_Terrazzo","Tool_Dock_Liner","Nearfield_Tea","Plant_Stem_Green"};
         static int DiagnosticMaterial(string path,out int role)
         {
             role=0;string prefix=G3ShopArtImporter.Root+"/Materials/";
@@ -358,7 +358,7 @@ namespace Lottery.G3.Editor
             public long captureTriangles=-1,fileBytes=-1,metaBytes=-1;public float maxChannelRange=-1;
             public long matBits,metaBits,packBits,packMetaBits,dirtyMatBits=-1,dirtyPackBits=-1;
             public int changedOther,dirtyStage=-1;
-            readonly Material[] materialRefs=new Material[34];readonly MaterialState[] materialBefore=new MaterialState[34];
+            readonly Material[] materialRefs=new Material[35];readonly MaterialState[] materialBefore=new MaterialState[35];
             int stageCode;
             BakeTrace(string commit,string run,string attempt)
             {
@@ -415,13 +415,13 @@ namespace Lottery.G3.Editor
                     {
                         foreach(var material in Resources.FindObjectsOfTypeAll<Material>())
                         {int role;int id=DiagnosticMaterial(AssetDatabase.GetAssetPath(material),out role);if(id>=0&&role==1){if(materialRefs[id]!=null&&materialRefs[id]!=material)throw new InvalidOperationException();materialRefs[id]=material;}}
-                        for(int i=0;i<34;i++)if(materialRefs[i]==null)audit.missingBits|=1L<<i;
+                        for(int i=0;i<35;i++)if(materialRefs[i]==null)audit.missingBits|=1L<<i;
                         if(audit.missingBits!=0)throw new InvalidOperationException();
                     }
                     if(stage!=20&&!audit.ready)throw new InvalidOperationException();
                     var subassets=Resources.FindObjectsOfTypeAll<ScriptableObject>();
-                    var snapshots=new MaterialState[34];for(int id=0;id<34;id++)snapshots[id]=ReadMaterialState(materialRefs[id],subassets,id);
-                    for(int id=0;id<34;id++)
+                    var snapshots=new MaterialState[35];for(int id=0;id<35;id++)snapshots[id]=ReadMaterialState(materialRefs[id],subassets,id);
+                    for(int id=0;id<35;id++)
                     {
                         var current=snapshots[id];
                         if(stage==20){materialBefore[id]=current;continue;}
@@ -435,7 +435,7 @@ namespace Lottery.G3.Editor
                         if(record!=null){record.lastStage=stage;record.last=current;record.lastBits=bits;record.changeBits|=bits;}
                     }
                     audit.ready=true;audit.stages|=1L<<stageBit;
-                    int count=0;for(int i=0;i<34;i++)if((audit.changedBits&(1L<<i))!=0)count++;
+                    int count=0;for(int i=0;i<35;i++)if((audit.changedBits&(1L<<i))!=0)count++;
                     audit.overflow=count-audit.records.Count;if(audit.overflow>0)writeFailed=true;
                 }
                 catch{audit.error=true;writeFailed=true;}

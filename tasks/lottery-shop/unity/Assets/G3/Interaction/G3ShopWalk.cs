@@ -32,5 +32,5 @@ namespace Lottery.G3.Interaction
         {if(!cameraWriteEnabled)return;yaw+=pixels.x*.13f;pitch=Mathf.Clamp(pitch-pixels.y*.10f,-30,45);ApplyCamera();}
         public void ApplyCamera(){if(cameraWriteEnabled&&camera!=null){camera.transform.position=transform.position+new Vector3(0,1.58f,0);camera.transform.rotation=Quaternion.Euler(pitch,yaw,0);}}
     }
-    public sealed class G3WorldTarget : MonoBehaviour {public G3Panel Panel;public bool IsTable;}
+    public sealed class G3WorldTarget : MonoBehaviour {public G3Panel Panel;public bool IsTable;public float ReachMeters=>1.6f;}
 }

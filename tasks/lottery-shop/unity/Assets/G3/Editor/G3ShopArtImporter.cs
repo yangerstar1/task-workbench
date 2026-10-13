@@ -118,7 +118,7 @@ namespace Lottery.G3.Editor
         }
         sealed class MaterialTrace
         {
-            static readonly string[] Names={"Aged_Aluminium","Bone_Laminate","Brass_Worn","Ceramic_Glazed","Charcoal_Metal","CounterToolTag_1","CounterToolTag_2","CounterToolTag_3","Cream_Plaster","Dark_Green_Felt","Decoration_Print_Atlas","Display_Silver_Coating","Glass_Blue_Water","Glass_Clear","Grout","Heritage_Green_Paint","Ink","Leaves_Green","Newspaper","Oxblood_Enamel","Paper_Ivory","Plastic_Cream","Rubber","Service_Monitor","ShopSign","StreetBlur","Ticket_Swap_1","Ticket_Swap_2","Ticket_Type_Label","Warm_Light","Warm_Oak","Warm_Terrazzo","Tool_Dock_Liner","Nearfield_Tea"};
+            static readonly string[] Names={"Aged_Aluminium","Bone_Laminate","Brass_Worn","Ceramic_Glazed","Charcoal_Metal","CounterToolTag_1","CounterToolTag_2","CounterToolTag_3","Cream_Plaster","Dark_Green_Felt","Decoration_Print_Atlas","Display_Silver_Coating","Glass_Blue_Water","Glass_Clear","Grout","Heritage_Green_Paint","Ink","Leaves_Green","Newspaper","Oxblood_Enamel","Paper_Ivory","Plastic_Cream","Rubber","Service_Monitor","ShopSign","StreetBlur","Ticket_Swap_1","Ticket_Swap_2","Ticket_Type_Label","Warm_Light","Warm_Oak","Warm_Terrazzo","Tool_Dock_Liner","Nearfield_Tea","Plant_Stem_Green"};
             readonly MaterialProgress receipt;readonly string path;
             readonly System.Diagnostics.Stopwatch clock=System.Diagnostics.Stopwatch.StartNew();
             MaterialTrace(string commit,string run,string attempt)
@@ -134,7 +134,7 @@ namespace Lottery.G3.Editor
             public void ObserveSmoothness(uint actual,uint expected){receipt.smoothnessObserved=true;receipt.smoothnessMaterialId=receipt.materialId;receipt.actualSmoothnessBits=actual;receipt.expectedSmoothnessBits=expected;Write();}
             public void Mark(int stage){receipt.stageCode=stage;Write();}
             public void BeginMaterial(string name){receipt.materialId=Array.IndexOf(Names,name);if(receipt.materialId<0)receipt.diagnosticWriteFailed=true;Mark(10);}
-            public void MaterialDone(){if(receipt.materialId>=0){if((receipt.completedBits&(1L<<receipt.materialId))!=0||receipt.materialsCompleted>=34)receipt.diagnosticWriteFailed=true;receipt.completedBits|=1L<<receipt.materialId;}receipt.materialsCompleted=Math.Min(receipt.materialsCompleted+1,34);Mark(24);}
+            public void MaterialDone(){if(receipt.materialId>=0){if((receipt.completedBits&(1L<<receipt.materialId))!=0||receipt.materialsCompleted>=35)receipt.diagnosticWriteFailed=true;receipt.completedBits|=1L<<receipt.materialId;}receipt.materialsCompleted=Math.Min(receipt.materialsCompleted+1,35);Mark(24);}
             public void Failure(Exception error)
             {
                 if(receipt.firstFailureStage>=0)return;receipt.firstFailureStage=receipt.stageCode;receipt.firstFailureMaterial=receipt.materialId;

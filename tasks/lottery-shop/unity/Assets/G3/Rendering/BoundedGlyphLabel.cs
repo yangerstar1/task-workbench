@@ -9,6 +9,15 @@ namespace Lottery.G3.Rendering
     public sealed class BoundedGlyphLabel : MonoBehaviour
     {
         const int RasterSize=80;
+        static bool costEnabled,costOverflow;
+        static long rebuildCount,rebuildTicks,rebuildMax,atlasLabelNotifications;
+        public static void BeginCostObservation(){costEnabled=true;costOverflow=false;rebuildCount=rebuildTicks=rebuildMax=atlasLabelNotifications=0;}
+        public static void EndCostObservation(){costEnabled=false;}
+        public static long[] CostObservation()=>new[]{rebuildCount,rebuildTicks,rebuildMax,atlasLabelNotifications,costOverflow?1L:0L};
+        static void CostAdd(ref long value,long add,long limit){if(add<0||value>limit-add){value=limit;costOverflow=true;}else value+=add;}
+        static void RebuildCostEnd(long start)
+        {if(!costEnabled)return;long ticks=System.Diagnostics.Stopwatch.GetTimestamp()-start;CostAdd(ref rebuildCount,1,1000000);CostAdd(ref rebuildTicks,ticks,1000000000000000L);if(ticks<0||ticks>1000000000000000L)costOverflow=true;rebuildMax=Math.Max(rebuildMax,Math.Max(0,Math.Min(ticks,1000000000000000L)));}
+
         Font font; Material material; Mesh mesh; Color tint;
         string text=""; float em=1,width=1,height=1; TextAnchor anchor; bool dirty=true,wrap;
         Vector4 maskMapping=new Vector4(1,1,0,0);
@@ -34,11 +43,14 @@ namespace Lottery.G3.Rendering
         public void SetMaskMapping(Vector4 mapping) {maskMapping=mapping;dirty=true;}
         public void SetText(string value) {value=value??"";if(text!=value){text=value;dirty=true;} RebuildIfNeeded();}
         public void SetColor(Color color) {if(tint!=color){tint=color;dirty=true;}}
-        void AtlasChanged(Font rebuilt) {if(rebuilt==font)dirty=true;}
+        void AtlasChanged(Font rebuilt) {if(rebuilt==font){dirty=true;if(costEnabled)CostAdd(ref atlasLabelNotifications,1,1000000);}}
         void LateUpdate(){RebuildIfNeeded();}
         public void RebuildIfNeeded()
         {
             if(!dirty||font==null||mesh==null)return;
+            long costStart=costEnabled?System.Diagnostics.Stopwatch.GetTimestamp():0;
+            try
+            {
             dirty=false; font.RequestCharactersInTexture(text,RasterSize,FontStyle.Normal); MissingGlyphCount=0; Fits=true;
             var lines=new List<List<CharacterInfo>> {new List<CharacterInfo>()}; var advances=new List<float>{0};
             float scale=em/RasterSize;
@@ -81,6 +93,8 @@ namespace Lottery.G3.Rendering
             }
             mesh.Clear();mesh.SetVertices(verts);mesh.SetUVs(0,uv);mesh.SetUVs(1,uv1);mesh.SetColors(colors);mesh.SetTriangles(tris,0);mesh.RecalculateBounds();
             material.mainTexture=font.material.mainTexture;
+            }
+            finally{RebuildCostEnd(costStart);}
         }
         void OnDestroy(){Font.textureRebuilt-=AtlasChanged;if(mesh!=null)Destroy(mesh);}
     }

@@ -20,12 +20,12 @@ import visual_candidate_ci as candidate
 def receipt():
     frames = []
     for name in candidate.FRAMES:
-        frames.append(dict(stage=name, file=name + ".png", sha256="a" * 64,
+        frames.append(dict(stateOrigin="REAL_SERVICE_TRANSACTIONS",navigationEvidence="SCENARIO_SETUP_NOT_WORLD_INPUT",cameraOrigin=candidate.FRAME_CAMERA_ORIGINS[name],stage=name, file=name + ".png", sha256="a" * 64,
             width=1600 if name.endswith("20x9") else 1280, height=720,
             stateSha256="b" * 64, seedSha256="c" * 64, hudVisible=True, hudFits=True,
             cameraOrthographic=False, hudFrustumRendererCount=20, importedRendererCount=200, inputUpdates=123,
             cameraPosition=dict(x=1, y=2, z=3), cameraEuler=dict(x=60, y=180, z=0), cameraFov=64, dayPhase="NIGHT_BILL" if name == "night-table" else "DAY_OPEN",
-            panel="None", hudOpaqueAreaRatio=.18, visibleControlIds=["open-shop", "open-inventory", "open-phone", "stand", "open-more"], moreVisible=False, paperVisible=True, renderedShopRendererCount=32, renderedShopMaterialCount=31, paperPresentationBounds=dict(x=300,y=200,width=600,height=400), toolPresentationBounds=[dict(x=400+i*100,y=510,width=60,height=80) for i in range(3)], currentTools=["small_prize_box", "inspection_lamp", "large_prize_stamp"], revealedCells=3))
+            panel="None", hudOpaqueAreaRatio=.18, visibleControlIds=["open-settings", "stand"], moreVisible=False, paperVisible=True, renderedShopRendererCount=32, renderedShopMaterialCount=31, paperPresentationBounds=dict(x=300,y=200,width=600,height=400), toolPresentationBounds=[dict(x=400+i*100,y=510,width=60,height=80) for i in range(3)], currentTools=["small_prize_box", "inspection_lamp", "large_prize_stamp"], revealedCells=3))
     for f in frames:
         name = f["stage"]
         f.update(ticketId="fixed-ticket", ticketPhase="ACTIVE", ticketMaskSha256="d"*64, ticketContentSha256="f"*64,
@@ -46,15 +46,17 @@ def receipt():
             exterior=dict(basis="MATERIAL_METADATA_NOT_PIXEL_ACCEPTANCE",backdropShader="Lottery/G3/ExteriorBackdrop",textureName="Street-night" if night else "Street-day",
                 textureWidth=1882 if night else 1881,textureHeight=836,exposure=.72 if night else 1,backdropRendererCount=1,backdropFrustumRendererCount=1,glassFrustumRendererCount=1,
                 transparentGlassMaterialCount=1,glassAlpha=.5,glassSurface=1,glassZWrite=0,glassRenderQueue=3000,nearFieldTriangles=60,nearFieldColliderCount=0,feltNormalScale=.6,linerSmoothness=.08,brassSmoothness=1))
-    return dict(schemaVersion=4, candidatePresentation="V19_EXTERIOR_FIXTURE_VIEWS_NOT_VISUAL_PASS", scope=candidate.SCOPE, sourceCommit="1" * 40, runId="12345", runAttempt="1", unityVersion="6000.3.19f1",
-                graphicsDeviceType="OpenGLCore", inputEvidence="SIMULATED_INPUT_SYSTEM",
+    return dict(schemaVersion=5, candidatePresentation="V31_SCENARIO_STATE_VIEWS_NOT_WORLD_INPUT_PASS", scope=candidate.SCOPE, sourceCommit="1" * 40, runId="12345", runAttempt="1", unityVersion="6000.3.19f1",
+                graphicsDeviceType="OpenGLCore", inputEvidence="SIMULATED_UI_INPUT_WITH_DECLARED_SCENARIO_SETUP",
                 captureMethod="URP_STANDARD_REQUEST_READPIXELS", hudVisibilityBasis="ENABLED_CAMERA_LAYER_AND_FRUSTUM_TEST_NOT_PIXEL_OCCLUSION", complete=True, frames=frames, actions=[])
 
 
 def progress_receipt(kind="runtime"):
-    return dict(schemaVersion=1, scope=candidate.SCOPE, kind=kind, sourceCommit="1" * 40, runId="12345", runAttempt="1",
+    value = dict(schemaVersion=1, scope=candidate.SCOPE, kind=kind, sourceCommit="1" * 40, runId="12345", runAttempt="1",
                 status="MILESTONES_ONLY_NOT_TEST_PASS", events=[dict(stage="runtime-setup-begin" if kind == "runtime" else "prebuild-begin",
                 utc="2026-10-13T03:00:00.0000000Z", elapsedMs=0, inputUpdates=0, frameCount=0, purchased=-1, settled=-1, dayPhase="UNAVAILABLE")])
+    if kind=="runtime":value.update(tickFrequency=1000000000,costs=[dict(values=[0]*11)])
+    return value
 
 
 class ProgressReceiptTests(unittest.TestCase):
@@ -78,7 +80,7 @@ class ProgressReceiptTests(unittest.TestCase):
         with self.assertRaises(ValueError): self.validate(value, "prebuild")
 
     def test_fixed_lifecycle_stages_accept_no_arbitrary_payload(self):
-        value = progress_receipt(); value["kind"] = "lifecycle"; value["events"][0]["stage"] = "editor-exiting-edit-mode"
+        value = progress_receipt("prebuild"); value["kind"] = "lifecycle"; value["events"][0]["stage"] = "editor-exiting-edit-mode"
         candidate.validate_progress(value, "lifecycle", "1" * 40, "12345", "1")
         value["events"][0]["sceneName"] = "not an allowed field"
         with self.assertRaises(ValueError): candidate.validate_progress(value, "lifecycle", "1" * 40, "12345", "1")
@@ -121,7 +123,7 @@ class ProgressReceiptTests(unittest.TestCase):
             with self.subTest(key=key), self.assertRaises(ValueError): self.validate(value)
 
     def test_timeout_milestone_never_claims_pass(self):
-        value = progress_receipt(); value["events"].append(dict(value["events"][0], stage="runtime-timeout", elapsedMs=900001))
+        value = progress_receipt(); value["events"].append(dict(value["events"][0], stage="runtime-timeout", elapsedMs=900001)); value["costs"].append(dict(values=[0]*11))
         self.validate(value)
         value["status"] = "PASS"
         with self.assertRaises(ValueError): self.validate(value)
@@ -134,7 +136,7 @@ class ProgressReceiptTests(unittest.TestCase):
         loop = source.split("for(int index = 0; index < remaining; index++)", 1)[1].split("Assert.That(State.TicketsPurchasedToday", 1)[0]
         self.assertIn("yield return null;", loop)
         self.assertIn('Assert.That(remaining, Is.InRange(0, 12)', source)
-        for text in ("State.TicketsPurchasedToday, Is.EqualTo(12)", "State.SettledTicketCount, Is.EqualTo(12)", "State.Phase, Is.EqualTo(DayPhase.CLOSING_PREP)", "frame < 600", "i < 1200", "Is.LessThan(UnloadSeconds)"):
+        for text in ("State.TicketsPurchasedToday, Is.EqualTo(12)", "State.SettledTicketCount, Is.EqualTo(12)", "State.Phase, Is.EqualTo(DayPhase.CLOSING_PREP)", "frame < 600", "Is.LessThan(UnloadSeconds)"):
             self.assertIn(text, source)
         workflow = (root / candidate.WORKFLOW).read_text()
         self.assertIn("timeout-minutes: 32", workflow)
@@ -403,7 +405,7 @@ class VisualCandidateEvidenceTests(unittest.TestCase):
 
 
 class NativeReportShapeTests(unittest.TestCase):
-    def test_existing_contract_union_has_287_edit_and_32_play_cases(self):
+    def test_v2_contract_has_331_edit_and_37_play_with_phone_coverage(self):
         task = Path(candidate.__file__).resolve().parents[1]
         contracts = [json.loads((task / "ci" / (name + "-test-contract.json")).read_text()) for name in ("g2", "g3")]
         source = (task / "unity/Assets/G3/Tests/EditMode/PhoneLoanTests.cs").read_text()
@@ -417,10 +419,10 @@ class NativeReportShapeTests(unittest.TestCase):
         interaction = (task / "unity/Assets/G3/Tests/PlayMode/G3PhoneInteractionTests.cs").read_text()
         phone_play = {"Lottery.G3.PlayMode.Tests.G3PlayTests." + method for method in re.findall(r"\[UnityTest\]\s*public IEnumerator (\w+)\(", interaction)}
         self.assertEqual(len(phone_edit), 44); self.assertEqual(len(phone_play), 3)
-        for stage, original_count, additional in (("edit", 287, phone_edit), ("play", 32, phone_play)):
+        for stage, original_count, additional in (("edit", 287, phone_edit), ("play", 34, phone_play)):
             names = {case for contract in contracts for cases in contract["profiles"][stage].values() for case in cases}
             self.assertTrue(additional <= names)
-            self.assertEqual(len(names - additional), original_count, "The original 287 Edit / 32 Play identities remain required")
+            self.assertEqual(len(names - additional), original_count, "V2 exact local/world case split plus phone identities is required")
             self.assertEqual(len(names), original_count + len(additional))
 
     def test_original_candidate_report_is_preserved_and_checked(self):
@@ -566,7 +568,7 @@ class PhysicalPhoneEvidenceTests(unittest.TestCase):
         root=Path(__file__).resolve().parents[3]
         fixture=(root/candidate.TASK/'unity/Assets/G3/Tests/VisualCandidate/VisualCandidateCaptureTests.cs').read_text()
         self.assertEqual(fixture.count('[UnityTest]'),1)
-        self.assertIn('RealRuntimeSixGroupsRetainHudAndRoutePurchasesScratchShelfAndNight',fixture)
+        self.assertIn('ScenarioStateCaptureRetainsTwentyThreeViewsFromRealTransactionsV2',fixture)
         for marker in ('Assert.That(State.TicketsPurchasedToday, Is.EqualTo(12))',
                        'Assert.That(State.SettledTicketCount, Is.EqualTo(12))',
                        'PreviewSettlement().RawPrizeMinor, Is.EqualTo(2000)',
@@ -617,20 +619,26 @@ class OriginalG3FrameExportTests(unittest.TestCase):
                                gameRunId="g3-protected-render-fixture" if name == "challenge-protected" else "g3-day-qafixture-001",
                                fixtureLabel="SYNTHETIC_CONSUMABLE_BOUNDARY_FIXTURE" if name == "challenge-protected" else "G3_DIAGNOSTIC_VECTOR_NOT_NATURAL"))
         import g3_ci
-        self.receipt = dict(schemaVersion=1, scope="G3_CAMERA_RENDER_NOT_DEVICE_TESTED", sourceCommit="1" * 40, runId="12345", unityVersion="6000.3.19f1",
+        self.receipt = dict(schemaVersion=2, scope="G3_CAMERA_RENDER_NOT_DEVICE_TESTED", sourceCommit="1" * 40, runId="12345", unityVersion="6000.3.19f1",
                             rulesSha256=g3_ci.RULES_SHA, captureMethod="URP_STANDARD_REQUEST_READPIXELS", graphicsDeviceType="OpenGLCore", graphicsDeviceName="Synthetic validation only",
-                            width=1280, height=720, sourceViewportWidth=1280, sourceViewportHeight=720, inputEvidence="SIMULATED_INPUT_SYSTEM", deviceQa="NOT_RUN", visualReview="PENDING", frames=frames)
+                            width=1280, height=720, sourceViewportWidth=1280, sourceViewportHeight=720, inputEvidence="SIMULATED_UI_INPUT_WITH_DECLARED_SCENARIO_SETUP", deviceQa="NOT_RUN", visualReview="PENDING", frames=frames)
         self.save_receipt()
 
     def save_receipt(self): candidate.write(self.source / "render-receipt.json", self.receipt)
     def export(self): candidate.export_original_g3_captures(self.root)
     def assert_no_frames_exported(self): self.assertFalse((candidate.outdir(self.root) / "original-g3-captures/empty.png").exists())
 
+    def test_original_legacy_navigation_provenance_rejected(self):
+        self.receipt.update(schemaVersion=1,inputEvidence="SIMULATED_INPUT_SYSTEM");self.save_receipt()
+        with self.assertRaises(ValueError):self.export()
+    def test_original_wrong_setup_provenance_rejected(self):
+        self.receipt["inputEvidence"]="WORLD_INPUT_PASS";self.save_receipt()
+        with self.assertRaises(ValueError):self.export()
     def test_complete_originals_export_separately_with_attempt_limitation(self):
         self.export(); folder = candidate.outdir(self.root) / "original-g3-captures"
         self.assertEqual(len(list(folder.glob("*.png"))), 14)
         result = candidate.read_json(folder / "export-receipt.json")
-        self.assertEqual(result["exactPlayModeCases"], 35)
+        self.assertEqual(result["exactPlayModeCases"], 37)
         self.assertEqual(result["legacyReceiptRunAttempt"], "NOT_PRESENT_IN_LEGACY_SCHEMA")
         self.assertEqual(result["separateProtectedFixtureFrame"], "challenge-protected")
         self.assertEqual(result["g3Gate"], "NOT_EVALUATED")
@@ -809,7 +817,7 @@ class RegressionProgressTests(unittest.TestCase):
 
     def test_callback_whitelist_matches_exact_current_contract_and_is_explicitly_gated(self):
         text = (self.root/candidate.TASK/"unity/Assets/G3/Tests/PlayMode/G3RegressionProgress.cs").read_text()
-        keys = set(re.findall(r'"([0-9a-f]{64})"', text)); self.assertEqual(keys, self.allowed); self.assertEqual(len(keys), 35)
+        keys = set(re.findall(r'"([0-9a-f]{64})"', text)); self.assertEqual(keys, self.allowed); self.assertEqual(len(keys), 37)
         for required in ('[assembly: TestRunCallback(', 'ITestRunCallback', 'Arg("-g3RegressionProgress")=="1"', 'Arg("-assemblyNames")==Assemblies', 'Arg("-testPlatform")=="playmode"', 'Arg("-probeReviewedCommit")', 'MaximumBytes=65536, MaximumEvents=128'):
             self.assertIn(required, text)
         for forbidden in ('.Message', '.StackTrace', '.Output', 'ToXml', 'GetEnvironmentVariable', 'test.Name'):
@@ -826,6 +834,76 @@ class RegressionProgressTests(unittest.TestCase):
         self.assertIn('visual_candidate_ci.py regression-progress', block)
         self.assertEqual(text.count('            tasks/lottery-shop/evidence/visual-candidate/regression-play-progress.json'), 1)
 
+
+
+class FrameCostTests(unittest.TestCase):
+    def check(self,v):return candidate.validate_progress(v,"runtime","1"*40,"12345","1")
+    def test_fixed_numeric_snapshot_and_overflow_accepted_as_observation(self):
+        v=progress_receipt();v['costs'][0]['values']=[2,10,8,5,3,20,9,2,100,60,1];self.check(v)
+    def test_unknown_fields_and_free_text_rejected(self):
+        for key,value in [('path','private'),('raw','private')]:
+            v=progress_receipt();v['costs'][0][key]=value
+            with self.assertRaises(ValueError):self.check(v)
+        v=progress_receipt();v['costs'][0]['values'][0]='private'
+        with self.assertRaises(ValueError):self.check(v)
+    def test_shape_count_and_missing_rejected(self):
+        for rows in ([],[dict(values=[0]*10)],[dict(values=[0]*12)],[dict(values=[0]*11)]*2):
+            v=progress_receipt();v['costs']=rows
+            with self.assertRaises(ValueError):self.check(v)
+        v=progress_receipt();del v['costs']
+        with self.assertRaises(ValueError):self.check(v)
+    def test_all_numeric_bounds_and_bool_rejected(self):
+        limits=[1000000,10**15,10**15,1000000,1000000,10**15,10**15,1000000,10**15,10**15,1]
+        for i,limit in enumerate(limits):
+            for bad in (-1,limit+1,True,1.5,float('nan'),float('inf')):
+                v=progress_receipt();v['costs'][0]['values'][i]=bad
+                with self.assertRaises(ValueError):self.check(v)
+    def test_frequency_bounds_rejected(self):
+        for bad in (0,-1,10**12+1,True,1.5,'private'):
+            v=progress_receipt();v['tickFrequency']=bad
+            with self.assertRaises(ValueError):self.check(v)
+    def test_monotonic_counts_and_overflow_sticky(self):
+        for i in range(11):
+            v=progress_receipt();v['events'].append(dict(v['events'][0],elapsedMs=1));v['costs']=[dict(values=[1]*11),dict(values=[1]*11)];v['costs'][1]['values'][i]=0
+            with self.assertRaises(ValueError):self.check(v)
+    def test_no_impossible_totals(self):
+        for count,total,maximum in ((0,1,2),(4,5,6),(7,8,9)):
+            v=progress_receipt();v['costs'][0]['values'][maximum]=1
+            with self.assertRaises(ValueError):self.check(v)
+            v=progress_receipt();v['costs'][0]['values'][total]=1
+            with self.assertRaises(ValueError):self.check(v)
+    def test_max128_compact_payload_keeps64k(self):
+        v=progress_receipt();v['events']*=128;v['costs']=[dict(values=[1000000,10**15,10**15,1000000,1000000,10**15,10**15,1000000,10**15,10**15,1])]*128;self.check(v);self.assertLess(len(json.dumps(v,separators=(',',':')).encode()),65536)
+    def test_no_diagnostic_poll_movement_or_material_change(self):
+        root=Path(__file__).resolve().parents[3];router=(root/candidate.TASK/'unity/Assets/G3/Interaction/G3InputRouter.cs').read_text();label=(root/candidate.TASK/'unity/Assets/G3/Rendering/BoundedGlyphLabel.cs').read_text()
+        self.assertIn('Mathf.Clamp(Time.unscaledTime-lastPoll,0,.05f)',router);self.assertIn('try{PollInputObserved();}finally{PollCostEnd(start);}',router);self.assertIn('if(!dirty||font==null||mesh==null)return;',label);self.assertIn('finally{RebuildCostEnd(costStart);}',label)
+    def test_capture_session_reset_stop_and_existing_write_only(self):
+        root=Path(__file__).resolve().parents[3];s=(root/candidate.TASK/'unity/Assets/G3/Tests/VisualCandidate/VisualCandidateCaptureTests.cs').read_text();self.assertIn('BoundedGlyphLabel.BeginCostObservation();G3InputRouter.BeginCostObservation();',s);self.assertIn('finally{BoundedGlyphLabel.EndCostObservation();G3InputRouter.EndCostObservation();}',s);self.assertIn('JsonUtility.ToJson(receipt, kind!="runtime")',s)
+
+
+class ScenarioProvenanceV2Tests(unittest.TestCase):
+    def test_every_frame_has_closed_origin_and_setup_scope(self):
+        self.assertEqual(set(candidate.FRAME_CAMERA_ORIGINS),set(candidate.FRAMES))
+        for index in range(23):
+            for key,bad in (("cameraOrigin","KEYBOARD_TRAVERSED_PLAYER_VIEW"),("stateOrigin","UNTRACKED"),("navigationEvidence","WORLD_INPUT_PASS")):
+                value=receipt();value["frames"][index][key]=bad
+                with self.assertRaises(ValueError):candidate.validate_capture(value,"1"*40,"12345","1")
+    def test_removed_global_controls_cannot_return(self):
+        for control in ("open-more","open-shop","open-inventory","open-phone","open-tickets","open-drawer","open-bill"):
+            value=receipt();value["frames"][0]["visibleControlIds"].append(control)
+            with self.assertRaises(ValueError):candidate.validate_capture(value,"1"*40,"12345","1")
+    def test_old_v4_receipt_rejected(self):
+        value=receipt();value.update(schemaVersion=4,candidatePresentation="V19_EXTERIOR_FIXTURE_VIEWS_NOT_VISUAL_PASS")
+        with self.assertRaises(ValueError):candidate.validate_capture(value,"1"*40,"12345","1")
+    def test_world_cases_match_compiled_source_list(self):
+        root=Path(candidate.__file__).resolve().parents[1]
+        contract=json.loads((root/"ci/g3-test-contract.json").read_text())["profiles"]["play"]["Lottery.G3.PlayMode.Tests.dll"]
+        methods=[]
+        for file in (root/"unity/Assets/G3/Tests/PlayMode").glob("G3*Tests.cs"):
+            methods+=re.findall(r"\[UnityTest(?:,Timeout\(180000\))?\]\s*public IEnumerator (\w+)\(",file.read_text())
+        self.assertEqual(len(methods),29);self.assertEqual({"Lottery.G3.PlayMode.Tests.G3PlayTests."+name for name in methods},set(contract))
+        worlds=[x for x in contract if ".WorldInput" in x];self.assertEqual(len(worlds),3)
+        self.assertNotIn("Lottery.G3.PlayMode.Tests.G3PlayTests.WalkingIsOptionalAndPhysicalAndQuickShopShareStockAndReturnPose",contract)
 
 if __name__ == "__main__":
     unittest.main()

@@ -21,7 +21,7 @@ def validate(value,ident):
     for k in ('sourceCommit','runId','runAttempt'):require(value[k]==ident[k],'MATERIAL_INITIALIZATION_IDENTITY_REJECTED')
     require(value['status'] in ('RUNNING','COMPLETE','FAILED') and type(value['diagnosticWriteFailed']) is bool,'MATERIAL_INITIALIZATION_STATUS_REJECTED')
     require(type(value['stageCode']) is int and value['stageCode'] in STAGES and type(value['exceptionKind']) is str and value['exceptionKind'] in KINDS,'MATERIAL_INITIALIZATION_ENUM_REJECTED')
-    require(integer(value['materialId'],-1,33) and integer(value['firstFailureMaterial'],-1,33) and integer(value['materialsCompleted'],0,34) and integer(value['elapsedMs'],0,3600000) and integer(value['completedBits'],0,(1<<34)-1),'MATERIAL_INITIALIZATION_NUMBER_REJECTED')
+    require(integer(value['materialId'],-1,34) and integer(value['firstFailureMaterial'],-1,34) and integer(value['materialsCompleted'],0,35) and integer(value['elapsedMs'],0,3600000) and integer(value['completedBits'],0,(1<<35)-1),'MATERIAL_INITIALIZATION_NUMBER_REJECTED')
     require(value['materialsCompleted']==value['completedBits'].bit_count(),'MATERIAL_INITIALIZATION_COUNT_REJECTED')
     code=value['predicateCode'];slot=value['slotIndex'];require(integer(code,0,45) and integer(slot,-1,6),'MATERIAL_INITIALIZATION_PREDICATE_REJECTED')
     require(type(value['firstFailureStage']) is int and value['firstFailureStage'] in STAGES|{-1},'MATERIAL_INITIALIZATION_FAILURE_STAGE_REJECTED')
@@ -34,8 +34,8 @@ def validate(value,ident):
         require(0<=slot<=3 if code in (22,23,24) else 0<=slot<=6 if code in (25,26) else slot==-1,'MATERIAL_INITIALIZATION_SLOT_REJECTED')
     else:require(slot==-1,'MATERIAL_INITIALIZATION_UNKNOWN_SLOT_REJECTED')
     if value['status']=='COMPLETE':
-        require(value['stageCode']==40 and value['materialId']==-1 and value['materialsCompleted']==34 and value['completedBits']==(1<<34)-1,'MATERIAL_INITIALIZATION_COMPLETENESS_REJECTED')
-    require(type(value['smoothnessObserved']) is bool and integer(value['smoothnessMaterialId'],-1,33) and all(integer(value[k],0,4294967295) for k in ('actualSmoothnessBits','expectedSmoothnessBits')),'MATERIAL_INITIALIZATION_FLOAT_BITS_REJECTED')
+        require(value['stageCode']==40 and value['materialId']==-1 and value['materialsCompleted']==35 and value['completedBits']==(1<<35)-1,'MATERIAL_INITIALIZATION_COMPLETENESS_REJECTED')
+    require(type(value['smoothnessObserved']) is bool and integer(value['smoothnessMaterialId'],-1,34) and all(integer(value[k],0,4294967295) for k in ('actualSmoothnessBits','expectedSmoothnessBits')),'MATERIAL_INITIALIZATION_FLOAT_BITS_REJECTED')
     observed=value['smoothnessObserved'];actual=value['actualSmoothnessBits'];expected=value['expectedSmoothnessBits'];mid=value['smoothnessMaterialId']
     if observed:
         require(mid>=0,'MATERIAL_INITIALIZATION_FLOAT_CONTEXT_REJECTED')

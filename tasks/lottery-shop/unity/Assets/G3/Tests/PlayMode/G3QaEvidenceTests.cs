@@ -96,8 +96,8 @@ namespace Lottery.G3.PlayMode.Tests
             {
                 BindPresentationTarget(width,720);P.View.SimulatedSafeArea=new Rect(36,18,width-72,684);P.View.Layout();
                 var cameraPos=app.SceneCamera.transform.position;var cameraRot=app.SceneCamera.transform.rotation;
-                var point=P.View.ButtonRect("open-more").center;TouchEvent(810,UnityEngine.InputSystem.TouchPhase.Began,point);TouchEvent(810,UnityEngine.InputSystem.TouchPhase.Ended,point);PumpInput();Router.PollInput();Assert.That(P.View.MoreVisible,Is.True);
-                point=P.View.ButtonRect("open-settings").center;TouchEvent(811,UnityEngine.InputSystem.TouchPhase.Began,point);TouchEvent(811,UnityEngine.InputSystem.TouchPhase.Ended,point);PumpInput();Router.PollInput();
+                AssertRemovedGlobalNavigation();
+                var point=P.View.ButtonRect("open-settings").center;TouchEvent(811,UnityEngine.InputSystem.TouchPhase.Began,point);TouchEvent(811,UnityEngine.InputSystem.TouchPhase.Ended,point);PumpInput();Router.PollInput();
                 point=P.View.ButtonRect("settings-evidence").center;TouchEvent(812,UnityEngine.InputSystem.TouchPhase.Began,point);TouchEvent(812,UnityEngine.InputSystem.TouchPhase.Ended,point);PumpInput();Router.PollInput();
                 Assert.That(P.Panel,Is.EqualTo(G3Panel.QaEvidence));Assert.That(EvidenceFields(P.EvidenceText)["inputMode"],Is.EqualTo("TOUCHSCREEN"));
                 Assert.That(EvidenceFields(P.EvidenceText)["presentationPixels"],Is.EqualTo(width+"x720"));
@@ -117,7 +117,7 @@ namespace Lottery.G3.PlayMode.Tests
         [UnityTest]
         public IEnumerator QaEvidenceUnknownCommitAndCorruptStoreWithholdStateWithoutRecoveryWrites()
         {
-            faults.AfterPublish=true;faults.BlockRecovery=true;Click("open-tickets");Click("buy-number");Confirm();Assert.That(P.IsCommitting,Is.True);
+            faults.AfterPublish=true;faults.BlockRecovery=true;SetupLocalPanel(G3Panel.Tickets);Click("buy-number");Confirm();Assert.That(P.IsCommitting,Is.True);
             string hash=StateCodec.ComputeHash(State);long revision=State.Revision;int ledger=State.Ledger.Count;var files=FileHashes(directory);string oldClipboard=GUIUtility.systemCopyBuffer;
             try
             {
@@ -150,7 +150,7 @@ namespace Lottery.G3.PlayMode.Tests
         {
             // Reuse the frozen 75-step input flow verbatim, then observe its final
             // persisted state. Evidence access adds no economic scenario steps.
-            yield return FixedSeventyFiveStepDayRunsContinuouslyFromMarkedApkEntryThroughInputSystem();
+            yield return FixedSeventyFiveStepEconomyUsesDeclaredLocalContextsAndRealTransactionsV2();
             Assert.That(State.Ledger.Count,Is.EqualTo(29));string hash=StateCodec.ComputeHash(State);long rev=State.Revision;var files=FileHashes(directory);string oldClipboard=GUIUtility.systemCopyBuffer;
             try
             {

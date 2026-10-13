@@ -5,7 +5,7 @@ from unittest.mock import patch
 import material_initialization_ci as ci
 IDENT=dict(sourceCommit='1'*40,reviewedCandidateCommit='2'*40,runId='123',runAttempt='1')
 ENV=dict(GITHUB_RUN_ID='123',GITHUB_RUN_ATTEMPT='1')
-def receipt():return dict(smoothnessObserved=True,smoothnessMaterialId=33,actualSmoothnessBits=0x3f35c290,expectedSmoothnessBits=0x3f35c290,schemaVersion=1,scope=ci.SCOPE,status='COMPLETE',sourceCommit='1'*40,runId='123',runAttempt='1',stageCode=40,materialId=-1,materialsCompleted=34,firstFailureStage=-1,firstFailureMaterial=-1,predicateCode=0,slotIndex=-1,exceptionKind='NONE',diagnosticWriteFailed=False,elapsedMs=100,completedBits=(1<<34)-1)
+def receipt():return dict(smoothnessObserved=True,smoothnessMaterialId=34,actualSmoothnessBits=0x3f35c290,expectedSmoothnessBits=0x3f35c290,schemaVersion=1,scope=ci.SCOPE,status='COMPLETE',sourceCommit='1'*40,runId='123',runAttempt='1',stageCode=40,materialId=-1,materialsCompleted=35,firstFailureStage=-1,firstFailureMaterial=-1,predicateCode=0,slotIndex=-1,exceptionKind='NONE',diagnosticWriteFailed=False,elapsedMs=100,completedBits=(1<<35)-1)
 def failure(code=15,slot=-1):
  v=receipt();v.update(status='FAILED',stageCode=20 if code<=18 else 22,materialId=0,materialsCompleted=0,completedBits=0,firstFailureStage=20 if code<=18 else 22,firstFailureMaterial=0,predicateCode=code,slotIndex=slot,exceptionKind='INVALID_OPERATION');v.update(smoothnessMaterialId=0);
  if code==8:v['actualSmoothnessBits']+=1
@@ -45,7 +45,7 @@ class Tests(unittest.TestCase):
   for raw in [b'',b' '*8193,b'\xff',b'{}']:
    p,_,ok=self.export(raw);self.assertFalse(ok);self.assertFalse(p.exists())
  def test_numeric_bounds_and_bool_rejected(self):
-  for k,x in [('stageCode',True),('stageCode',999),('materialId',34),('materialId',-2),('materialsCompleted',35),('elapsedMs',3600001),('elapsedMs',-1),('completedBits',1<<34),('predicateCode',46),('predicateCode',True),('slotIndex',7),('slotIndex',True),('diagnosticWriteFailed',0)]:
+  for k,x in [('stageCode',True),('stageCode',999),('materialId',35),('materialId',-2),('materialsCompleted',36),('elapsedMs',3600001),('elapsedMs',-1),('completedBits',1<<35),('predicateCode',46),('predicateCode',True),('slotIndex',7),('slotIndex',True),('diagnosticWriteFailed',0)]:
    v=receipt();v[k]=x
    with self.subTest(k=k,x=x),self.assertRaises(ValueError):ci.validate(v,IDENT)
  def test_predicate_context_and_slot_constraints(self):
@@ -54,7 +54,7 @@ class Tests(unittest.TestCase):
    with self.assertRaises(ValueError):ci.validate(v,IDENT)
   for code,slot in [(22,-1),(22,4),(25,-1),(25,7)]:
    with self.assertRaises(ValueError):ci.validate(failure(code,slot),IDENT)
- def test_completion_requires_all34_exact_bits(self):
+ def test_completion_requires_all35_exact_bits(self):
   for changes in [dict(materialsCompleted=33,completedBits=(1<<33)-1),dict(materialId=0),dict(stageCode=34),dict(completedBits=1),dict(firstFailureStage=20)]:
    v=receipt();v.update(changes)
    with self.assertRaises(ValueError):ci.validate(v,IDENT)
@@ -89,7 +89,7 @@ class Tests(unittest.TestCase):
   for forbidden in ['LoadAsset','SaveAssets','Refresh(','SetFloat(','SetTexture(','SetColor(','Debug.Log','error.Message','error.StackTrace']:self.assertNotIn(forbidden,body)
   self.assertIn('catch{receipt.diagnosticWriteFailed=true;}',body);self.assertIn('>8192',body)
  def test_fixed_material_table_and_capture_scope(self):
-  s=self.source();names=re.findall(r'"([A-Za-z0-9_]+)"',s.split('static readonly string[] Names={',1)[1].split('};',1)[0]);self.assertEqual(len(names),34);self.assertEqual(names[-2:],['Tool_Dock_Liner','Nearfield_Tea']);self.assertIn('args[i+1]!="Lottery.G3.VisualCandidate.Tests"',s)
+  s=self.source();names=re.findall(r'"([A-Za-z0-9_]+)"',s.split('static readonly string[] Names={',1)[1].split('};',1)[0]);self.assertEqual(len(names),35);self.assertEqual(names[-3:],['Tool_Dock_Liner','Nearfield_Tea','Plant_Stem_Green']);self.assertIn('args[i+1]!="Lottery.G3.VisualCandidate.Tests"',s)
  def test_no_detail_explicit_initialization_before_original_assertions(self):
   s=self.source();start=s.index('material.SetTexture("_DetailAlbedoMap",null)');end=s.index('MaterialPredicate.DETAIL_ALBEDO_ABSENT');self.assertLess(start,end)
   block=s[start:end]
@@ -121,15 +121,15 @@ class Tests(unittest.TestCase):
    v=receipt();v.update(actualSmoothnessBits=bits,expectedSmoothnessBits=bits)
    with self.assertRaises(ValueError):ci.validate(v,IDENT)
  def test_smoothness_observation_closed_numeric_context(self):
-  for updates in [dict(smoothnessObserved=1),dict(smoothnessMaterialId=34),dict(actualSmoothnessBits=True),dict(expectedSmoothnessBits=-1),dict(actualSmoothnessBits=4294967296),dict(actualSmoothnessBits='private'),dict(smoothnessObserved=False),dict(smoothnessMaterialId=-1)]:
+  for updates in [dict(smoothnessObserved=1),dict(smoothnessMaterialId=35),dict(actualSmoothnessBits=True),dict(expectedSmoothnessBits=-1),dict(actualSmoothnessBits=4294967296),dict(actualSmoothnessBits='private'),dict(smoothnessObserved=False),dict(smoothnessMaterialId=-1)]:
    v=receipt();v.update(updates)
    with self.assertRaises(ValueError):ci.validate(v,IDENT)
   v=failure(8);v['actualSmoothnessBits']=v['expectedSmoothnessBits']
   with self.assertRaises(ValueError):ci.validate(v,IDENT)
  def test_smoothness_unobserved_early_failure_valid(self):
   v=failure(1);v.update(smoothnessObserved=False,smoothnessMaterialId=-1,actualSmoothnessBits=0,expectedSmoothnessBits=0);ci.validate(v,IDENT)
- def test_all34_roughness_float32_and_clamp_boundaries(self):
-  root=Path(__file__).resolve().parents[3];items=json.loads((root/ci.visual.TASK/'unity/Assets/G3/Shop/Resources/G3/Shop/materials.json').read_text())['materials'];self.assertEqual(len(items),34)
+ def test_all35_roughness_float32_and_clamp_boundaries(self):
+  root=Path(__file__).resolve().parents[3];items=json.loads((root/ci.visual.TASK/'unity/Assets/G3/Shop/Resources/G3/Shop/materials.json').read_text())['materials'];self.assertEqual(len(items),35)
   f=lambda x:struct.unpack('<f',struct.pack('<f',x))[0]
   bits=lambda x:struct.unpack('<I',struct.pack('<f',x))[0]
   for item in items:
@@ -140,4 +140,21 @@ class Tests(unittest.TestCase):
   body=s.split('static void RequireSmoothness(',1)[1].split('static void RequireMaterial',1)[0]
   self.assertIn('FiniteSingleBits(actual)&&FiniteSingleBits(expected)&&actual==expected',body);self.assertIn('trace?.ObserveSmoothness(actual,expected)',body)
   for forbidden in ('Approximately','Abs(','SetFloat','epsilon','tolerance'):self.assertNotIn(forbidden,body)
+ def test_stem_id34_failure_preserved(self):
+  v=failure();v.update(materialId=34,firstFailureMaterial=34,smoothnessMaterialId=34);ci.validate(v,IDENT);p,raw,ok=self.export(v);self.assertFalse(ok);self.assertEqual(p.read_bytes(),raw)
+ def test_old34_complete_no_longer_complete(self):
+  v=receipt();v.update(materialsCompleted=34,completedBits=(1<<34)-1)
+  with self.assertRaises(ValueError):ci.validate(v,IDENT)
+ def test_unknown_id35_and_high_bit_rejected(self):
+  for values in [dict(materialId=35,firstFailureMaterial=35),dict(materialId='Plant_Stem_Green'),dict(completedBits=1<<35,materialsCompleted=1)]:
+   v=failure();v.update(values)
+   with self.assertRaises(ValueError):ci.validate(v,IDENT)
+ def test_initializer_ids_equal_reflection_and_external_manifest(self):
+  import reflection_progress_ci as progress
+  names=re.findall(r'"([A-Za-z0-9_]+)"',self.source().split('static readonly string[] Names={',1)[1].split('};',1)[0]);self.assertEqual(tuple(names),tuple(progress.MATERIAL_IDS))
+ def test_stem_smoothness_bits_and_unknown_id_bounds(self):
+  v=failure(8);v.update(materialId=34,firstFailureMaterial=34,smoothnessMaterialId=34);ci.validate(v,IDENT)
+  v['smoothnessMaterialId']=35
+  with self.assertRaises(ValueError):ci.validate(v,IDENT)
+  v=receipt();self.assertEqual(v['smoothnessMaterialId'],34);ci.validate(v,IDENT)
 if __name__=='__main__':unittest.main()

@@ -29,7 +29,7 @@ INT_FIELDS = frozenset({'stageCode', 'pixelSampleCount', 'height', 'captureRende
 LONG_FIELDS = frozenset({'fileBytes', 'metaBytes', 'captureTriangles'})
 
 
-MATERIAL_IDS = ('Aged_Aluminium', 'Bone_Laminate', 'Brass_Worn', 'Ceramic_Glazed', 'Charcoal_Metal', 'CounterToolTag_1', 'CounterToolTag_2', 'CounterToolTag_3', 'Cream_Plaster', 'Dark_Green_Felt', 'Decoration_Print_Atlas', 'Display_Silver_Coating', 'Glass_Blue_Water', 'Glass_Clear', 'Grout', 'Heritage_Green_Paint', 'Ink', 'Leaves_Green', 'Newspaper', 'Oxblood_Enamel', 'Paper_Ivory', 'Plastic_Cream', 'Rubber', 'Service_Monitor', 'ShopSign', 'StreetBlur', 'Ticket_Swap_1', 'Ticket_Swap_2', 'Ticket_Type_Label', 'Warm_Light', 'Warm_Oak', 'Warm_Terrazzo', 'Tool_Dock_Liner', 'Nearfield_Tea')
+MATERIAL_IDS = ('Aged_Aluminium', 'Bone_Laminate', 'Brass_Worn', 'Ceramic_Glazed', 'Charcoal_Metal', 'CounterToolTag_1', 'CounterToolTag_2', 'CounterToolTag_3', 'Cream_Plaster', 'Dark_Green_Felt', 'Decoration_Print_Atlas', 'Display_Silver_Coating', 'Glass_Blue_Water', 'Glass_Clear', 'Grout', 'Heritage_Green_Paint', 'Ink', 'Leaves_Green', 'Newspaper', 'Oxblood_Enamel', 'Paper_Ivory', 'Plastic_Cream', 'Rubber', 'Service_Monitor', 'ShopSign', 'StreetBlur', 'Ticket_Swap_1', 'Ticket_Swap_2', 'Ticket_Type_Label', 'Warm_Light', 'Warm_Oak', 'Warm_Terrazzo', 'Tool_Dock_Liner', 'Nearfield_Tea', 'Plant_Stem_Green')
 CHANGE_BITS = frozenset(('matBits','metaBits','packBits','packMetaBits'))
 DIRTY_BITS = frozenset(('dirtyMatBits','dirtyPackBits'))
 DIRTY_STAGES = frozenset((21,71,112,212,306,310,311,320,321,322,323,324,325))
@@ -51,7 +51,7 @@ def material_difference(a,b):
 
 def validate_material_audit(receipt):
     a=receipt['materialAudit'];require(isinstance(a,dict) and set(a)==AUDIT_FIELDS,'MATERIAL_AUDIT_FIELDS_REJECTED')
-    require(type(a['ready']) is bool and type(a['error']) is bool and all(integer(a[k],0,BIT_LIMIT) for k in ('missingBits','changedBits')) and integer(a['stages'],0,(1<<len(MATERIAL_STAGES))-1) and integer(a['overflow'],0,34),'MATERIAL_AUDIT_RANGE_REJECTED')
+    require(type(a['ready']) is bool and type(a['error']) is bool and all(integer(a[k],0,BIT_LIMIT) for k in ('missingBits','changedBits')) and integer(a['stages'],0,(1<<len(MATERIAL_STAGES))-1) and integer(a['overflow'],0,35),'MATERIAL_AUDIT_RANGE_REJECTED')
     rows=a['records'];require(isinstance(rows,list) and len(rows)<=4,'MATERIAL_AUDIT_COUNT_REJECTED')
     require(not (a['error'] or a['overflow']) or receipt['diagnosticWriteFailed'],'MATERIAL_AUDIT_INCOMPLETE_REJECTED')
     require(not a['missingBits'] or a['error'] and not a['ready'],'MATERIAL_AUDIT_MISSING_REJECTED')
@@ -64,7 +64,7 @@ def validate_material_audit(receipt):
     seen=set()
     for r in rows:
         require(isinstance(r,dict) and set(r)==RECORD_FIELDS,'MATERIAL_RECORD_FIELDS_REJECTED')
-        require(integer(r['id'],0,33) and r['id'] not in seen and a['changedBits']&(1<<r['id']),'MATERIAL_RECORD_ID_REJECTED');seen.add(r['id'])
+        require(integer(r['id'],0,34) and r['id'] not in seen and a['changedBits']&(1<<r['id']),'MATERIAL_RECORD_ID_REJECTED');seen.add(r['id'])
         require(type(r['firstStage']) is int and type(r['lastStage']) is int and r['firstStage'] in MATERIAL_STAGES[1:] and r['lastStage'] in MATERIAL_STAGES[1:] and r['firstStage']<=r['lastStage'] and all(a['stages']&(1<<MATERIAL_STAGES.index(r[k])) for k in ('firstStage','lastStage')),'MATERIAL_RECORD_STAGE_REJECTED')
         require(integer(r['changeBits'],1,511) and integer(r['lastBits'],0,511),'MATERIAL_RECORD_BITS_REJECTED')
         for key in ('before','first','last'):

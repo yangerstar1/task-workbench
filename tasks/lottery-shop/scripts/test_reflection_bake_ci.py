@@ -172,10 +172,63 @@ class ReflectionEvidenceTests(unittest.TestCase):
 
 
 
+class EmptySpriteMetadataCompatibilityTests(unittest.TestCase):
+    def test_current_root_owner_rejects_children_below_scalar_root(self):
+        valid=(b'fileFormatVersion: 2\nTextureImporter:\n  mipmaps:\n    enableMipMap: 1\n    sRGBTexture: 0\n  textureShape: 2\nguid: '+bake.GUIDS['day'].encode()+b'\n')
+        for suffix in (b'  spriteSheet:\n    customData: \n',b'  spriteSheet:\n    spriteCustomMetadata:\n      entries: []\n',b'  serializedVersion: 12\n',b'  bumpmap:\n    convertToNormalMap: 0\n'):
+            with self.subTest(suffix=suffix):
+                with self.assertRaises(ValueError):bake.validate_meta(valid+suffix)
+        scalar_last=valid.replace(b'fileFormatVersion: 2\n',b'')+b'fileFormatVersion: 2\n'
+        with self.assertRaises(ValueError):bake.validate_meta(scalar_last+b'  spriteSheet:\n    customData: \n')
+    def test_valid_root_order_still_accepts_complete_importer(self):
+        valid=(b'fileFormatVersion: 2\nTextureImporter:\n  mipmaps:\n    enableMipMap: 1\n    sRGBTexture: 0\n  textureShape: 2\nguid: '+bake.GUIDS['day'].encode()+b'\n')
+        bake.validate_meta(valid)
+        bake.validate_meta(valid.replace(b'fileFormatVersion: 2\n',b'')+b'fileFormatVersion: 2\n')
+    def sprite_meta(self, suffix):
+        return meta(bake.GUIDS['day']).replace(b'  userData:',b'  spriteSheet:\n    serializedVersion: 2\n    sprites: []\n'+suffix+b'  userData:')
+    def test_exact_empty_official_sprite_metadata_is_accepted(self):
+        for suffix in (b'    customData: \n', b'    spriteCustomMetadata:\n      entries: []\n', b'    customData: \n    spriteCustomMetadata:\n      entries: []\n'):
+            with self.subTest(suffix=suffix):bake.validate_meta(self.sprite_meta(suffix))
+    def test_empty_metadata_negative_values_structure_duplicates_fail_closed(self):
+        bad=(b'    customData: secret\n',b'    customData: {}\n',b'    customData: []\n',b'    customData: \"\"\n',b'    customData: \n    customData: \n',b'  customData: \n',b'      customData: \n',b'    spriteCustomMetadata: {}\n',b'    spriteCustomMetadata: []\n',b'    spriteCustomMetadata: secret\n',b'    spriteCustomMetadata:\n',b'    spriteCustomMetadata:\n      entries: {}\n',b'    spriteCustomMetadata:\n      entries: [secret]\n',b'    spriteCustomMetadata:\n      entries: \n',b'    spriteCustomMetadata:\n      entries: []\n      entries: []\n',b'    spriteCustomMetadata:\n      unexpected: []\n',b'    spriteCustomMetadata:\n      entries: []\n      customData: \n',b'    spriteCustomMetadata:\n      entries: []\n    spriteCustomMetadata:\n      entries: []\n',b'    entries: []\n',b'  spriteCustomMetadata:\n    entries: []\n',b'    spriteCustomMetadata:\n    entries: []\n',b'    spriteCustomMetadata:\n        entries: []\n',b'    spriteCustomMetadata:\n      - entries: []\n',b'    spriteCustomMetadata:\n      entries: []\n    bones: []\n      entries: []\n',b'    spriteCustomMetadata:\n      entries: []\n  userData: \n      entries: []\n',b'    customData: &anchor\n',b'    customData: *anchor\n',b'    customData: !!str\n',b'    spriteCustomMetadata:\n      entries: [ ]\n')
+        for suffix in bad:
+            with self.subTest(suffix=suffix):
+                with self.assertRaises(ValueError):bake.validate_meta(self.sprite_meta(suffix))
+    def test_empty_sprite_id_is_limited_by_existing_cubemap_contract(self):
+        for value in (b'',b'0123456789abcdef0123456789abcdef'):
+            payload=self.sprite_meta(b'    spriteID: '+value+b'\n');bake.validate_meta(payload)
+            with self.assertRaises(ValueError):bake.validate_meta(payload.replace(b'textureShape: 2',b'textureShape: 1'))
+            with self.assertRaises(ValueError):bake.validate_meta(payload.replace(b'sRGBTexture: 0',b'sRGBTexture: 1'))
+        for value in (b'0',b'null',b'{}',b'[]',b'\"\"',b'ABCDEF0123456789ABCDEF0123456789',b'g'*32,b'0'*31,b'0'*33,b'&anchor',b'*anchor'):
+            with self.subTest(value=value):
+                with self.assertRaises(ValueError):bake.validate_meta(self.sprite_meta(b'    spriteID: '+value+b'\n'))
+    def test_new_key_diagnostics_are_bounded_and_other_unknowns_redacted(self):
+        for field,scope in [('customData','SPRITE_SHEET'),('spriteCustomMetadata','SPRITE_SHEET'),('entries','SPRITE_CUSTOM_METADATA')]:
+            suffix=(b'    '+field.encode()+b': secret\n') if field!='entries' else b'    spriteCustomMetadata:\n      entries: [secret]\n'
+            trace=bake.ExportTrace();trace.bind(IDENT);trace.stage='META_VALIDATE';trace.fileRole='DAY'
+            try:bake.validate_meta(self.sprite_meta(suffix),trace)
+            except ValueError as error:d=trace.receipt(error)
+            else:self.fail('must reject')
+            self.assertEqual((d['metaScope'],d['metaField']),(scope,field));self.assertNotIn('secret',json.dumps(d));self.assertEqual(d['status'],'FAILED')
+        trace=bake.ExportTrace();trace.bind(IDENT);trace.stage='META_VALIDATE'
+        try:bake.validate_meta(self.sprite_meta(b'    spriteCustomMetadata:\n      arbitrary_secret_key: []\n'),trace)
+        except ValueError as error:d=trace.receipt(error)
+        self.assertEqual(d['metaField'],'UNKNOWN');self.assertNotIn('arbitrary_secret_key',json.dumps(d))
+
+
 class ExportDiagnosticTests(unittest.TestCase):
     setUp=ReflectionEvidenceTests.setUp
     save=ReflectionEvidenceTests.save
     def diagnostic(self):return json.loads((bake.visual.outdir(self.root)/bake.DIAGNOSTIC_NAME).read_text())
+    def test_official_empty_extensions_export_exact_original_bytes(self):
+        payload=meta(bake.GUIDS['day']).replace(b'  userData:',b'  spriteSheet:\n    serializedVersion: 2\n    sprites: []\n    customData: \n    spriteID: \n    spriteCustomMetadata:\n      entries: []\n  userData:')
+        self.alter_meta(payload);self.assertEqual(bake.run(self.root),0)
+        self.assertEqual((bake.visual.outdir(self.root)/'reflections/Day.exr.meta').read_bytes(),payload)
+    def test_nonempty_extension_cannot_export_any_original(self):
+        payload=meta(bake.GUIDS['day']).replace(b'  userData:',b'  spriteSheet:\n    customData: SECRET_PAYLOAD\n  userData:')
+        self.alter_meta(payload);self.assertEqual(bake.run(self.root),1)
+        self.assertFalse((bake.visual.outdir(self.root)/'reflections').exists());d=self.diagnostic()
+        self.assertEqual((d['metaScope'],d['metaField']),('SPRITE_SHEET','customData'));self.assertNotIn('SECRET_PAYLOAD',json.dumps(d))
     def test_diagnostic_complete_is_fixed_bound_sidecar(self):
         self.assertEqual(bake.run(self.root),0);d=self.diagnostic()
         self.assertEqual(set(d),{'schemaVersion','scope','sourceCommit','runId','runAttempt','status','stage','fileRole','metaScope','metaField','errorCode','exceptionKind'})

@@ -80,26 +80,32 @@ NUMBER = r'-?[0-9]+(?:\.[0-9]+)?(?:[eE][+-]?[0-9]+)?'
 def validate_meta(data, trace=None):
     text = data.decode('utf-8'); lines = text.splitlines()
     require(len(lines) <= 256 and all(len(line) <= 512 for line in lines), 'REFLECTION_META_SIZE_REJECTED')
-    seen = {}; section = None; platform = -1; targets = set()
+    seen = {}; section = None; sprite_child = None; root_owner = None; platform = -1; targets = set()
     for line in lines:
         if trace is not None:trace.meta('UNKNOWN','UNKNOWN')
         match = re.fullmatch(r'( *)(- )?([A-Za-z_][A-Za-z0-9_]*):[ ]*(.*)', line)
         require(match is not None, 'REFLECTION_META_LINE_REJECTED')
         if trace is not None:trace.meta('UNKNOWN',match[3])
         indent=len(match[1]); dash=match[2] is not None; key=match[3]; value=match[4].rstrip(' ')
+        if indent > 0:
+            require(root_owner == 'TextureImporter', 'REFLECTION_META_STRUCTURE_REJECTED')
         if indent == 0:
             require(not dash and key in {'fileFormatVersion','guid','TextureImporter'}, 'REFLECTION_META_ROOT_REJECTED')
-            scope='root'; section=None
+            scope='root'; section=None; sprite_child=None; root_owner=key
         elif indent == 2 and dash:
             require(section == 'platformSettings' and key == 'serializedVersion', 'REFLECTION_META_LIST_REJECTED')
             platform+=1; require(platform < 8, 'REFLECTION_META_LIST_REJECTED'); scope='platformSettings:'+str(platform)
         elif indent == 2:
             require(not dash and ('root','TextureImporter') in seen, 'REFLECTION_META_STRUCTURE_REJECTED')
-            scope='TextureImporter'; section=key if key in META_SECTIONS else None
+            scope='TextureImporter'; section=key if key in META_SECTIONS else None; sprite_child=None
         elif indent == 4:
             require(not dash and section in META_SECTIONS, 'REFLECTION_META_STRUCTURE_REJECTED')
             require(section != 'platformSettings' or platform >= 0, 'REFLECTION_META_LIST_REJECTED')
             scope=section+':'+str(platform) if section == 'platformSettings' else section
+            sprite_child=key if section=='spriteSheet' and key=='spriteCustomMetadata' else None
+        elif indent == 6:
+            require(not dash and section=='spriteSheet' and sprite_child=='spriteCustomMetadata', 'REFLECTION_META_STRUCTURE_REJECTED')
+            scope='spriteCustomMetadata'
         else:
             require(False, 'REFLECTION_META_STRUCTURE_REJECTED')
         if trace is not None:trace.meta(scope,key)
@@ -123,11 +129,18 @@ def validate_meta(data, trace=None):
             ok=value in META_PLATFORMS and value not in targets;targets.add(value)
         elif kind=='spriteSheet' and key in {'sprites','outline','physicsShape','bones','vertices','edges','weights','secondaryTextures'}:
             ok=value=='[]'
+        elif kind=='spriteSheet' and key in {'customData','spriteCustomMetadata'}:ok=value==''
+        elif kind=='spriteCustomMetadata' and key=='entries':ok=value=='[]'
         elif kind=='spriteSheet' and key=='indices':ok=value in ('','[]')
         elif kind=='spriteSheet' and key=='nameFileIdTable':ok=value=='{}'
-        elif kind=='spriteSheet' and key=='spriteID':ok=re.fullmatch(r'[0-9a-f]{32}',value) is not None
+        elif kind=='spriteSheet' and key=='spriteID':
+            # Empty ID is Unity's non-sprite cubemap default. The mandatory
+            # import contract below still requires textureShape == 2.
+            ok=value=='' or re.fullmatch(r'[0-9a-f]{32}',value) is not None
         else:ok=False
         require(ok, 'REFLECTION_META_FIELD_OR_VALUE_REJECTED')
+    if ('spriteSheet','spriteCustomMetadata') in seen:
+        require(seen.get(('spriteCustomMetadata','entries'))=='[]', 'REFLECTION_META_STRUCTURE_REJECTED')
     required={('root','fileFormatVersion'):'2',('root','TextureImporter'):'',('TextureImporter','textureShape'):'2',('mipmaps','sRGBTexture'):'0',('mipmaps','enableMipMap'):'1'}
     require(('root','guid') in seen and all(seen.get(key)==value for key,value in required.items()), 'REFLECTION_META_IMPORT_REJECTED')
     for n in range(platform+1):require(('platformSettings:'+str(n),'buildTarget') in seen, 'REFLECTION_META_PLATFORM_REJECTED')
@@ -249,8 +262,8 @@ DIAGNOSTIC_NAME = 'reflection-export-diagnostic.json'
 DIAGNOSTIC_SCOPE = 'REFLECTION_EXPORT_DIAGNOSTIC_NOT_NATIVE_OR_VISUAL_PASS'
 DIAGNOSTIC_CODES = frozenset(['REFLECTION_BACKGROUND_ONLY_REJECTED', 'REFLECTION_BAKE_EVIDENCE_REJECTED', 'REFLECTION_CAPTURE_GEOMETRY_REJECTED', 'REFLECTION_COMPLETENESS_REJECTED', 'REFLECTION_DEPENDENCY_REJECTED', 'REFLECTION_DESTINATION_REJECTED', 'REFLECTION_EXR_DIMENSIONS_REJECTED', 'REFLECTION_EXR_HEADER_REJECTED', 'REFLECTION_EXR_REJECTED', 'REFLECTION_EXR_VERSION_REJECTED', 'REFLECTION_EXR_WINDOW_MISSING', 'REFLECTION_EXR_WINDOW_REJECTED', 'REFLECTION_FILE_REJECTED', 'REFLECTION_HASH_REJECTED', 'REFLECTION_IDENTITY_REJECTED', 'REFLECTION_IMPORT_REJECTED', 'REFLECTION_INPUT_BYTES_REJECTED', 'REFLECTION_INPUT_DIRECTORY_REJECTED', 'REFLECTION_INPUT_LINK_REJECTED', 'REFLECTION_INPUT_PATH_REJECTED', 'REFLECTION_INPUT_SET_REJECTED', 'REFLECTION_JSON_DUPLICATE_KEY', 'REFLECTION_LINK_REJECTED', 'REFLECTION_META_DUPLICATE_KEY', 'REFLECTION_META_FIELD_OR_VALUE_REJECTED', 'REFLECTION_META_GUID_REJECTED', 'REFLECTION_META_IMPORT_REJECTED', 'REFLECTION_META_LINE_REJECTED', 'REFLECTION_META_LIST_REJECTED', 'REFLECTION_META_PLATFORM_REJECTED', 'REFLECTION_META_ROOT_REJECTED', 'REFLECTION_META_SIZE_REJECTED', 'REFLECTION_META_STRUCTURE_REJECTED', 'REFLECTION_ORIGINAL_HASH_REJECTED', 'REFLECTION_RECEIPT_FIELDS_REJECTED', 'REFLECTION_RECIPE_REJECTED', 'REFLECTION_RUN_IDENTITY_REJECTED', 'REFLECTION_SOURCE_DIGEST_REJECTED', 'REFLECTION_SOURCE_INPUT_CHANGED', 'REFLECTION_STALE_OUTPUT_REJECTED', 'REFLECTION_TEXTURE_FIELDS_REJECTED', 'REFLECTION_TEXTURE_IDENTITY_REJECTED', 'REFLECTION_TEXTURE_SIZE_REJECTED']) | {'NONE','UNKNOWN'}
 DIAGNOSTIC_STAGES = frozenset({'DESTINATION','IDENTITY','RECEIPT_READ','RECEIPT_VALIDATE','SOURCE_DIGEST','ORIGINAL_READ','ORIGINAL_HASH','EXR_HEADER','META_VALIDATE','META_GUID','EXPORT_COPY','COMPLETE'})
-META_FIELD_CODES = frozenset().union(*META_NUMERIC.values(),META_SECTIONS,META_EMPTY,{'fileFormatVersion','guid','TextureImporter','internalIDToNameTable','externalObjects','spritePivot','spriteBorder','buildTarget','sprites','outline','physicsShape','bones','vertices','edges','weights','secondaryTextures','indices','nameFileIdTable','spriteID'})
-META_SCOPE_CODES = {'root':'ROOT','TextureImporter':'TEXTURE_IMPORTER','mipmaps':'MIPMAPS','bumpmap':'BUMPMAP','textureSettings':'TEXTURE_SETTINGS','platformSettings':'PLATFORM_SETTINGS','spriteSheet':'SPRITE_SHEET'}
+META_FIELD_CODES = frozenset().union(*META_NUMERIC.values(),META_SECTIONS,META_EMPTY,{'fileFormatVersion','guid','TextureImporter','internalIDToNameTable','externalObjects','spritePivot','spriteBorder','buildTarget','sprites','outline','physicsShape','bones','vertices','edges','weights','secondaryTextures','indices','nameFileIdTable','spriteID','customData','spriteCustomMetadata','entries'})
+META_SCOPE_CODES = {'root':'ROOT','TextureImporter':'TEXTURE_IMPORTER','mipmaps':'MIPMAPS','bumpmap':'BUMPMAP','textureSettings':'TEXTURE_SETTINGS','platformSettings':'PLATFORM_SETTINGS','spriteSheet':'SPRITE_SHEET','spriteCustomMetadata':'SPRITE_CUSTOM_METADATA'}
 
 
 class ExportTrace:
