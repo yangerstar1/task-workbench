@@ -26,6 +26,77 @@ def receipt():
                 captureMethod="URP_STANDARD_REQUEST_READPIXELS", hudVisibilityBasis="ENABLED_CAMERA_LAYER_AND_FRUSTUM_TEST_NOT_PIXEL_OCCLUSION", complete=True, frames=frames, actions=[])
 
 
+def progress_receipt(kind="runtime"):
+    return dict(schemaVersion=1, scope=candidate.SCOPE, kind=kind, sourceCommit="1" * 40, runId="12345", runAttempt="1",
+                status="MILESTONES_ONLY_NOT_TEST_PASS", events=[dict(stage="runtime-setup-begin" if kind == "runtime" else "prebuild-begin",
+                utc="2026-10-13T03:00:00.0000000Z", elapsedMs=0, inputUpdates=0, frameCount=0, purchased=-1, settled=-1, dayPhase="UNAVAILABLE")])
+
+
+class ProgressReceiptTests(unittest.TestCase):
+    def validate(self, value, kind="runtime"):
+        return candidate.validate_progress(value, kind, "1" * 40, "12345", "1")
+
+    def test_runtime_and_prebuild_milestones_are_observations_only(self):
+        self.validate(progress_receipt()); self.validate(progress_receipt("prebuild"), "prebuild")
+
+    def test_missing_progress_is_not_fabricated(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            with patch.object(candidate, "identity", return_value=dict(sourceCommit="1" * 40, runId="12345", runAttempt="1")):
+                candidate.export_progress(root)
+            self.assertFalse(candidate.outdir(root).exists())
+
+    def test_progress_export_only_fixed_named_files(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory); folder = root / candidate.TASK / "artifacts/visual-candidate"
+            candidate.write(folder / "runtime-progress.json", progress_receipt())
+            (folder / "Unity.log").write_text("synthetic unrelated file must not be exported")
+            with patch.object(candidate, "identity", return_value=dict(sourceCommit="1" * 40, runId="12345", runAttempt="1")):
+                candidate.export_progress(root)
+            self.assertEqual([x.name for x in candidate.outdir(root).iterdir()], ["runtime-progress.json"])
+
+    def test_progress_run_attempt_source_and_kind_must_match(self):
+        for key, wrong in (("runAttempt", "2"), ("runId", "99999"), ("sourceCommit", "2" * 40), ("kind", "prebuild")):
+            value = progress_receipt(); value[key] = wrong
+            with self.subTest(key=key), self.assertRaises(ValueError): self.validate(value)
+
+    def test_progress_refuses_arbitrary_text_fields_or_unknown_stages(self):
+        for event_key, value in (("exception", "not allowed"), ("stage", "arbitrary log text"), ("dayPhase", "arbitrary phase")):
+            receipt = progress_receipt(); receipt["events"][0][event_key] = value
+            with self.subTest(key=event_key), self.assertRaises(ValueError): self.validate(receipt)
+        value = progress_receipt(); value["rawLog"] = "not allowed"
+        with self.assertRaises(ValueError): self.validate(value)
+
+    def test_progress_bounds_and_clock_are_strict(self):
+        value = progress_receipt(); value["events"] *= 129
+        with self.assertRaises(ValueError): self.validate(value)
+        value = progress_receipt(); value["events"].append(dict(value["events"][0], elapsedMs=-1))
+        with self.assertRaises(ValueError): self.validate(value)
+        for key, wrong in (("elapsedMs", -1), ("inputUpdates", True), ("frameCount", 12), ("purchased", 13), ("settled", -2), ("utc", "not-a-date")):
+            value = progress_receipt(); value["events"][0][key] = wrong
+            with self.subTest(key=key), self.assertRaises(ValueError): self.validate(value)
+
+    def test_timeout_milestone_never_claims_pass(self):
+        value = progress_receipt(); value["events"].append(dict(value["events"][0], stage="runtime-timeout", elapsedMs=900001))
+        self.validate(value)
+        value["status"] = "PASS"
+        with self.assertRaises(ValueError): self.validate(value)
+
+    def test_fixture_loop_and_ci_backstop_remain_bounded_static(self):
+        root = Path(__file__).resolve().parents[3]
+        source = (root / candidate.TASK / "unity/Assets/G3/Tests/VisualCandidate/VisualCandidateCaptureTests.cs").read_text()
+        self.assertNotIn("while(State.TicketsPurchasedToday", source)
+        self.assertIn("for(int index = 0; index < remaining; index++)", source)
+        loop = source.split("for(int index = 0; index < remaining; index++)", 1)[1].split("Assert.That(State.TicketsPurchasedToday", 1)[0]
+        self.assertIn("yield return null;", loop)
+        self.assertIn('Assert.That(remaining, Is.InRange(0, 12)', source)
+        for text in ("State.TicketsPurchasedToday, Is.EqualTo(12)", "State.SettledTicketCount, Is.EqualTo(12)", "State.Phase, Is.EqualTo(DayPhase.CLOSING_PREP)", "frame < 600", "i < 1200", "Is.LessThan(UnloadSeconds)"):
+            self.assertIn(text, source)
+        workflow = (root / candidate.WORKFLOW).read_text()
+        self.assertIn("id: capture\n        timeout-minutes: 30", workflow)
+        self.assertIn("timeout-minutes: 60", workflow)
+
+
 class VisualCandidateEvidenceTests(unittest.TestCase):
     def validate(self, value, complete=True):
         return candidate.validate_capture(value, "1" * 40, "12345", "1", complete)

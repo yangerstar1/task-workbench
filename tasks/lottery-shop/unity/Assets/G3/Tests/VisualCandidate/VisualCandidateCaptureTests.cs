@@ -17,6 +17,7 @@ using UnityEngine.Rendering.Universal;
 using UnityEngine.SceneManagement;
 using UnityEngine.TestTools;
 using Object = UnityEngine.Object;
+using Stopwatch = System.Diagnostics.Stopwatch;
 
 namespace Lottery.G3.VisualCandidate.Tests
 {
@@ -47,6 +48,8 @@ namespace Lottery.G3.VisualCandidate.Tests
         bool capturedInputSettings;
         string storeDirectory, output;
         int inputUpdates;
+        ProgressTrail runtimeProgress;
+        const double RuntimeSeconds = 900, FaceSeconds = 120, WalkSeconds = 180, UnloadSeconds = 10;
         G3Presenter P => app.Presenter;
         G3InputRouter Router => P.Router;
         RunState State => P.Snapshot;
@@ -56,18 +59,27 @@ namespace Lottery.G3.VisualCandidate.Tests
         public void Setup()
         {
 #if UNITY_EDITOR
-            var type = AppDomain.CurrentDomain.GetAssemblies()
-                .Select(a => a.GetType("Lottery.G3.Editor.G3Build", false)).FirstOrDefault(t => t != null);
-            if(type == null) throw new InvalidOperationException("G3Build missing: no whitebox fallback");
-            var prepare = type.GetMethod("Prepare", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static);
-            if(prepare == null) throw new InvalidOperationException("G3Build.Prepare missing");
-            prepare.Invoke(null, null);
+            var progress = new ProgressTrail("prebuild");
+            progress.Mark("prebuild-begin");
+            try
+            {
+                var type = AppDomain.CurrentDomain.GetAssemblies()
+                    .Select(a => a.GetType("Lottery.G3.Editor.G3Build", false)).FirstOrDefault(t => t != null);
+                if(type == null) throw new InvalidOperationException("G3Build missing: no whitebox fallback");
+                var prepare = type.GetMethod("Prepare", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static);
+                if(prepare == null) throw new InvalidOperationException("G3Build.Prepare missing");
+                prepare.Invoke(null, null);
+                progress.Mark("prebuild-end");
+            }
+            catch { progress.Mark("prebuild-failed"); throw; }
 #endif
         }
 
         [UnitySetUp]
         public IEnumerator SetUpRuntime()
         {
+            runtimeProgress = new ProgressTrail("runtime");
+            runtimeProgress.Mark("runtime-setup-begin");
             prior = SceneManager.GetActiveScene();
             // Isolate only project-owned objects across loaded scenes. Never disable
             // an arbitrary ancestor that could contain the Unity test controller.
@@ -130,11 +142,14 @@ namespace Lottery.G3.VisualCandidate.Tests
             Directory.CreateDirectory(output);
             frames.Clear(); actions.Clear();
             WriteReceipt(false);
+            Milestone("runtime-setup-end");
+            CheckRuntimeBudget();
         }
 
         [UnityTearDown]
         public IEnumerator TearDownRuntime()
         {
+            runtimeProgress?.Mark("runtime-teardown-begin");
             ReleaseTarget();
             if(app != null) Object.Destroy(app.gameObject);
             store?.Dispose();
@@ -158,9 +173,16 @@ namespace Lottery.G3.VisualCandidate.Tests
             if(scene.IsValid() && scene.isLoaded)
             {
                 var unloading = SceneManager.UnloadSceneAsync(scene);
-                if(unloading != null) yield return unloading;
+                var timer = Stopwatch.StartNew();
+                for(int frame = 0; unloading != null && !unloading.isDone && frame < 600; frame++)
+                {
+                    Assert.That(timer.Elapsed.TotalSeconds, Is.LessThan(UnloadSeconds), "Visual fixture scene unload exceeded 10 seconds");
+                    yield return null;
+                }
+                Assert.That(unloading == null || unloading.isDone, Is.True, "Visual fixture scene unload exceeded 600 frames");
             }
             if(storeDirectory != null && Directory.Exists(storeDirectory)) Directory.Delete(storeDirectory, true);
+            runtimeProgress?.Mark("runtime-teardown-end");
         }
 
         [UnityTest]
@@ -184,7 +206,7 @@ namespace Lottery.G3.VisualCandidate.Tests
             Capture("number-half-20x9", "SAME_STATE_ALTERNATE_ASPECT");
             Assert.That(StateCodec.ComputeHash(State), Is.EqualTo(halfHash));
             BindTarget(1280, 720); yield return null;
-            Click("quick"); Claim();
+            QuickRevealNumber(); Claim();
             BuyStock("inspection_lamp"); Equip("inspection_lamp", 1);
             BuyStock("large_prize_stamp"); Equip("large_prize_stamp", 2);
             Buy("challenge"); RevealSelected(0); RevealSelected(1);
@@ -228,7 +250,20 @@ namespace Lottery.G3.VisualCandidate.Tests
             yield return null; Capture("challenge-returned-from-shelf", "KEYBOARD_RETURN_SAME_CONFIRMED_TICKET");
             Claim();
 
-            while(State.TicketsPurchasedToday < 12) { Buy("number"); Click("quick"); Claim(); }
+            int remaining = 12 - State.TicketsPurchasedToday;
+            Assert.That(remaining, Is.InRange(0, 12), "Invalid remaining day quota");
+            Assert.That(State.SettledTicketCount, Is.EqualTo(State.TicketsPurchasedToday));
+            for(int index = 0; index < remaining; index++)
+            {
+                CheckRuntimeBudget();
+                Buy("number"); QuickRevealNumber(); Claim();
+                Milestone("day-ticket-settled");
+                yield return null;
+            }
+            Assert.That(State.TicketsPurchasedToday, Is.EqualTo(12));
+            Assert.That(State.SettledTicketCount, Is.EqualTo(12));
+            Assert.That(State.Tickets.Select(x => x.Id).Distinct().Count(), Is.EqualTo(12));
+            Assert.That(State.HasUnsettledTicket, Is.False);
             Assert.That(State.Phase, Is.EqualTo(DayPhase.CLOSING_PREP));
             yield return null; Capture("closing-day-table", "NORMAL_SEATED_PLAYER_VIEW");
             var dayPosition = app.SceneCamera.transform.position; var dayRotation = app.SceneCamera.transform.rotation;
@@ -245,10 +280,22 @@ namespace Lottery.G3.VisualCandidate.Tests
             Assert.That(frames.Single(x => x.stage == "shelf-before-open").sha256, Is.Not.EqualTo(frames.Single(x => x.stage == "shelf-after-open").sha256));
             Assert.That(frames.Single(x => x.stage == "closing-day-table").sha256, Is.Not.EqualTo(frames.Single(x => x.stage == "night-table").sha256));
             WriteReceipt(true);
+            Milestone("scenario-complete");
         }
+
+        void CheckRuntimeBudget()
+        {
+            if(runtimeProgress != null && runtimeProgress.ElapsedSeconds >= RuntimeSeconds)
+            {
+                Milestone("runtime-timeout");
+                Assert.Fail("Visual fixture runtime exceeded 900 seconds; this is a diagnostic failure, never a skip or pass");
+            }
+        }
+        void Milestone(string stage) => runtimeProgress?.Mark(stage, app != null && app.Presenter != null ? State : null, inputUpdates, frames.Count);
 
         void Pump()
         {
+            CheckRuntimeBudget();
             InputSystem.Update(); inputUpdates++;
             Assert.That(InputState.currentUpdateType, Is.EqualTo(InputUpdateType.Manual));
             Router.PollInput();
@@ -280,8 +327,58 @@ namespace Lottery.G3.VisualCandidate.Tests
         void Confirm() { Assert.That(P.Panel, Is.EqualTo(G3Panel.Confirm)); Click("confirm-action"); }
         void Close() { if(P.Panel != G3Panel.None) Click("close-panel"); }
         void Buy(string type)
-        { Close(); Click("open-tickets"); Click(type == "number" ? "buy-number" : "buy-challenge"); Confirm(); Assert.That(State.CurrentTicket.TicketType, Is.EqualTo(type)); }
-        void Claim() { Click("claim"); if(P.Panel == G3Panel.Confirm) Confirm(); Close(); }
+        {
+            var before = State.Copy();
+            Assert.That(before.HasUnsettledTicket, Is.False);
+            Assert.That(before.TicketsPurchasedToday, Is.InRange(0, 11));
+            Close(); Click("open-tickets"); Click(type == "number" ? "buy-number" : "buy-challenge"); Confirm();
+            var after = State; var ticket = after.CurrentTicket;
+            Assert.That(ticket, Is.Not.Null);
+            Assert.That(ticket.Id, Is.Not.Empty);
+            Assert.That(before.Tickets.Any(x => x.Id == ticket.Id), Is.False, "Purchase must create a new ticket identity");
+            Assert.That(ticket.TicketType, Is.EqualTo(type));
+            Assert.That(ticket.Phase, Is.EqualTo(TicketPhase.ACTIVE));
+            Assert.That(ticket.PriceMinor, Is.EqualTo(DayRules.TicketPriceMinor));
+            Assert.That(after.Phase, Is.EqualTo(DayPhase.DAY_OPEN));
+            Assert.That(after.TicketsPurchasedToday, Is.EqualTo(before.TicketsPurchasedToday + 1));
+            Assert.That(after.Tickets.Count, Is.EqualTo(before.Tickets.Count + 1));
+            Assert.That(after.SettledTicketCount, Is.EqualTo(before.SettledTicketCount));
+            Assert.That(after.Settlements.Count, Is.EqualTo(before.Settlements.Count));
+            Assert.That(after.CashMinor, Is.EqualTo(before.CashMinor - DayRules.TicketPriceMinor));
+            Assert.That(after.HasUnsettledTicket, Is.True);
+        }
+        void QuickRevealNumber()
+        {
+            var before = State.Copy(); string id = before.CurrentTicket.Id;
+            Assert.That(before.CurrentTicket.TicketType, Is.EqualTo("number"));
+            Assert.That(before.CurrentTicket.Phase, Is.EqualTo(TicketPhase.ACTIVE));
+            Click("quick");
+            var after = State;
+            Assert.That(after.CurrentTicket.Id, Is.EqualTo(id));
+            Assert.That(after.CurrentTicket.Phase, Is.EqualTo(TicketPhase.REVEALED_UNCLAIMED));
+            Assert.That(after.CurrentTicket.Scratch.IsFullyRevealed, Is.True);
+            Assert.That(after.CashMinor, Is.EqualTo(before.CashMinor));
+            Assert.That(after.TicketsPurchasedToday, Is.EqualTo(before.TicketsPurchasedToday));
+            Assert.That(after.SettledTicketCount, Is.EqualTo(before.SettledTicketCount));
+            Assert.That(after.Settlements.Count, Is.EqualTo(before.Settlements.Count));
+        }
+        void Claim()
+        {
+            var before = State.Copy(); string id = before.CurrentTicket.Id;
+            Assert.That(before.HasUnsettledTicket, Is.True);
+            Assert.That(before.Settlements.Count(x => x.TicketId == id), Is.EqualTo(0));
+            Click("claim"); if(P.Panel == G3Panel.Confirm) Confirm(); Close();
+            var after = State;
+            Assert.That(after.CurrentTicket.Id, Is.EqualTo(id));
+            Assert.That(after.CurrentTicket.Phase, Is.EqualTo(TicketPhase.SETTLED));
+            Assert.That(after.TicketsPurchasedToday, Is.EqualTo(before.TicketsPurchasedToday));
+            Assert.That(after.SettledTicketCount, Is.EqualTo(before.SettledTicketCount + 1));
+            Assert.That(after.Settlements.Count, Is.EqualTo(before.Settlements.Count + 1));
+            Assert.That(after.Settlements.Count(x => x.TicketId == id), Is.EqualTo(1));
+            Assert.That(after.CashMinor, Is.EqualTo(before.CashMinor + after.Settlements.Single(x => x.TicketId == id).TotalMinor));
+            Assert.That(after.HasUnsettledTicket, Is.False);
+            Assert.That(after.Phase, Is.EqualTo(after.TicketsPurchasedToday == 12 ? DayPhase.CLOSING_PREP : DayPhase.DAY_OPEN));
+        }
         void BuyStock(string item)
         { Close(); Click("open-shop"); Click("stock-" + State.Stock.Single(x => x.ItemId == item).StockId); Click("stock-buy"); Confirm(); Close(); }
         void Equip(string item, int slot)
@@ -302,12 +399,15 @@ namespace Lottery.G3.VisualCandidate.Tests
         { MouseEvent(CellPoint(core), true); MouseEvent(CellPoint(core), false); Assert.That(State.CurrentTicket.SelectedCell, Is.EqualTo(core)); Click("quick"); Assert.That(State.CurrentTicket.RevealedCells[core], Is.True); }
         IEnumerator Face(Vector3 point)
         {
+            var timer = Stopwatch.StartNew(); Milestone("face-begin");
             for(int i = 0; i < 600; i++)
             {
+                CheckRuntimeBudget();
+                Assert.That(timer.Elapsed.TotalSeconds, Is.LessThan(FaceSeconds), "Keyboard turn exceeded 120 seconds");
                 var offset = point - app.SceneCamera.transform.position;
                 float desired = Mathf.Atan2(offset.x, offset.z) * Mathf.Rad2Deg;
                 float delta = Mathf.DeltaAngle(app.SceneCamera.transform.eulerAngles.y, desired);
-                if(Mathf.Abs(delta) < 1.5f) { KeyboardEvent(); yield break; }
+                if(Mathf.Abs(delta) < 1.5f) { KeyboardEvent(); Milestone("face-end"); yield break; }
                 KeyboardEvent(delta > 0 ? Key.RightArrow : Key.LeftArrow); yield return null;
             }
             KeyboardEvent(); Assert.Fail("Keyboard turn did not reach the physical target");
@@ -315,11 +415,14 @@ namespace Lottery.G3.VisualCandidate.Tests
         IEnumerator WalkTo(Vector3 destination)
         {
             var start = P.View.Walk.SavedPosition;
+            var timer = Stopwatch.StartNew(); Milestone("walk-begin");
             yield return Face(new Vector3(destination.x, app.SceneCamera.transform.position.y, destination.z));
             for(int i = 0; i < 1200; i++)
             {
+                CheckRuntimeBudget();
+                Assert.That(timer.Elapsed.TotalSeconds, Is.LessThan(WalkSeconds), "Keyboard waypoint exceeded 180 seconds");
                 var at = P.View.Walk.SavedPosition; var delta = new Vector2(destination.x - at.x, destination.z - at.z);
-                if(delta.magnitude < .09f) { KeyboardEvent(); Observe("keyboard-walk-waypoint"); yield break; }
+                if(delta.magnitude < .09f) { KeyboardEvent(); Observe("keyboard-walk-waypoint"); Milestone("walk-end"); yield break; }
                 float desired = Mathf.Atan2(delta.x, delta.y) * Mathf.Rad2Deg;
                 float angle = Mathf.DeltaAngle(app.SceneCamera.transform.eulerAngles.y, desired);
                 KeyboardEvent(Mathf.Abs(angle) > 4 ? (angle > 0 ? Key.RightArrow : Key.LeftArrow) : Key.W);
@@ -350,6 +453,7 @@ namespace Lottery.G3.VisualCandidate.Tests
         { return new ProjectionReceipt { x = rect.x, y = rect.y, width = rect.width, height = rect.height }; }
         void Capture(string stage, string cameraOrigin)
         {
+            CheckRuntimeBudget(); Milestone("capture-begin:" + stage);
             P.View.RefreshGlyphGeometry();
             Assert.That(P.View.AllHudLabelsFit, Is.True, string.Join(" | ", P.View.OverflowingHudLabels));
             var hud = app.SceneCamera.transform.Find("Same-camera readable HUD");
@@ -391,6 +495,7 @@ namespace Lottery.G3.VisualCandidate.Tests
                     hudVisible = hud.gameObject.activeInHierarchy && visibleHudRenderers > 5, hudFrustumRendererCount = visibleHudRenderers, hudFits = P.View.AllHudLabelsFit, qualityName = QualitySettings.names[QualitySettings.GetQualityLevel()]
                 });
                 WriteReceipt(false);
+                Milestone("capture-end:" + stage); CheckRuntimeBudget();
             }
             finally { RenderTexture.active = old; Object.Destroy(image); }
         }
@@ -409,6 +514,41 @@ namespace Lottery.G3.VisualCandidate.Tests
         }
         static string Arg(string key)
         { var args = Environment.GetCommandLineArgs(); int i = Array.IndexOf(args, key); return i >= 0 && i + 1 < args.Length ? args[i + 1] : ""; }
+        // Fixed-schema milestones only, never exception text, environment values, seeds, or Unity logs.
+        // Cooperative clocks cannot interrupt blocked native Unity calls; CI's step timeout is the backstop.
+        sealed class ProgressTrail
+        {
+            readonly Stopwatch timer = Stopwatch.StartNew();
+            readonly string kind, path;
+            readonly List<ProgressEvent> events = new List<ProgressEvent>();
+            public double ElapsedSeconds => timer.Elapsed.TotalSeconds;
+            public ProgressTrail(string kind)
+            {
+                this.kind = kind;
+                path = Path.GetFullPath(Path.Combine(Application.dataPath, "../../artifacts/visual-candidate/" + kind + "-progress.json"));
+                Directory.CreateDirectory(Path.GetDirectoryName(path));
+            }
+            public void Mark(string stage, RunState state = null, int inputUpdates = 0, int frameCount = 0)
+            {
+                Assert.That(events.Count, Is.LessThan(128), "Diagnostic milestone bound exceeded");
+                events.Add(new ProgressEvent { stage = stage, elapsedMs = timer.ElapsedMilliseconds,
+                    utc = DateTime.UtcNow.ToString("O"), inputUpdates = inputUpdates, frameCount = frameCount,
+                    purchased = state?.TicketsPurchasedToday ?? -1, settled = state?.SettledTicketCount ?? -1,
+                    dayPhase = state?.Phase.ToString() ?? "UNAVAILABLE" });
+                File.WriteAllText(path, JsonUtility.ToJson(new ProgressReceipt { kind = kind, sourceCommit = Arg("-probeCommit"),
+                    runId = Arg("-probeRunId"), runAttempt = Arg("-probeRunAttempt"), events = events.ToArray() }, true));
+                Debug.Log("VISUAL_CANDIDATE_PROGRESS " + kind + " " + stage + " elapsedMs=" + timer.ElapsedMilliseconds);
+            }
+        }
+        [Serializable] sealed class ProgressEvent
+        { public string stage, utc, dayPhase; public long elapsedMs; public int inputUpdates, frameCount, purchased, settled; }
+        [Serializable] sealed class ProgressReceipt
+        {
+            public int schemaVersion = 1;
+            public string scope = Scope, kind, sourceCommit, runId, runAttempt;
+            public string status = "MILESTONES_ONLY_NOT_TEST_PASS";
+            public ProgressEvent[] events;
+        }
         [Serializable] sealed class ActionReceipt
         { public string action, phase, panel, stateSha256; public int inputUpdate; public long revision; public Vector3 playerPosition, cameraPosition; }
         [Serializable] sealed class ProjectionReceipt { public float x, y, width, height; }

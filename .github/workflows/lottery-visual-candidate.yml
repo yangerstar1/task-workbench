@@ -48,6 +48,7 @@ jobs:
           python3 tasks/lottery-shop/scripts/visual_candidate_ci.py snapshot
       - name: Capture actual runtime with imported FBX, routed input, and visible HUD
         id: capture
+        timeout-minutes: 30
         uses: game-ci/unity-test-runner@0ff419b913a3630032cbe0de48a0099b5a9f0ed9
         env:
           UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
@@ -63,6 +64,9 @@ jobs:
             -job-worker-count 2 -probeCommit ${{ github.sha }} -probeRunId ${{ github.run_id }} -probeRunAttempt ${{ github.run_attempt }}
           dockerCpuLimit: 2
           dockerMemoryLimit: 12g
+      - name: Preserve fixed-schema bounded prebuild and runtime milestones
+        if: ${{ always() && steps.guard.outcome == 'success' && steps.capture.outcome != 'skipped' }}
+        run: python3 tasks/lottery-shop/scripts/visual_candidate_ci.py progress
       - name: Preserve bounded capture NUnit XML, including real failures
         if: ${{ always() && steps.guard.outcome == 'success' && steps.capture.outcome != 'skipped' }}
         run: python3 tasks/lottery-shop/scripts/visual_candidate_ci.py tests --stage capture
@@ -81,6 +85,8 @@ jobs:
             tasks/lottery-shop/evidence/visual-candidate/source-receipt.json
             tasks/lottery-shop/evidence/visual-candidate/source-before.json
             tasks/lottery-shop/evidence/visual-candidate/font-receipt.json
+            tasks/lottery-shop/evidence/visual-candidate/prebuild-progress.json
+            tasks/lottery-shop/evidence/visual-candidate/runtime-progress.json
             tasks/lottery-shop/evidence/visual-candidate/capture/raw-test-results.xml
             tasks/lottery-shop/evidence/visual-candidate/capture/raw-test-report-receipt.json
             tasks/lottery-shop/evidence/visual-candidate/capture/test-receipt.json

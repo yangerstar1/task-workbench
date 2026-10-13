@@ -223,9 +223,52 @@ def export_captures(root, require_complete=True):
     print(SCOPE + ": preserved " + str(len(frames)) + " original Unity runtime PNGs")
 
 
+PROGRESS_STAGES = {
+    "prebuild": {"prebuild-begin", "prebuild-end", "prebuild-failed"},
+    "runtime": {"runtime-setup-begin", "runtime-setup-end", "runtime-teardown-begin", "runtime-teardown-end",
+                "face-begin", "face-end", "walk-begin", "walk-end", "day-ticket-settled", "scenario-complete", "runtime-timeout"}
+               | {prefix + name for prefix in ("capture-begin:", "capture-end:") for name in FRAMES},
+}
+
+
+def validate_progress(value, kind, source, run, attempt):
+    require(isinstance(value, dict) and set(value) == {"schemaVersion", "scope", "kind", "sourceCommit", "runId", "runAttempt", "status", "events"}, "Unexpected progress receipt fields")
+    require(value["schemaVersion"] == 1 and value["scope"] == SCOPE and value["kind"] == kind and kind in PROGRESS_STAGES, "Invalid progress kind/scope")
+    require((value["sourceCommit"], value["runId"], value["runAttempt"]) == (source, run, attempt), "Progress source/run/attempt mismatch")
+    require(value["status"] == "MILESTONES_ONLY_NOT_TEST_PASS", "Progress cannot claim a test pass")
+    events = value["events"]
+    require(isinstance(events, list) and 1 <= len(events) <= 128, "Progress event count exceeds bound")
+    last_elapsed = -1
+    for event in events:
+        require(isinstance(event, dict) and set(event) == {"stage", "utc", "elapsedMs", "inputUpdates", "frameCount", "purchased", "settled", "dayPhase"}, "Unexpected progress event fields")
+        require(event["stage"] in PROGRESS_STAGES[kind], "Unrecognized progress stage")
+        require(type(event["elapsedMs"]) is int and 0 <= event["elapsedMs"] <= 24 * 60 * 60 * 1000 and last_elapsed <= event["elapsedMs"], "Invalid/non-monotonic progress clock")
+        last_elapsed = event["elapsedMs"]
+        require(isinstance(event["utc"], str) and len(event["utc"]) <= 40, "Invalid progress timestamp")
+        timestamp = datetime.fromisoformat(event["utc"].replace("Z", "+00:00"))
+        require(timestamp.tzinfo is not None and timestamp.utcoffset().total_seconds() == 0, "Progress timestamp must be UTC")
+        for key, low, high in (("inputUpdates", 0, 100000), ("frameCount", 0, 11), ("purchased", -1, 12), ("settled", -1, 12)):
+            require(type(event[key]) is int and low <= event[key] <= high, "Invalid bounded progress counter")
+        require(event["dayPhase"] in {"UNAVAILABLE", "DAY_OPEN", "CLOSING_PREP", "NIGHT_BILL", "DAY_COMPLETE", "RUN_FAILED"}, "Invalid progress day phase")
+    require(events[0]["stage"] == ("prebuild-begin" if kind == "prebuild" else "runtime-setup-begin"), "Missing initial progress milestone")
+    return value
+
+
+def export_progress(root):
+    ident = identity(root)
+    # Two explicitly named, fixed-schema files only. Missing files mean no observed
+    # milestone, not a successful import/runtime; the real NUnit verdict stays separate.
+    for kind in ("prebuild", "runtime"):
+        path = root / TASK / ("artifacts/visual-candidate/" + kind + "-progress.json")
+        if not path.exists():
+            continue
+        value = validate_progress(read_json(path, 65536), kind, ident["sourceCommit"], ident["runId"], ident["runAttempt"])
+        write(outdir(root) / (kind + "-progress.json"), value)
+
+
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("command", choices=("guard", "restore-font", "snapshot", "snapshot-after", "tests", "captures", "partial-captures"))
+    parser.add_argument("command", choices=("guard", "restore-font", "snapshot", "snapshot-after", "tests", "captures", "partial-captures", "progress"))
     parser.add_argument("--root", type=Path, default=Path(__file__).resolve().parents[3])
     parser.add_argument("--stage", choices=STAGES, default="capture")
     args = parser.parse_args(); root = args.root.resolve()
@@ -234,6 +277,7 @@ def main():
         identity(root); bounded.restore(root)
         shutil.copyfile(root / TASK / "evidence/font-receipt.json", outdir(root) / "font-receipt.json")
     elif args.command in ("snapshot", "snapshot-after"): snapshot(root, after=args.command == "snapshot-after")
+    elif args.command == "progress": export_progress(root)
     elif args.command == "tests": export_tests(root, args.stage)
     else: export_captures(root, require_complete=args.command == "captures")
 
