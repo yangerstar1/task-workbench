@@ -7,6 +7,8 @@ namespace Lottery.G3.Interaction
     {
         readonly List<Object> owned=new List<Object>();string shown;GameObject model;Shader shader;
         public void Initialize(Shader lit){shader=lit;}
+        public Bounds WorldBounds
+        {get{if(model==null)return new Bounds(transform.position,Vector3.zero);var renderers=model.GetComponentsInChildren<Renderer>();if(renderers.Length==0)return new Bounds(transform.position,Vector3.zero);var b=renderers[0].bounds;for(int i=1;i<renderers.Length;i++)b.Encapsulate(renderers[i].bounds);return b;}}
         Material Mat(string name,Color color,float metallic=0,float smooth=.35f)
         {var m=new Material(shader){name=name};m.color=color;m.SetFloat("_Metallic",metallic);m.SetFloat("_Smoothness",smooth);owned.Add(m);return m;}
         GameObject Shape(string name,PrimitiveType type,Vector3 p,Vector3 size,Material m)
@@ -14,7 +16,7 @@ namespace Lottery.G3.Interaction
         public void Show(string id)
         {
             if(shown==id)return;shown=id;if(model!=null)Destroy(model);foreach(var m in owned)if(m!=null)Destroy(m);owned.Clear();
-            if(string.IsNullOrEmpty(id))return;var authored=Resources.Load<GameObject>("G3/Shop/Tool_"+id);if(authored!=null){model=Instantiate(authored,transform);model.name="Snapshot-bound authored "+id;model.transform.localScale*=.9f;return;}model=new GameObject("Snapshot-bound "+id);model.transform.SetParent(transform,false);
+            if(string.IsNullOrEmpty(id))return;var authored=Resources.Load<GameObject>("G3/Shop/Tool_"+id+"_Runtime");if(authored!=null){model=Instantiate(authored,transform);model.name="Snapshot-bound authored "+id;model.transform.localScale*=id=="inspection_lamp" ? .53f : .55f;return;}if(id=="small_prize_box"||id=="inspection_lamp"||id=="large_prize_stamp")throw new System.InvalidOperationException("Normalized authored tool prefab missing: "+id);model=new GameObject("Snapshot-bound "+id);model.transform.SetParent(transform,false);model.transform.localScale=Vector3.one*.45f;
             var brass=Mat("Brushed brass",new Color(.65f,.45f,.18f),.78f,.52f);var wood=Mat("Dark walnut",new Color(.23f,.105f,.055f),0,.22f);
             var ceramic=Mat("Warm cream enamel",new Color(.84f,.80f,.67f),.12f,.42f);var jade=Mat("Green enamel",new Color(.045f,.19f,.14f),.20f,.4f);
             if(id=="small_prize_box")

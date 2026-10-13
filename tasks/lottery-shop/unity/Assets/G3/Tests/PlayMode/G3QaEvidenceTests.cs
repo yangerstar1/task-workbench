@@ -96,7 +96,8 @@ namespace Lottery.G3.PlayMode.Tests
             {
                 BindPresentationTarget(width,720);P.View.SimulatedSafeArea=new Rect(36,18,width-72,684);P.View.Layout();
                 var cameraPos=app.SceneCamera.transform.position;var cameraRot=app.SceneCamera.transform.rotation;
-                var point=P.View.ButtonRect("open-settings").center;TouchEvent(811,UnityEngine.InputSystem.TouchPhase.Began,point);TouchEvent(811,UnityEngine.InputSystem.TouchPhase.Ended,point);PumpInput();Router.PollInput();
+                var point=P.View.ButtonRect("open-more").center;TouchEvent(810,UnityEngine.InputSystem.TouchPhase.Began,point);TouchEvent(810,UnityEngine.InputSystem.TouchPhase.Ended,point);PumpInput();Router.PollInput();Assert.That(P.View.MoreVisible,Is.True);
+                point=P.View.ButtonRect("open-settings").center;TouchEvent(811,UnityEngine.InputSystem.TouchPhase.Began,point);TouchEvent(811,UnityEngine.InputSystem.TouchPhase.Ended,point);PumpInput();Router.PollInput();
                 point=P.View.ButtonRect("settings-evidence").center;TouchEvent(812,UnityEngine.InputSystem.TouchPhase.Began,point);TouchEvent(812,UnityEngine.InputSystem.TouchPhase.Ended,point);PumpInput();Router.PollInput();
                 Assert.That(P.Panel,Is.EqualTo(G3Panel.QaEvidence));Assert.That(EvidenceFields(P.EvidenceText)["inputMode"],Is.EqualTo("TOUCHSCREEN"));
                 Assert.That(EvidenceFields(P.EvidenceText)["presentationPixels"],Is.EqualTo(width+"x720"));

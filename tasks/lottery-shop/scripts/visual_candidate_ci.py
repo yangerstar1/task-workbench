@@ -9,6 +9,7 @@ import argparse
 from datetime import datetime, timezone
 import hashlib
 import json
+import math
 import os
 from pathlib import Path
 import re
@@ -160,6 +161,7 @@ def export_tests(root, stage):
 
 
 def validate_capture(receipt, source, run, attempt, require_complete=True):
+    require(receipt.get("schemaVersion") == 2 and receipt.get("candidatePresentation") == "V13_MORE_NAVIGATION_MEASURED_GEOMETRY_NOT_VISUAL_PASS", "V13 measured presentation receipt required")
     require(receipt.get("scope") == SCOPE and receipt.get("sourceCommit") == source and receipt.get("runId") == run and receipt.get("runAttempt") == attempt, "Capture source/run/attempt mismatch")
     require(receipt.get("unityVersion") == "6000.3.19f1" and receipt.get("graphicsDeviceType") not in (None, "Null"), "Pinned native GPU capture required")
     require(receipt.get("hudVisibilityBasis") == "ENABLED_CAMERA_LAYER_AND_FRUSTUM_TEST_NOT_PIXEL_OCCLUSION", "HUD visibility observation basis missing")
@@ -176,6 +178,19 @@ def validate_capture(receipt, source, run, attempt, require_complete=True):
         require(all(HEX64.fullmatch(f.get(k, "")) for k in ("stateSha256", "seedSha256")), "State/seed hash missing")
         require(f.get("hudVisible") is True and f.get("hudFits") is True and f.get("hudFrustumRendererCount", 0) > 5 and f.get("cameraOrthographic") is False, "Runtime HUD/perspective evidence incomplete")
         require(f.get("importedRendererCount", 0) > 10 and f.get("inputUpdates", 0) > 0, "Real imported model/input evidence missing")
+        ratio = f.get("hudOpaqueAreaRatio")
+        require(type(ratio) in (int, float) and math.isfinite(ratio) and 0 <= ratio <= 1.00001, "HUD opaque-area observation missing or invalid")
+        controls = f.get("visibleControlIds")
+        require(isinstance(controls, list) and len(controls) <= 64 and len(controls) == len(set(controls)) and all(isinstance(x, str) for x in controls), "Visible control identity observation invalid")
+        require(type(f.get("moreVisible")) is bool and type(f.get("paperVisible")) is bool, "More/paper visibility observation missing")
+        require(all(type(f.get(key)) is int and f[key] >= 0 for key in ("renderedShopRendererCount", "renderedShopMaterialCount")), "Rendered shop resource counts missing")
+        tool_bounds = f.get("toolPresentationBounds")
+        require(isinstance(tool_bounds, list) and len(tool_bounds) == 3, "Three tool projection observations required")
+        for rect in [f.get("paperPresentationBounds")] + tool_bounds:
+            require(isinstance(rect, dict) and set(rect) == {"x", "y", "width", "height"} and all(type(v) in (int, float) and math.isfinite(v) for v in rect.values()), "Invalid projection observation")
+            require(rect["width"] >= 0 and rect["height"] >= 0, "Negative projection size")
+        # These observations intentionally do not confer art/layout acceptance.
+
     if require_complete:
         by_name = {f["stage"]: f for f in frames}
         require(by_name["shelf-before-open"]["stateSha256"] == by_name["shelf-after-open"]["stateSha256"] == by_name["challenge-returned-from-shelf"]["stateSha256"], "Shelf/return mutated the ticket state")

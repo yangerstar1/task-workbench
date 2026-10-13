@@ -259,6 +259,14 @@ namespace Lottery.G3.VisualCandidate.Tests
         { InputSystem.QueueStateEvent(keyboard, new KeyboardState(keys)); Pump(); }
         void Click(string id)
         {
+            // Secondary navigation is genuinely opened through the visible control.
+            // Never mutate the presentation's More state or bypass the input router.
+            if(!P.View.HasButton(id) && (id == "open-tickets" || id == "open-drawer" || id == "open-bill" || id == "open-settings"))
+            {
+                Assert.That(P.View.HasButton("open-more"), Is.True, "Missing visible More navigation for " + id);
+                var more = P.View.ButtonRect("open-more").center;
+                MouseEvent(more, true); MouseEvent(more, false); Observe("click:open-more");
+            }
             Assert.That(P.View.HasButton(id), Is.True, "Missing runtime control: " + id);
             var point = P.View.ButtonRect(id).center;
             MouseEvent(point, true); MouseEvent(point, false); Observe("click:" + id);
@@ -331,6 +339,15 @@ namespace Lottery.G3.VisualCandidate.Tests
             if(RenderTexture.active == target) RenderTexture.active = null;
             target.Release(); Object.Destroy(target); target = null;
         }
+        Rect ProjectedPaperBounds()
+        {
+            if(!P.View.Surface.IsVisible) return new Rect();
+            var corners = new[] { new Uv(0, 0), new Uv(0, 1), new Uv(1, 0), new Uv(1, 1) }
+                .Select(uv => P.View.WorldToPresentationPoint(P.View.Surface.PaperUvToWorld(uv))).ToArray();
+            return Rect.MinMaxRect(corners.Min(p => p.x), corners.Min(p => p.y), corners.Max(p => p.x), corners.Max(p => p.y));
+        }
+        static ProjectionReceipt Projection(Rect rect)
+        { return new ProjectionReceipt { x = rect.x, y = rect.y, width = rect.width, height = rect.height }; }
         void Capture(string stage, string cameraOrigin)
         {
             P.View.RefreshGlyphGeometry();
@@ -365,6 +382,12 @@ namespace Lottery.G3.VisualCandidate.Tests
                     cameraPosition = app.SceneCamera.transform.position, cameraEuler = app.SceneCamera.transform.eulerAngles,
                     cameraFov = app.SceneCamera.fieldOfView, cameraOrthographic = app.SceneCamera.orthographic,
                     importedRendererCount = P.View.Environment.ImportedRendererCount,
+                    renderedShopRendererCount = P.View.Environment.RenderedShopRendererCount,
+                    renderedShopMaterialCount = P.View.Environment.RenderedShopMaterialCount,
+                    hudOpaqueAreaRatio = P.View.VisibleOpaqueHudAreaRatio,
+                    visibleControlIds = P.View.VisibleControlIds, moreVisible = P.View.MoreVisible,
+                    paperVisible = P.View.Surface.IsVisible, paperPresentationBounds = Projection(ProjectedPaperBounds()),
+                    toolPresentationBounds = Enumerable.Range(0, 3).Select(slot => Projection(P.View.ToolPresentationBounds(slot))).ToArray(),
                     hudVisible = hud.gameObject.activeInHierarchy && visibleHudRenderers > 5, hudFrustumRendererCount = visibleHudRenderers, hudFits = P.View.AllHudLabelsFit, qualityName = QualitySettings.names[QualitySettings.GetQualityLevel()]
                 });
                 WriteReceipt(false);
@@ -388,16 +411,18 @@ namespace Lottery.G3.VisualCandidate.Tests
         { var args = Environment.GetCommandLineArgs(); int i = Array.IndexOf(args, key); return i >= 0 && i + 1 < args.Length ? args[i + 1] : ""; }
         [Serializable] sealed class ActionReceipt
         { public string action, phase, panel, stateSha256; public int inputUpdate; public long revision; public Vector3 playerPosition, cameraPosition; }
+        [Serializable] sealed class ProjectionReceipt { public float x, y, width, height; }
         [Serializable] sealed class FrameReceipt
         {
             public string stage, file, sha256, capturedUtc, stateSha256, seedSha256, gameRunId, fixtureLabel, ticketId, ticketPhase, ticketMaskSha256, dayPhase, panel, mode, cameraOrigin, qualityName;
-            public long bytes, revision; public int width, height, revealedCells, inputUpdates, actionCount, importedRendererCount, hudFrustumRendererCount;
-            public string[] currentTools, nextTools; public Vector3 cameraPosition, cameraEuler; public float cameraFov;
-            public bool cameraOrthographic, hudVisible, hudFits;
+            public long bytes, revision; public int width, height, revealedCells, inputUpdates, actionCount, importedRendererCount, hudFrustumRendererCount, renderedShopRendererCount, renderedShopMaterialCount;
+            public string[] currentTools, nextTools, visibleControlIds; public ProjectionReceipt paperPresentationBounds; public ProjectionReceipt[] toolPresentationBounds; public float hudOpaqueAreaRatio; public Vector3 cameraPosition, cameraEuler; public float cameraFov;
+            public bool cameraOrthographic, hudVisible, hudFits, moreVisible, paperVisible;
         }
         [Serializable] sealed class CaptureReceipt
         {
-            public int schemaVersion = 1;
+            public int schemaVersion = 2;
+            public string candidatePresentation = "V13_MORE_NAVIGATION_MEASURED_GEOMETRY_NOT_VISUAL_PASS";
             public string scope = Scope, sourceCommit, runId, runAttempt, unityVersion, graphicsDeviceType, graphicsDeviceName;
             public string inputEvidence = "SIMULATED_INPUT_SYSTEM", captureMethod = "URP_STANDARD_REQUEST_READPIXELS",
                 seedDisclosure = "FIXED_DIAGNOSTIC_SEED_HASH_ONLY", hudVisibilityBasis = "ENABLED_CAMERA_LAYER_AND_FRUSTUM_TEST_NOT_PIXEL_OCCLUSION", deviceQa = "NOT_RUN", visualReview = "PENDING", g3Gate = "NOT_EVALUATED";

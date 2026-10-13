@@ -9,7 +9,7 @@ namespace Lottery.G3.Rendering
 {
     public sealed class ConfirmedTicketSurface : MonoBehaviour
     {
-        public const float PaperY=0,TextY=.003f,SilverY=.006f;
+        public const float PaperY=0,TextY=.00006f,SilverY=.00012f;
         readonly List<UnityEngine.Object> owned=new List<UnityEngine.Object>();
         readonly DisplaySession session=new DisplaySession();
         readonly Dictionary<string,BoundedGlyphLabel> legends=new Dictionary<string,BoundedGlyphLabel>();
@@ -32,10 +32,10 @@ namespace Lottery.G3.Rendering
             collider=paperObject.AddComponent<MeshCollider>();collider.sharedMesh=paperObject.GetComponent<MeshFilter>().sharedMesh;
             // Thin paper edge and contact shadow share the atomic display body, so
             // neither survives a failed save or leaks an unconfirmed ticket.
-            var edge=GameObject.CreatePrimitive(PrimitiveType.Cube);edge.name="Fine paper stock edge";edge.transform.SetParent(body.transform,false);edge.transform.localPosition=new Vector3(0,-.0013f,0);edge.transform.localScale=new Vector3(width,.0025f,depth);Destroy(edge.GetComponent<Collider>());
+            var edge=GameObject.CreatePrimitive(PrimitiveType.Cube);edge.name="Fine paper stock edge";edge.transform.SetParent(body.transform,false);edge.transform.localPosition=new Vector3(0,-.00012f,0);edge.transform.localScale=new Vector3(width,.00024f,depth);Destroy(edge.GetComponent<Collider>());
             var edgeMat=Own(new Material(Shader.Find("Universal Render Pipeline/Lit")));edgeMat.color=new Color(.78f,.74f,.62f);edgeMat.SetFloat("_Smoothness",.1f);edge.GetComponent<Renderer>().sharedMaterial=edgeMat;
-            var shadow=GameObject.CreatePrimitive(PrimitiveType.Cube);shadow.name="Paper contact shadow";shadow.transform.SetParent(body.transform,false);shadow.transform.localPosition=new Vector3(.003f,-.0029f,-.001f);shadow.transform.localScale=new Vector3(width+.008f,.0004f,depth+.006f);Destroy(shadow.GetComponent<Collider>());
-            var shadowMat=Own(new Material(Shader.Find("Universal Render Pipeline/Lit")));shadowMat.color=new Color(.028f,.042f,.030f);shadowMat.SetFloat("_Smoothness",0);shadow.GetComponent<Renderer>().sharedMaterial=shadowMat;
+            // Natural edge contact comes from the lit stock mesh. No enlarged black
+            // backing box: a 0.4 m sheet must read as paper rather than a rigid board.
 
             masks=new Texture2D[Layout.Cells.Count];cellText=new BoundedGlyphLabel[Layout.Cells.Count];cellNumbers=new BoundedGlyphLabel[Layout.Id=="challenge"?8:0];
             var publicFont=Own(new Material(ordinaryFont));
@@ -53,7 +53,7 @@ namespace Lottery.G3.Rendering
                     // Public positional ID only: independent of all hidden outcomes.
                     // Stay inside the reviewed text-safe box, above masked results.
                     var ordinal=Label("Public cell number "+(i+1),new PixelRect(cell.Text.X,cell.Text.Y,cell.Text.Width,64),publicFont,font,60);
-                    var pos=ordinal.transform.localPosition;pos.y=SilverY+.002f;ordinal.transform.localPosition=pos;ordinal.SetText((i+1).ToString());cellNumbers[i]=ordinal;
+                    var pos=ordinal.transform.localPosition;pos.y=SilverY+.00004f;ordinal.transform.localPosition=pos;ordinal.SetText((i+1).ToString());cellNumbers[i]=ordinal;
                     resultBox=new PixelRect(cell.Text.X,cell.Text.Y+68,cell.Text.Width,cell.Text.Height-68);
                 }
                 var label=Label("Masked result "+cell.Id,resultBox,glyphMat,font,Layout.Id=="number"?76:68);cellText[i]=label;

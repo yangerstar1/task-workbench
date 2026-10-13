@@ -13,12 +13,13 @@ namespace Lottery.G3.Interaction
     {
         [Serializable] public sealed class Anchor { public string name; public float[] position; public float[] rotation; }
         [Serializable] public sealed class CollisionBox { public string name,target; public float[] position,size; }
-        [Serializable] public sealed class LayoutData { public Anchor[] anchors; public CollisionBox[] colliders; }
-        readonly List<Light> practicals=new List<Light>();readonly HashSet<Material> instantiatedMaterials=new HashSet<Material>();
+        [Serializable] public sealed class LayoutData { public Anchor[] anchors; public CollisionBox[] colliders;public float ticketWidth=.4f;public bool requiresUnityXReflection; }
+        readonly List<Light> practicals=new List<Light>();readonly HashSet<Material> instantiatedMaterials=new HashSet<Material>();readonly Dictionary<Material,Color> authoredWindowColors=new Dictionary<Material,Color>();
         Light daylight; LayoutData layout; bool? night; GameObject art;
         UniversalRenderPipelineAsset priorPipeline,runtimePipeline;
-        public Vector3 TicketPosition=>AnchorPosition("ticket",new Vector3(2.05f,.797f,-.10f));
-        public Vector3 TableCameraPosition=>AnchorPosition("table_camera",TicketPosition+new Vector3(0,1.21f,.59f));
+        public float TicketWidth=>layout!=null&&layout.ticketWidth>0?layout.ticketWidth:.4f;
+        public Vector3 TicketPosition=>AnchorPosition("ticket",new Vector3(2.025f,.81825f,.50f));
+        public Vector3 TableCameraPosition=>AnchorPosition("table_camera",TicketPosition+new Vector3(0,.725f,.38f));
         public Vector3 TableLookAt=>AnchorPosition("table_look_at",TicketPosition);
         public Vector3 EntryPosition=>AnchorPosition("entry",new Vector3(0,0,2.1f));
         public float EntryYaw=>AnchorRotation("entry",new Vector3(8,180,0)).y;
@@ -28,15 +29,18 @@ namespace Lottery.G3.Interaction
         public float ShelfViewYaw=>AnchorRotation("shelf_view",new Vector3(8,270,0)).y;
         public Vector3 ShelfTargetPosition=>AnchorPosition("shelf_target",new Vector3(-2.5f,1.2f,-.6f));
         public bool HasImportedArt=>art!=null;
+        public int RenderedShopRendererCount=>ImportedRendererCount;
+        public int RenderedShopMaterialCount=>art==null?0:art.GetComponentsInChildren<Renderer>().SelectMany(r=>r.sharedMaterials).Where(m=>m!=null).Distinct().Count();
         public int ImportedRendererCount=>art==null?0:art.GetComponentsInChildren<Renderer>().Length;
         public Vector3 AnchorPosition(string name,Vector3 fallback)
         {var a=layout?.anchors?.FirstOrDefault(x=>x.name==name);return a?.position!=null&&a.position.Length==3?V(a.position):fallback;}
+        public Vector3 AnchorEulerAngles(string name,Vector3 fallback)=>AnchorRotation(name,fallback);
         Vector3 AnchorRotation(string name,Vector3 fallback)
         {var a=layout?.anchors?.FirstOrDefault(x=>x.name==name);return a?.rotation!=null&&a.rotation.Length==3?V(a.rotation):fallback;}
         static Vector3 V(float[] p)=>new Vector3(p[0],p[1],p[2]);
         public void Build(bool configureQuality=true)
         {
-            var source=Resources.Load<GameObject>("G3/Shop/LotteryShop_Runtime")??Resources.Load<GameObject>("G3/Shop/LotteryShop_Interior");
+            var source=Resources.Load<GameObject>("G3/Shop/LotteryShop_Runtime");
             var manifest=Resources.Load<TextAsset>("G3/Shop/anchors");
             if(source==null||manifest==null)throw new InvalidOperationException("G3 visual candidate requires imported LotteryShop_Interior.fbx and anchors.json; no whitebox fallback is permitted.");
             layout=JsonUtility.FromJson<LayoutData>(manifest.text);
@@ -45,9 +49,9 @@ namespace Lottery.G3.Interaction
             foreach(var r in art.GetComponentsInChildren<Renderer>()){r.shadowCastingMode=r.sharedMaterials.Any(m=>m.renderQueue>=(int)RenderQueue.Transparent)?ShadowCastingMode.Off:ShadowCastingMode.On;r.receiveShadows=true;}
             foreach(var box in layout.colliders)
             {
-                var go=new GameObject(box.target=="shop"?"Tool shelf":box.name);go.transform.SetParent(transform,false);go.transform.localPosition=V(box.position);
+                var go=new GameObject(box.name);go.transform.SetParent(transform,false);go.transform.localPosition=V(box.position);
                 var collider=go.AddComponent<BoxCollider>();collider.size=V(box.size);
-                if(box.target=="shop"){go.transform.localPosition-=Vector3.up*.5f;collider.center=Vector3.up*.5f;collider.size+=Vector3.up*.16f;}
+                // The shop hit box now belongs to the authored tool-sample tray, not the whole till.
                 if(box.target=="none"||string.IsNullOrEmpty(box.target))continue;
                 var target=go.AddComponent<G3WorldTarget>();target.IsTable=box.target=="table";
                 switch(box.target){case "shop":target.Panel=G3Panel.Shop;break;case "tickets":target.Panel=G3Panel.Tickets;break;case "inventory":target.Panel=G3Panel.Inventory;break;case "drawer":target.Panel=G3Panel.Drawer;break;case "phone":target.Panel=G3Panel.Phone;break;}
@@ -72,7 +76,7 @@ namespace Lottery.G3.Interaction
             RenderSettings.ambientEquatorColor=value?new Color(.33f,.28f,.23f):new Color(.52f,.49f,.42f);RenderSettings.ambientGroundColor=new Color(.22f,.19f,.15f);
             for(int i=0;i<practicals.Count;i++)practicals[i].intensity=(i==0?1.8f:i==1?1.4f:.6f)*(value?1.1f:1);
             if(art!=null)foreach(var renderer in art.GetComponentsInChildren<Renderer>())foreach(var material in renderer.materials)
-                {instantiatedMaterials.Add(material);if((material.name.StartsWith("Window")||material.name.StartsWith("StreetBlur"))&&material.HasProperty("_BaseColor"))material.SetColor("_BaseColor",value?new Color(.06f,.12f,.24f):new Color(.53f,.72f,.82f));}
+                {instantiatedMaterials.Add(material);if((material.name.StartsWith("Window")||material.name.StartsWith("StreetBlur"))&&material.HasProperty("_BaseColor")){if(!authoredWindowColors.ContainsKey(material))authoredWindowColors[material]=material.GetColor("_BaseColor");material.SetColor("_BaseColor",authoredWindowColors[material]*(value?new Color(.06f,.12f,.24f):Color.white));}}
         }
         public void Sync(RunState state)=>SetNight(state.Phase==DayPhase.NIGHT_BILL||state.Phase==DayPhase.DAY_COMPLETE||state.Phase==DayPhase.RUN_FAILED);
         void OnDestroy(){foreach(var material in instantiatedMaterials)if(material!=null)Destroy(material);if(runtimePipeline!=null){if(QualitySettings.renderPipeline==runtimePipeline)QualitySettings.renderPipeline=priorPipeline;Destroy(runtimePipeline);}}

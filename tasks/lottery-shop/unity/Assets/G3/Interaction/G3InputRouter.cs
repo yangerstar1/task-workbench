@@ -29,7 +29,7 @@ namespace Lottery.G3.Interaction
             float dt=lastPoll>0?Mathf.Clamp(Time.unscaledTime-lastPoll,0,.05f):.016f;lastPoll=Time.unscaledTime;
             if(view.LayoutChanged){if(captured>=0||touchGesture)CancelGesture();view.Layout();}
             var keyboard=Keyboard.current;
-            if(keyboard!=null&&keyboard.escapeKey.wasPressedThisFrame){CancelGesture();presenter.Back();return;}
+            if(keyboard!=null&&keyboard.escapeKey.wasPressedThisFrame){CancelGesture();if(!view.CloseMore())presenter.Back();return;}
             var touches=ETouch.activeTouches;int live=0;for(int i=0;i<touches.Count;i++)if(touches[i].phase!=IPhase.Ended&&touches[i].phase!=IPhase.Canceled)live++;
             if(touches.Count>0||touchGesture)
             {
@@ -51,7 +51,7 @@ namespace Lottery.G3.Interaction
                 if(captured==0&&!capturedTouch&&!mouse.leftButton.isPressed)End();
             }
             MoveHeld(dt);
-            if(Mode==G3Mode.WALK&&keyboard!=null)
+            if(Mode==G3Mode.WALK&&keyboard!=null&&!view.MoreVisible)
             {
                 var v=new Vector2((keyboard.dKey.isPressed?1:0)-(keyboard.aKey.isPressed?1:0),(keyboard.wKey.isPressed?1:0)-(keyboard.sKey.isPressed?1:0));
                 float turn=(keyboard.rightArrowKey.isPressed?1:0)-(keyboard.leftArrowKey.isPressed?1:0);if(v!=Vector2.zero||turn!=0)view.Walk.Move(v,turn,dt);
@@ -64,7 +64,7 @@ namespace Lottery.G3.Interaction
             LastInputSource=touch?"TOUCHSCREEN":"MOUSE";evidenceDrag=0;
             evidenceScrollCapture=presenter.IsReadOnlyEvidence&&view.EvidenceBodyRect.Contains(pixel);
             uiCapture=view.ConsumeUi(pixel,out G3Action action);
-            if(uiCapture){held=action;if(!Movement(action.Kind)&&action.Kind!=G3ActionKind.None)presenter.Execute(action);return;}
+            if(uiCapture){held=action;if(!Movement(action.Kind)&&action.Kind!=G3ActionKind.None&&!view.HandleLocalAction(action))presenter.Execute(action);return;}
             if(Mode==G3Mode.WALK)
             {
                 var target=view.WorldTarget(pixel);if(target!=null){uiCapture=true;if(target.IsTable)presenter.Execute(new G3Action(G3ActionKind.Sit));else presenter.OpenPanel(target.Panel);}return;
@@ -89,7 +89,7 @@ namespace Lottery.G3.Interaction
                 if(evidenceScrollCapture&&presenter.IsReadOnlyEvidence)
                 {
                     evidenceDrag+=pixel.y-previous.y;previous=pixel;
-                    float row=28*view.PresentationSafeArea.height/720f;int lines=(int)(evidenceDrag/Mathf.Max(1,row));
+                    float row=37.12f*view.PresentationSafeArea.height/720f;int lines=(int)(evidenceDrag/Mathf.Max(1,row));
                     if(lines!=0){presenter.ScrollEvidence(lines);evidenceDrag-=lines*row;}
                     return;
                 }

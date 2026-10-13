@@ -1,6 +1,6 @@
 {
-  "version": "art-v1.2",
-  "coordinateContract": "Blender metres Z-up. FBX axis_forward=-Z axis_up=Y. Unity position = [Blender x, Blender z, -Blender y]. Floor origin at center. Entrance +Unity Z; face -Unity Z into shop.",
+  "version": "art-v1.3",
+  "coordinateContract": "Blender metres Z-up. FBX exports -Z forward / Y up. Desired runtime positions are [Blender x, Blender z, -Blender y]. Actual Unity importer first-pass evidence returned [-Blender x, Blender z, -Blender y]; importer must apply exactly one X reflection to mesh positions/normals, triangle winding and tangent handedness before consuming these positive-X runtime anchors.",
   "interiorMeters": [
     6,
     5.2,
@@ -38,9 +38,9 @@
     {
       "name": "ScratchTicket",
       "position": [
-        2.05,
-        0.824,
-        -0.1
+        2.025,
+        0.81825,
+        0.5
       ],
       "rotation": [
         0,
@@ -80,9 +80,9 @@
     {
       "name": "ScratchCamera",
       "position": [
-        2.05,
-        1.68,
-        0.91
+        2.025,
+        1.54325,
+        0.88
       ],
       "rotation": [
         49,
@@ -94,9 +94,9 @@
     {
       "name": "ScratchLookAt",
       "position": [
-        2.05,
-        0.824,
-        -0.1
+        2.025,
+        0.81825,
+        0.5
       ],
       "rotation": [
         0,
@@ -178,9 +178,9 @@
     {
       "name": "ToolSlot1",
       "position": [
-        1.28,
-        0.881,
-        -0.38
+        1.76,
+        0.84,
+        0.44
       ],
       "rotation": [
         0,
@@ -192,9 +192,9 @@
     {
       "name": "ToolSlot2",
       "position": [
-        2.81,
-        0.881,
-        -0.34
+        2.29,
+        0.84,
+        0.46
       ],
       "rotation": [
         0,
@@ -206,9 +206,9 @@
     {
       "name": "ToolSlot3",
       "position": [
-        1.28,
-        0.881,
-        0.24
+        1.76,
+        0.84,
+        0.61
       ],
       "rotation": [
         0,
@@ -246,11 +246,134 @@
       "purpose": ""
     },
     {
+      "name": "ShopTray",
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "position": [
+        0.045,
+        1.08,
+        -2.005
+      ]
+    },
+    {
+      "name": "ShopPrice1",
+      "rotation": [
+        0,
+        180,
+        0
+      ],
+      "position": [
+        -0.245,
+        1.04,
+        -1.787
+      ],
+      "faceNormal": [
+        0,
+        0,
+        1
+      ],
+      "up": [
+        0,
+        1,
+        0
+      ],
+      "availableRectMeters": [
+        0.204,
+        0.09
+      ],
+      "purpose": "Runtime card overlays this whole printed name plate with current catalog name, price and stock."
+    },
+    {
+      "name": "ShopPrice2",
+      "rotation": [
+        0,
+        180,
+        0
+      ],
+      "position": [
+        0.044999999999999984,
+        1.04,
+        -1.787
+      ],
+      "faceNormal": [
+        0,
+        0,
+        1
+      ],
+      "up": [
+        0,
+        1,
+        0
+      ],
+      "availableRectMeters": [
+        0.204,
+        0.09
+      ],
+      "purpose": "Runtime card overlays this whole printed name plate with current catalog name, price and stock."
+    },
+    {
+      "name": "ShopPrice3",
+      "rotation": [
+        0,
+        180,
+        0
+      ],
+      "position": [
+        0.33499999999999996,
+        1.04,
+        -1.787
+      ],
+      "faceNormal": [
+        0,
+        0,
+        1
+      ],
+      "up": [
+        0,
+        1,
+        0
+      ],
+      "availableRectMeters": [
+        0.204,
+        0.09
+      ],
+      "purpose": "Runtime card overlays this whole printed name plate with current catalog name, price and stock."
+    },
+    {
+      "name": "ShopInteract",
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "position": [
+        0.045,
+        1.04,
+        -1.765
+      ]
+    },
+    {
+      "name": "ShopStand",
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "position": [
+        0.045,
+        0,
+        -0.95
+      ]
+    },
+    {
       "name": "ticket",
       "position": [
-        2.05,
-        0.824,
-        -0.1
+        2.025,
+        0.81825,
+        0.5
       ],
       "rotation": [
         0,
@@ -260,11 +383,25 @@
       "purpose": ""
     },
     {
+      "name": "table_camera",
+      "position": [
+        2.025,
+        1.54325,
+        0.88
+      ],
+      "rotation": [
+        49,
+        180,
+        0
+      ],
+      "purpose": ""
+    },
+    {
       "name": "table_look_at",
       "position": [
-        2.05,
-        0.824,
-        -0.1
+        2.025,
+        0.81825,
+        0.5
       ],
       "rotation": [
         0,
@@ -304,9 +441,9 @@
     {
       "name": "tool_1",
       "position": [
-        1.28,
-        0.881,
-        -0.38
+        1.76,
+        0.84,
+        0.44
       ],
       "rotation": [
         0,
@@ -318,9 +455,9 @@
     {
       "name": "tool_2",
       "position": [
-        2.81,
-        0.881,
-        -0.34
+        2.29,
+        0.84,
+        0.46
       ],
       "rotation": [
         0,
@@ -332,9 +469,9 @@
     {
       "name": "tool_3",
       "position": [
-        1.28,
-        0.881,
-        0.24
+        1.76,
+        0.84,
+        0.61
       ],
       "rotation": [
         0,
@@ -344,42 +481,29 @@
       "purpose": ""
     },
     {
-      "name": "table_camera",
-      "position": [
-        2.05,
-        2.044,
-        0.5
-      ],
-      "rotation": [
-        63.8,
-        180,
-        0
-      ]
-    },
-    {
       "name": "shelf_view",
-      "position": [
-        -0.7,
-        0,
-        0.1
-      ],
       "rotation": [
         8,
         180,
         0
+      ],
+      "position": [
+        0.045,
+        0,
+        -0.45
       ]
     },
     {
       "name": "shelf_target",
-      "position": [
-        -0.7,
-        1.1,
-        -1.46
-      ],
       "rotation": [
         0,
         0,
         0
+      ],
+      "position": [
+        0.045,
+        1.04,
+        -1.765
       ]
     }
   ],
@@ -693,20 +817,6 @@
       "target": "phone"
     },
     {
-      "name": "Interaction_Cashier",
-      "position": [
-        -0.7,
-        1.03,
-        -1.86
-      ],
-      "size": [
-        2.7,
-        0.2,
-        0.8
-      ],
-      "target": "shop"
-    },
-    {
       "name": "Interaction_Inventory",
       "position": [
         -2.345,
@@ -719,6 +829,62 @@
         0.5
       ],
       "target": "inventory"
+    },
+    {
+      "name": "Tool shelf",
+      "position": [
+        0.045,
+        1.08,
+        -2.005
+      ],
+      "size": [
+        0.97,
+        0.22,
+        0.43
+      ],
+      "target": "shop"
+    },
+    {
+      "name": "Interaction_ToolPrice_1",
+      "position": [
+        -0.245,
+        1.04,
+        -1.789
+      ],
+      "size": [
+        0.225,
+        0.115,
+        0.035
+      ],
+      "target": "shop"
+    },
+    {
+      "name": "Interaction_ToolPrice_2",
+      "position": [
+        0.044999999999999984,
+        1.04,
+        -1.789
+      ],
+      "size": [
+        0.225,
+        0.115,
+        0.035
+      ],
+      "target": "shop"
+    },
+    {
+      "name": "Interaction_ToolPrice_3",
+      "position": [
+        0.33499999999999996,
+        1.04,
+        -1.789
+      ],
+      "size": [
+        0.225,
+        0.115,
+        0.035
+      ],
+      "target": "shop"
     }
   ],
   "geometryStats": {
@@ -727,8 +893,33 @@
     "materialCount": 32,
     "budgetTargetTriangles": 150000,
     "mobilePerformance": "Not verified on device. Modular repeated meshes, maximum 2048 maps, static bake-ready architecture; further batching and bake work needed in Unity.",
-    "exportedStaticTriangles": 61308,
-    "exportedMeshObjects": 520
+    "exportedStaticTriangles": 67858,
+    "exportedMeshObjects": 558
   },
-  "integrationNotes": "Runtime aliases preserve authored metre-space. The oblique table_camera is raised for the approved runtime numeral size. Shelf view points to the authored tool counter, separate from ticket showcase."
+  "paperDimensionsMeters": [
+    0.4,
+    0.2666667
+  ],
+  "feltTopY": 0.818,
+  "tableFrontZ": 0.7,
+  "toolScales": [
+    0.55,
+    0.53,
+    0.55
+  ],
+  "toolsExportScale": "Tool FBX files remain original 1:1 dimensions. Apply toolScales on runtime instances.",
+  "paperTopY": 0.81825,
+  "paperThicknessMeters": 0.00024,
+  "requiresUnityXReflection": true,
+  "observedNativeUnityMapping": [
+    "-BlenderX",
+    "BlenderZ",
+    "-BlenderY"
+  ],
+  "desiredRuntimeMapping": [
+    "BlenderX",
+    "BlenderZ",
+    "-BlenderY"
+  ],
+  "ticketWidth": 0.4
 }

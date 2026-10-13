@@ -21,7 +21,7 @@ namespace Lottery.G3.Interaction
         readonly HashSet<int> informationCells=new HashSet<int>();
         Action afterCommit;
         G3Panel settingsReturn;G3QaEvidenceSnapshot evidence;string[] evidenceLines=new string[0];int evidenceOffset;string evidenceFeedback="";
-        public const int EvidencePageLines=14;
+        public const int EvidencePageLines=10;
         public string EvidenceText=>evidence?.Text??"";
         public int EvidenceScrollOffset=>evidenceOffset;
         public int EvidenceLineCount=>evidenceLines.Length;
@@ -141,7 +141,7 @@ namespace Lottery.G3.Interaction
             if(!G3QaEvidence.Enabled||Panel!=G3Panel.Settings||strokes.Count>0)return;
             // Capture once. Refresh, scroll, copy and close do not re-read or write the run.
             evidence=G3QaEvidence.Capture(service.Snapshot,IsCommitting,view,Router);
-            evidenceLines=G3QaEvidence.DisplayLines(evidence.DisplayText);evidenceOffset=0;evidenceFeedback="";
+            evidenceLines=view.WrapEvidenceDisplayLines(evidence.DisplayText);evidenceOffset=0;evidenceFeedback="";
             Router?.ReleaseCapture();Panel=G3Panel.QaEvidence;Refresh();
         }
         void CopyEvidence()

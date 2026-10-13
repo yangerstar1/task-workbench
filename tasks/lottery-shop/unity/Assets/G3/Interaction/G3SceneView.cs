@@ -14,13 +14,34 @@ namespace Lottery.G3.Interaction
         readonly List<UnityEngine.Object> owned=new List<UnityEngine.Object>();readonly List<BoundedGlyphLabel> labels=new List<BoundedGlyphLabel>();readonly List<ButtonVisual> pool=new List<ButtonVisual>();
         Font font;Shader flat;Material fontMat;Transform hud,header,footer,modal;BoundedGlyphLabel headerText,statusText,resultText,panelTitle,panelBody,panelFoot,emptyText;
         readonly List<G3ToolDisplay> toolDisplays=new List<G3ToolDisplay>();
+        readonly List<BoundedGlyphLabel> shopPriceLabels=new List<BoundedGlyphLabel>();
+        static readonly string[] DisplayStockIds={"small_prize_box","inspection_lamp","large_prize_stamp"};
         readonly List<Renderer> toolObjects=new List<Renderer>();readonly List<BoundedGlyphLabel> toolLabels=new List<BoundedGlyphLabel>();
         ConfirmedTicketSurface number,challenge;G3Presenter current;G3PanelModel panelModel;
-        float settlementPulse;bool pulseReduced;int lastWidth,lastHeight,used;Rect lastSafe,headerRect,footerRect,modalRect,evidenceBodyRect;bool walking;
+        float settlementPulse;bool pulseReduced;int lastWidth,lastHeight,used;Rect lastSafe,headerRect,footerRect,modalRect,evidenceBodyRect;bool walking,moreVisible;
         public Camera SceneCamera {get;private set;}
         public G3ShopWalk Walk {get;private set;}
         public G3ShopEnvironment Environment {get;private set;}
-        public Rect TableInteractionRect=>new Rect(Safe.x+230*Safe.height/720f,Safe.y+196*Safe.height/720f,Safe.width-410*Safe.height/720f,Safe.height-276*Safe.height/720f);
+        public Rect TableInteractionRect=>new Rect(Safe.center.x-360*Safe.height/720f,Safe.y+160*Safe.height/720f,760*Safe.height/720f,420*Safe.height/720f);
+        public bool MoreVisible=>moreVisible;
+        public string[] VisibleControlIds=>pool.Take(used).Where(b=>b.Root.activeInHierarchy).Select(b=>b.Id).ToArray();
+        public Rect ToolPresentationBounds(int slot)
+        {
+            var bounds=toolDisplays[slot].WorldBounds;var min=new Vector2(float.PositiveInfinity,float.PositiveInfinity);var max=new Vector2(float.NegativeInfinity,float.NegativeInfinity);
+            for(int i=0;i<8;i++){var p=bounds.center+Vector3.Scale(bounds.extents,new Vector3((i&1)==0?-1:1,(i&2)==0?-1:1,(i&4)==0?-1:1));var q=WorldToPresentationPoint(p);min=Vector2.Min(min,q);max=Vector2.Max(max,q);}
+            return Rect.MinMaxRect(min.x,min.y,max.x,max.y);
+        }
+        public float VisibleOpaqueHudAreaRatio
+        {
+            get
+            {
+                var rects=pool.Take(used).Where(b=>b.Root.activeInHierarchy).Select(b=>b.Rect).ToList();
+                if(header.gameObject.activeInHierarchy)rects.Add(headerRect);if(footer.gameObject.activeInHierarchy)rects.Add(footerRect);if(modal.gameObject.activeInHierarchy)rects.Add(modalRect);
+                var xs=rects.SelectMany(r=>new[]{Mathf.Clamp(r.xMin,Safe.xMin,Safe.xMax),Mathf.Clamp(r.xMax,Safe.xMin,Safe.xMax)}).Distinct().OrderBy(x=>x).ToArray();float area=0;
+                for(int i=1;i<xs.Length;i++){float mid=(xs[i-1]+xs[i])*.5f,end=Safe.yMin,total=0;foreach(var r in rects.Where(r=>r.xMin<mid&&r.xMax>mid).OrderBy(r=>r.yMin)){float lo=Mathf.Max(end,Mathf.Max(Safe.yMin,r.yMin)),hi=Mathf.Min(Safe.yMax,r.yMax);if(hi>lo){total+=hi-lo;end=hi;}}area+=(xs[i]-xs[i-1])*total;}
+                return area/(Safe.width*Safe.height);
+            }
+        }
         public ConfirmedTicketSurface Surface=>current?.Snapshot.CurrentTicket?.TicketType=="challenge"?challenge:number;
         public bool PanelVisible=>current!=null&&current.Panel!=G3Panel.None;
         public string VisibleSummary=>resultText.Text;
@@ -40,9 +61,9 @@ namespace Lottery.G3.Interaction
             fontMat=Own(new Material(glyph));var go=new GameObject("G3 single scene camera");go.transform.SetParent(transform,false);SceneCamera=go.AddComponent<Camera>();SceneCamera.nearClipPlane=.02f;SceneCamera.farClipPlane=30;SceneCamera.fieldOfView=64;
             SceneCamera.clearFlags=CameraClearFlags.SolidColor;SceneCamera.backgroundColor=new Color(.48f,.58f,.62f);SceneCamera.GetUniversalAdditionalCameraData().renderPostProcessing=false;
             BuildShop(lit);
-            var n=new GameObject("Approved number ticket");n.transform.SetParent(transform,false);n.transform.position=Environment.TicketPosition;number=n.AddComponent<ConfirmedTicketSurface>();number.Build(numberArt,font,paper,silver,maskedFont,glyph,1.2f);
-            var c=new GameObject("Approved challenge ticket");c.transform.SetParent(transform,false);c.transform.position=n.transform.position;challenge=c.AddComponent<ConfirmedTicketSurface>();challenge.Build(challengeArt,font,paper,silver,maskedFont,glyph,1.2f);
-            var empty=new GameObject("Empty table prompt");empty.transform.SetParent(transform,false);empty.transform.position=Environment.TicketPosition+Vector3.up*.005f;empty.transform.rotation=Quaternion.Euler(90,0,0);emptyText=empty.AddComponent<BoundedGlyphLabel>();emptyText.Initialize(font,fontMat,new Color(.94f,.92f,.78f));emptyText.SetBox(.95f,.28f,.055f,true);emptyText.SetText("今日的第一张好运\n从柜台挑一张票");labels.Add(emptyText);
+            var n=new GameObject("Approved number ticket");n.transform.SetParent(transform,false);n.transform.position=Environment.TicketPosition;n.transform.rotation=Quaternion.Euler(0,180,0);number=n.AddComponent<ConfirmedTicketSurface>();number.Build(numberArt,font,paper,silver,maskedFont,glyph,Environment.TicketWidth);
+            var c=new GameObject("Approved challenge ticket");c.transform.SetParent(transform,false);c.transform.position=n.transform.position;c.transform.rotation=n.transform.rotation;challenge=c.AddComponent<ConfirmedTicketSurface>();challenge.Build(challengeArt,font,paper,silver,maskedFont,glyph,Environment.TicketWidth);
+            var empty=new GameObject("Empty table prompt");empty.transform.SetParent(transform,false);empty.transform.position=Environment.TicketPosition+Vector3.up*.005f;empty.transform.rotation=Quaternion.Euler(90,180,0);emptyText=empty.AddComponent<BoundedGlyphLabel>();emptyText.Initialize(font,fontMat,new Color(.94f,.92f,.78f));emptyText.SetBox(.38f,.14f,.022f,true);emptyText.SetText("今日的第一张好运\n从柜台挑一张票");labels.Add(emptyText);
             var walker=new GameObject("Player short-distance body");walker.transform.SetParent(transform,false);Walk=walker.AddComponent<G3ShopWalk>();Walk.Initialize(SceneCamera,Environment.StandPosition,Environment.StandYaw);
             hud=new GameObject("Same-camera readable HUD").transform;hud.SetParent(SceneCamera.transform,false);
             header=Plate("Header",hud,new Color(.07f,.085f,.092f));footer=Plate("Footer",hud,new Color(.07f,.085f,.092f));modal=Plate("Modal background",hud,new Color(.11f,.13f,.14f));
@@ -63,11 +84,17 @@ namespace Lottery.G3.Interaction
             Environment=shop.AddComponent<G3ShopEnvironment>();Environment.Build();
             for(int i=0;i<3;i++)
             {
+                var anchor=Environment.AnchorPosition("ShopPrice"+(i+1),new Vector3(.2f+i*.24f,1.07f,-1.38f));
+                Box("Confirmed stock price card "+(i+1),anchor+Vector3.forward*.001f,new Vector3(.204f,.09f,.0006f),new Color(.90f,.88f,.79f),lit,false);
+                var label=Label("Live shop sample price "+(i+1),transform,new Color(.13f,.16f,.14f));label.transform.position=anchor+Vector3.forward*.0016f;label.transform.rotation=Quaternion.Euler(Environment.AnchorEulerAngles("ShopPrice"+(i+1),new Vector3(0,180,0)));label.SetBox(.19f,.075f,.014f,true);shopPriceLabels.Add(label);
+            }
+            for(int i=0;i<3;i++)
+            {
                 var anchor=Environment.AnchorPosition("tool_"+(i+1),Environment.TicketPosition+new Vector3((i-1)*.39f,.015f,-.59f));
-                var stand=Box("Configuration stand "+(i+1),anchor,new Vector3(.34f,.018f,.25f),new Color(.48f,.48f,.38f),lit,false);
-                toolObjects.Add(stand.GetComponent<Renderer>());var display=new GameObject("Physical tool slot "+(i+1));display.transform.SetParent(transform,false);display.transform.position=anchor+Vector3.up*.012f;
+                var stand=Box("Configuration stand "+(i+1),anchor,new Vector3(.12f,.002f,.12f),new Color(.48f,.48f,.38f),lit,false);
+                toolObjects.Add(stand.GetComponent<Renderer>());var display=new GameObject("Physical tool slot "+(i+1));display.transform.SetParent(transform,false);display.transform.position=anchor+Vector3.up*.0011f;
                 var visual=display.AddComponent<G3ToolDisplay>();visual.Initialize(lit);toolDisplays.Add(visual);
-                var label=Label("Current tool name "+i,transform,new Color(.88f,.83f,.68f));label.transform.position=anchor+new Vector3(0,.017f,-.145f);label.transform.rotation=Quaternion.Euler(90,0,0);label.SetBox(.38f,.08f,.03f,true);toolLabels.Add(label);
+                var label=Label("Current tool name "+i,transform,new Color(.88f,.83f,.68f));label.transform.position=anchor+new Vector3(0,.003f,.078f);label.transform.rotation=Quaternion.Euler(90,180,0);label.SetBox(.14f,.045f,.012f,true);toolLabels.Add(label);
             }
         }
         void Target(GameObject go,G3Panel panel,bool table=false){var t=go.AddComponent<G3WorldTarget>();t.Panel=panel;t.IsTable=table;}
@@ -83,13 +110,13 @@ namespace Lottery.G3.Interaction
         {float h=HeightAt(z);l.transform.localPosition=PixelPoint(r.center.x,r.center.y,z);l.SetBox(r.width/PresentationHeight*h,r.height/PresentationHeight*h,pixels/PresentationHeight*h,wrap);}
         public void SetWalking(bool value)
         {
-            walking=value;SceneCamera.orthographic=false;SceneCamera.fieldOfView=value?64:54;
+            moreVisible=false;walking=value;SceneCamera.orthographic=false;SceneCamera.fieldOfView=value?64:32;
             if(value)Walk.ApplyCamera();else FrameTable();
             if(current!=null)Layout();
         }
         void FrameTable()
         {
-            SceneCamera.orthographic=false;SceneCamera.fieldOfView=54;
+            SceneCamera.orthographic=false;SceneCamera.fieldOfView=32;
             var focus=Environment.TableLookAt;var cameraPosition=focus+(Environment.TableCameraPosition-focus)*(PresentationHeight/Mathf.Max(1,Safe.height));
             // Constant oblique perspective keeps paper thickness and the room visible.
             SceneCamera.transform.position=cameraPosition;SceneCamera.transform.LookAt(focus);
@@ -106,21 +133,28 @@ namespace Lottery.G3.Interaction
         public void Show(G3Presenter presenter,G3PanelModel model)
         {
             current=presenter;panelModel=model;if(LayoutChanged){Layout();return;}used=0;float s=lastSafe.height/720f,margin=12*s;
-            headerRect=new Rect(lastSafe.x+margin,lastSafe.yMax-64*s,lastSafe.width-2*margin,52*s);footerRect=new Rect(lastSafe.x+margin,lastSafe.y+110*s,lastSafe.width-2*margin,76*s);
+            if(PanelVisible)moreVisible=false;
+            headerRect=new Rect(lastSafe.x+margin,lastSafe.yMax-56*s,Mathf.Min(lastSafe.width-2*margin,1056*s),44*s);footerRect=new Rect(lastSafe.x+margin,lastSafe.y+112*s,lastSafe.width-2*margin,40*s);
             PlacePlate(header,headerRect,.55f);PlacePlate(footer,footerRect,.55f);
             var state=presenter.Snapshot;var t=state.CurrentTicket;var bill=presenter.Service.PreviewNightBill();Environment.Sync(state);
-            headerText.SetText(state.RecoveryRequired?"存档恢复受阻 · 请保留原件 · 现金暂不可确认":"现金 "+G3Text.Money(state.CashMinor)+"    今晚 "+G3Text.Money(bill.TotalDueMinor)+"    已购 "+state.TicketsPurchasedToday+" / 12    已结算 "+state.SettledTicketCount+(string.IsNullOrEmpty(state.FixtureLabel)?"    G3 首日":"    QA 固定新局"));
-            PlaceLabel(headerText,Inset(headerRect,16*s,8*s),32*s,.48f,false);
+            for(int i=0;i<shopPriceLabels.Count;i++)
+            {
+                var stock=state.Stock.FirstOrDefault(x=>x.ItemId==DisplayStockIds[i]&&!x.IsConsumable&&x.Quantity>0);
+                shopPriceLabels[i].SetText(state.RecoveryRequired?"库存待确认":G3Text.Tool(DisplayStockIds[i])+"\n"+(stock==null?"样品 · 暂无现货":G3Text.Money(stock.PriceMinor)+" 金币 · 库存 "+stock.Quantity));
+            }
+            headerText.SetText(state.RecoveryRequired?"存档恢复受阻 · 请保留原件 · 现金暂不可确认":"现金 "+G3Text.Money(state.CashMinor)+"  ·  今晚 "+G3Text.Money(bill.TotalDueMinor)+"  ·  已购 "+state.TicketsPurchasedToday+"/12  ·  已结算 "+state.SettledTicketCount+(string.IsNullOrEmpty(state.FixtureLabel)?"":"  ·  QA"));
+            headerRect.width=Mathf.Min(lastSafe.width-24*s,TextWidth(headerText.Text,32*s)+24*s);PlacePlate(header,headerRect,.55f);PlaceLabel(headerText,Inset(headerRect,12*s,5*s),32*s,.48f,false);
             string summary;
             if(state.RecoveryRequired)summary="存档待恢复，票面已隐藏";
             else if(t==null)summary="空桌 · 两种票均为 100 金币";
             else if(t.Phase==TicketPhase.SETTLED){var record=state.Settlements.LastOrDefault(x=>x.TicketId==t.Id);summary=record==null?"已结算": "原奖 "+G3Text.Money(record.RawPrizeMinor)+" · 已收 "+G3Text.Money(record.TotalMinor)+" · 净额 "+G3Text.Signed(record.NetMinor);}
             else{var p=presenter.Service.PreviewSettlement();summary=p==null?(t.TicketType=="number"?"号码票 · 已揭 "+t.Scratch.RevealedCellCount+" / 6":"挑战票 · 安全 "+t.SafeCount+" 格 · "+(t.SelectedCell>=0?"完成已选格":"请主动选格")):"原奖 "+G3Text.Money(p.RawPrizeMinor)+" · 追加 "+G3Text.Money(p.TotalMinor-p.RawPrizeMinor)+" · 待收 "+G3Text.Money(p.TotalMinor)+" · 净额 "+G3Text.Signed(p.NetMinor);}
-            resultText.SetText(summary+(t!=null?" · 点此明细":""));PlaceLabel(resultText,new Rect(footerRect.x+14*s,footerRect.y+39*s,footerRect.width-28*s,35*s),32*s,.47f,false);
+            resultText.SetText(summary+(t!=null?" · 明细":""));
+            footerRect.width=Mathf.Min(lastSafe.width-24*s,TextWidth(resultText.Text,32*s)+28*s);PlacePlate(footer,footerRect,.55f);PlaceLabel(resultText,Inset(footerRect,14*s,3*s),32*s,.47f,false);
             string feedback=presenter.Status;
             if(G3QaEvidence.Enabled&&!presenter.IsCommitting&&!state.RecoveryRequired&&t!=null&&t.SelectedCell>=0&&!PanelVisible)
                 feedback="已保存格 "+(((t.SelectedCell+4)%8)+1)+" · QA r"+state.Revision+" · selection="+G3QaEvidence.SelectionMarker(t);
-            statusText.SetText(feedback);PlaceLabel(statusText,new Rect(footerRect.x+14*s,footerRect.y+3*s,footerRect.width-28*s,35*s),32*s,.47f,false);
+            statusText.SetText(feedback);float feedbackWidth=620*s,feedbackHeight=TextHeight(feedback,32*s,feedbackWidth);PlaceLabel(statusText,new Rect(lastSafe.center.x-feedbackWidth*.5f,lastSafe.yMax-72*s-feedbackHeight,feedbackWidth,feedbackHeight),32*s,.47f,true);
             bool empty=t==null&&!state.RecoveryRequired;emptyText.gameObject.SetActive(empty);
             if(!presenter.IsCommitting&&!state.RecoveryRequired){number.Show(state);challenge.Show(state);}else InvalidateTicket();
             for(int i=0;i<3;i++)
@@ -136,32 +170,56 @@ namespace Lottery.G3.Interaction
             }
             if(!PanelVisible)
             {
-                // Eight existing routes in one shallow dock. All hit boxes remain 48 dp
-                // at the 720 px / 360 dp reference, instead of covering both scene edges.
-                float gap=8*s,w=(lastSafe.width-24*s-7*gap)/8,h=96*s,x=lastSafe.x+12*s,y=lastSafe.y+12*s;
-                AddButton("open-tickets","购票",new G3Action(G3ActionKind.Open,slot:(int)G3Panel.Tickets),new Rect(x,y,w,h));
-                AddButton("open-shop","货架",new G3Action(G3ActionKind.Open,slot:(int)G3Panel.Shop),new Rect(x+(w+gap),y,w,h));
+                // Four contract-required routes stay visible; secondary routes use a
+                // real, input-routed More drawer instead of eight equal-weight blocks.
+                float gap=8*s,w=112*s,h=96*s,x=lastSafe.x+12*s,y=lastSafe.y+12*s;
+                AddButton("stand",walking?"坐下":"起身",new G3Action(walking?G3ActionKind.Sit:G3ActionKind.Stand),new Rect(x,y,w,h));
+                AddButton("open-shop","货架",new G3Action(G3ActionKind.Open,slot:(int)G3Panel.Shop),new Rect(x+w+gap,y,w,h));
                 AddButton("open-inventory","收纳",new G3Action(G3ActionKind.Open,slot:(int)G3Panel.Inventory),new Rect(x+2*(w+gap),y,w,h));
-                AddButton("open-drawer","抽屉",new G3Action(G3ActionKind.Open,slot:(int)G3Panel.Drawer),new Rect(x+3*(w+gap),y,w,h));
-                AddButton("stand",walking?"回票桌":"起身",new G3Action(walking?G3ActionKind.Sit:G3ActionKind.Stand),new Rect(x+4*(w+gap),y,w,h));
-                AddButton("open-phone","手机",new G3Action(G3ActionKind.Open,slot:(int)G3Panel.Phone),new Rect(x+5*(w+gap),y,w,h));
-                AddButton("open-bill","账单",new G3Action(G3ActionKind.Open,slot:(int)G3Panel.Bill),new Rect(x+6*(w+gap),y,w,h));
-                AddButton("open-settings","设置",new G3Action(G3ActionKind.Open,slot:(int)G3Panel.Settings),new Rect(x+7*(w+gap),y,w,h));
-                x=lastSafe.xMax-194*s;y=lastSafe.y+198*s;w=182*s;h=104*s;
+                AddButton("open-phone","手机",new G3Action(G3ActionKind.Open,slot:(int)G3Panel.Phone),new Rect(x+3*(w+gap),y,w,h));
+                AddButton("open-more",moreVisible?"收起":"更多",new G3Action(G3ActionKind.ToggleMore),new Rect(x+4*(w+gap),y,w,h));
+                if(moreVisible)
+                {
+                    float mx=x+4*(w+gap),mw=176*s;
+                    AddButton("open-tickets","购票",new G3Action(G3ActionKind.Open,slot:(int)G3Panel.Tickets),new Rect(mx,y+104*s,mw,h));
+                    AddButton("open-drawer","抽屉",new G3Action(G3ActionKind.Open,slot:(int)G3Panel.Drawer),new Rect(mx,y+208*s,mw,h));
+                    AddButton("open-bill","账单",new G3Action(G3ActionKind.Open,slot:(int)G3Panel.Bill),new Rect(mx,y+312*s,mw,h));
+                    AddButton("open-settings","设置",new G3Action(G3ActionKind.Open,slot:(int)G3Panel.Settings),new Rect(mx,y+416*s,mw,h));
+                }
+                x=lastSafe.xMax-194*s;y=lastSafe.y+12*s;w=182*s;h=96*s;
                 if(presenter.IsCommitting)AddButton("retry","确认交易",new G3Action(G3ActionKind.Retry),new Rect(x,y,w,h));
                 else if(!walking&&t!=null&&t.Phase!=TicketPhase.SETTLED)
                 {
                     bool claim=presenter.Service.PreviewSettlement()!=null;
                     AddButton("claim",t.TicketType=="challenge"?"收手\n并结算":"收下奖金",new G3Action(G3ActionKind.Claim),new Rect(x,y,w,h),claim);
-                    if(claim&&state.TicketsPurchasedToday<12)AddButton("claim-next","收下再买\n同型 100",new G3Action(G3ActionKind.ClaimThenBuy,t.TicketType),new Rect(x,y+108*s,w,h));
-                    else if(presenter.QuickEnabled)AddButton("quick",t.TicketType=="challenge"?"快揭\n已选格":"快速揭晓",new G3Action(G3ActionKind.QuickReveal),new Rect(x,y+108*s,w,h),t.TicketType=="number"||t.SelectedCell>=0);
+                    if(claim&&state.TicketsPurchasedToday<12)AddButton("claim-next","收下再买\n同型 100",new G3Action(G3ActionKind.ClaimThenBuy,t.TicketType),new Rect(x-190*s,y,w,h));
+                    else if(presenter.QuickEnabled)AddButton("quick",t.TicketType=="challenge"?"快揭\n已选格":"快速揭晓",new G3Action(G3ActionKind.QuickReveal),new Rect(x-190*s,y,w,h),t.TicketType=="number"||t.SelectedCell>=0);
                 }
-                if(walking)WalkControls(s);
+                if(walking&&!moreVisible)WalkControls(s);
             }
-            header.gameObject.SetActive(!PanelVisible);footer.gameObject.SetActive(!PanelVisible);headerText.gameObject.SetActive(!PanelVisible);statusText.gameObject.SetActive(!PanelVisible);resultText.gameObject.SetActive(!PanelVisible);
+            header.gameObject.SetActive(!PanelVisible);footer.gameObject.SetActive(!PanelVisible);headerText.gameObject.SetActive(!PanelVisible);statusText.gameObject.SetActive(!PanelVisible&&!moreVisible&&!string.IsNullOrEmpty(feedback));resultText.gameObject.SetActive(!PanelVisible);
             ShowModal(model,s);
             foreach(var b in pool.Skip(used))b.Root.SetActive(false);
         }
+        public string[] WrapEvidenceDisplayLines(string text)
+        {
+            // Wrap the immutable diagnostic snapshot for the narrower supported phone
+            // width. Clipboard still uses the original full snapshot, not these lines.
+            float scale=Safe.height/720f,width=Mathf.Min(1100,Safe.width/scale-72);var lines=new List<string>();
+            font.RequestCharactersInTexture(text??"",80,FontStyle.Normal);
+            foreach(string raw in (text??"").Split('\n'))
+            {
+                var line=new System.Text.StringBuilder();float usedWidth=0;
+                foreach(char c in raw){float advance=font.GetCharacterInfo(c,out var glyph,80,FontStyle.Normal)?glyph.advance*32f/80:32;if(usedWidth+advance>width&&line.Length>0){lines.Add(line.ToString());line.Clear();usedWidth=0;}line.Append(c);usedWidth+=advance;}
+                lines.Add(line.ToString());
+            }
+            return lines.ToArray();
+        }
+        float TextWidth(string text,float pixels)
+        {font.RequestCharactersInTexture(text??"",80,FontStyle.Normal);float width=0;foreach(char c in text??"")if(font.GetCharacterInfo(c,out var info,80,FontStyle.Normal))width+=info.advance*pixels/80;return width;}
+        public bool HandleLocalAction(G3Action action)
+        {if(action.Kind==G3ActionKind.ToggleMore){moreVisible=!moreVisible;Show(current,panelModel);return true;}if(moreVisible){moreVisible=false;Show(current,panelModel);}return false;}
+        public bool CloseMore(){if(!moreVisible)return false;moreVisible=false;Show(current,panelModel);return true;}
         float TextHeight(string text,float pixels,float width)
         {
             font.RequestCharactersInTexture(text??"",80,FontStyle.Normal);float line=0;int lines=1;
@@ -199,8 +257,8 @@ namespace Lottery.G3.Interaction
             panelBody.SetText(model.Body);panelFoot.SetText(model.Footnote);
             if(model.Evidence)
             {
-                evidenceBodyRect=new Rect(modalRect.x+24*s,modalRect.y+198*s,modalRect.width-48*s,modalRect.height-318*s);
-                PlaceLabel(panelBody,evidenceBodyRect,24*s,.22f,false);PlaceLabel(panelFoot,new Rect(modalRect.x+24*s,modalRect.y+16*s,modalRect.width-48*s,64*s),24*s,.22f,true);
+                evidenceBodyRect=new Rect(modalRect.x+24*s,modalRect.y+190*s,modalRect.width-48*s,modalRect.height-302*s);
+                PlaceLabel(panelBody,evidenceBodyRect,32*s,.22f,false);PlaceLabel(panelFoot,new Rect(modalRect.x+24*s,modalRect.y+8*s,modalRect.width-48*s,76*s),32*s,.22f,true);
                 float w=(modalRect.width-64*s)/3;for(int i=0;i<model.Cards.Count;i++){var c=model.Cards[i];AddButton(c.Id,c.Text,c.Action,new Rect(modalRect.x+24*s+i*(w+8*s),modalRect.y+88*s,w,96*s),c.Enabled,.25f);}
                 return;
             }
@@ -218,9 +276,9 @@ namespace Lottery.G3.Interaction
         void AddButton(string id,string text,G3Action action,Rect rect,bool enabled=true,float z=.51f,float fontPixels=32)
         {
             if(used>=pool.Count)throw new InvalidOperationException("UI button capacity exceeded");var b=pool[used++];b.Id=id;b.Action=action;b.Rect=rect;bool evidenceControl=G3QaEvidence.Enabled&&(action.Kind==G3ActionKind.Open&&(action.Slot==(int)G3Panel.Settings||action.Slot==(int)G3Panel.QaEvidence)||(current.Panel==G3Panel.QaEvidence&&(action.Kind==G3ActionKind.CopyEvidence||action.Kind==G3ActionKind.ScrollEvidence))||(action.Kind==G3ActionKind.Close&&(current.Panel==G3Panel.QaEvidence||current.Panel==G3Panel.Settings)));
-            b.Enabled=enabled&&(!current.IsCommitting||evidenceControl)||action.Kind==G3ActionKind.Retry;b.Root.SetActive(true);
+            b.Enabled=enabled&&(!current.IsCommitting||evidenceControl)||action.Kind==G3ActionKind.Retry||action.Kind==G3ActionKind.ToggleMore;b.Root.SetActive(true);
             PlacePlate(b.Plate,rect,z);bool primary=id=="claim"||id=="confirm-action"||id=="buy-number"||id=="buy-challenge";b.Plate.GetComponent<Renderer>().sharedMaterial.color=!b.Enabled?new Color(.15f,.17f,.18f):primary?new Color(.44f,.28f,.09f):new Color(.16f,.19f,.20f);
-            b.Label.SetText(text);PlaceLabel(b.Label,Inset(rect,12*lastSafe.height/720f,14*lastSafe.height/720f),fontPixels*lastSafe.height/720f,z-.025f,true);
+            b.Label.SetText(text);PlaceLabel(b.Label,Inset(rect,12*lastSafe.height/720f,12*lastSafe.height/720f),fontPixels*lastSafe.height/720f,z-.025f,true);
         }
         void WalkControls(float s)
         {
@@ -240,7 +298,7 @@ namespace Lottery.G3.Interaction
             // Check frontmost controls first (confirmation/recovery overlays win).
             for(int i=used-1;i>=0;i--){var b=pool[i];if(b.Root.activeInHierarchy&&b.Rect.Contains(pixel)){action=b.Enabled?b.Action:default;return true;}}
             if(!PanelVisible&&footerRect.Contains(pixel)&&current.Snapshot.CurrentTicket!=null){action=new G3Action(G3ActionKind.Open,slot:(int)G3Panel.Settlement);return true;}
-            action=default;return PanelVisible||headerRect.Contains(pixel)||footerRect.Contains(pixel);
+            action=default;return PanelVisible||moreVisible||headerRect.Contains(pixel)||footerRect.Contains(pixel);
         }
         public bool TryScratchUv(Vector2 pixel,out Uv uv)
         {

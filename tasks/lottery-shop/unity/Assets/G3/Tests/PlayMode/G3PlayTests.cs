@@ -104,8 +104,12 @@ namespace Lottery.G3.PlayMode.Tests
                 Assert.That(Router.AwaitingRelease,Is.False,Router.DiagnosticState);
                 P.View.Layout();
                 Assert.That(P.View.LayoutChanged,Is.False,Router.DiagnosticState);
+                Assert.That(P.View.MoreVisible,Is.False);
+                Assert.That(P.View.HasButton("open-tickets"),Is.False,"The secondary route must first be opened through More");
+                RevealNavigationButton("open-tickets");
                 Assert.That(P.View.ConsumeUi(P.View.ButtonRect("open-tickets").center,out G3Action firstAction),Is.True);
                 Assert.That(firstAction.Kind,Is.EqualTo(G3ActionKind.Open),"The visible buy control must be the routed UI action");
+                Click("open-more");Assert.That(P.View.MoreVisible,Is.False);
                 TestContext.Out.WriteLine("SIMULATED_INPUT_SYSTEM ready, mouse/Escape edges primed: "+InputDiagnostic);
                 setupComplete=true;
             }
@@ -252,7 +256,17 @@ namespace Lottery.G3.PlayMode.Tests
         }
         void TouchEvent(int id,IPhase phase,Vector2 p){InputSystem.QueueStateEvent(touch,new TouchState{touchId=id,phase=phase,position=p,pressure=phase==IPhase.Ended||phase==IPhase.Canceled?0:1});PumpInput();Router.PollInput();}
         void KeyboardEvent(params Key[] keys){InputSystem.QueueStateEvent(keyboard,new KeyboardState(keys));PumpInput();Router.PollInput();}
-        void Click(string id){var p=P.View.ButtonRect(id).center;MouseEvent(p,true);MouseEvent(p,false);}
+        void RevealNavigationButton(string id)
+        {
+            if(P.View.HasButton(id))return;
+            if(id!="open-tickets"&&id!="open-drawer"&&id!="open-bill"&&id!="open-settings")return;
+            // Secondary navigation is a real player gesture. Never expose hidden
+            // controls by calling view or presenter actions directly from a test.
+            var more=P.View.ButtonRect("open-more").center;MouseEvent(more,true);MouseEvent(more,false);
+            Assert.That(P.View.MoreVisible,Is.True,"The actual More button must open secondary navigation");
+            Assert.That(P.View.HasButton(id),Is.True,"The requested secondary route must now be visible: "+id);
+        }
+        void Click(string id){RevealNavigationButton(id);var p=P.View.ButtonRect(id).center;MouseEvent(p,true);MouseEvent(p,false);}
         void Claim(){Click("claim");if(P.Panel==G3Panel.Confirm)Confirm();}
         void Confirm(){Assert.That(P.Panel,Is.EqualTo(G3Panel.Confirm));Click("confirm-action");}
         void Close(){if(P.Panel!=G3Panel.None)Click("close-panel");}
@@ -390,7 +404,7 @@ namespace Lottery.G3.PlayMode.Tests
             Buy("number");ScratchCell(3,.3f);string hash=StateCodec.ComputeHash(State);Click("open-shop");var quickBody=P.BuildPanel().Body;Close();
             Click("stand");Assert.That(Router.Mode,Is.EqualTo(G3Mode.WALK));Vector3 origin=P.View.Walk.SavedPosition;
             for(int i=0;i<15;i++){KeyboardEvent(Key.A);yield return null;}KeyboardEvent();Assert.That(Vector3.Distance(P.View.Walk.SavedPosition,origin),Is.GreaterThan(.01f));
-            var rack=GameObject.Find("Tool shelf");Assert.That(rack,Is.Not.Null);yield return FaceTargetWithKeyboard(rack.transform.position+Vector3.up*.6f);var point=P.View.WorldToPresentationPoint(rack.transform.position+Vector3.up*.6f);Assert.That(P.View.WorldTarget(point),Is.Not.Null,"Shelf must be physically reachable by the visible camera ray");
+            var rack=GameObject.Find("Tool shelf");Assert.That(rack,Is.Not.Null);var target=P.View.Environment.ShelfTargetPosition;yield return FaceTargetWithKeyboard(target);var point=P.View.WorldToPresentationPoint(target);Assert.That(P.View.WorldTarget(point),Is.Not.Null,"Shelf must be physically reachable by the visible camera ray");
             Vector3 pos=app.SceneCamera.transform.position;Quaternion rot=app.SceneCamera.transform.rotation;MouseEvent(point,true);MouseEvent(point,false);Assert.That(P.Panel,Is.EqualTo(G3Panel.Shop));Assert.That(P.BuildPanel().Body,Is.EqualTo(quickBody));Assert.That(StateCodec.ComputeHash(State),Is.EqualTo(hash));Close();
             Assert.That(app.SceneCamera.transform.position,Is.EqualTo(pos));Assert.That(app.SceneCamera.transform.rotation,Is.EqualTo(rot));Click("stand");Assert.That(P.Walking,Is.False);Assert.That(State.CurrentTicket.Scratch.CellCoverage(3),Is.GreaterThan(0));yield return null;
         }
@@ -462,8 +476,8 @@ namespace Lottery.G3.PlayMode.Tests
             Buy("challenge");RevealSelected(0);RevealSelected(1);yield return null;Capture("challenge-two-safe",output,records);
             Select(2);yield return null;Capture("challenge-selected",output,records);Click("quick");Claim();
             Click("open-shop");yield return null;Capture("shop-shortcut",output,records);string shopHash=StateCodec.ComputeHash(State);Close();
-            Click("stand");var rack=GameObject.Find("Tool shelf");yield return FaceTargetWithKeyboard(rack.transform.position+Vector3.up*.6f);
-            var point=P.View.WorldToPresentationPoint(rack.transform.position+Vector3.up*.6f);Assert.That(P.View.ConsumeUi(point,out _),Is.False,"Physical shelf must be visible outside the overlay controls");Assert.That(P.View.WorldTarget(point),Is.Not.Null);MouseEvent(point,true);MouseEvent(point,false);Assert.That(P.Panel,Is.EqualTo(G3Panel.Shop));Assert.That(StateCodec.ComputeHash(State),Is.EqualTo(shopHash));yield return null;Capture("shop-physical",output,records);Close();Click("stand");
+            Click("stand");var rack=GameObject.Find("Tool shelf");Assert.That(rack,Is.Not.Null);var target=P.View.Environment.ShelfTargetPosition;yield return FaceTargetWithKeyboard(target);
+            var point=P.View.WorldToPresentationPoint(target);Assert.That(P.View.ConsumeUi(point,out _),Is.False,"Physical shelf must be visible outside the overlay controls");Assert.That(P.View.WorldTarget(point),Is.Not.Null);MouseEvent(point,true);MouseEvent(point,false);Assert.That(P.Panel,Is.EqualTo(G3Panel.Shop));Assert.That(StateCodec.ComputeHash(State),Is.EqualTo(shopHash));yield return null;Capture("shop-physical",output,records);Close();Click("stand");
             while(State.TicketsPurchasedToday<12){Buy("number");Click("quick");Claim();}
             Click("open-bill");Click("enter-night");Confirm();yield return null;Capture("night",output,records);Click("pay-night");Confirm();Assert.That(State.Phase,Is.EqualTo(DayPhase.DAY_COMPLETE));yield return null;Capture("day-end",output,records);
             // Separate disclosed run, never mixed into the normal one-day ledger.

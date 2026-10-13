@@ -33,3 +33,7 @@ Receipts bind source, run, run attempt, fixed diagnostic seed hash, confirmed st
 ## Local verification boundary
 
 The validator unit tests are synthetic and run without Unity. No native compile, model import, runtime frame, visual acceptance or device result is claimed until the corresponding actual run completes and is inspected.
+
+## V13 measured presentation extension
+
+Receipt schema 2 records actual visible control IDs and More visibility, the union of visible opaque HUD plates divided by safe-area size, projected bounds of the visible ticket and three runtime tools, and rendered shop renderer/material counts. Secondary navigation is opened only through genuine mouse events on the visible `open-more` control before clicking its destination. Geometry measurements are observations for manual review of the native PNGs. Passing their shape/finite-value checks is not an art quality or pixel-occlusion verdict; offscreen or very large but well-formed bounds remain visible in the evidence.

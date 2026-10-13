@@ -1,12 +1,23 @@
 {
-  "version": "art-v1.2",
+  "version": "art-v1.3",
   "fbx": "LotteryShop_Interior.fbx",
-  "sha256": "c1bca323479949be459b90d97a19f7deb8f5b56092157572598c0e146e39cbf2",
-  "staticTriangles": 61308,
-  "staticMeshObjects": 520,
+  "sha256": "29a71f0dfaac26ab3409c42f3eeac60e20d334b255e01e23ba5f6b83670f427f",
+  "staticTriangles": 67858,
+  "staticMeshObjects": 558,
   "tools": [
     "Tool_small_prize_box.fbx",
     "Tool_inspection_lamp.fbx",
     "Tool_large_prize_stamp.fbx"
-  ]
+  ],
+  "paperMeters": [
+    0.4,
+    0.2666667
+  ],
+  "toolScales": [
+    0.55,
+    0.53,
+    0.55
+  ],
+  "previewStatus": "Render pending. No Unity or mobile performance pass claimed.",
+  "revisionNote": "Separated dock wood top .839 from rubber top .840; no coplanar faces."
 }

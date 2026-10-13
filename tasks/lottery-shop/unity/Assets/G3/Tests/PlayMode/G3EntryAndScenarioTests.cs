@@ -155,8 +155,8 @@ namespace Lottery.G3.PlayMode.Tests
         IEnumerator PhysicalShelf()
         {
             Close();Click("stand");Assert.That(P.Walking,Is.True);var rack=GameObject.Find("Tool shelf");
-            yield return FaceTargetWithKeyboard(rack.transform.position+Vector3.up*.6f);
-            var point=P.View.WorldToPresentationPoint(rack.transform.position+Vector3.up*.6f);Assert.That(P.View.WorldTarget(point)?.Panel,Is.EqualTo(G3Panel.Shop));MouseEvent(point,true);MouseEvent(point,false);Assert.That(P.Panel,Is.EqualTo(G3Panel.Shop));
+            Assert.That(rack,Is.Not.Null);var target=P.View.Environment.ShelfTargetPosition;yield return FaceTargetWithKeyboard(target);
+            var point=P.View.WorldToPresentationPoint(target);Assert.That(P.View.WorldTarget(point)?.Panel,Is.EqualTo(G3Panel.Shop));MouseEvent(point,true);MouseEvent(point,false);Assert.That(P.Panel,Is.EqualTo(G3Panel.Shop));
         }
         [UnityTest]
         public IEnumerator FixedSeventyFiveStepDayRunsContinuouslyFromMarkedApkEntryThroughInputSystem()

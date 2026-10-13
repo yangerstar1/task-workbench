@@ -20,8 +20,8 @@ def receipt():
             stateSha256="b" * 64, seedSha256="c" * 64, hudVisible=True, hudFits=True,
             cameraOrthographic=False, hudFrustumRendererCount=20, importedRendererCount=200, inputUpdates=123,
             cameraPosition=dict(x=1, y=2, z=3), cameraEuler=dict(x=60, y=180, z=0), cameraFov=64, dayPhase="NIGHT_BILL" if name == "night-table" else "DAY_OPEN",
-            panel="None", currentTools=["small_prize_box", "inspection_lamp", "large_prize_stamp"], revealedCells=3))
-    return dict(scope=candidate.SCOPE, sourceCommit="1" * 40, runId="12345", runAttempt="1", unityVersion="6000.3.19f1",
+            panel="None", hudOpaqueAreaRatio=.18, visibleControlIds=["open-shop", "open-inventory", "open-phone", "stand", "open-more"], moreVisible=False, paperVisible=True, renderedShopRendererCount=32, renderedShopMaterialCount=31, paperPresentationBounds=dict(x=300,y=200,width=600,height=400), toolPresentationBounds=[dict(x=400+i*100,y=510,width=60,height=80) for i in range(3)], currentTools=["small_prize_box", "inspection_lamp", "large_prize_stamp"], revealedCells=3))
+    return dict(schemaVersion=2, candidatePresentation="V13_MORE_NAVIGATION_MEASURED_GEOMETRY_NOT_VISUAL_PASS", scope=candidate.SCOPE, sourceCommit="1" * 40, runId="12345", runAttempt="1", unityVersion="6000.3.19f1",
                 graphicsDeviceType="OpenGLCore", inputEvidence="SIMULATED_INPUT_SYSTEM",
                 captureMethod="URP_STANDARD_REQUEST_READPIXELS", hudVisibilityBasis="ENABLED_CAMERA_LAYER_AND_FRUSTUM_TEST_NOT_PIXEL_OCCLUSION", complete=True, frames=frames, actions=[])
 
@@ -81,6 +81,18 @@ class VisualCandidateEvidenceTests(unittest.TestCase):
     def test_night_must_be_real_phase_with_closed_bill(self):
         for key, bad in (("dayPhase", "DAY_OPEN"), ("panel", "Bill")):
             value = receipt(); value["frames"][9][key] = bad
+            with self.subTest(key=key), self.assertRaises(ValueError): self.validate(value)
+
+    def test_measured_layout_fields_are_required_without_art_pass_threshold(self):
+        value = receipt(); value["frames"][0]["hudOpaqueAreaRatio"] = .9
+        self.assertEqual(len(self.validate(value)), 11)
+        for bad in (None, -1, float("inf"), 1.1):
+            value = receipt(); value["frames"][0]["hudOpaqueAreaRatio"] = bad
+            with self.subTest(bad=bad), self.assertRaises(ValueError): self.validate(value)
+
+    def test_missing_or_nonfinite_paper_tool_projections_rejected(self):
+        for key, bad in (("paperPresentationBounds", None), ("toolPresentationBounds", [])):
+            value = receipt(); value["frames"][0][key] = bad
             with self.subTest(key=key), self.assertRaises(ValueError): self.validate(value)
 
     def test_no_unlisted_output_paths(self):

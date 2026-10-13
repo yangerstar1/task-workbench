@@ -1,531 +1,1115 @@
 {
   "materials": [
     {
+      "name": "Aged_Aluminium",
+      "baseColor": [
+        0.28999999165534973,
+        0.3199999928474426,
+        0.30000001192092896,
+        1.0
+      ],
+      "baseColorFactor": [
+        0.28999999165534973,
+        0.3199999928474426,
+        0.30000001192092896,
+        1.0
+      ],
+      "metallic": 0.7400000095367432,
+      "roughness": 0.28999999165534973,
+      "normalStrength": 0.0,
+      "transmission": 0.0,
+      "ior": 1.4500000476837158,
+      "emission": 0.0,
+      "emissionColor": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "coatWeight": 0.0,
+      "coatRoughness": 0.029999999329447746,
+      "mainTextureScale": [
+        1,
+        1
+      ]
+    },
+    {
+      "name": "Bone_Laminate",
+      "baseColor": [
+        0.4300000071525574,
+        0.4399999976158142,
+        0.38499999046325684,
+        1.0
+      ],
+      "baseColorFactor": [
+        0.4300000071525574,
+        0.4399999976158142,
+        0.38499999046325684,
+        1.0
+      ],
+      "metallic": 0.0,
+      "roughness": 0.6800000071525574,
+      "normalStrength": 0.0,
+      "transmission": 0.0,
+      "ior": 1.4500000476837158,
+      "emission": 0.0,
+      "emissionColor": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "coatWeight": 0.0,
+      "coatRoughness": 0.029999999329447746,
+      "mainTextureScale": [
+        1,
+        1
+      ]
+    },
+    {
+      "name": "Brass_Worn",
+      "baseColor": [
+        0.4300000071525574,
+        0.2800000011920929,
+        0.09000000357627869,
+        1.0
+      ],
+      "baseColorFactor": [
+        0.4300000071525574,
+        0.2800000011920929,
+        0.09000000357627869,
+        1.0
+      ],
+      "metallic": 0.6499999761581421,
+      "roughness": 0.4000000059604645,
+      "normalStrength": 0.0,
+      "transmission": 0.0,
+      "ior": 1.4500000476837158,
+      "emission": 0.0,
+      "emissionColor": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "coatWeight": 0.0,
+      "coatRoughness": 0.029999999329447746,
+      "mainTextureScale": [
+        1,
+        1
+      ]
+    },
+    {
+      "name": "Charcoal_Metal",
+      "baseColor": [
+        0.04500000178813934,
+        0.054999999701976776,
+        0.052000001072883606,
+        1.0
+      ],
+      "baseColorFactor": [
+        0.04500000178813934,
+        0.054999999701976776,
+        0.052000001072883606,
+        1.0
+      ],
+      "metallic": 0.550000011920929,
+      "roughness": 0.5299999713897705,
+      "normalStrength": 0.0,
+      "transmission": 0.0,
+      "ior": 1.4500000476837158,
+      "emission": 0.0,
+      "emissionColor": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "coatWeight": 0.0,
+      "coatRoughness": 0.029999999329447746,
+      "mainTextureScale": [
+        1,
+        1
+      ]
+    },
+    {
+      "name": "CounterToolTag_1",
+      "baseColor": [
+        1,
+        1,
+        1,
+        1.0
+      ],
+      "baseColorFactor": [
+        1,
+        1,
+        1,
+        1.0
+      ],
+      "metallic": 0.0,
+      "roughness": 0.800000011920929,
+      "normalStrength": 0.0,
+      "transmission": 0.0,
+      "ior": 1.5,
+      "emission": 0.0,
+      "emissionColor": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "coatWeight": 0.0,
+      "coatRoughness": 0.029999999329447746,
+      "baseColorTexture": "textures/CounterToolTag_1_BaseColor.png",
+      "mainTextureScale": [
+        1,
+        1
+      ]
+    },
+    {
+      "name": "CounterToolTag_2",
+      "baseColor": [
+        1,
+        1,
+        1,
+        1.0
+      ],
+      "baseColorFactor": [
+        1,
+        1,
+        1,
+        1.0
+      ],
+      "metallic": 0.0,
+      "roughness": 0.800000011920929,
+      "normalStrength": 0.0,
+      "transmission": 0.0,
+      "ior": 1.5,
+      "emission": 0.0,
+      "emissionColor": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "coatWeight": 0.0,
+      "coatRoughness": 0.029999999329447746,
+      "baseColorTexture": "textures/CounterToolTag_2_BaseColor.png",
+      "mainTextureScale": [
+        1,
+        1
+      ]
+    },
+    {
+      "name": "CounterToolTag_3",
+      "baseColor": [
+        1,
+        1,
+        1,
+        1.0
+      ],
+      "baseColorFactor": [
+        1,
+        1,
+        1,
+        1.0
+      ],
+      "metallic": 0.0,
+      "roughness": 0.800000011920929,
+      "normalStrength": 0.0,
+      "transmission": 0.0,
+      "ior": 1.5,
+      "emission": 0.0,
+      "emissionColor": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "coatWeight": 0.0,
+      "coatRoughness": 0.029999999329447746,
+      "baseColorTexture": "textures/CounterToolTag_3_BaseColor.png",
+      "mainTextureScale": [
+        1,
+        1
+      ]
+    },
+    {
       "name": "Cream_Plaster",
       "baseColor": [
-        0.72,
-        0.68,
-        0.57,
+        1,
+        1,
+        1,
+        1.0
+      ],
+      "baseColorFactor": [
+        1,
+        1,
+        1,
+        1.0
+      ],
+      "metallic": 0.0,
+      "roughness": 0.8999999761581421,
+      "normalStrength": 0.0,
+      "transmission": 0.0,
+      "ior": 1.4500000476837158,
+      "emission": 0.0,
+      "emissionColor": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "coatWeight": 0.0,
+      "coatRoughness": 0.029999999329447746,
+      "baseColorTexture": "textures/SoftPlaster_v13_BaseColor.png",
+      "mainTextureScale": [
+        1,
         1
-      ],
-      "roughness": 0.85,
-      "metallic": 0,
-      "transmission": 0,
-      "emission": 0,
-      "baseColorTexture": "textures/CreamPlaster_BaseColor.png",
-      "roughnessTexture": "textures/CreamPlaster_Roughness.png",
-      "normalTexture": "textures/CreamPlaster_Normal.png",
-      "baseColorTextureDimensions": [
-        2048,
-        2048
-      ],
-      "roughnessTextureDimensions": [
-        2048,
-        2048
-      ],
-      "normalTextureDimensions": [
-        2048,
-        2048
       ]
     },
     {
-      "name": "Heritage_Green_Paint",
+      "name": "Dark_Green_Felt",
       "baseColor": [
-        0.075,
-        0.16,
-        0.13,
+        0.02500000037252903,
+        0.06499999761581421,
+        0.04100000113248825,
+        1.0
+      ],
+      "baseColorFactor": [
+        0.02500000037252903,
+        0.06499999761581421,
+        0.04100000113248825,
+        1.0
+      ],
+      "metallic": 0.0,
+      "roughness": 0.9700000286102295,
+      "normalStrength": 0.0,
+      "transmission": 0.0,
+      "ior": 1.4500000476837158,
+      "emission": 0.0,
+      "emissionColor": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "coatWeight": 0.0,
+      "coatRoughness": 0.029999999329447746,
+      "mainTextureScale": [
+        1,
         1
-      ],
-      "roughness": 0.67,
-      "metallic": 0,
-      "transmission": 0,
-      "emission": 0,
-      "baseColorTexture": "textures/GreenPaint_BaseColor.png",
-      "roughnessTexture": "textures/GreenPaint_Roughness.png",
-      "normalTexture": "textures/GreenPaint_Normal.png",
-      "baseColorTextureDimensions": [
-        2048,
-        2048
-      ],
-      "roughnessTextureDimensions": [
-        2048,
-        2048
-      ],
-      "normalTextureDimensions": [
-        2048,
-        2048
       ]
     },
     {
-      "name": "Warm_Oak",
+      "name": "Glass_Blue_Water",
       "baseColor": [
-        0.72,
-        0.78,
-        0.83,
+        0.23000000417232513,
+        0.4099999964237213,
+        0.49000000953674316,
+        1.0
+      ],
+      "baseColorFactor": [
+        0.23000000417232513,
+        0.4099999964237213,
+        0.49000000953674316,
+        1.0
+      ],
+      "metallic": 0.0,
+      "roughness": 0.18000000715255737,
+      "normalStrength": 0.0,
+      "transmission": 0.6700000166893005,
+      "ior": 1.4500000476837158,
+      "emission": 0.0,
+      "emissionColor": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "coatWeight": 0.0,
+      "coatRoughness": 0.029999999329447746,
+      "mainTextureScale": [
+        1,
         1
-      ],
-      "roughness": 0.64,
-      "metallic": 0,
-      "transmission": 0,
-      "emission": 0,
-      "baseColorTexture": "textures/counter-wood-basecolor.png",
-      "roughnessTexture": "textures/WarmOak_Roughness.png",
-      "normalTexture": "textures/WarmOak_Normal.png",
-      "baseColorTextureDimensions": [
-        1254,
-        1254
-      ],
-      "roughnessTextureDimensions": [
-        2048,
-        2048
-      ],
-      "normalTextureDimensions": [
-        2048,
-        2048
       ]
     },
     {
-      "name": "Warm_Terrazzo",
+      "name": "Glass_Clear",
       "baseColor": [
-        0.42,
-        0.43,
-        0.38,
+        0.8700000047683716,
+        0.9599999785423279,
+        0.9100000262260437,
+        0.2199999988079071
+      ],
+      "baseColorFactor": [
+        0.8700000047683716,
+        0.9599999785423279,
+        0.9100000262260437,
+        0.2199999988079071
+      ],
+      "metallic": 0.0,
+      "roughness": 0.03500000014901161,
+      "normalStrength": 0.0,
+      "transmission": 0.5,
+      "ior": 1.4500000476837158,
+      "emission": 0.0,
+      "emissionColor": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "coatWeight": 0.0,
+      "coatRoughness": 0.029999999329447746,
+      "mainTextureScale": [
+        1,
         1
-      ],
-      "roughness": 0.72,
-      "metallic": 0,
-      "transmission": 0,
-      "emission": 0,
-      "baseColorTexture": "textures/Terrazzo_BaseColor.png",
-      "roughnessTexture": "textures/Terrazzo_Roughness.png",
-      "normalTexture": "textures/Terrazzo_Normal.png",
-      "baseColorTextureDimensions": [
-        2048,
-        2048
-      ],
-      "roughnessTextureDimensions": [
-        2048,
-        2048
-      ],
-      "normalTextureDimensions": [
-        2048,
-        2048
       ]
     },
     {
       "name": "Grout",
       "baseColor": [
-        0.28,
-        0.3,
-        0.26,
+        0.2800000011920929,
+        0.30000001192092896,
+        0.25999999046325684,
+        1.0
+      ],
+      "baseColorFactor": [
+        0.2800000011920929,
+        0.30000001192092896,
+        0.25999999046325684,
+        1.0
+      ],
+      "metallic": 0.0,
+      "roughness": 0.9200000166893005,
+      "normalStrength": 0.0,
+      "transmission": 0.0,
+      "ior": 1.4500000476837158,
+      "emission": 0.0,
+      "emissionColor": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "coatWeight": 0.0,
+      "coatRoughness": 0.029999999329447746,
+      "mainTextureScale": [
+        1,
         1
-      ],
-      "roughness": 0.92,
-      "metallic": 0,
-      "transmission": 0,
-      "emission": 0
+      ]
     },
     {
-      "name": "Bone_Laminate",
+      "name": "Heritage_Green_Paint",
       "baseColor": [
-        0.63,
-        0.62,
-        0.51,
+        1,
+        1,
+        1,
+        1.0
+      ],
+      "baseColorFactor": [
+        1,
+        1,
+        1,
+        1.0
+      ],
+      "metallic": 0.0,
+      "roughness": 0.6100000143051147,
+      "normalStrength": 0.0,
+      "transmission": 0.0,
+      "ior": 1.4500000476837158,
+      "emission": 0.0,
+      "emissionColor": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "coatWeight": 0.0,
+      "coatRoughness": 0.029999999329447746,
+      "baseColorTexture": "textures/SmoothGreen_v13_BaseColor.png",
+      "mainTextureScale": [
+        1,
         1
-      ],
-      "roughness": 0.55,
-      "metallic": 0,
-      "transmission": 0,
-      "emission": 0
-    },
-    {
-      "name": "Aged_Aluminium",
-      "baseColor": [
-        0.29,
-        0.32,
-        0.3,
-        1
-      ],
-      "roughness": 0.29,
-      "metallic": 0.74,
-      "transmission": 0,
-      "emission": 0
-    },
-    {
-      "name": "Charcoal_Metal",
-      "baseColor": [
-        0.045,
-        0.055,
-        0.052,
-        1
-      ],
-      "roughness": 0.53,
-      "metallic": 0.55,
-      "transmission": 0,
-      "emission": 0
-    },
-    {
-      "name": "Oxblood_Enamel",
-      "baseColor": [
-        0.25,
-        0.037,
-        0.039,
-        1
-      ],
-      "roughness": 0.47,
-      "metallic": 0.12,
-      "transmission": 0,
-      "emission": 0
-    },
-    {
-      "name": "Brass_Worn",
-      "baseColor": [
-        0.43,
-        0.28,
-        0.09,
-        1
-      ],
-      "roughness": 0.4,
-      "metallic": 0.65,
-      "transmission": 0,
-      "emission": 0
-    },
-    {
-      "name": "Dark_Green_Felt",
-      "baseColor": [
-        0.032,
-        0.093,
-        0.071,
-        1
-      ],
-      "roughness": 0.94,
-      "metallic": 0,
-      "transmission": 0,
-      "emission": 0
-    },
-    {
-      "name": "Paper_Ivory",
-      "baseColor": [
-        0.8,
-        0.76,
-        0.65,
-        1
-      ],
-      "roughness": 0.85,
-      "metallic": 0,
-      "transmission": 0,
-      "emission": 0
-    },
-    {
-      "name": "Plastic_Cream",
-      "baseColor": [
-        0.61,
-        0.62,
-        0.54,
-        1
-      ],
-      "roughness": 0.45,
-      "metallic": 0,
-      "transmission": 0,
-      "emission": 0
-    },
-    {
-      "name": "Stool_Red",
-      "baseColor": [
-        0.37,
-        0.055,
-        0.039,
-        1
-      ],
-      "roughness": 0.5,
-      "metallic": 0,
-      "transmission": 0,
-      "emission": 0
-    },
-    {
-      "name": "Stool_Green",
-      "baseColor": [
-        0.065,
-        0.16,
-        0.13,
-        1
-      ],
-      "roughness": 0.58,
-      "metallic": 0,
-      "transmission": 0,
-      "emission": 0
-    },
-    {
-      "name": "Rubber",
-      "baseColor": [
-        0.015,
-        0.023,
-        0.019,
-        1
-      ],
-      "roughness": 0.8,
-      "metallic": 0,
-      "transmission": 0,
-      "emission": 0
-    },
-    {
-      "name": "Glass_Clear",
-      "baseColor": [
-        0.87,
-        0.96,
-        0.91,
-        0.22
-      ],
-      "roughness": 0.035,
-      "metallic": 0,
-      "transmission": 0.5,
-      "emission": 0
-    },
-    {
-      "name": "Glass_Blue_Water",
-      "baseColor": [
-        0.23,
-        0.41,
-        0.49,
-        0.5
-      ],
-      "roughness": 0.18,
-      "metallic": 0,
-      "transmission": 0.67,
-      "emission": 0
+      ]
     },
     {
       "name": "Ink",
       "baseColor": [
-        0.035,
-        0.044,
-        0.035,
-        1
+        0.03500000014901161,
+        0.04399999976158142,
+        0.03500000014901161,
+        1.0
       ],
-      "roughness": 0.62,
-      "metallic": 0,
-      "transmission": 0,
-      "emission": 0
-    },
-    {
-      "name": "Warm_Light",
-      "baseColor": [
-        0.99,
-        0.75,
-        0.4,
-        1
+      "baseColorFactor": [
+        0.03500000014901161,
+        0.04399999976158142,
+        0.03500000014901161,
+        1.0
       ],
-      "roughness": 0.5,
-      "metallic": 0,
-      "transmission": 0,
-      "emission": 4
-    },
-    {
-      "name": "Tube_Light",
-      "baseColor": [
-        0.78,
-        0.9,
-        0.89,
-        1
+      "metallic": 0.0,
+      "roughness": 0.6200000047683716,
+      "normalStrength": 0.0,
+      "transmission": 0.0,
+      "ior": 1.4500000476837158,
+      "emission": 0.0,
+      "emissionColor": [
+        1.0,
+        1.0,
+        1.0
       ],
-      "roughness": 0.5,
-      "metallic": 0,
-      "transmission": 0,
-      "emission": 5
-    },
-    {
-      "name": "Red_LED",
-      "baseColor": [
-        0.8,
-        0.017,
-        0.007,
+      "coatWeight": 0.0,
+      "coatRoughness": 0.029999999329447746,
+      "mainTextureScale": [
+        1,
         1
-      ],
-      "roughness": 0.45,
-      "metallic": 0,
-      "transmission": 0,
-      "emission": 2
-    },
-    {
-      "name": "ShopSign",
-      "baseColor": [
-        0.7,
-        0.7,
-        0.7,
-        1
-      ],
-      "roughness": 0.82,
-      "metallic": 0,
-      "transmission": 0,
-      "emission": 0,
-      "baseColorTexture": "textures/ShopSign_BaseColor.png",
-      "baseColorTextureDimensions": [
-        2048,
-        768
-      ]
-    },
-    {
-      "name": "Poster_Fortune",
-      "baseColor": [
-        0.7,
-        0.7,
-        0.7,
-        1
-      ],
-      "roughness": 0.82,
-      "metallic": 0,
-      "transmission": 0,
-      "emission": 0,
-      "baseColorTexture": "textures/Poster_Fortune_BaseColor.png",
-      "baseColorTextureDimensions": [
-        1024,
-        1536
-      ]
-    },
-    {
-      "name": "ServiceNotice",
-      "baseColor": [
-        0.7,
-        0.7,
-        0.7,
-        1
-      ],
-      "roughness": 0.82,
-      "metallic": 0,
-      "transmission": 0,
-      "emission": 0,
-      "baseColorTexture": "textures/ServiceNotice_BaseColor.png",
-      "baseColorTextureDimensions": [
-        1024,
-        768
-      ]
-    },
-    {
-      "name": "ResultsBoard",
-      "baseColor": [
-        0.7,
-        0.7,
-        0.7,
-        1
-      ],
-      "roughness": 0.82,
-      "metallic": 0,
-      "transmission": 0,
-      "emission": 0,
-      "baseColorTexture": "textures/ResultsBoard_BaseColor.png",
-      "baseColorTextureDimensions": [
-        1536,
-        1024
       ]
     },
     {
       "name": "Newspaper",
       "baseColor": [
-        0.7,
-        0.7,
-        0.7,
-        1
+        1,
+        1,
+        1,
+        1.0
       ],
-      "roughness": 0.82,
-      "metallic": 0,
-      "transmission": 0,
-      "emission": 0,
+      "baseColorFactor": [
+        1,
+        1,
+        1,
+        1.0
+      ],
+      "metallic": 0.0,
+      "roughness": 0.8199999928474426,
+      "normalStrength": 0.0,
+      "transmission": 0.0,
+      "ior": 1.4500000476837158,
+      "emission": 0.0,
+      "emissionColor": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "coatWeight": 0.0,
+      "coatRoughness": 0.029999999329447746,
       "baseColorTexture": "textures/Newspaper_BaseColor.png",
-      "baseColorTextureDimensions": [
-        1024,
-        1024
+      "mainTextureScale": [
+        1,
+        1
+      ]
+    },
+    {
+      "name": "Oxblood_Enamel",
+      "baseColor": [
+        0.25,
+        0.03700000047683716,
+        0.039000000804662704,
+        1.0
+      ],
+      "baseColorFactor": [
+        0.25,
+        0.03700000047683716,
+        0.039000000804662704,
+        1.0
+      ],
+      "metallic": 0.11999999731779099,
+      "roughness": 0.4699999988079071,
+      "normalStrength": 0.0,
+      "transmission": 0.0,
+      "ior": 1.4500000476837158,
+      "emission": 0.0,
+      "emissionColor": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "coatWeight": 0.0,
+      "coatRoughness": 0.029999999329447746,
+      "mainTextureScale": [
+        1,
+        1
+      ]
+    },
+    {
+      "name": "Paper_Ivory",
+      "baseColor": [
+        0.800000011920929,
+        0.7599999904632568,
+        0.6499999761581421,
+        1.0
+      ],
+      "baseColorFactor": [
+        0.800000011920929,
+        0.7599999904632568,
+        0.6499999761581421,
+        1.0
+      ],
+      "metallic": 0.0,
+      "roughness": 0.8500000238418579,
+      "normalStrength": 0.0,
+      "transmission": 0.0,
+      "ior": 1.4500000476837158,
+      "emission": 0.0,
+      "emissionColor": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "coatWeight": 0.0,
+      "coatRoughness": 0.029999999329447746,
+      "mainTextureScale": [
+        1,
+        1
+      ]
+    },
+    {
+      "name": "Plastic_Cream",
+      "baseColor": [
+        0.46000000834465027,
+        0.4699999988079071,
+        0.4099999964237213,
+        1.0
+      ],
+      "baseColorFactor": [
+        0.46000000834465027,
+        0.4699999988079071,
+        0.4099999964237213,
+        1.0
+      ],
+      "metallic": 0.0,
+      "roughness": 0.44999998807907104,
+      "normalStrength": 0.0,
+      "transmission": 0.0,
+      "ior": 1.4500000476837158,
+      "emission": 0.0,
+      "emissionColor": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "coatWeight": 0.0,
+      "coatRoughness": 0.029999999329447746,
+      "mainTextureScale": [
+        1,
+        1
+      ]
+    },
+    {
+      "name": "Poster_Fortune",
+      "baseColor": [
+        1,
+        1,
+        1,
+        1.0
+      ],
+      "baseColorFactor": [
+        1,
+        1,
+        1,
+        1.0
+      ],
+      "metallic": 0.0,
+      "roughness": 0.8199999928474426,
+      "normalStrength": 0.0,
+      "transmission": 0.0,
+      "ior": 1.4500000476837158,
+      "emission": 0.0,
+      "emissionColor": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "coatWeight": 0.0,
+      "coatRoughness": 0.029999999329447746,
+      "baseColorTexture": "textures/Poster_Fortune_BaseColor.png",
+      "mainTextureScale": [
+        1,
+        1
+      ]
+    },
+    {
+      "name": "ResultsBoard",
+      "baseColor": [
+        1,
+        1,
+        1,
+        1.0
+      ],
+      "baseColorFactor": [
+        1,
+        1,
+        1,
+        1.0
+      ],
+      "metallic": 0.0,
+      "roughness": 0.8199999928474426,
+      "normalStrength": 0.0,
+      "transmission": 0.0,
+      "ior": 1.4500000476837158,
+      "emission": 0.0,
+      "emissionColor": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "coatWeight": 0.0,
+      "coatRoughness": 0.029999999329447746,
+      "baseColorTexture": "textures/ResultsBoard_BaseColor.png",
+      "mainTextureScale": [
+        1,
+        1
+      ]
+    },
+    {
+      "name": "Rubber",
+      "baseColor": [
+        0.014999999664723873,
+        0.023000000044703484,
+        0.01899999938905239,
+        1.0
+      ],
+      "baseColorFactor": [
+        0.014999999664723873,
+        0.023000000044703484,
+        0.01899999938905239,
+        1.0
+      ],
+      "metallic": 0.0,
+      "roughness": 0.800000011920929,
+      "normalStrength": 0.0,
+      "transmission": 0.0,
+      "ior": 1.4500000476837158,
+      "emission": 0.0,
+      "emissionColor": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "coatWeight": 0.0,
+      "coatRoughness": 0.029999999329447746,
+      "mainTextureScale": [
+        1,
+        1
+      ]
+    },
+    {
+      "name": "ServiceNotice",
+      "baseColor": [
+        1,
+        1,
+        1,
+        1.0
+      ],
+      "baseColorFactor": [
+        1,
+        1,
+        1,
+        1.0
+      ],
+      "metallic": 0.0,
+      "roughness": 0.8199999928474426,
+      "normalStrength": 0.0,
+      "transmission": 0.0,
+      "ior": 1.4500000476837158,
+      "emission": 0.0,
+      "emissionColor": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "coatWeight": 0.0,
+      "coatRoughness": 0.029999999329447746,
+      "baseColorTexture": "textures/ServiceNotice_BaseColor.png",
+      "mainTextureScale": [
+        1,
+        1
+      ]
+    },
+    {
+      "name": "ShopSign",
+      "baseColor": [
+        1,
+        1,
+        1,
+        1.0
+      ],
+      "baseColorFactor": [
+        1,
+        1,
+        1,
+        1.0
+      ],
+      "metallic": 0.0,
+      "roughness": 0.8199999928474426,
+      "normalStrength": 0.0,
+      "transmission": 0.0,
+      "ior": 1.4500000476837158,
+      "emission": 0.0,
+      "emissionColor": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "coatWeight": 0.0,
+      "coatRoughness": 0.029999999329447746,
+      "baseColorTexture": "textures/ShopSign_BaseColor.png",
+      "mainTextureScale": [
+        1,
+        1
+      ]
+    },
+    {
+      "name": "Stool_Green",
+      "baseColor": [
+        0.06499999761581421,
+        0.1599999964237213,
+        0.12999999523162842,
+        1.0
+      ],
+      "baseColorFactor": [
+        0.06499999761581421,
+        0.1599999964237213,
+        0.12999999523162842,
+        1.0
+      ],
+      "metallic": 0.0,
+      "roughness": 0.5799999833106995,
+      "normalStrength": 0.0,
+      "transmission": 0.0,
+      "ior": 1.4500000476837158,
+      "emission": 0.0,
+      "emissionColor": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "coatWeight": 0.0,
+      "coatRoughness": 0.029999999329447746,
+      "mainTextureScale": [
+        1,
+        1
+      ]
+    },
+    {
+      "name": "Stool_Red",
+      "baseColor": [
+        0.3700000047683716,
+        0.054999999701976776,
+        0.039000000804662704,
+        1.0
+      ],
+      "baseColorFactor": [
+        0.3700000047683716,
+        0.054999999701976776,
+        0.039000000804662704,
+        1.0
+      ],
+      "metallic": 0.0,
+      "roughness": 0.5,
+      "normalStrength": 0.0,
+      "transmission": 0.0,
+      "ior": 1.4500000476837158,
+      "emission": 0.0,
+      "emissionColor": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "coatWeight": 0.0,
+      "coatRoughness": 0.029999999329447746,
+      "mainTextureScale": [
+        1,
+        1
       ]
     },
     {
       "name": "StreetBlur",
       "baseColor": [
-        0.7,
-        0.7,
-        0.7,
-        1
+        1,
+        1,
+        1,
+        1.0
       ],
-      "roughness": 0.82,
-      "metallic": 0,
-      "transmission": 0,
-      "emission": 0,
+      "baseColorFactor": [
+        1,
+        1,
+        1,
+        1.0
+      ],
+      "metallic": 0.0,
+      "roughness": 0.8199999928474426,
+      "normalStrength": 0.0,
+      "transmission": 0.0,
+      "ior": 1.4500000476837158,
+      "emission": 0.0,
+      "emissionColor": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "coatWeight": 0.0,
+      "coatRoughness": 0.029999999329447746,
       "baseColorTexture": "textures/StreetBlur_BaseColor.png",
-      "baseColorTextureDimensions": [
-        2048,
-        1024
+      "mainTextureScale": [
+        1,
+        1
       ]
     },
     {
       "name": "Ticket_Swap_1",
       "baseColor": [
-        0.8,
-        0.8,
-        0.8,
-        1
+        1,
+        1,
+        1,
+        1.0
       ],
-      "roughness": 0.67,
-      "metallic": 0,
-      "transmission": 0,
-      "emission": 0,
+      "baseColorFactor": [
+        1,
+        1,
+        1,
+        1.0
+      ],
+      "metallic": 0.0,
+      "roughness": 0.6700000166893005,
+      "normalStrength": 0.0,
+      "transmission": 0.0,
+      "ior": 1.4500000476837158,
+      "emission": 0.0,
+      "emissionColor": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "coatWeight": 0.0,
+      "coatRoughness": 0.029999999329447746,
       "baseColorTexture": "textures/TicketPlaceholder_1_BaseColor.png",
-      "baseColorTextureDimensions": [
-        512,
-        1024
+      "mainTextureScale": [
+        1,
+        1
       ]
     },
     {
       "name": "Ticket_Swap_2",
       "baseColor": [
-        0.8,
-        0.8,
-        0.8,
-        1
+        1,
+        1,
+        1,
+        1.0
       ],
-      "roughness": 0.67,
-      "metallic": 0,
-      "transmission": 0,
-      "emission": 0,
+      "baseColorFactor": [
+        1,
+        1,
+        1,
+        1.0
+      ],
+      "metallic": 0.0,
+      "roughness": 0.6700000166893005,
+      "normalStrength": 0.0,
+      "transmission": 0.0,
+      "ior": 1.4500000476837158,
+      "emission": 0.0,
+      "emissionColor": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "coatWeight": 0.0,
+      "coatRoughness": 0.029999999329447746,
       "baseColorTexture": "textures/TicketPlaceholder_2_BaseColor.png",
-      "baseColorTextureDimensions": [
-        512,
-        1024
+      "mainTextureScale": [
+        1,
+        1
       ]
     },
     {
       "name": "Ticket_Swap_3",
       "baseColor": [
-        0.8,
-        0.8,
-        0.8,
-        1
+        1,
+        1,
+        1,
+        1.0
       ],
-      "roughness": 0.67,
-      "metallic": 0,
-      "transmission": 0,
-      "emission": 0,
+      "baseColorFactor": [
+        1,
+        1,
+        1,
+        1.0
+      ],
+      "metallic": 0.0,
+      "roughness": 0.6700000166893005,
+      "normalStrength": 0.0,
+      "transmission": 0.0,
+      "ior": 1.4500000476837158,
+      "emission": 0.0,
+      "emissionColor": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "coatWeight": 0.0,
+      "coatRoughness": 0.029999999329447746,
       "baseColorTexture": "textures/TicketPlaceholder_3_BaseColor.png",
-      "baseColorTextureDimensions": [
-        512,
-        1024
+      "mainTextureScale": [
+        1,
+        1
       ]
     },
     {
       "name": "Ticket_Swap_4",
       "baseColor": [
-        0.8,
-        0.8,
-        0.8,
-        1
+        1,
+        1,
+        1,
+        1.0
       ],
-      "roughness": 0.67,
-      "metallic": 0,
-      "transmission": 0,
-      "emission": 0,
+      "baseColorFactor": [
+        1,
+        1,
+        1,
+        1.0
+      ],
+      "metallic": 0.0,
+      "roughness": 0.6700000166893005,
+      "normalStrength": 0.0,
+      "transmission": 0.0,
+      "ior": 1.4500000476837158,
+      "emission": 0.0,
+      "emissionColor": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "coatWeight": 0.0,
+      "coatRoughness": 0.029999999329447746,
       "baseColorTexture": "textures/TicketPlaceholder_4_BaseColor.png",
-      "baseColorTextureDimensions": [
-        512,
-        1024
+      "mainTextureScale": [
+        1,
+        1
+      ]
+    },
+    {
+      "name": "Tube_Light",
+      "baseColor": [
+        0.7799999713897705,
+        0.8999999761581421,
+        0.8899999856948853,
+        1.0
+      ],
+      "baseColorFactor": [
+        0.7799999713897705,
+        0.8999999761581421,
+        0.8899999856948853,
+        1.0
+      ],
+      "metallic": 0.0,
+      "roughness": 0.5,
+      "normalStrength": 0.0,
+      "transmission": 0.0,
+      "ior": 1.4500000476837158,
+      "emission": 5.0,
+      "emissionColor": [
+        0.7799999713897705,
+        0.8999999761581421,
+        0.8899999856948853
+      ],
+      "coatWeight": 0.0,
+      "coatRoughness": 0.029999999329447746,
+      "mainTextureScale": [
+        1,
+        1
+      ]
+    },
+    {
+      "name": "Warm_Light",
+      "baseColor": [
+        0.9900000095367432,
+        0.75,
+        0.4000000059604645,
+        1.0
+      ],
+      "baseColorFactor": [
+        0.9900000095367432,
+        0.75,
+        0.4000000059604645,
+        1.0
+      ],
+      "metallic": 0.0,
+      "roughness": 0.5,
+      "normalStrength": 0.0,
+      "transmission": 0.0,
+      "ior": 1.4500000476837158,
+      "emission": 4.0,
+      "emissionColor": [
+        0.9900000095367432,
+        0.75,
+        0.4000000059604645
+      ],
+      "coatWeight": 0.0,
+      "coatRoughness": 0.029999999329447746,
+      "mainTextureScale": [
+        1,
+        1
+      ]
+    },
+    {
+      "name": "Warm_Oak",
+      "baseColor": [
+        1,
+        1,
+        1,
+        1.0
+      ],
+      "baseColorFactor": [
+        1,
+        1,
+        1,
+        1.0
+      ],
+      "metallic": 0.0,
+      "roughness": 0.5699999928474426,
+      "normalStrength": 0.0,
+      "transmission": 0.0,
+      "ior": 1.4500000476837158,
+      "emission": 0.0,
+      "emissionColor": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "coatWeight": 0.04500000178813934,
+      "coatRoughness": 0.029999999329447746,
+      "baseColorTexture": "textures/QuietOak_v13_BaseColor.png",
+      "mainTextureScale": [
+        0.65,
+        0.65
+      ],
+      "note": "All color tint and contrast are baked into QuietOak_v13_BaseColor; factor=white. Apply UV scale .65."
+    },
+    {
+      "name": "Warm_Terrazzo",
+      "baseColor": [
+        1,
+        1,
+        1,
+        1.0
+      ],
+      "baseColorFactor": [
+        1,
+        1,
+        1,
+        1.0
+      ],
+      "metallic": 0.0,
+      "roughness": 0.7200000286102295,
+      "normalStrength": 0.30000001192092896,
+      "transmission": 0.0,
+      "ior": 1.4500000476837158,
+      "emission": 0.0,
+      "emissionColor": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "coatWeight": 0.0,
+      "coatRoughness": 0.029999999329447746,
+      "baseColorTexture": "textures/Terrazzo_BaseColor.png",
+      "roughnessTexture": "textures/Terrazzo_Roughness.png",
+      "roughnessColorSpace": "Linear",
+      "roughnessEncoding": "Grayscale roughness, not packed. Unity smoothness=1-R.",
+      "normalTexture": "textures/Terrazzo_Normal.png",
+      "mainTextureScale": [
+        1,
+        1
       ]
     }
   ],
-  "note": "Unity use Standard/URP Lit, image sRGB basecolor; normal/roughness non-color. Smoothness=1-roughness. PNG roughness is independent, not packed metallic. Glass requires Transparent surface, alpha supplied, baseColor tinted, roughness 0.12, metallic0. Do not blindly depend on FBX shader conversion."
+  "colorSpaceNote": "baseColor PNG sRGB, normal/roughness Linear. baseColorFactor is actual source node multiplier, not material swatch. White when color already baked."
 }
