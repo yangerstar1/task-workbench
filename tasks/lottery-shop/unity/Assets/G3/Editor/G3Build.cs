@@ -77,31 +77,48 @@ namespace Lottery.G3.Editor
             challenge=AssetDatabase.LoadAssetAtPath<ApprovedArtworkBinding>("Assets/G3/Rendering/Resources/G3/challenge.asset");
             ValidateArtwork(number,"number");ValidateArtwork(challenge,"challenge");
         }
-        public static void BuildAndroid()
+        public static void BuildAndroid() => BuildAndroidInternal(false);
+        public static void BuildAndroidDiagnostic() => BuildAndroidInternal(true);
+        static void BuildAndroidInternal(bool diagnostic)
         {
             if(Lottery.G2.Core.NumberTicketRules.RulesSha256!=RulesSha256)throw new InvalidOperationException("Frozen rules mismatch");
             string commit=Arg("-probeCommit"),run=Arg("-probeRunId");
             if(!System.Text.RegularExpressions.Regex.IsMatch(commit,"^[0-9a-f]{40}$") || !System.Text.RegularExpressions.Regex.IsMatch(run,"^[1-9][0-9]*$"))throw new InvalidOperationException("Invalid source/run identity");
+            string reviewed=diagnostic?Arg("-probeReviewedCommit"):null;
+            string attempt=diagnostic?Arg("-probeRunAttempt"):null;
+            if(diagnostic && (!System.Text.RegularExpressions.Regex.IsMatch(reviewed,"^[0-9a-f]{40}$") || attempt!="1"))throw new InvalidOperationException("Invalid diagnostic source/attempt identity");
             G3ArtworkValidation.WriteAndroidDiagnostic(commit,run,Arg("-probeRunAttempt"));
             Prepare();
-            PlayerSettings.companyName="BuYuQi";PlayerSettings.productName="Lottery G3 Original Shop Visual Candidate";
-            PlayerSettings.bundleVersion="0.0.3";PlayerSettings.Android.bundleVersionCode=3;
-            PlayerSettings.SetApplicationIdentifier(UnityEditor.Build.NamedBuildTarget.Android,"com.buyuqi.lotteryprobe");
+            PlayerSettings.companyName="BuYuQi";PlayerSettings.productName=diagnostic?"Lottery v39 Diagnostic Candidate":"Lottery G3 Original Shop Visual Candidate";
+            PlayerSettings.bundleVersion=diagnostic?"0.0.39":"0.0.3";PlayerSettings.Android.bundleVersionCode=diagnostic?39:3;
+            PlayerSettings.SetApplicationIdentifier(UnityEditor.Build.NamedBuildTarget.Android,diagnostic?"com.buyuqi.lotteryprobe.candidate":"com.buyuqi.lotteryprobe");
             PlayerSettings.SetScriptingBackend(UnityEditor.Build.NamedBuildTarget.Android,ScriptingImplementation.IL2CPP);
             PlayerSettings.Android.targetArchitectures=AndroidArchitecture.ARM64;
             PlayerSettings.Android.minSdkVersion=AndroidSdkVersions.AndroidApiLevel26;PlayerSettings.Android.targetSdkVersion=AndroidSdkVersions.AndroidApiLevel35;
             PlayerSettings.Android.useCustomKeystore=false;PlayerSettings.SetUseDefaultGraphicsAPIs(BuildTarget.Android,false);
             PlayerSettings.SetGraphicsAPIs(BuildTarget.Android,new[]{GraphicsDeviceType.OpenGLES3});
             PlayerSettings.defaultInterfaceOrientation=UIOrientation.LandscapeLeft;EditorUserBuildSettings.buildAppBundle=false;
-            var output=Path.GetFullPath(Path.Combine(Application.dataPath,"../../build/G3/Android"));Directory.CreateDirectory(output);var apk=Path.Combine(output,"LotteryG3.apk");
+            var output=Path.GetFullPath(Path.Combine(Application.dataPath,diagnostic?"../../build/AndroidCandidate/Android":"../../build/G3/Android"));Directory.CreateDirectory(output);var apk=Path.Combine(output,diagnostic?"LotteryCandidate.apk":"LotteryG3.apk");
             var report=BuildPipeline.BuildPlayer(new BuildPlayerOptions{scenes=new[]{ScenePath},locationPathName=apk,target=BuildTarget.Android,options=BuildOptions.Development});
             if(report.summary.result!=BuildResult.Succeeded || !File.Exists(apk))throw new InvalidOperationException("G3 Android build failed");
             var receipt=new Receipt{sourceCommit=commit,runId=run,unityVersion=Application.unityVersion,apkSha256=Hash(apk),apkBytes=new FileInfo(apk).Length,builtAtUtc=DateTime.UtcNow.ToString("O"),buildResult=report.summary.result.ToString(),buildTarget=report.summary.platform.ToString(),scriptingBackend=PlayerSettings.GetScriptingBackend(UnityEditor.Build.NamedBuildTarget.Android).ToString(),architecture=PlayerSettings.Android.targetArchitectures.ToString(),minSdk=(int)PlayerSettings.Android.minSdkVersion,targetSdk=(int)PlayerSettings.Android.targetSdkVersion,graphicsApis=string.Join(",",PlayerSettings.GetGraphicsAPIs(BuildTarget.Android).Select(x=>x.ToString())),editorRevision=UnityEditorInternal.InternalEditorUtility.GetFullUnityVersion()};
-            File.WriteAllText(Path.Combine(output,"build-receipt.json"),JsonUtility.ToJson(receipt,true));
+            if(diagnostic)
+            {
+                receipt.scope="DIAGNOSTIC_ANDROID_CANDIDATE_NOT_G3_PASS";
+                receipt.applicationIdentifier="com.buyuqi.lotteryprobe.candidate";
+                receipt.versionCode=39;receipt.versionName="0.0.39";
+                // Separate envelope avoids changing the original formal receipt schema.
+                var envelope=new DiagnosticReceipt{sourceCommit=commit,reviewedCandidateCommit=reviewed,runId=run,runAttempt=attempt,build=receipt};
+                File.WriteAllText(Path.Combine(output,"diagnostic-build-receipt.json"),JsonUtility.ToJson(envelope,true));
+            }
+            else File.WriteAllText(Path.Combine(output,"build-receipt.json"),JsonUtility.ToJson(receipt,true));
             File.WriteAllLines(Path.Combine(output,"resolved-packages.txt"),UnityEditor.PackageManager.PackageInfo.GetAllRegisteredPackages().OrderBy(p=>p.name).Select(p=>p.name+"@"+p.version));
         }
         static string Arg(string key){var args=Environment.GetCommandLineArgs();int i=Array.IndexOf(args,key);if(i<0||i+1>=args.Length)throw new InvalidOperationException("Missing build identity");return args[i+1];}
         static string Hash(string path){using(var sha=SHA256.Create())using(var f=File.OpenRead(path))return BitConverter.ToString(sha.ComputeHash(f)).Replace("-","").ToLowerInvariant();}
+        [Serializable]sealed class DiagnosticReceipt {
+            public int schemaVersion=1;public string sourceCommit,reviewedCandidateCommit,runId,runAttempt;public Receipt build;
+        }
         [Serializable]sealed class Receipt {
             public string scope="G3_ONE_DAY_WHITEBOX_NOT_DEVICE_TESTED",sourceCommit,runId,unityVersion,apkSha256,builtAtUtc;
             public long apkBytes;public string buildResult,buildTarget,scriptingBackend,architecture,graphicsApis,editorRevision;public int minSdk,targetSdk;

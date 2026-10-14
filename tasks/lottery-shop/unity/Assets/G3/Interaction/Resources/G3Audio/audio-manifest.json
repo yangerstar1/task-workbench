@@ -1,0 +1,129 @@
+{
+  "schemaVersion": 1,
+  "origin": "ORIGINAL_PROCEDURAL_PCM_NO_THIRD_PARTY_SAMPLES",
+  "generator": "tasks/lottery-shop/scripts/generate_g3_audio.py",
+  "numpyVersion": "2.3.5",
+  "seed": 20261014,
+  "files": [
+    {
+      "file": "scratch_loop.wav",
+      "sha256": "94a06605aeaf6262b144cf8ab73c408400b5d240d2f4697499ce0ce9c1337f3f",
+      "bytes": 88244,
+      "sampleRate": 22050,
+      "channels": 1,
+      "seconds": 2.0,
+      "peak": 0.58,
+      "rms": 0.12113398748277417,
+      "loop": true,
+      "description": "Granular foil/paper friction; live speed changes pitch and level, not a timed scrape sample."
+    },
+    {
+      "file": "ticket_take.wav",
+      "sha256": "407f1df25b2938b5c205bfa6e9b4bf84ccade0a4144081c06adfd16b342e7699",
+      "bytes": 19448,
+      "sampleRate": 22050,
+      "channels": 1,
+      "seconds": 0.44,
+      "peak": 0.58,
+      "rms": 0.08167125736118673,
+      "loop": false,
+      "description": "Two paper flexes and a soft desktop contact for a committed ticket purchase."
+    },
+    {
+      "file": "ui_press.wav",
+      "sha256": "77f2b31f87d5845b7d3aaf5edf6ab14e77a0a99b0be582eda5d2b336f6f4037f",
+      "bytes": 5336,
+      "sampleRate": 22050,
+      "channels": 1,
+      "seconds": 0.12,
+      "peak": 0.45,
+      "rms": 0.1048690770143047,
+      "loop": false,
+      "description": "Short wooden button tap, only after a valid pointer release."
+    },
+    {
+      "file": "coin_settle.wav",
+      "sha256": "6badc2732ed7baa2b640edaf17768e8564c3c1836992a86080c287043605e773",
+      "bytes": 36206,
+      "sampleRate": 22050,
+      "channels": 1,
+      "seconds": 0.82,
+      "peak": 0.6,
+      "rms": 0.09503829070832837,
+      "loop": false,
+      "description": "Several inharmonic metal contacts falling into a tray; positive net settlement only."
+    },
+    {
+      "file": "settle_flat.wav",
+      "sha256": "83cb5f157013a2b4574f1ce5db360c927283946d5475f49f038e052f5db378ed",
+      "bytes": 12392,
+      "sampleRate": 22050,
+      "channels": 1,
+      "seconds": 0.28,
+      "peak": 0.48,
+      "rms": 0.08533093791854168,
+      "loop": false,
+      "description": "Quiet paper/wood close; loss or break-even has no celebratory coins."
+    },
+    {
+      "file": "prize_high.wav",
+      "sha256": "afc4a5d5eded6a005dd4dc86f4d5f3a7b071c94be8623ed5068391a030063a1c",
+      "bytes": 55168,
+      "sampleRate": 22050,
+      "channels": 1,
+      "seconds": 1.2499773242630385,
+      "peak": 0.62,
+      "rms": 0.10716473670770817,
+      "loop": false,
+      "description": "Short layered struck-metal flourish, only a confirmed positive-net raw prize of at least 20 ticket prices; no gameplay wait."
+    },
+    {
+      "file": "transfer.wav",
+      "sha256": "e0a66530db0ca6b4e272fc355aeb391f21c17c7249b74ccafea007b6cb232bc8",
+      "bytes": 17684,
+      "sampleRate": 22050,
+      "channels": 1,
+      "seconds": 0.4,
+      "peak": 0.5,
+      "rms": 0.07144956891205526,
+      "loop": false,
+      "description": "Soft two-part receipt acknowledgement for real money movement, distinct from a prize."
+    },
+    {
+      "file": "paper_reveal.wav",
+      "sha256": "6438bec09eb1e4f1d8efbb839253ec198df78a3abeeacee547d4991534b44fc4",
+      "bytes": 9746,
+      "sampleRate": 22050,
+      "channels": 1,
+      "seconds": 0.22,
+      "peak": 0.45,
+      "rms": 0.0627210264097212,
+      "loop": false,
+      "description": "Brief coating lift at confirmed reveal; not a second reward."
+    },
+    {
+      "file": "shop_ambient.wav",
+      "sha256": "07bce37ddbdf4dab80a8fcc090beb6f451bc03b1bf2565cabbfcf5030cb69018",
+      "bytes": 705644,
+      "sampleRate": 22050,
+      "channels": 1,
+      "seconds": 16.0,
+      "peak": 0.35,
+      "rms": 0.06281197875762765,
+      "loop": true,
+      "description": "Subtle original indoor fan/air and two distant street swells; no recorded people or real-world audio."
+    },
+    {
+      "file": "shop_music.wav",
+      "sha256": "e65ac8c5f0ec0d9605719ce404ccc868b53bdb0d72a57659a2275ef7f7dcc3a9",
+      "bytes": 1411244,
+      "sampleRate": 22050,
+      "channels": 1,
+      "seconds": 32.0,
+      "peak": 0.42,
+      "rms": 0.09114853187849703,
+      "loop": true,
+      "description": "Original sparse eight-bar felt-pluck texture at 60 bpm; independently adjustable and initially quiet."
+    }
+  ]
+}

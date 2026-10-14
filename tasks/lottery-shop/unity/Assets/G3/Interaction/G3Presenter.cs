@@ -27,6 +27,7 @@ namespace Lottery.G3.Interaction
         public int EvidenceLineCount=>evidenceLines.Length;
         public bool IsReadOnlyEvidence=>Panel==G3Panel.QaEvidence;
         public G3InputRouter Router {get;set;}
+        public G3AudioController Audio {get;set;}
         public DayGameService Service=>service;
         public RunState Snapshot=>confirmed??(confirmed=service.Snapshot);
         public G3SceneView View=>view;
@@ -46,6 +47,7 @@ namespace Lottery.G3.Interaction
         {
             if(!CanScratch)return;
             var t=Snapshot.CurrentTicket;if(t.TicketType=="challenge"&&t.SelectedCell!=proposal.CoreIndex)return;
+            Audio?.RecordScratch(proposal);
             strokes.Add(new CellStroke(proposal.CoreIndex,proposal.FromLocal.U,proposal.FromLocal.V,proposal.ToLocal.U,proposal.ToLocal.V,proposal.HasFrom,proposal.RadiusLocalU,proposal.RadiusLocalV));
             if(strokes.Count>=64)FlushScratch();
         }
@@ -82,6 +84,11 @@ namespace Lottery.G3.Interaction
         }
         public void Execute(G3Action a)
         {
+            if(a.Kind==G3ActionKind.CycleAudioVolume)
+            {
+                if(Audio!=null&&a.Slot>=0&&a.Slot<=2){bool saved=Audio.CycleVolume((G3AudioBus)a.Slot);Status=saved?"音量已保存。0%为静音，点按依次调整。":"音量已调整，但暂时无法保存设置。";Refresh();}
+                return;
+            }
             if(ExecutePhone(a))return;
             if(a.Kind==G3ActionKind.Open&&(a.Slot==(int)G3Panel.QaEvidence||a.Slot==(int)G3Panel.Settings)){OpenPanel((G3Panel)a.Slot);return;}
             if(a.Kind==G3ActionKind.CopyEvidence){CopyEvidence();return;}
@@ -229,6 +236,7 @@ namespace Lottery.G3.Interaction
         }
         void Handle(CommandResult result)
         {
+            var audioBefore=Snapshot;
             bool repeated=result.Success&&(unknown||(result.Receipt!=null&&Snapshot.Commands.Any(c=>c.CommandId==result.Receipt.CommandId)));
             confirmed=result.State??service.Snapshot;
             if(result.CommitStatus==CommitStatus.COMMIT_UNKNOWN){unknown=true;if(!string.IsNullOrEmpty(result.State?.PendingCommandId))pendingId=result.State.PendingCommandId;Status="正在确认上笔保存。请点「确认交易」，不会重复扣款或展示未确认结果。";view.InvalidateTicket();}
@@ -237,6 +245,7 @@ namespace Lottery.G3.Interaction
             {
                 retry=null;pendingId=null;unknown=false;var continuation=afterCommit;afterCommit=null;
                 Status=result.Success?(repeated?"上笔交易已确认，没有重复扣款或重复奖励。":ReadyMessage()):Describe(result.Code);
+                if(!repeated)Audio?.Confirmed(audioBefore,confirmed,result.Success?result.Receipt:null);
                 if(result.Success){if(result.Receipt?.Kind=="CLAIM"){view.SettlementFeedback(ReduceFlash);if(Vibration)Handheld.Vibrate();}continuation?.Invoke();}
                 if(PendingIntent()!=null){Panel=G3Panel.Tickets;Status="原票已收下，下张购买未完成。请继续原购买，或取消下张购买。";}
             }
@@ -405,7 +414,14 @@ namespace Lottery.G3.Interaction
                     m.Grid=true;m.Title="操作与可访问性";m.Body="可自由走动或原位采购，价格与效果相同。\n挑战快揭只完成已选格。完整品质尚未验收。";
                     if(G3QaEvidence.Enabled)m.Add("settings-evidence","QA 只读取证",new G3Action(G3ActionKind.Open,slot:(int)G3Panel.QaEvidence));
                     m.Add("settings-rules","完整规则与概率",new G3Action(G3ActionKind.Open,slot:(int)G3Panel.Rules));
-                    m.Add("setting-quick","快揭按钮："+(QuickEnabled?"显示":"隐藏"),new G3Action(G3ActionKind.ToggleQuick));m.Add("setting-flash","减弱闪光："+(ReduceFlash?"开":"关"),new G3Action(G3ActionKind.ToggleFlash));m.Add("setting-vibration","结算震动："+(Vibration?"开":"关"),new G3Action(G3ActionKind.ToggleVibration));break;
+                    m.Add("setting-quick","快揭按钮："+(QuickEnabled?"显示":"隐藏"),new G3Action(G3ActionKind.ToggleQuick));m.Add("setting-flash","减弱闪光："+(ReduceFlash?"开":"关"),new G3Action(G3ActionKind.ToggleFlash));m.Add("setting-vibration","结算震动："+(Vibration?"开":"关"),new G3Action(G3ActionKind.ToggleVibration));
+                    if(Audio!=null)
+                    {
+                        m.Add("audio-environment","环境音 "+Audio.VolumePercent(G3AudioBus.Environment)+"%\n点按调整",new G3Action(G3ActionKind.CycleAudioVolume,slot:0));
+                        m.Add("audio-interaction","交互音 "+Audio.VolumePercent(G3AudioBus.Interaction)+"%\n点按调整",new G3Action(G3ActionKind.CycleAudioVolume,slot:1));
+                        m.Add("audio-music","音乐 "+Audio.VolumePercent(G3AudioBus.Music)+"%\n点按调整",new G3Action(G3ActionKind.CycleAudioVolume,slot:2));
+                    }
+                    break;
                 case G3Panel.Confirm:
                     m.Title="请核对这笔操作";m.Body=confirmText;m.Add("confirm-action","确认",new G3Action(G3ActionKind.Confirm));m.Add("cancel-action","取消",new G3Action(G3ActionKind.Cancel));break;
             }

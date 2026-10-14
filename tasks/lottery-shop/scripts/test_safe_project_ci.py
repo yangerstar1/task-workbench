@@ -67,7 +67,10 @@ class BoundaryTests(unittest.TestCase):
 
     def test_workflow_exact_exports_and_no_raw_logging_actions(self):
         root=Path(__file__).resolve().parents[3];text=(root/safe.visual.WORKFLOW).read_text()
-        self.assertNotIn('uses: game-ci/unity-test-runner@',text);self.assertEqual(text.count('secrets.'),3)
+        self.assertNotIn('uses: game-ci/unity-test-runner@',text);self.assertEqual(text.count('secrets.'),6)
+        for key in ('UNITY_LICENSE','UNITY_EMAIL','UNITY_PASSWORD'):
+            self.assertEqual(text.count('secrets.'+key),2)
+        self.assertEqual(text.split('\n  android-diagnostic-candidate:',1)[0].count('secrets.'),3)
         self.assertIn('group: unity-personal-proof',text);self.assertIn('timeout-minutes: 75',text)
         self.assertIn('safe_project_ci.py finish',text);self.assertIn('safe_project_ci.py capture',text)
         self.assertNotIn('continue-on-error',text)

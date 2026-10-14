@@ -18,6 +18,10 @@ jobs:
       github.event.repository.private == false && github.event.repository.fork == false && github.event.deleted == false
     runs-on: ubuntu-24.04
     timeout-minutes: 75
+    outputs:
+      android_requested: ${{ steps.guard.outputs.android_requested }}
+      capture_outcome: ${{ steps.capture.outcome }}
+      cleanup_outcome: ${{ steps.nativefinish.outcome }}
     env:
       PYTHONDONTWRITEBYTECODE: '1'
     steps:
@@ -37,6 +41,7 @@ jobs:
       - name: Run diagnostic evidence validator synthetic tests
         run: |
           PYTHONDONTWRITEBYTECODE=1 python3 tasks/lottery-shop/scripts/test_visual_candidate_ci.py -v
+          PYTHONDONTWRITEBYTECODE=1 python3 tasks/lottery-shop/scripts/test_android_candidate_ci.py -v
           PYTHONDONTWRITEBYTECODE=1 python3 tasks/lottery-shop/scripts/test_activation_probe.py -v
           PYTHONDONTWRITEBYTECODE=1 python3 tasks/lottery-shop/scripts/test_safe_project_ci.py -v
           PYTHONDONTWRITEBYTECODE=1 python3 tasks/lottery-shop/scripts/test_play_split_ci.py -v
@@ -50,6 +55,7 @@ jobs:
           PYTHONDONTWRITEBYTECODE=1 python3 tasks/lottery-shop/scripts/test_diagnostic_extensions_ci.py -v
           PYTHONDONTWRITEBYTECODE=1 python3 -S tasks/lottery-shop/scripts/test_counter_light_prepare_ci.py -v
           PYTHONDONTWRITEBYTECODE=1 python3 tasks/lottery-shop/scripts/test_stage_a_combined_receipt_ci.py -v
+          PYTHONDONTWRITEBYTECODE=1 python3 tasks/lottery-shop/scripts/export_interior_meta.py --self-test
       - name: Prepare existing authorized disposable runner disk layout
         run: |
           python3 tasks/lottery-shop/scripts/visual_candidate_ci.py guard
@@ -307,9 +313,30 @@ jobs:
           if-no-files-found: error
           retention-days: 7
       - name: Return only this temporary session and verify its container is gone
+        id: nativefinish
         if: ${{ always() && steps.guard.outcome == 'success' && steps.safestart.outcome != 'skipped' }}
         timeout-minutes: 5
         run: PYTHONDONTWRITEBYTECODE=1 python3 tasks/lottery-shop/scripts/safe_project_ci.py finish
+      - name: Project only the fixed interior model meta structure after cleanup
+        id: interiormetaprojection
+        if: ${{ always() && steps.guard.outcome == 'success' && steps.nativefinish.outcome == 'success' && (steps.capture.outcome == 'success' || steps.capture.outcome == 'failure') }}
+        timeout-minutes: 1
+        env:
+          META_GUARD_OUTCOME: ${{ steps.guard.outcome }}
+          META_FINISH_OUTCOME: ${{ steps.nativefinish.outcome }}
+          META_CAPTURE_OUTCOME: ${{ steps.capture.outcome }}
+        run: |
+          set -euo pipefail
+          PYTHONDONTWRITEBYTECODE=1 python3 tasks/lottery-shop/scripts/export_interior_meta.py
+          echo 'safe_projection=true' >> "$GITHUB_OUTPUT"
+      - name: Preserve only the bounded fixed model-meta structure projection
+        if: ${{ always() && steps.interiormetaprojection.outcome == 'success' && steps.interiormetaprojection.outputs.safe_projection == 'true' }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: lottery-interior-meta-structure-not-source-waiver-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/lottery-interior-meta-structure-${{ github.run_id }}-${{ github.run_attempt }}/interior-meta-structure.json
+          if-no-files-found: error
+          retention-days: 7
       - name: Capture source mutation metadata without exporting project settings or logs
         if: ${{ always() && steps.guard.outcome == 'success' && steps.capture.outcome != 'skipped' }}
         run: python3 tasks/lottery-shop/scripts/visual_candidate_ci.py snapshot-after
@@ -408,3 +435,80 @@ jobs:
         run: |
           echo 'STAGE_A_INVENTORY_BLOCKED_NOT_SOURCE_WAIVER_NOT_G3_PASS'
           exit 1
+
+  android-diagnostic-candidate:
+    name: Cold installable Android candidate, no device or G3 acceptance
+    needs: visual-candidate
+    if: >-
+      always() && !cancelled() && needs.visual-candidate.outputs.android_requested == 'true' &&
+      needs.visual-candidate.outputs.capture_outcome == 'success' && needs.visual-candidate.outputs.cleanup_outcome == 'success'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 75
+    env:
+      PYTHONDONTWRITEBYTECODE: '1'
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+          lfs: false
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /tasks/lottery-shop/
+            /.github/workflows/lottery-visual-candidate.yml
+      - name: Recheck exact request-only trigger and separately reviewed Android capability
+        id: androidguard
+        run: python3 tasks/lottery-shop/scripts/visual_candidate_ci.py guard
+      - name: Prepare existing authorized disposable Android runner disk layout
+        run: |
+          sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/.ghcup /usr/local/lib/android /opt/hostedtoolcache/CodeQL
+          python3 - <<'PYTHON'
+          import shutil
+          if shutil.disk_usage('.').free < 30*1024**3:
+              raise SystemExit('Need at least 30 GiB for cold pinned Android image')
+          PYTHON
+      - name: Read the same pinned public activation and return commands
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          repository: game-ci/unity-test-runner
+          ref: 0ff419b913a3630032cbe0de48a0099b5a9f0ed9
+          path: .visual-safe-upstream
+          persist-credentials: false
+          lfs: false
+          sparse-checkout: |
+            dist/BlankProject
+            dist/unity-config
+            dist/platforms/ubuntu
+      - name: Restore the existing source-bound licensed font in a cold checkout
+        run: python3 tasks/lottery-shop/scripts/visual_candidate_ci.py restore-font
+      - name: Build and verify isolated diagnostic APK with bounded private native output
+        id: androidbuild
+        timeout-minutes: 65
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+        run: python3 tasks/lottery-shop/scripts/android_candidate_ci.py run
+      - name: Independently verify this exact Android container is absent
+        id: androidcleanup
+        if: ${{ always() && steps.androidguard.outcome == 'success' && steps.androidbuild.outcome != 'skipped' }}
+        timeout-minutes: 2
+        run: python3 tasks/lottery-shop/scripts/android_candidate_ci.py cleanup
+      - name: Preserve bounded fixed diagnostic build status
+        if: ${{ always() && steps.androidbuild.outputs.safe_receipt == 'true' }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: lottery-android-candidate-status-not-g3-pass-${{ github.run_id }}-${{ github.run_attempt }}
+          path: tasks/lottery-shop/artifacts/android-candidate-delivery/diagnostic-apk-receipt.json
+          if-no-files-found: error
+          retention-days: 7
+      - name: Deliver only verified isolated installable diagnostic APK
+        if: ${{ steps.androidbuild.outcome == 'success' && steps.androidcleanup.outcome == 'success' }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: lottery-v39-android-diagnostic-not-device-tested-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            tasks/lottery-shop/artifacts/android-candidate-delivery/LotteryCandidate.apk
+            tasks/lottery-shop/artifacts/android-candidate-delivery/diagnostic-apk-receipt.json
+          if-no-files-found: error
+          retention-days: 7

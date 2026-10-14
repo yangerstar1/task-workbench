@@ -83,7 +83,7 @@ namespace Lottery.G3.Interaction
         {
             if(target==null||presenter.IsCommitting)return;
             if(Mode!=G3Mode.WALK&&target.Panel!=G3Panel.Phone)return;
-            ClearWorldTouches();
+            ClearWorldTouches();presenter.Audio?.ButtonPressed();
             if(target.IsTable)presenter.Execute(new G3Action(G3ActionKind.Sit));else presenter.OpenPanel(target.Panel);
         }
         void ProcessTouches(UnityEngine.InputSystem.Utilities.ReadOnlyArray<ETouch> touches,int live,float dt)
@@ -175,8 +175,8 @@ namespace Lottery.G3.Interaction
                 return;
             }
             if(Mode==G3Mode.WALK||worldPressed!=null){if(Vector2.Distance(pixel,worldStart)>8*view.TouchPixelsPerDp)worldDragged=true;if(Mode==G3Mode.WALK&&worldDragged&&(!capturedTouch||worldStart.x>=view.PresentationSafeArea.center.x)&&!view.ConsumeUi(pixel,out _))view.Walk.Look((pixel-previous)/view.TouchPixelsPerDp*2);previous=pixel;return;}
-            if(!presenter.CanScratch){tracker?.Cancel();return;}
-            if(view.ConsumeUi(pixel,out _)||!view.TryScratchUv(pixel,out Uv uv)){tracker?.Cancel();return;}
+            if(!presenter.CanScratch){presenter.Audio?.StopScratch();tracker?.Cancel();return;}
+            if(view.ConsumeUi(pixel,out _)||!view.TryScratchUv(pixel,out Uv uv)){presenter.Audio?.StopScratch();tracker?.Cancel();return;}
             var layout=view.Surface.Layout;if(tracker==null||layout.Id!=layoutId){tracker=new RegionPointerTracker(layout);layoutId=layout.Id;}
             // An approx 17-screen-pixel footprint at 1280x720, projected to paper
             // pixels. It becomes a cell-local ellipse and is clipped by authority.
@@ -195,12 +195,13 @@ namespace Lottery.G3.Interaction
             var deferred=pendingUi;
             bool executeUi=uiCapture&&captured>=0&&!cancelled&&!uiDragged&&!string.IsNullOrEmpty(pendingControl)&&!Movement(deferred.Kind)&&deferred.Kind!=G3ActionKind.None&&releasePosition.HasValue&&view.IsSafePointer(releasePosition.Value)&&Vector2.Distance(releasePosition.Value,uiStart)<=8*view.TouchPixelsPerDp&&pendingUiMode==Mode&&pendingUiRevision==view.InteractionRevision&&view.UiControlId(releasePosition.Value)==pendingControl&&view.ConsumeUi(releasePosition.Value,out var released)&&released.Id==deferred.Id;
             var target=worldPressed;bool activate=!cancelled&&!worldDragged&&releasePosition.HasValue&&target!=null&&view.WorldTarget(releasePosition.Value)==target&&Vector2.Distance(releasePosition.Value,worldStart)<=8*view.TouchPixelsPerDp;
+            if(executeUi||action.Kind!=G3ActionKind.None)presenter?.Audio?.ButtonPressed();
             ReleaseCapture();if(executeUi&&!view.HandleLocalAction(deferred))presenter.Execute(deferred);if(activate)ActivateWorld(target);if(action.Kind!=G3ActionKind.None)presenter?.Execute(action);presenter?.FlushScratch();
         }
-        public void ReleaseCapture(){view?.Phone?.EndPointer(true);captured=-1;pendingUi=default;pendingControl="";uiDragged=false;worldPressed=null;worldDragged=false;uiCapture=false;evidenceScrollCapture=false;evidenceDrag=0;held=default;tracker?.Cancel();}
+        public void ReleaseCapture(){presenter?.Audio?.StopScratch();view?.Phone?.EndPointer(true);captured=-1;pendingUi=default;pendingControl="";uiDragged=false;worldPressed=null;worldDragged=false;uiCapture=false;evidenceScrollCapture=false;evidenceDrag=0;held=default;tracker?.Cancel();}
         public void CancelGesture(){ClearWorldTouches();End(true);requireRelease=true;}
-        public void NotifyFocus(bool value){bool prior=IsFocused;focused=value;if(prior!=IsFocused){CancelGesture();if(!IsFocused)view?.InvalidateTicket();else presenter?.Refresh();}}
-        public void NotifyPause(bool value){bool prior=IsFocused;paused=value;if(prior!=IsFocused){CancelGesture();if(!IsFocused)view?.InvalidateTicket();else presenter?.Refresh();}}
+        public void NotifyFocus(bool value){bool prior=IsFocused;focused=value;presenter?.Audio?.SetInputFocused(IsFocused);if(prior!=IsFocused){CancelGesture();if(!IsFocused)view?.InvalidateTicket();else presenter?.Refresh();}}
+        public void NotifyPause(bool value){bool prior=IsFocused;paused=value;presenter?.Audio?.SetInputFocused(IsFocused);if(prior!=IsFocused){CancelGesture();if(!IsFocused)view?.InvalidateTicket();else presenter?.Refresh();}}
         void OnApplicationFocus(bool value){NotifyFocus(value);}
         void OnApplicationPause(bool value){NotifyPause(value);}
     }

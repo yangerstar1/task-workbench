@@ -163,10 +163,10 @@ namespace Lottery.G3.Interaction
                         {
                             if(y+16>=chatViewport.yMin&&y+60<=chatViewport.yMax)TransferMark(msg.Id,new Rect(x+16,y+20,40,40));
                             string amount=msg.Text.Split('\n').Last();
-                            ChatText(msg.Id+" value",amount,new Rect(x+68,y+16,w-84,49),42,Color.white);
-                            ChatText(msg.Id+" status",claimed?"已收款":"待收款",new Rect(x+68,y+76,w-84,49),42,Color.white);
+                            ChatText(msg.Id+" value",amount,new Rect(x+68,y+16,w-84,49),42,Ink);
+                            ChatText(msg.Id+" status",claimed?"已收款":"待收款",new Rect(x+68,y+76,w-84,49),42,Ink);
                             if(y+137>=chatViewport.yMin&&y+138<=chatViewport.yMax)Surface(msg.Id+" footer rule",new Rect(x+14,y+137,w-28,1),new Color(1,.83f,.66f),0);
-                            ChatText(msg.Id+" type","转账",new Rect(x+18,y+150,w-36,49),42,Color.white);
+                            ChatText(msg.Id+" type","转账",new Rect(x+18,y+150,w-36,49),42,Ink);
                         }
                         else ChatText(msg.Id+" text",msg.Text,new Rect(x+14,y+10,w-28,h-20),size,Ink);
                         if(msg.Enabled)hits[msg.Id]=new Hit{Rect=Clip(rect,chatViewport),Action=msg.Action,Enabled=true};

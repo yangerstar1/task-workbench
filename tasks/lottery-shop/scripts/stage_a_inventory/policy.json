@@ -293,9 +293,9 @@
   "shop": "Assets/G3/Shop/Resources/G3/Shop",
   "sourceFiles": [
     {
-      "bytes": 9695,
+      "bytes": 11264,
       "path": "Assets/G3/Editor/G3Build.cs",
-      "sha256": "95b9bc5885e8ffc3856faf3bdab63c943757d6be7f198696eb957a1b26348168"
+      "sha256": "7b1b8b78532814cda88b72efa3e9b1769ba1d8e4a1e3ed6fa49bdedadc993fd8"
     },
     {
       "bytes": 44292,
@@ -358,9 +358,9 @@
       "sha256": "f458405af3af9d143fac4b24cde50f1f4a6644514ef6215304ad74a66c5471ce"
     },
     {
-      "bytes": 7062700,
+      "bytes": 7059926,
       "path": "Assets/G3/Shop/Resources/G3/Shop/LotteryShop_Interior.fbx",
-      "sha256": "912658da9c7ca0bb8d917436040ad301bd6eef4944095da43a06f456054c2b47"
+      "sha256": "96ffdb54bd9564bc30a396c80006758178d1d071e69c0d4d5d275d8a4579a569"
     },
     {
       "bytes": 675,
@@ -668,9 +668,9 @@
       "sha256": "3164ddbfc9b26fcc3297d49f2cf595e41ded328ef297e2ba4ddc986dd74d48ef"
     },
     {
-      "bytes": 60956,
+      "bytes": 143292,
       "path": "Assets/G3/Shop/Resources/G3/Shop/Tool_small_prize_box.fbx",
-      "sha256": "52223fb576e66ec4cb60e2f3a43622cbf4d2449c99054b884d12018c75d530d6"
+      "sha256": "1c553580d4508a0ecb03d06d042bfd64374b6b40de4eabe24b6533e7be0c659f"
     },
     {
       "bytes": 14275,
@@ -678,9 +678,9 @@
       "sha256": "6f1cdd2c21d85ee2f7ced41c7108b39bba52f39a37b7c2a6ae017238a0913f39"
     },
     {
-      "bytes": 25267,
+      "bytes": 25253,
       "path": "Assets/G3/Shop/Resources/G3/Shop/materials.json",
-      "sha256": "74d6d9d0cbdaabba35cb7733d5b50e953770f514e187eb503494586c454bb1bf"
+      "sha256": "8223975ec9bd168cd610756fa9914715dd81681989147415db4f8a69792257ad"
     },
     {
       "bytes": 13688,
@@ -693,14 +693,14 @@
       "sha256": "a2b4e96c73d7696a2e4cdca75b70367eae148858135008be6b679ddd36e0bec3"
     },
     {
-      "bytes": 526,
+      "bytes": 566,
       "path": "Packages/manifest.json",
-      "sha256": "95bb5ada418c6d596d622ebd1a2e0f0b6d24422f3e525c622958cb492bae3eb2"
+      "sha256": "ad525a2452e7831e795557b37c0b176f5192403ac609385d855e54e7e93a86a9"
     },
     {
-      "bytes": 6015,
+      "bytes": 6151,
       "path": "Packages/packages-lock.json",
-      "sha256": "950e703b31453d45443719e88b1a37025d40d388df07c9c3bed31b507fd2f132"
+      "sha256": "8694d50b72b6e056af07a7f9e7463ffb6922670c0d6f75928a87b7d9e98c987c"
     },
     {
       "bytes": 2615,

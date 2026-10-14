@@ -17,7 +17,7 @@ namespace Lottery.G3.Interaction
         {
             public string Id;public GameObject Root;public Transform Plate;public G3HudIcon Icon;
             public BoundedGlyphLabel Label,Title,Detail;public Rect Rect,FaceRect;public G3Action Action;
-            public bool Enabled,Primary,Selected,Navigation,Movement,Pressed,Catalog;public G3HudSymbol Symbol;
+            public bool Enabled,Primary,Selected,Navigation,Movement,Pressed,Catalog,PolishedDrawer;public G3HudSymbol Symbol;
         }
         readonly List<UnityEngine.Object> owned=new List<UnityEngine.Object>();readonly List<BoundedGlyphLabel> labels=new List<BoundedGlyphLabel>();readonly List<ButtonVisual> pool=new List<ButtonVisual>();
         Transform joystickBase,joystickKnob,aimDot;BoundedGlyphLabel worldHint;Vector2 joystickValue;float androidDensity;
@@ -25,7 +25,8 @@ namespace Lottery.G3.Interaction
         public long InteractionRevision {get;private set;}
         public bool HasMeasuredAndroidDensity=>androidDensity>0;
         Font font;Shader flat;Material fontMat;Transform hud,header,dayHeader,qaTag,headerDivider,footer,modal,feedbackPlate,modalRule;
-        BoundedGlyphLabel headerText,cashValue,nightCaption,nightValue,dayText,qaText,statusText,resultText,panelTitle,panelBody,panelFoot,emptyText;
+        BoundedGlyphLabel headerText,cashValue,nightCaption,nightValue,dayText,qaText,statusText,resultText,panelTitle,panelBody,panelFoot,panelMeta,emptyText;
+        readonly List<BoundedGlyphLabel> panelParagraphs=new List<BoundedGlyphLabel>();
         G3HudIcon walletIcon,nightIcon;bool headerFallback,phoneOwnsCamera;Vector3 beforePhonePosition;Quaternion beforePhoneRotation;float beforePhoneFov;bool beforePhoneOrthographic;
         string lastFeedback="";float feedbackUntil;bool persistentFeedback;
         readonly List<G3ToolDisplay> toolDisplays=new List<G3ToolDisplay>();
@@ -111,6 +112,7 @@ namespace Lottery.G3.Interaction
             dayText=Label("Game day purchases and settlements",hud,G3HudTheme.Card);qaText=Label("Explicit QA marker",hud,G3HudTheme.QuietInk);
             walletIcon=G3HudIcon.Create(hud,flat);nightIcon=G3HudIcon.Create(hud,flat);statusText=Label("Confirmed operation feedback",hud,G3HudTheme.Card);resultText=Label("Live ticket progress and detail route",hud,G3HudTheme.Paper);
             panelTitle=Label("Panel title",hud,G3HudTheme.Card);panelBody=Label("Panel explanation",hud,G3HudTheme.Paper);panelFoot=Label("Panel status",hud,G3HudTheme.QuietInk);
+            panelMeta=Label("Drawer context and currency unit",hud,G3HudTheme.QuietInk);
             for(int i=0;i<32;i++){var root=new GameObject("Routed control "+i);root.transform.SetParent(hud,false);pool.Add(new ButtonVisual{Root=root,Plate=Plate("Button surface",root.transform,G3HudTheme.Ink),Icon=G3HudIcon.Create(root.transform,flat),Label=Label("Button text",root.transform,G3HudTheme.Card,TextAnchor.MiddleCenter),Title=Label("Catalog item name",root.transform,G3HudTheme.Card,TextAnchor.UpperLeft),Detail=Label("Catalog price stock or placement",root.transform,G3HudTheme.QuietInk,TextAnchor.MiddleLeft)});}
             for(int i=0;i<toolLabels.Count;i++){toolLabels[i].transform.SetParent(hud,false);toolLabels[i].transform.localRotation=Quaternion.identity;toolChipPlates.Add(Plate("Confirmed configuration chip "+(i+1),hud,G3HudTheme.Ink));toolChipRects.Add(new Rect());}
             walkHudActive=true;SetWalking(false);Layout();UpdateWalkHud();Physics.SyncTransforms();
@@ -367,10 +369,38 @@ namespace Lottery.G3.Interaction
             }
             return pixels+(lines-1)*pixels*1.16f+2;
         }
+        // Presentation only: keep the model, its amounts and every routed hit rect intact.
+        bool PolishedDrawerPanel=>current!=null&&(current.Panel==G3Panel.Bill||current.Panel==G3Panel.Shop||current.Panel==G3Panel.StockDetail||current.Panel==G3Panel.Inventory||current.Panel==G3Panel.ToolDetail||current.Panel==G3Panel.Drawer);
+        string DrawerMeta=>current.Panel==G3Panel.Inventory||current.Panel==G3Panel.ToolDetail?"本张生效与下一张布置分别显示":current.Panel==G3Panel.Drawer?"购买与使用分别确认":"金额单位：元";
+        Color DrawerParagraphColor(string text,int index)
+        {
+            if(text.StartsWith("下一张布置：",StringComparison.Ordinal))return G3HudTheme.Mint;
+            if(current.Panel==G3Panel.Bill)return index==1?G3HudTheme.Copper:index<=2?G3HudTheme.Paper:G3HudTheme.QuietInk;
+            if(current.Panel==G3Panel.Shop)return index==0?G3HudTheme.Card:G3HudTheme.QuietInk;
+            if(current.Panel==G3Panel.StockDetail)return index==0?G3HudTheme.Copper:text.StartsWith("购买",StringComparison.Ordinal)||text.StartsWith("教学",StringComparison.Ordinal)?G3HudTheme.QuietInk:G3HudTheme.Paper;
+            return text.StartsWith("点击工具",StringComparison.Ordinal)?G3HudTheme.QuietInk:G3HudTheme.Paper;
+        }
+        void PlaceDrawerBody(string text,Rect rect,float s)
+        {
+            // Separate existing paragraphs for hierarchy without rewriting the financial
+            // copy, shrinking body type or changing the shared line/height calculation.
+            panelBody.gameObject.SetActive(false);float top=rect.yMax,pixels=32*s;
+            string[] paragraphs=(text??"").Split('\n');
+            for(int i=0;i<paragraphs.Length;i++)
+            {
+                if(i==panelParagraphs.Count)panelParagraphs.Add(Label("Drawer paragraph "+i,hud,G3HudTheme.Paper));
+                var label=panelParagraphs[i];label.gameObject.SetActive(true);label.SetText(paragraphs[i]);label.SetColor(DrawerParagraphColor(paragraphs[i],i));
+                float height=TextHeight(paragraphs[i],pixels,rect.width);
+                PlaceLabel(label,new Rect(rect.x,top-height,rect.width,height),pixels,.22f,true);
+                top-=height+pixels*.16f-2; // Same baseline advance as the unsplit body.
+            }
+        }
         void ShowModal(G3PanelModel model,float s)
         {
             bool visible=PanelVisible&&!current.PhoneVisible;modal.gameObject.SetActive(visible);modalRule.gameObject.SetActive(visible);panelTitle.gameObject.SetActive(visible);panelBody.gameObject.SetActive(visible);panelFoot.gameObject.SetActive(visible);
+            panelMeta.gameObject.SetActive(false);foreach(var paragraph in panelParagraphs)paragraph.gameObject.SetActive(false);panelFoot.SetColor(G3HudTheme.QuietInk);
             if(!visible)return;
+            bool polished=PolishedDrawerPanel;
             // Debt totals need a quiet, fully opaque backplate. Reapply the normal
             // tint for every other drawer so leaving Bill never leaks its opacity.
             Color drawerFill=G3HudTheme.Ink;
@@ -397,6 +427,14 @@ namespace Lottery.G3.Interaction
             PlacePlate(modalRule,new Rect(modalRect.x+20*s,modalRect.yMax-103*s,modalRect.width-40*s,2*s),.30f);
             string title=model.Title;if(current.Panel==G3Panel.Bill&&current.Snapshot.Phase!=DayPhase.DAY_COMPLETE&&current.Snapshot.Phase!=DayPhase.RUN_FAILED)title+=" · 应付 "+G3Text.Money(current.Service.PreviewNightBill().TotalDueMinor);
             panelTitle.SetText(title);PlaceLabel(panelTitle,new Rect(modalRect.x+20*s,modalRect.yMax-96*s,modalRect.width-208*s,76*s),32*s,.22f,true);
+            // A two-level header occupies the existing header band. Dense/narrow titles
+            // retain their original wrapping instead of colliding with the close target.
+            if(polished&&TextHeight(title,36*s,modalRect.width-208*s)<=44*s&&TextWidth(DrawerMeta,28*s)<=modalRect.width-208*s)
+            {
+                PlaceLabel(panelTitle,new Rect(modalRect.x+20*s,modalRect.yMax-64*s,modalRect.width-208*s,44*s),36*s,.22f,false);
+                panelMeta.SetText(DrawerMeta);panelMeta.gameObject.SetActive(true);
+                PlaceLabel(panelMeta,new Rect(modalRect.x+20*s,modalRect.yMax-98*s,modalRect.width-208*s,32*s),28*s,.22f,false);
+            }
             bool pendingQa=G3QaEvidence.Enabled&&current.IsCommitting&&current.Panel!=G3Panel.QaEvidence&&current.Panel!=G3Panel.Settings;
             AddButton(pendingQa?"qa-settings":"close-panel",pendingQa?"QA 设置":"返回",pendingQa?new G3Action(G3ActionKind.Open,slot:(int)G3Panel.Settings):new G3Action(G3ActionKind.Close),new Rect(modalRect.xMax-176*s,modalRect.yMax-108*s,156*s,96*s),true,.25f);
             panelBody.SetText(model.Body);panelFoot.SetText(footnote);
@@ -409,6 +447,7 @@ namespace Lottery.G3.Interaction
             }
             float top=modalRect.yMax-112*s;
             PlaceLabel(panelBody,new Rect(modalRect.x+20*s,top-bodyHeight,modalRect.width-40*s,bodyHeight),32*s,.22f,true);
+            if(polished)PlaceDrawerBody(model.Body,new Rect(modalRect.x+20*s,top-bodyHeight,modalRect.width-40*s,bodyHeight),s);
             float cardTop=top-bodyHeight-16*s,cardW=(modalRect.width-40*s-(cols-1)*8*s)/cols;
             for(int row=0;row<rows;row++)
             {
@@ -416,6 +455,11 @@ namespace Lottery.G3.Interaction
                 cardTop-=rowHeights[row]+8*s;
             }
             PlaceLabel(panelFoot,new Rect(modalRect.x+20*s,modalRect.y+16*s,modalRect.width-40*s,footHeight),32*s,.22f,true);
+            if(polished)
+            {
+                panelFoot.SetColor(CriticalFeedback(model.Footnote)?G3HudTheme.Paper:G3HudTheme.QuietInk);
+                PlaceLabel(panelFoot,new Rect(modalRect.x+20*s,modalRect.y+16*s,modalRect.width-40*s,footHeight),(CriticalFeedback(model.Footnote)?32:28)*s,.22f,true);
+            }
             if(current.IsCommitting)AddButton("retry","确认上笔交易",new G3Action(G3ActionKind.Retry),new Rect(modalRect.xMax-340*s,modalRect.y+88*s,310*s,96*s),true,.19f);
         }
         void AddButton(string id,string text,G3Action action,Rect rect,bool enabled=true,float z=.51f,float fontPixels=32)
@@ -424,6 +468,8 @@ namespace Lottery.G3.Interaction
             bool evidenceControl=G3QaEvidence.Enabled&&(action.Kind==G3ActionKind.Open&&(action.Slot==(int)G3Panel.Settings||action.Slot==(int)G3Panel.QaEvidence)||(current.Panel==G3Panel.QaEvidence&&(action.Kind==G3ActionKind.CopyEvidence||action.Kind==G3ActionKind.ScrollEvidence))||(action.Kind==G3ActionKind.Close&&(current.Panel==G3Panel.QaEvidence||current.Panel==G3Panel.Settings)));
             b.Enabled=enabled&&(!current.IsCommitting||evidenceControl)||action.Kind==G3ActionKind.Retry||action.Kind==G3ActionKind.ToggleMore;b.Root.SetActive(true);
             b.Primary=id=="quick"||id=="claim"||id=="confirm-action"||id=="buy-number"||id=="buy-challenge"||id=="pay-night"||id=="enter-night"||id=="information-confirm"||id=="amount-accept";
+            b.PolishedDrawer=PanelVisible&&PolishedDrawerPanel;
+            if(b.PolishedDrawer&&id=="stock-buy")b.Primary=true;
             b.Navigation=id=="stand"||id=="open-shop"||id=="open-inventory"||id=="open-phone"||id=="open-more";
             b.Movement=action.Kind>=G3ActionKind.MoveForward&&action.Kind<=G3ActionKind.TurnRight;
             b.Selected=(id=="open-more"&&moreVisible)||(action.Kind==G3ActionKind.Equip&&action.Slot>=0&&current.Snapshot.NextToolIds[action.Slot]==action.Key)||(action.Kind==G3ActionKind.TargetCell&&text.StartsWith("已选格",StringComparison.Ordinal))||(id=="setting-quick"&&current.QuickEnabled)||(id=="setting-flash"&&current.ReduceFlash)||(id=="setting-vibration"&&current.Vibration);
@@ -435,6 +481,7 @@ namespace Lottery.G3.Interaction
             if(id=="claim-next")b.FaceRect=Inset(rect,4*s,6*s);
             if(id=="open-more")b.FaceRect=new Rect(rect.x+12*s,rect.center.y-24*s,rect.width-24*s,48*s);
             b.Symbol=NavigationSymbol(id);PlacePlate(b.Plate,b.FaceRect,z);
+            if(b.PolishedDrawer)b.Plate.GetComponent<G3HudSurface>().Configure(b.FaceRect.width,b.FaceRect.height,16*s,s);
             if(round||b.Movement)b.Plate.GetComponent<G3HudSurface>().Configure(b.FaceRect.width,b.FaceRect.height,b.FaceRect.height*.5f,s);
             if(round)
             {
@@ -446,8 +493,10 @@ namespace Lottery.G3.Interaction
                 b.Symbol=CatalogSymbol(action);PlaceIcon(b.Icon,new Rect(b.FaceRect.x+16*s,b.FaceRect.center.y-25*s,50*s,50*s),z-.025f);
                 string[] parts=text.Split(new[]{'\n'},2);b.Title.SetText(parts[0]);b.Detail.SetText(parts.Length>1?parts[1]:"");b.Detail.gameObject.SetActive(parts.Length>1);
                 float contentW=b.FaceRect.width-96*s,titleH=TextHeight(parts[0],32*s,contentW),detailH=parts.Length>1?TextHeight(parts[1],32*s,contentW):0,total=titleH+(detailH>0?detailH+4*s:0),top=b.FaceRect.center.y+total*.5f;
-                PlaceLabel(b.Title,new Rect(b.FaceRect.x+80*s,top-titleH,contentW,titleH),32*s,z-.025f,true);
-                PlaceLabel(b.Detail,new Rect(b.FaceRect.x+80*s,top-titleH-4*s-detailH,contentW,Mathf.Max(1,detailH)),32*s,z-.025f,true);
+                float textLeft=b.FaceRect.x+(b.PolishedDrawer?76:80)*s;
+                if(b.PolishedDrawer)PlaceIcon(b.Icon,new Rect(b.FaceRect.x+20*s,b.FaceRect.center.y-20*s,40*s,40*s),z-.025f);
+                PlaceLabel(b.Title,new Rect(textLeft,top-titleH,contentW,titleH),32*s,z-.025f,true);
+                PlaceLabel(b.Detail,new Rect(textLeft,top-titleH-4*s-detailH,contentW,Mathf.Max(1,detailH)),32*s,z-.025f,true);
             }
             else
             {
@@ -471,8 +520,10 @@ namespace Lottery.G3.Interaction
             else if(b.Primary){face=G3HudTheme.Action;ink=G3HudTheme.Card;edge=G3HudTheme.Mint;}
             else if(b.Selected){face=G3HudTheme.InkLift;ink=G3HudTheme.Card;edge=G3HudTheme.Mint;}
             else{face=b.Catalog?G3HudTheme.InkLift:G3HudTheme.Ink;ink=G3HudTheme.Paper;edge=G3HudTheme.Rule;}
+            if(b.PolishedDrawer&&b.Enabled&&!b.Primary&&!b.Selected&&!b.Catalog)face=new Color(.095f,.12f,.108f,.96f);
             if(pressed&&b.Enabled){face=Color.Lerp(face,G3HudTheme.Action,.45f);edge=G3HudTheme.Mint;}
             b.Plate.GetComponent<G3HudSurface>().Tint(face,edge);b.Label.SetColor(ink);b.Title.SetColor(ink);b.Detail.SetColor(!b.Enabled?G3HudTheme.DisabledInk:G3HudTheme.QuietInk);
+            if(b.PolishedDrawer&&b.Enabled&&b.Catalog)b.Detail.SetColor(b.Action.Kind==G3ActionKind.InspectStock?G3HudTheme.Copper:G3HudTheme.Mint);
             b.Icon.Show(b.Symbol,!b.Enabled?G3HudTheme.DisabledInk:b.Catalog?G3HudTheme.Mint:ink);b.Pressed=pressed;
         }
         void RefreshPressedState()

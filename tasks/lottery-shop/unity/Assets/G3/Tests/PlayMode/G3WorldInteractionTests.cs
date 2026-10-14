@@ -2,6 +2,7 @@ using System.Collections;
 using System.Linq;
 using Lottery.G3.Core;
 using Lottery.G3.Interaction;
+using Lottery.G3.Rendering;
 using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.InputSystem.LowLevel;
@@ -57,18 +58,55 @@ namespace Lottery.G3.PlayMode.Tests
         static string WorldNumber(float value)=>value.ToString("F4",System.Globalization.CultureInfo.InvariantCulture);
         static string WorldVector(Vector3 value)=>"("+WorldNumber(value.x)+","+WorldNumber(value.y)+","+WorldNumber(value.z)+")";
         static float WorldDistance(Vector3 a,Vector3 b)=>new Vector2(a.x-b.x,a.z-b.z).magnitude;
+        // Failure-only numeric attribution; does not change the route or frame budget.
+        // Snapshot order: glyph count/ticks/max, atlas notifications, input count/ticks/max, overflow.
+        struct WorldCostSnapshot
+        {
+            public long GlyphCount,GlyphTicks,GlyphMax,Atlas,InputCount,InputTicks,InputMax,Overflow;
+            public static WorldCostSnapshot Read()
+            {
+                var glyph=BoundedGlyphLabel.CostObservation();var input=G3InputRouter.CostObservation();
+                return new WorldCostSnapshot{GlyphCount=glyph[0],GlyphTicks=glyph[1],GlyphMax=glyph[2],Atlas=glyph[3],
+                    InputCount=input[0],InputTicks=input[1],InputMax=input[2],Overflow=System.Math.Max(glyph[4],input[6])};
+            }
+            static string Numbers(params long[] values)=>string.Join(",",values.Select(x=>x.ToString(System.Globalization.CultureInfo.InvariantCulture)));
+            public string FixedValues()=>Numbers(GlyphCount,GlyphTicks,GlyphMax,Atlas,InputCount,InputTicks,InputMax,Overflow);
+            // Maxima are cumulative, not additive; their pre/post values are retained separately.
+            public string Delta(WorldCostSnapshot before)=>Numbers(GlyphCount-before.GlyphCount,GlyphTicks-before.GlyphTicks,
+                Atlas-before.Atlas,InputCount-before.InputCount,InputTicks-before.InputTicks);
+        }
+        sealed class WorldWorkloadObservation
+        {
+            readonly WorldCostSnapshot baseline;WorldCostSnapshot previous,beforeWorst,afterWorst;float longest;int worstFrame;
+            public WorldWorkloadObservation()
+            {
+                BoundedGlyphLabel.BeginCostObservation();G3InputRouter.BeginCostObservation();
+                baseline=previous=beforeWorst=afterWorst=WorldCostSnapshot.Read();
+            }
+            public void Observe(float interval,int frame)
+            {
+                // Existing getters allocate only two tiny arrays; live snapshots stay constant-size.
+                var current=WorldCostSnapshot.Read();
+                if(interval>longest){longest=interval;worstFrame=frame;beforeWorst=previous;afterWorst=current;}
+                previous=current;
+            }
+            public string FailureSummary()=>" WORLD_WORKLOAD_V1 tickFrequency="+System.Diagnostics.Stopwatch.Frequency.ToString(System.Globalization.CultureInfo.InvariantCulture)+
+                " worstFrame="+worstFrame.ToString(System.Globalization.CultureInfo.InvariantCulture)+" base=("+baseline.FixedValues()+
+                ") pre=("+beforeWorst.FixedValues()+") post=("+afterWorst.FixedValues()+") delta=("+afterWorst.Delta(beforeWorst)+")";
+            public void End(){BoundedGlyphLabel.EndCostObservation();G3InputRouter.EndCostObservation();}
+        }
         sealed class WorldWalkObservation
         {
             public string Segment;public Vector3 Origin,Destination,Previous;
             public float Started,PreviousAt,LastStep,PathMeters,MaxFrameWall,MaxFrameDelta,MinRemaining;
-            public int Frames,StationaryFrames;public Vector2 LastCommand;
+            public int Frames,StationaryFrames;public Vector2 LastCommand;public WorldWorkloadObservation Workload;
             public void Observe(Vector3 body)
             {
                 float now=Time.realtimeSinceStartup;
                 LastStep=WorldDistance(body,Previous);PathMeters+=LastStep;
                 MaxFrameWall=Mathf.Max(MaxFrameWall,now-PreviousAt);MaxFrameDelta=Mathf.Max(MaxFrameDelta,Time.unscaledDeltaTime);
                 MinRemaining=Mathf.Min(MinRemaining,WorldDistance(body,Destination));
-                Frames++;if(LastStep<.0001f)StationaryFrames++;
+                Frames++;if(LastStep<.0001f)StationaryFrames++;Workload?.Observe(now-PreviousAt,Frames);
                 Previous=body;PreviousAt=now;
             }
         }
@@ -90,7 +128,7 @@ namespace Lottery.G3.PlayMode.Tests
         {
             float elapsed=Time.realtimeSinceStartup-sample.Started;
             // Build the detailed string only on failure, not on every movement frame.
-            if(!(elapsed<45))Assert.That(elapsed,Is.LessThan(45),"Real joystick route stalled; never teleport or extend the native budget. "+WorldWalkDiagnostic(sample,phase));
+            if(!(elapsed<45))Assert.That(elapsed,Is.LessThan(45),"Real joystick route stalled; never teleport or extend the native budget. "+WorldWalkDiagnostic(sample,phase)+(sample.Workload?.FailureSummary()??""));
         }
         IEnumerator TouchWalkTo(string segment,Vector3 destination,bool proveConcurrentLook=false)
         {
@@ -103,6 +141,7 @@ namespace Lottery.G3.PlayMode.Tests
             bool movedLook=false;Quaternion initialLook=app.SceneCamera.transform.rotation;
             try
             {
+                if(segment=="PHONE_TO_RETURN_AISLE")sample.Workload=new WorldWorkloadObservation();
                 while(WorldDistance(P.View.Walk.SavedPosition,destination)>.09f)
                 {
                     AssertWorldRouteBudget(sample,"STALL");
@@ -126,7 +165,7 @@ namespace Lottery.G3.PlayMode.Tests
                 AssertWorldRouteBudget(sample,"ARRIVAL");
                 reached=true;
             }
-            finally{WriteWorldDiagnostic(WorldWalkDiagnostic(sample,reached?"REACHED":"ABORTED"));}
+            finally{sample.Workload?.End();WriteWorldDiagnostic(WorldWalkDiagnostic(sample,reached?"REACHED":"ABORTED"));}
             WorldTouches(Finger(901,IPhase.Ended,move));if(proveConcurrentLook)WorldTouches(Finger(902,IPhase.Ended,look));
             yield return WorldNeutral();Assert.That(Vector3.Distance(P.View.Walk.SavedPosition,origin),Is.GreaterThan(.05f));
         }

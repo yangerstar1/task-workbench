@@ -28,6 +28,7 @@ namespace Lottery.G3.Interaction
             if(service==null){ownedStore=new FileStateStore(storeDirectory??ExistingOrNewDirectory,RunFactory.Create(Guid.NewGuid().ToString("N"),Guid.NewGuid().ToString("N")));sharedStore=ownedStore;service=new DayGameService(ownedStore);}
             var view=gameObject.AddComponent<G3SceneView>();view.Initialize(chineseFont,flatShader,fontShader,surfaceShader,paperShader,silverShader,maskedFontShader,numberArtwork,challengeArtwork);
             Presenter=gameObject.AddComponent<G3Presenter>();var router=gameObject.AddComponent<G3InputRouter>();Presenter.Router=router;router.Initialize(Presenter,view);Presenter.Initialize(service,view);
+            Presenter.Audio=gameObject.AddComponent<G3AudioController>();Presenter.Audio.Initialize(Presenter);Presenter.Refresh();
             Application.targetFrameRate=60;
         }
         public static bool HasStoredData(string directory)=>Directory.Exists(directory)&&Directory.GetFiles(directory).Length>0;

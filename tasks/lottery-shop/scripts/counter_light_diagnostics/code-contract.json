@@ -101,9 +101,9 @@
       "sha256": "7a4477d05656c70944c95b8269af8d97e12aa405e644c5455c65ebdc067d1984"
     },
     {
-      "bytes": 46904,
+      "bytes": 48269,
       "repositoryPath": "tasks/lottery-shop/scripts/visual_candidate_ci.py",
-      "sha256": "df0d7524ac2dc29ce3abf48a410c0fe191d9988493887de91e7b00eee29b4caa"
+      "sha256": "d3f186bb1109b1513980f4fae77eebcc8c5c862776cd21916051444482bc6e81"
     },
     {
       "bytes": 49197,
