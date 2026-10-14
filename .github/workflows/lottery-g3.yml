@@ -33,6 +33,9 @@ jobs:
             /.github/workflows/lottery-g3.yml
             /.github/workflows/lottery-g2.yml
             /.github/workflows/lottery-g0.yml
+            /.github/workflows/lottery-activation-probe.yml
+            /.github/workflows/lottery-performance-probe.yml
+            /.github/workflows/lottery-visual-candidate.yml
       - name: Validate source-frozen fresh preflight and unique request
         id: guard
         run: python3 tasks/lottery-shop/scripts/g3_ci.py guard
@@ -312,6 +315,9 @@ jobs:
             /.github/workflows/lottery-g3.yml
             /.github/workflows/lottery-g2.yml
             /.github/workflows/lottery-g0.yml
+            /.github/workflows/lottery-activation-probe.yml
+            /.github/workflows/lottery-performance-probe.yml
+            /.github/workflows/lottery-visual-candidate.yml
       - name: Verify source-frozen fresh preflight and unique request
         id: guard
         run: python3 tasks/lottery-shop/scripts/g3_ci.py guard --stage android

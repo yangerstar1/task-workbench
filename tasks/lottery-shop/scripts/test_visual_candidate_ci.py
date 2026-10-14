@@ -403,6 +403,51 @@ class VisualCandidateEvidenceTests(unittest.TestCase):
         value = receipt(); value["frames"].append(copy.deepcopy(value["frames"][0]))
         with self.assertRaises(ValueError): self.validate(value)
 
+    def test_exterior_metadata_precedes_atomic_frame_append_source_and_negative(self):
+        source=(Path(__file__).resolve().parents[3] / candidate.TASK / "unity/Assets/G3/Tests/VisualCandidate/VisualCandidateCaptureTests.cs").read_text()
+        def require_order(text):
+            body=text.split("IEnumerator ExteriorFixtureViews(bool isNight)",1)[1].split("ExteriorReceipt ExteriorMetadata",1)[0]
+            self.assertIn("var metadata = ExteriorMetadata(isNight);",body)
+            self.assertLess(body.index("var metadata = ExteriorMetadata(isNight);"),body.index('Capture("exterior-"'))
+            self.assertIn('"FIXTURE_VIEW_NOT_WALKED", metadata, hash);',body)
+            self.assertNotIn("frames[frames.Count-1]",body)
+            self.assertIn("finally",body);self.assertIn("WriteReceipt(false)",body)
+            capture=text.split("void Capture(string stage",1)[1].split("void WriteReceipt",1)[0]
+            self.assertIn("exterior = exterior, fixtureStateBefore = fixtureStateBefore,",capture)
+        require_order(source)
+        for before,after in [('var metadata = ExteriorMetadata(isNight);','var metadata = new ExteriorReceipt();'),
+                             ('exterior = exterior, fixtureStateBefore = fixtureStateBefore,',''),
+                             ('"FIXTURE_VIEW_NOT_WALKED", metadata, hash);','"FIXTURE_VIEW_NOT_WALKED");')]:
+            with self.subTest(before=before),self.assertRaises(AssertionError):require_order(source.replace(before,after))
+
+    def test_run21_first_exterior_failure_preserves_fifteen_but_never_claims_complete(self):
+        # Exercise the real consumer with a synthetic pre-error receipt. No Unity run
+        # is claimed; PNG payloads only satisfy this exporter's signature contract.
+        value=receipt();value["complete"]=False
+        first=candidate.FRAMES.index(candidate.EXTERIOR_DAY_FRAMES[0]);self.assertEqual(first,15)
+        value["frames"]=value["frames"][:first]
+        self.assertEqual(len(self.validate(value,False)),15)
+        with self.assertRaises(ValueError):self.validate(value,True)
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory);folder=root/candidate.TASK/"artifacts/visual-candidate/captures";folder.mkdir(parents=True)
+            for f in value["frames"]:
+                data=b'\x89PNG\r\n\x1a\n'+bytes(8)+struct.pack(">II",f["width"],f["height"])+bytes(10000)
+                f["bytes"]=len(data);f["sha256"]=hashlib.sha256(data).hexdigest();(folder/f["file"]).write_bytes(data)
+            (folder/"capture-receipt.json").write_text(json.dumps(value))
+            with patch.object(candidate,"identity",return_value=dict(sourceCommit="1"*40,runId="12345",runAttempt="1")):
+                candidate.export_captures(root,False)
+            exported=candidate.outdir(root)/"captures"
+            self.assertEqual(len(list(exported.glob("*.png"))),15)
+            self.assertFalse(json.loads((exported/"capture-receipt.json").read_text())["complete"])
+
+    def test_partial_consumer_still_rejects_poisoned_exterior_and_bad_material(self):
+        for update in ({"exterior":None},{"fixturePoseRestored":False}):
+            value=receipt();value["complete"]=False;value["frames"]=value["frames"][:16];value["frames"][-1].update(update)
+            with self.subTest(update=update),self.assertRaises(ValueError):self.validate(value,False)
+        for field,bad in (("feltNormalScale",.28),("linerSmoothness",.5),("brassSmoothness",.7)):
+            value=receipt();value["complete"]=False;value["frames"]=value["frames"][:16];value["frames"][-1]["exterior"][field]=bad
+            with self.subTest(field=field),self.assertRaises(ValueError):self.validate(value,False)
+
 
 class NativeReportShapeTests(unittest.TestCase):
     def test_v2_contract_has_331_edit_and_37_play_with_phone_coverage(self):

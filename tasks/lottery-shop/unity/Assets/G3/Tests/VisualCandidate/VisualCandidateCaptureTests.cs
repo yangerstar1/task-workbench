@@ -503,9 +503,10 @@ namespace Lottery.G3.VisualCandidate.Tests
                     yield return null;
                     Assert.That(StateCodec.ComputeHash(State), Is.EqualTo(hash));
                     Assert.That(app.SceneCamera.fieldOfView, Is.EqualTo(64f));
-                    Capture("exterior-"+(isNight?"night-":"day-")+labels[i], "FIXTURE_VIEW_NOT_WALKED");
-                    frames[frames.Count-1].exterior = ExteriorMetadata(isNight);
-                    frames[frames.Count-1].fixtureStateBefore = hash;
+                    // Validate first: a failing material contract must not append
+                    // an incomplete frame and invalidate earlier diagnostic captures.
+                    var metadata = ExteriorMetadata(isNight);
+                    Capture("exterior-"+(isNight?"night-":"day-")+labels[i], "FIXTURE_VIEW_NOT_WALKED", metadata, hash);
                 }
             }
             finally
@@ -558,6 +559,11 @@ namespace Lottery.G3.VisualCandidate.Tests
             var felt=materials.Single(m=>m.name.StartsWith("Dark_Green_Felt",StringComparison.Ordinal));
             var liner=materials.Single(m=>m.name.StartsWith("Tool_Dock_Liner",StringComparison.Ordinal));
             var brass=materials.Single(m=>m.name.StartsWith("Brass_Worn",StringComparison.Ordinal));
+#if UNITY_EDITOR
+            RequireOwnedRuntimeMaterial(felt,"Dark_Green_Felt");
+            RequireOwnedRuntimeMaterial(liner,"Tool_Dock_Liner");
+            RequireOwnedRuntimeMaterial(brass,"Brass_Worn");
+#endif
             Assert.That(felt.GetFloat("_BumpScale"), Is.EqualTo(.60f).Within(.0001f));
             Assert.That(liner.GetFloat("_Smoothness"), Is.EqualTo(.08f).Within(.0001f));
             Assert.That(liner.GetTexture("_BumpMap"), Is.SameAs(felt.GetTexture("_BumpMap")));
@@ -570,6 +576,21 @@ namespace Lottery.G3.VisualCandidate.Tests
                 glassRenderQueue=glass.Min(m=>m.renderQueue), nearFieldTriangles=triangles, nearFieldColliderCount=near.GetComponentsInChildren<Collider>().Length,
                 feltNormalScale=felt.GetFloat("_BumpScale"), linerSmoothness=liner.GetFloat("_Smoothness"), brassSmoothness=brass.GetFloat("_Smoothness") };
         }
+
+#if UNITY_EDITOR
+        static void RequireOwnedRuntimeMaterial(Material actual,string name)
+        {
+            string path="Assets/G3/Shop/Resources/G3/Shop/Materials/"+name+".mat";
+            var expected=UnityEditor.AssetDatabase.LoadAssetAtPath<Material>(path);
+            Assert.That(expected,Is.Not.Null);Assert.That(actual,Is.SameAs(expected),"Runtime material must use the validated external asset");
+            Assert.That(UnityEditor.AssetDatabase.IsMainAsset(actual),Is.True);
+            Assert.That(UnityEditor.AssetDatabase.GetAssetPath(actual),Is.EqualTo(path));
+            Assert.That(UnityEditor.AssetDatabase.TryGetGUIDAndLocalFileIdentifier(actual,out string actualGuid,out long actualId),Is.True);
+            Assert.That(UnityEditor.AssetDatabase.TryGetGUIDAndLocalFileIdentifier(expected,out string expectedGuid,out long expectedId),Is.True);
+            Assert.That(actualGuid,Is.EqualTo(expectedGuid));Assert.That(actualId,Is.EqualTo(expectedId));
+            Assert.That(actualGuid,Is.EqualTo(UnityEditor.AssetDatabase.AssetPathToGUID(path)));
+        }
+#endif
 
         // v24: scalar smoothness is the packed-alpha multiplier, not roughness.
         // One full content verification per fixture; paired views reuse one material.
@@ -926,7 +947,7 @@ namespace Lottery.G3.VisualCandidate.Tests
         }
         static ProjectionReceipt Projection(Rect rect)
         { return new ProjectionReceipt { x = rect.x, y = rect.y, width = rect.width, height = rect.height }; }
-        void Capture(string stage, string cameraOrigin)
+        void Capture(string stage, string cameraOrigin, ExteriorReceipt exterior = null, string fixtureStateBefore = null)
         {
             CheckRuntimeBudget(); Milestone("capture-begin:" + stage);
             P.View.RefreshGlyphGeometry();
@@ -975,6 +996,7 @@ namespace Lottery.G3.VisualCandidate.Tests
                 File.WriteAllBytes(Path.Combine(output, stage + ".png"), bytes);
                 var ticket = State.CurrentTicket;
                 frames.Add(new FrameReceipt {
+                    exterior = exterior, fixtureStateBefore = fixtureStateBefore,
                     stage = stage, file = stage + ".png", sha256 = StateCodec.HashBytes(bytes), bytes = bytes.Length,
                     capturedUtc = DateTime.UtcNow.ToString("O"), width = target.width, height = target.height,
                     ticketContentSha256 = TicketContentHash(State.CurrentTicket),

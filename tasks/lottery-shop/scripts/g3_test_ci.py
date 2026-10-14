@@ -7,6 +7,7 @@ from pathlib import Path
 import struct
 import subprocess
 import os
+import re
 import tempfile
 import time
 import zlib
@@ -19,6 +20,23 @@ import g3_ci as ci
 import g3_process as process
 
 ROOT=Path(__file__).resolve().parents[3]
+
+# Independent exact expectations: no wildcard or validator-derived allowlist.
+REVIEWED_WORKFLOW_PATHS=(
+    '.github/workflows/lottery-g3.yml',
+    '.github/workflows/lottery-g2.yml',
+    '.github/workflows/lottery-g0.yml',
+    '.github/workflows/lottery-activation-probe.yml',
+    '.github/workflows/lottery-performance-probe.yml',
+    '.github/workflows/lottery-visual-candidate.yml',
+)
+STATIC_HELPER_WORKFLOW_PATHS=REVIEWED_WORKFLOW_PATHS[3:]
+
+
+def g3_sparse_patterns():
+    text=(ROOT/'.github/workflows/lottery-g3.yml').read_text()
+    blocks=re.findall(r'^          sparse-checkout: \|\n((?:            /[^\n]+\n)+)',text,re.M)
+    return [[line.strip() for line in block.splitlines()] for block in blocks]
 
 
 def diagnostic_shell(root):
@@ -132,7 +150,7 @@ class G3ValidatorTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             root=Path(d)
             inputs={ci.TASK+'/scripts/process-g3/Program.cs':b'SYNTHETIC_SOURCE',
-                    '.github/workflows/lottery-g3.yml':b'SYNTHETIC_WORKFLOW',
+                    **{name:b'SYNTHETIC_WORKFLOW' for name in REVIEWED_WORKFLOW_PATHS},
                     ci.TASK+'/Directory.Build.props':b'SYNTHETIC_REVIEWED_INPUT',
                     ci.TASK+'/fonts/OFL.txt':b'SYNTHETIC_LICENSE_MARKER_NOT_LICENSE_PROOF',
                     ci.TASK+'/ci/g2-request.review.json':b'{"syntheticOldRequest":true}\n',
@@ -165,12 +183,114 @@ class G3ValidatorTests(unittest.TestCase):
         git('init','-q');source=root/ci.TASK/'scripts/source.cs';source.parent.mkdir(parents=True);source.write_text('reviewed source\n')
         def commit(message):
             git('add','-A');git('-c','user.name=Synthetic Fixture','-c','user.email=fixture@example.invalid','commit','-q','-m',message)
+        for name in REVIEWED_WORKFLOW_PATHS:
+            path=root/name;path.parent.mkdir(parents=True,exist_ok=True);path.write_text('SYNTHETIC_REVIEWED_WORKFLOW '+name+'\n')
         commit('reviewed source');reviewed=git('rev-parse','HEAD')
         review=dict(schemaVersion=1,status='APPROVED_FOR_TRIGGER',requestId=ci.REQUEST['requestId'],reviewedSourceCommit=reviewed,reviewerId='synthetic-fresh-001',sourceFiles=ci.reviewed_files(root,committed=True),deviceQa='NOT_RUN',finalQuality='NOT_PASSED')
         target=root/ci.REVIEW_PATH;target.parent.mkdir(parents=True);target.write_text(json.dumps(review));commit('review metadata')
         def trigger():
             (root/ci.REQUEST_PATH).write_text(json.dumps(ci.REQUEST));commit('unique request')
         return git,commit,trigger,review,source
+    def testReviewedWorkflowScopeAndBothSparseCheckoutsAreExact(self):
+        self.assertEqual(ci.WORKFLOWS,set(REVIEWED_WORKFLOW_PATHS))
+        patterns=['/tasks/lottery-shop/']+['/'+name for name in REVIEWED_WORKFLOW_PATHS]
+        self.assertEqual(g3_sparse_patterns(),[patterns,patterns])
+        workflow=(ROOT/'.github/workflows/lottery-g3.yml').read_text()
+        self.assertEqual(workflow.count('          sparse-checkout-cone-mode: false'),2)
+        files=ci.reviewed_files(ROOT,committed=(ROOT/'.git').exists())
+        for name in REVIEWED_WORKFLOW_PATHS:
+            self.assertEqual(files[name],hashlib.sha256((ROOT/name).read_bytes()).hexdigest())
+        for name in ('.github/workflows/lottery-extra.yml',REVIEWED_WORKFLOW_PATHS[3]+'.bak'):
+            self.assertFalse(ci.source_path(name))
+
+    def testReviewedWorkflowFixturesBindExactPathsAndBytes(self):
+        with tempfile.TemporaryDirectory() as d:
+            root=Path(d);git,commit,trigger,review,source=self.makeReviewedGit(root);trigger()
+            expected={name:hashlib.sha256((root/name).read_bytes()).hexdigest() for name in REVIEWED_WORKFLOW_PATHS}
+            expected[source.relative_to(root).as_posix()]=hashlib.sha256(source.read_bytes()).hexdigest()
+            self.assertEqual(review['sourceFiles'],expected)
+            self.assertEqual(ci.reviewed_files(root),expected)
+            self.assertEqual(ci.reviewed_files(root,committed=True),expected)
+            self.assertEqual(ci.verify_preflight(root)['sourceFiles'],expected)
+
+    def testStaticHelperWorkflowsRejectMissingDirtyModeAndNonRegularInputs(self):
+        for name in STATIC_HELPER_WORKFLOW_PATHS:
+            with self.subTest(workflow=name),tempfile.TemporaryDirectory() as d:
+                root=Path(d);git,commit,trigger,review,source=self.makeReviewedGit(root);trigger()
+                path=root/name;raw=path.read_bytes();alias=root/'.git/synthetic-workflow-alias'
+                for attack in ('missing','bytes','mode','symlink','hardlink','fifo','directory'):
+                    with self.subTest(attack=attack):
+                        if attack=='bytes':path.write_bytes(raw+b'DIRTY')
+                        elif attack=='mode':path.chmod(0o755)
+                        else:
+                            path.unlink()
+                            if attack=='symlink':path.symlink_to('/dev/null')
+                            elif attack=='hardlink':alias.write_bytes(raw);os.link(alias,path)
+                            elif attack=='fifo':os.mkfifo(path)
+                            elif attack=='directory':path.mkdir()
+                        with self.assertRaises((ValueError,FileNotFoundError)):ci.verify_preflight(root)
+                        if path.is_dir() and not path.is_symlink():path.rmdir()
+                        else:path.unlink(missing_ok=True)
+                        alias.unlink(missing_ok=True);path.write_bytes(raw);path.chmod(0o644)
+                        self.assertEqual(ci.verify_preflight(root)['sourceFiles'],review['sourceFiles'])
+
+    def testStaticHelperWorkflowsRejectCommittedDriftAndNonRegularTreeEntries(self):
+        for name in STATIC_HELPER_WORKFLOW_PATHS:
+            for attack in ('bytes','mode','symlink','deletion'):
+                with self.subTest(workflow=name,attack=attack),tempfile.TemporaryDirectory() as d:
+                    root=Path(d);git,commit,trigger,review,source=self.makeReviewedGit(root);path=root/name
+                    if attack=='bytes':path.write_text('UNREVIEWED_WORKFLOW_BYTES')
+                    elif attack=='mode':path.chmod(0o755)
+                    else:
+                        path.unlink()
+                        if attack=='symlink':path.symlink_to('/dev/null')
+                    commit('unreviewed workflow drift');trigger()
+                    with self.assertRaisesRegex(ValueError,'Unreviewed repository tree change'):ci.verify_preflight(root)
+                    if attack=='symlink':
+                        with self.assertRaisesRegex(ValueError,'Non-regular execution input refused'):ci.reviewed_files(root,committed=True)
+
+    def testStaticHelperWorkflowsRejectOmittedOrForgedSourceMapEntries(self):
+        for name in STATIC_HELPER_WORKFLOW_PATHS:
+            for attack in ('omitted','forged'):
+                with self.subTest(workflow=name,attack=attack),tempfile.TemporaryDirectory() as d:
+                    root=Path(d);git,commit,trigger,review,source=self.makeReviewedGit(root)
+                    if attack=='omitted':del review['sourceFiles'][name]
+                    else:review['sourceFiles'][name]='0'*64
+                    (root/ci.REVIEW_PATH).write_text(json.dumps(review));commit('synthetic stale review map');trigger()
+                    with self.assertRaisesRegex(ValueError,'Reviewed execution input set drifted'):ci.verify_preflight(root)
+
+    def testUndeclaredWorkflowAndSidecarRemainRejected(self):
+        for name in ('.github/workflows/lottery-extra.yml',STATIC_HELPER_WORKFLOW_PATHS[0]+'.bak'):
+            for ignored in (False,True):
+                with self.subTest(workflow=name,ignored=ignored),tempfile.TemporaryDirectory() as d:
+                    root=Path(d);git,commit,trigger,review,source=self.makeReviewedGit(root);trigger()
+                    (root/name).write_text('UNREVIEWED_MATERIALIZED_WORKFLOW')
+                    if ignored:(root/'.git/info/exclude').write_text('/'+name+'\n')
+                    self.assertNotIn(name,ci.reviewed_files(root))
+                    with self.assertRaisesRegex(ValueError,'Unexpected materialized checkout input'):ci.verify_preflight(root)
+
+    def testBothRealNonconeSparseCheckoutsCloseReviewedInputs(self):
+        patterns=g3_sparse_patterns();self.assertEqual(len(patterns),2)
+        for job,selected in zip(('tests','android'),patterns):
+            with self.subTest(job=job),tempfile.TemporaryDirectory() as d:
+                root=Path(d);git,commit,trigger,review,source=self.makeReviewedGit(root)
+                for name in ('.github/workflows/lottery-extra.yml','outside-sparse-input.txt'):
+                    (root/name).write_text('SYNTHETIC_TRACKED_SPARSE_EXCLUSION')
+                commit('synthetic full repository tree');review['reviewedSourceCommit']=git('rev-parse','HEAD')
+                review['sourceFiles']=ci.reviewed_files(root,committed=True)
+                (root/ci.REVIEW_PATH).write_text(json.dumps(review));commit('synthetic exact source map');trigger()
+                git('sparse-checkout','init','--no-cone')
+                result=subprocess.run(['git','-C',str(root),'sparse-checkout','set','--no-cone','--stdin'],input='\n'.join(selected)+'\n',stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True,timeout=30)
+                self.assertEqual(result.returncode,0,result.stderr)
+                self.assertEqual(git('config','--bool','core.sparseCheckoutCone'),'false')
+                self.assertEqual(git('sparse-checkout','list').splitlines(),selected)
+                self.assertFalse((root/'.github/workflows/lottery-extra.yml').exists())
+                self.assertFalse((root/'outside-sparse-input.txt').exists())
+                actual={p.relative_to(root).as_posix() for p in root.rglob('*') if p.is_file() and '.git' not in p.relative_to(root).parts}
+                self.assertEqual(actual,set(review['sourceFiles'])|ci.REVIEW_EXCEPTIONS)
+                self.assertEqual(ci.verify_preflight(root)['sourceFiles'],review['sourceFiles'])
+                ci.check_working_inputs(root,review['sourceFiles'])
+
     def testFreshReviewAcceptsRealGitMetadataThenRequestOnly(self):
         with tempfile.TemporaryDirectory() as d:
             root=Path(d);git,commit,trigger,review,source=self.makeReviewedGit(root);trigger()

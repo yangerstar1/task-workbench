@@ -86,11 +86,25 @@ namespace Lottery.G3.PlayMode.Tests
         IEnumerator TouchWorldOpen(Vector3 target,G3Panel panel,bool table=false)
         {
             yield return TouchFace(target);Physics.SyncTransforms();var pixel=P.View.WorldToPresentationPoint(target);
-            Assert.That(P.View.IsSafePointer(pixel),Is.True);var physical=P.View.WorldTarget(pixel);Assert.That(physical,Is.Not.Null,"Nearest unobstructed collider must be a reachable physical target");
+            Assert.That(P.View.IsSafePointer(pixel),Is.True);var physical=P.View.WorldTarget(pixel);Assert.That(physical,Is.Not.Null,"Nearest unobstructed collider must be a reachable physical target. "+WorldRayDiagnostic(target,pixel));
             Assert.That(physical.IsTable,Is.EqualTo(table));if(!table)Assert.That(physical.Panel,Is.EqualTo(panel));
             var before=P.Panel;WorldTouches(Finger(903,IPhase.Began,pixel));Assert.That(P.Panel,Is.EqualTo(before),"Press is not activation");
             WorldTouches(Finger(903,IPhase.Ended,pixel));Assert.That(P.Panel,Is.EqualTo(panel));
             if(table)Assert.That(P.Walking,Is.False);yield return WorldNeutral();
+        }
+        // Fixed source-owned numeric observations only; not a replacement for the assertion.
+        string WorldRayDiagnostic(Vector3 target,Vector2 pixel)
+        {
+            var ray=app.SceneCamera.ViewportPointToRay(new Vector3(pixel.x/P.View.PresentationWidth,pixel.y/P.View.PresentationHeight,0));
+            bool hitAny=Physics.Raycast(ray,out RaycastHit hit,5,Physics.DefaultRaycastLayers,QueryTriggerInteraction.Collide);
+            var physical=hitAny?hit.collider.GetComponentInParent<G3WorldTarget>():null;
+            string kind=!hitAny?"NONE":hit.collider is CharacterController?"CHARACTER_CONTROLLER":physical!=null?"WORLD_TARGET":"UNTARGETED_COLLIDER";
+            var body=P.View.Walk.SavedPosition;
+            float reach=hitAny?new Vector2(hit.point.x-body.x,hit.point.z-body.z).magnitude:-1;
+            return "WORLD_RAY_V1 kind="+kind+" trigger="+(hitAny&&hit.collider.isTrigger)+" ownBody="+(hitAny&&hit.collider.transform.IsChildOf(P.View.Walk.transform))+
+                " environment="+(hitAny&&hit.collider.transform.IsChildOf(P.View.Environment.transform))+" hitDistance="+(hitAny?hit.distance:-1).ToString("F4",System.Globalization.CultureInfo.InvariantCulture)+
+                " horizontalReach="+reach.ToString("F4",System.Globalization.CultureInfo.InvariantCulture)+" body="+body.ToString("F4")+" camera="+app.SceneCamera.transform.position.ToString("F4")+
+                " target="+target.ToString("F4")+" pixel="+pixel.ToString("F4")+" rayOrigin="+ray.origin.ToString("F4")+" rayDirection="+ray.direction.ToString("F4");
         }
         [UnityTest,Timeout(180000)]
         public IEnumerator WorldInputEntryToTicketRackAndTableUsesConcurrentMoveLookAndRelease()

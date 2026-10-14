@@ -7,7 +7,7 @@ IDENT=dict(sourceCommit='1'*40,reviewedCandidateCommit='2'*40,runId='123',runAtt
 ENV=dict(GITHUB_RUN_ID='123',GITHUB_RUN_ATTEMPT='1')
 def receipt():return dict(smoothnessObserved=True,smoothnessMaterialId=34,actualSmoothnessBits=0x3f35c290,expectedSmoothnessBits=0x3f35c290,schemaVersion=1,scope=ci.SCOPE,status='COMPLETE',sourceCommit='1'*40,runId='123',runAttempt='1',stageCode=40,materialId=-1,materialsCompleted=35,firstFailureStage=-1,firstFailureMaterial=-1,predicateCode=0,slotIndex=-1,exceptionKind='NONE',diagnosticWriteFailed=False,elapsedMs=100,completedBits=(1<<35)-1)
 def failure(code=15,slot=-1):
- v=receipt();v.update(status='FAILED',stageCode=20 if code<=18 else 22,materialId=0,materialsCompleted=0,completedBits=0,firstFailureStage=20 if code<=18 else 22,firstFailureMaterial=0,predicateCode=code,slotIndex=slot,exceptionKind='INVALID_OPERATION');v.update(smoothnessMaterialId=0);
+ v=receipt();v.update(status='FAILED',stageCode=35 if code>=46 else 20 if code<=18 else 22,materialId=0,materialsCompleted=0,completedBits=0,firstFailureStage=35 if code>=46 else 20 if code<=18 else 22,firstFailureMaterial=0,predicateCode=code,slotIndex=slot,exceptionKind='INVALID_OPERATION');v.update(smoothnessMaterialId=0);
  if code==8:v['actualSmoothnessBits']+=1
  return v
 class Tests(unittest.TestCase):
@@ -21,7 +21,7 @@ class Tests(unittest.TestCase):
   v=receipt();ci.validate(v,IDENT);p,raw,ok=self.export(v);self.assertTrue(ok);self.assertEqual(p.read_bytes(),raw)
  def test_all45_predicates_and_slots_preserved_failed(self):
   for code in ci.PREDICATES:
-   slots=range(4) if code in (22,23,24) else range(7) if code in (25,26) else [-1]
+   slots=range(4) if code in (22,23,24) else range(7) if code in (25,26,47) else [-1]
    for slot in slots:ci.validate(failure(code,slot),IDENT)
   p,raw,ok=self.export(failure());self.assertFalse(ok);self.assertEqual(p.read_bytes(),raw)
  def test_running_and_write_failure_never_pass(self):
@@ -45,7 +45,7 @@ class Tests(unittest.TestCase):
   for raw in [b'',b' '*8193,b'\xff',b'{}']:
    p,_,ok=self.export(raw);self.assertFalse(ok);self.assertFalse(p.exists())
  def test_numeric_bounds_and_bool_rejected(self):
-  for k,x in [('stageCode',True),('stageCode',999),('materialId',35),('materialId',-2),('materialsCompleted',36),('elapsedMs',3600001),('elapsedMs',-1),('completedBits',1<<35),('predicateCode',46),('predicateCode',True),('slotIndex',7),('slotIndex',True),('diagnosticWriteFailed',0)]:
+  for k,x in [('stageCode',True),('stageCode',999),('materialId',35),('materialId',-2),('materialsCompleted',36),('elapsedMs',3600001),('elapsedMs',-1),('completedBits',1<<35),('predicateCode',48),('predicateCode',True),('slotIndex',7),('slotIndex',True),('diagnosticWriteFailed',0)]:
    v=receipt();v[k]=x
    with self.subTest(k=k,x=x),self.assertRaises(ValueError):ci.validate(v,IDENT)
  def test_predicate_context_and_slot_constraints(self):
@@ -72,7 +72,7 @@ class Tests(unittest.TestCase):
  def test_enum_predicates_match_producer(self):
   s=self.source();enum=s.split('enum MaterialPredicate {',1)[1].split('}',1)[0];pairs={int(i):n for n,i in re.findall(r'(\w+)=(\d+)',enum)};self.assertEqual(pairs,{0:'NONE',**ci.PREDICATES})
  def test_every_original_predicate_expression_unchanged(self):
-  found=re.findall(r'RequireMaterial\((.*?),MaterialPredicate\.(\w+),(i|-1)\);',self.source());self.assertEqual(len(found),45);found=[(expr,name,slot) for expr,name,slot in found if name!='AUTHOR_SMOOTHNESS'];found.insert(7,('material.GetFloat("_Smoothness")== (packed?1:1-Mathf.Clamp01(item.roughness))','AUTHOR_SMOOTHNESS','-1'))
+  found=re.findall(r'RequireMaterial\((.*?),MaterialPredicate\.(\w+),(i|-1)\);',self.source());found=[x for x in found if x[1] not in ('OWNED_MATERIAL_IDENTITY','OWNED_MATERIAL_STATE')];self.assertEqual(len(found),45);found=[(expr,name,slot) for expr,name,slot in found if name!='AUTHOR_SMOOTHNESS'];found.insert(7,('material.GetFloat("_Smoothness")== (packed?1:1-Mathf.Clamp01(item.roughness))','AUTHOR_SMOOTHNESS','-1'))
   reverse={n:c for c,n in ci.PREDICATES.items()};normalized=[(reverse[name],re.sub(r'\s+','',expr),name,slot) for expr,name,slot in found]
   self.assertEqual(hashlib.sha256(json.dumps(normalized,separators=(',',':')).encode()).hexdigest(),'687cbc15af3a16199ee000a364cf4ad60147c54d9300099e5f1ea738210f00aa')
  def test_shortcircuit_equivalence_exhaustive(self):
@@ -157,4 +157,70 @@ class Tests(unittest.TestCase):
   v['smoothnessMaterialId']=35
   with self.assertRaises(ValueError):ci.validate(v,IDENT)
   v=receipt();self.assertEqual(v['smoothnessMaterialId'],34);ci.validate(v,IDENT)
+
+ def test_postimport_failure_stages_and_state_slots_are_bounded(self):
+  for stage in (35,36,37,38,39):
+   for code,slots in ((46,[-1]),(47,range(7))):
+    for slot in slots:
+     v=failure(code,slot);v.update(stageCode=stage,firstFailureStage=stage);ci.validate(v,IDENT)
+     p,raw,ok=self.export(v);self.assertFalse(ok);self.assertEqual(p.read_bytes(),raw)
+  for changes in [dict(stageCode=22,firstFailureStage=22),dict(slotIndex=7),dict(slotIndex=-1),dict(materialId=-1,firstFailureMaterial=-1),dict(predicateCode=48)]:
+   v=failure(47,3);v.update(changes)
+   with self.subTest(changes=changes),self.assertRaises(ValueError):ci.validate(v,IDENT)
+ def test_unknown_renderer_material_identity_is_bounded_without_name(self):
+  v=failure(46);v.update(materialId=-1,firstFailureMaterial=-1);ci.validate(v,IDENT)
+  for key in ('actualPath','actualGuid','materialName','rawLog'):
+   bad=dict(v);bad[key]='UNTRUSTED';p,_,ok=self.export(bad);self.assertFalse(ok);self.assertFalse(p.exists())
+ def require_remap_contract(self,s):
+  setup=s.split('static void PrepareObserved',1)[1].split('enum MaterialPredicate',1)[0]
+  self.assertNotIn('AssetImporter.GetAtPath',setup);self.assertNotIn('AddRemap(',setup)
+  self.assertLess(setup.index('owned.Add(item.name,new OwnedMaterialState'),setup.index('RemapModel(model,true,owned)'))
+  for token in ('RequireOwnedMaterials(owned,trace,35)','RequireOwnedMaterials(owned,trace,36);RequireModelBindings(model,owned,trace,36)',
+                'RemapModel(toolFile,false,owned);RequireOwnedMaterials(owned,trace,37);RequireModelBindings(toolFile,owned,trace,37)',
+                'RequireOwnedMaterials(owned,trace,39)'):self.assertIn(token,setup)
+  remap=s.split('static void RemapModel(',1)[1].split('static void RequireModelBindings(',1)[0]
+  self.assertLess(remap.index('AssetImporter.GetAtPath'),remap.index('importer.AddRemap'))
+  self.assertLess(remap.index('importer.AddRemap'),remap.index('importer.SaveAndReimport'))
+  self.assertEqual(remap.count('SaveAndReimport'),1)
+  for token in ('Texture(', 'PackRoughness(', 'ImportAsset(', 'Refresh('):self.assertNotIn(token,remap)
+ def test_remap_occurs_after_all_dependency_imports_source_negative_mutations(self):
+  s=self.source();self.require_remap_contract(s)
+  for before,after in [('owned.Add(item.name,new OwnedMaterialState','importer.AddRemap(item.name,new OwnedMaterialState'),
+                       ('RequireModelBindings(toolFile,owned,trace,37)','SkipToolBindings(toolFile,owned,trace,37)'),
+                       ('importer.SaveAndReimport();','Texture("late.png",false);importer.SaveAndReimport();')]:
+   changed=s.replace(before,after);self.assertNotEqual(s,changed)
+   with self.assertRaises(AssertionError):self.require_remap_contract(changed)
+ def require_identity_contract(self,s):
+  body=s.split('public void RequireIdentity(Material actual)',1)[1].split('public void RequireState()',1)[0]
+  for token in ('actual==Material','LoadAssetAtPath<Material>(Path)==actual','IsMainAsset(actual)','GetAssetPath(actual)==Path',
+                'AssetPathToGUID(Path)==Guid','GUIDToAssetPath(Guid)==Path','TryGetGUIDAndLocalFileIdentifier(actual',
+                'guid==Guid&&id==localId'):self.assertIn(token,body)
+  checks=s.split('static void RequireModelBindings(',1)[1].split('static void BuildRuntimePrefab(',1)[0]
+  for token in ('importer.GetExternalObjectMap()','mapped==state.Material','state.RequireIdentity(mapped as Material)',
+                'GetComponentsInChildren<Renderer>(true)','renderer.sharedMaterials','owned[name].RequireIdentity(material)'):self.assertIn(token,checks)
+  build=s.split('static void BuildRuntimePrefab(',1)[1].split('static Color SourceLinearBaseColor',1)[0]
+  self.assertIn('RequireRendererMaterial(material,owned,trace,38);',build)
+  self.assertIn('RequireRendererBindings(AssetDatabase.LoadAssetAtPath<GameObject>(prefabPath),owned,trace,38);',build)
+ def test_identity_checks_reject_name_shader_only_and_wrong_guid_source_mutations(self):
+  s=self.source();self.require_identity_contract(s)
+  for token in ('actual==Material','GetAssetPath(actual)==Path','guid==Guid&&id==localId','mapped==state.Material','owned[name].RequireIdentity(material)'):
+   with self.subTest(token=token),self.assertRaises(AssertionError):self.require_identity_contract(s.replace(token,'true'))
+ def test_snapshot_validation_is_read_only_and_covers_all_authored_state(self):
+  s=self.source();body=s.split('sealed class OwnedMaterialState',1)[1].split('static void RemapModel',1)[0]
+  for forbidden in ('SetFloat(','SetColor(','SetTexture(','SaveAsset','ImportAsset(','Refresh(','SetMaterialKeywords','EnableKeyword','DisableKeyword'):self.assertNotIn(forbidden,body)
+  for token in ('AuthoredTextureSlots.Concat','AuthoredFloatSlots.Concat','"_MainTex"','"_Color"','"_DetailAlbedoMap"','"_DetailNormalMap"',
+                '"_Blend"','"_SrcBlend"','"_DstBlend"','"_ZWrite"','SingleBits','shaderKeywords.OrderBy','globalIlluminationFlags','doubleSidedGI','enableInstancing'):self.assertIn(token,body)
+  self.assertEqual(set(map(int,re.findall(r'MaterialPredicate.OWNED_MATERIAL_STATE,(\d)',body))),set(range(7)))
+ def test_manifest_felt_liner_brass_contracts_are_not_relaxed(self):
+  base=Path(__file__).resolve().parents[1]/'unity/Assets/G3'
+  manifest=json.loads((base/'Shop/Resources/G3/Shop/materials.json').read_text())['materials'];items={x['name']:x for x in manifest}
+  self.assertEqual(items['Dark_Green_Felt']['normalStrength'],.6);self.assertEqual(items['Tool_Dock_Liner']['normalStrength'],.45)
+  self.assertEqual(items['Tool_Dock_Liner']['roughness'],.92);self.assertFalse(items['Tool_Dock_Liner'].get('roughnessTexture'))
+  self.assertEqual(items['Brass_Worn']['normalStrength'],.18);self.assertTrue(items['Brass_Worn']['roughnessTexture'])
+  fixture=(base/'Tests/VisualCandidate/VisualCandidateCaptureTests.cs').read_text()
+  for token in ('felt.GetFloat("_BumpScale"), Is.EqualTo(.60f).Within(.0001f)','liner.GetFloat("_Smoothness"), Is.EqualTo(.08f).Within(.0001f)',
+                'brass.GetFloat("_BumpScale"), Is.EqualTo(.18f).Within(.0001f)','brass.GetFloat("_Smoothness"), Is.EqualTo(1f).Within(.0001f)',
+                'RequireOwnedRuntimeMaterial(felt,"Dark_Green_Felt")','RequireOwnedRuntimeMaterial(liner,"Tool_Dock_Liner")','RequireOwnedRuntimeMaterial(brass,"Brass_Worn")'):
+   self.assertIn(token,fixture)
+
 if __name__=='__main__':unittest.main()

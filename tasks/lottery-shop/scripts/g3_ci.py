@@ -90,7 +90,9 @@ def load_contract(task):
 
 REVIEW_PATH = TASK+'/ci/g3-preflight.review.json'
 REVIEW_EXCEPTIONS = {REQUEST_PATH, REVIEW_PATH}
-WORKFLOWS = {'.github/workflows/lottery-'+x+'.yml' for x in ('g0','g2','g3')}
+# Exact static helper dependencies are reviewed inputs in both G3 jobs.
+WORKFLOWS = {'.github/workflows/lottery-'+x+'.yml' for x in
+             ('g0','g2','g3','activation-probe','performance-probe','visual-candidate')}
 # These are outputs, not implicit source/import search directories. Exact paths only.
 OUTPUT_ROOTS = {TASK+'/'+x for x in ('artifacts','evidence','build','unity/Library','unity/Temp','unity/Obj','unity/Logs','unity/UserSettings','unity/.utmp')}
 

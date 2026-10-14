@@ -32,9 +32,7 @@ namespace Lottery.G3.Editor
             if(data?.materials==null||data.materials.Length<5)throw new InvalidOperationException("Shop material manifest is incomplete");
             trace?.Mark(2);
             var shader=Shader.Find("Universal Render Pipeline/Lit");if(shader==null)throw new InvalidOperationException("URP/Lit is required");
-            var importer=AssetImporter.GetAtPath(model) as ModelImporter;if(importer==null)throw new InvalidOperationException("FBX model importer missing");
-            importer.globalScale=1;importer.useFileScale=true;importer.importAnimation=false;importer.importCameras=false;importer.importLights=false;
-            importer.materialImportMode=ModelImporterMaterialImportMode.ImportStandard;importer.addCollider=false;importer.isReadable=true;importer.generateSecondaryUV=true;
+            var owned=new Dictionary<string,OwnedMaterialState>(StringComparer.Ordinal);
             foreach(var item in data.materials)
             {
                 trace?.BeginMaterial(item.name);
@@ -71,12 +69,17 @@ namespace Lottery.G3.Editor
                 material.DisableKeyword("_EMISSION");material.SetColor("_EmissionColor",Color.black);material.SetTexture("_EmissionMap",null);
                 if(item.emission>0){var e=item.emissionColor??item.baseColor;material.EnableKeyword("_EMISSION");material.SetColor("_EmissionColor",(new Color(e[0],e[1],e[2])*Mathf.Min(item.emission,2)).gamma);if(!string.IsNullOrEmpty(item.emissionTexture))material.SetTexture("_EmissionMap",Texture(item.emissionTexture,false));}
                 trace?.Mark(12);FinalizeAuthoredMaterial(material,item,shader,trace);trace?.Mark(23);
-                EditorUtility.SetDirty(material);AssetDatabase.SaveAssetIfDirty(material);importer.AddRemap(new AssetImporter.SourceAssetIdentifier(typeof(Material),item.name),material);trace?.MaterialDone();
+                EditorUtility.SetDirty(material);AssetDatabase.SaveAssetIfDirty(material);
+                owned.Add(item.name,new OwnedMaterialState(material,item.name));trace?.MaterialDone();
             }
-            trace?.Mark(30);importer.SaveAndReimport();
-            trace?.Mark(31);foreach(string toolFile in Directory.GetFiles(Root,"Tool_*.fbx"))
-            {var toolImporter=AssetImporter.GetAtPath(toolFile) as ModelImporter;if(toolImporter==null)throw new InvalidOperationException("Tool model importer missing");toolImporter.globalScale=1;toolImporter.useFileScale=true;toolImporter.importAnimation=false;toolImporter.importCameras=false;toolImporter.importLights=false;toolImporter.addCollider=false;toolImporter.isReadable=true;
-                foreach(var item in data.materials)toolImporter.AddRemap(new AssetImporter.SourceAssetIdentifier(typeof(Material),item.name),AssetDatabase.LoadAssetAtPath<Material>(Root+"/Materials/"+item.name+".mat"));toolImporter.SaveAndReimport();}
+            // Texture imports can reimport their dependent FBX. Do not keep a
+            // ModelImporter or unsaved remaps alive across those imports. Bind all
+            // final external materials together, after all dependencies are ready.
+            RequireOwnedMaterials(owned,trace,35);
+            trace?.Mark(30);RemapModel(model,true,owned);
+            RequireOwnedMaterials(owned,trace,36);RequireModelBindings(model,owned,trace,36);
+            trace?.Mark(31);foreach(string toolFile in Directory.GetFiles(Root,"Tool_*.fbx").OrderBy(x=>x,StringComparer.Ordinal))
+            {RemapModel(toolFile,false,owned);RequireOwnedMaterials(owned,trace,37);RequireModelBindings(toolFile,owned,trace,37);}
 
             trace?.Mark(32);var source=AssetDatabase.LoadAssetAtPath<UniversalRenderPipelineAsset>(Lottery.Probe.Editor.ProbeBuild.PipelinePath);
             if(source==null)throw new InvalidOperationException("Prepare Probe pipeline before G3 shop art");
@@ -89,8 +92,8 @@ namespace Lottery.G3.Editor
             EditorUtility.SetDirty(pipeline);AssetDatabase.SaveAssets();
             var loaded=AssetDatabase.LoadAssetAtPath<GameObject>(model);var renderers=loaded.GetComponentsInChildren<Renderer>();
             if(renderers.Length<30||renderers.Any(r=>r.sharedMaterials.Any(m=>m==null||m.shader!=shader)))throw new InvalidOperationException("Shop import has too few authored renderers or unresolved URP materials");
-            trace?.Mark(33);BuildRuntimePrefab(loaded,"LotteryShop_Runtime",true);
-            foreach(string toolFile in Directory.GetFiles(Root,"Tool_*.fbx"))BuildRuntimePrefab(AssetDatabase.LoadAssetAtPath<GameObject>(toolFile),Path.GetFileNameWithoutExtension(toolFile)+"_Runtime",false);
+            trace?.Mark(33);BuildRuntimePrefab(loaded,"LotteryShop_Runtime",true,owned,trace);
+            foreach(string toolFile in Directory.GetFiles(Root,"Tool_*.fbx"))BuildRuntimePrefab(AssetDatabase.LoadAssetAtPath<GameObject>(toolFile),Path.GetFileNameWithoutExtension(toolFile)+"_Runtime",false,owned,trace);
             trace?.Mark(34);
             // This is still importer preparation, before Baker's first digest.
             // Never accept a dirty authored material as a stable source baseline.
@@ -102,9 +105,10 @@ namespace Lottery.G3.Editor
                 if(assets.Length==0||assets.Any(asset=>EditorUtility.IsDirty(asset)))
                     throw new InvalidOperationException("Owned material preparation remains dirty");
             }
+            RequireOwnedMaterials(owned,trace,39);
             Debug.Log("G3_SHOP_IMPORT original_authored_meshes="+renderers.Length+" materials="+data.materials.Length+" pipeline="+PipelinePath+" DEVICE_QA_NOT_RUN");
         }
-        enum MaterialPredicate { NONE=0,AUTHOR_SHADER=1,AUTHOR_BASE_COLOR=2,AUTHOR_BASE_MAP=3,AUTHOR_NORMAL_MAP=4,AUTHOR_PACKED_MAP=5,AUTHOR_EMISSION_MAP=6,AUTHOR_METALLIC=7,AUTHOR_SMOOTHNESS=8,AUTHOR_SMOOTHNESS_CHANNEL=9,AUTHOR_NORMAL_STRENGTH=10,AUTHOR_BASE_SCALE=11,AUTHOR_SURFACE=12,AUTHOR_EMISSION_COLOR=13,AUTHOR_CULL=14,DETAIL_ALBEDO_ABSENT=15,DETAIL_NORMAL_ABSENT=16,DETAIL_MULX2_OFF=17,DETAIL_SCALED_OFF=18,FINAL_SHADER=19,FINAL_BASE_COLOR=20,FINAL_EMISSION_COLOR=21,FINAL_TEXTURE_REFERENCE=22,FINAL_TEXTURE_SCALE=23,FINAL_TEXTURE_OFFSET=24,FINAL_FLOAT_PRESENCE=25,FINAL_FLOAT_VALUE=26,ALIAS_TEXTURE=27,ALIAS_SCALE=28,ALIAS_OFFSET=29,ALIAS_COLOR=30,NORMAL_KEYWORD=31,PACKED_KEYWORD=32,EMISSION_KEYWORD=33,TRANSPARENT_KEYWORD=34,ALPHA_TEST_OFF=35,ALPHA_PREMULTIPLY_OFF=36,ALPHA_MODULATE_OFF=37,ALBEDO_SMOOTHNESS_OFF=38,SOURCE_BLEND=39,DEST_BLEND=40,DEPTH_WRITE=41,RENDER_QUEUE=42,RENDER_TAG=43,GI_FLAGS=44,DOUBLE_SIDED_GI=45 }
+        enum MaterialPredicate { NONE=0,AUTHOR_SHADER=1,AUTHOR_BASE_COLOR=2,AUTHOR_BASE_MAP=3,AUTHOR_NORMAL_MAP=4,AUTHOR_PACKED_MAP=5,AUTHOR_EMISSION_MAP=6,AUTHOR_METALLIC=7,AUTHOR_SMOOTHNESS=8,AUTHOR_SMOOTHNESS_CHANNEL=9,AUTHOR_NORMAL_STRENGTH=10,AUTHOR_BASE_SCALE=11,AUTHOR_SURFACE=12,AUTHOR_EMISSION_COLOR=13,AUTHOR_CULL=14,DETAIL_ALBEDO_ABSENT=15,DETAIL_NORMAL_ABSENT=16,DETAIL_MULX2_OFF=17,DETAIL_SCALED_OFF=18,FINAL_SHADER=19,FINAL_BASE_COLOR=20,FINAL_EMISSION_COLOR=21,FINAL_TEXTURE_REFERENCE=22,FINAL_TEXTURE_SCALE=23,FINAL_TEXTURE_OFFSET=24,FINAL_FLOAT_PRESENCE=25,FINAL_FLOAT_VALUE=26,ALIAS_TEXTURE=27,ALIAS_SCALE=28,ALIAS_OFFSET=29,ALIAS_COLOR=30,NORMAL_KEYWORD=31,PACKED_KEYWORD=32,EMISSION_KEYWORD=33,TRANSPARENT_KEYWORD=34,ALPHA_TEST_OFF=35,ALPHA_PREMULTIPLY_OFF=36,ALPHA_MODULATE_OFF=37,ALBEDO_SMOOTHNESS_OFF=38,SOURCE_BLEND=39,DEST_BLEND=40,DEPTH_WRITE=41,RENDER_QUEUE=42,RENDER_TAG=43,GI_FLAGS=44,DOUBLE_SIDED_GI=45,OWNED_MATERIAL_IDENTITY=46,OWNED_MATERIAL_STATE=47 }
         sealed class MaterialContractFailure:InvalidOperationException
         {
             public readonly MaterialPredicate Predicate;public readonly int Slot;
@@ -134,6 +138,7 @@ namespace Lottery.G3.Editor
             public void ObserveSmoothness(uint actual,uint expected){receipt.smoothnessObserved=true;receipt.smoothnessMaterialId=receipt.materialId;receipt.actualSmoothnessBits=actual;receipt.expectedSmoothnessBits=expected;Write();}
             public void Mark(int stage){receipt.stageCode=stage;Write();}
             public void BeginMaterial(string name){receipt.materialId=Array.IndexOf(Names,name);if(receipt.materialId<0)receipt.diagnosticWriteFailed=true;Mark(10);}
+            public void SelectMaterial(string name,int stage){receipt.materialId=Array.IndexOf(Names,name);Mark(stage);}
             public void MaterialDone(){if(receipt.materialId>=0){if((receipt.completedBits&(1L<<receipt.materialId))!=0||receipt.materialsCompleted>=35)receipt.diagnosticWriteFailed=true;receipt.completedBits|=1L<<receipt.materialId;}receipt.materialsCompleted=Math.Min(receipt.materialsCompleted+1,35);Mark(24);}
             public void Failure(Exception error)
             {
@@ -229,7 +234,83 @@ namespace Lottery.G3.Editor
             RequireMaterial(material.globalIlluminationFlags==(emissive?MaterialGlobalIlluminationFlags.BakedEmissive:MaterialGlobalIlluminationFlags.EmissiveIsBlack),MaterialPredicate.GI_FLAGS,-1);
             RequireMaterial(material.doubleSidedGI==(material.GetFloat("_Cull")!=(float)CullMode.Back),MaterialPredicate.DOUBLE_SIDED_GI,-1);
         }
-        static void BuildRuntimePrefab(GameObject source,string outputName,bool validateRoom)
+        // Read-only post-import contracts, captured only after the original 45
+        // authoring/finalization predicates passed. No repair occurs inside checks.
+        sealed class OwnedMaterialState
+        {
+            static readonly string[] Textures=AuthoredTextureSlots.Concat(new[]{"_MainTex","_DetailAlbedoMap","_DetailNormalMap"}).ToArray();
+            static readonly string[] Floats=AuthoredFloatSlots.Concat(new[]{"_Blend","_BlendModePreserveSpecular","_AlphaClip","_QueueOffset","_SrcBlend","_DstBlend","_ZWrite"}).ToArray();
+            public readonly Material Material;public readonly string Name,Path,Guid;readonly long localId;
+            readonly Shader shader;readonly Texture[] textures;readonly Vector2[] scales,offsets;readonly bool[] present;readonly uint[] floats;
+            readonly Color[] colors;readonly string[] keywords;readonly string renderType;readonly int queue;
+            readonly MaterialGlobalIlluminationFlags gi;readonly bool doubleSided,instancing;
+            public OwnedMaterialState(Material material,string name)
+            {
+                Material=material;Name=name;Path=Root+"/Materials/"+name+".mat";
+                if(!AssetDatabase.TryGetGUIDAndLocalFileIdentifier(material,out string guid,out long id))throw new InvalidOperationException("Owned material identity unavailable");
+                Guid=guid;localId=id;shader=material.shader;textures=Textures.Select(material.GetTexture).ToArray();
+                scales=Textures.Select(material.GetTextureScale).ToArray();offsets=Textures.Select(material.GetTextureOffset).ToArray();
+                present=Floats.Select(material.HasProperty).ToArray();floats=Floats.Select((slot,i)=>present[i]?SingleBits(material.GetFloat(slot)):0).ToArray();
+                colors=new[]{material.GetColor("_BaseColor"),material.GetColor("_EmissionColor"),material.GetColor("_Color")};
+                keywords=material.shaderKeywords.OrderBy(x=>x,StringComparer.Ordinal).ToArray();renderType=material.GetTag("RenderType",false);
+                queue=material.renderQueue;gi=material.globalIlluminationFlags;doubleSided=material.doubleSidedGI;instancing=material.enableInstancing;
+            }
+            public void RequireIdentity(Material actual)
+            {
+                RequireMaterial(actual!=null&&actual==Material&&AssetDatabase.LoadAssetAtPath<Material>(Path)==actual&&
+                    AssetDatabase.IsMainAsset(actual)&&AssetDatabase.GetAssetPath(actual)==Path&&
+                    AssetDatabase.AssetPathToGUID(Path)==Guid&&AssetDatabase.GUIDToAssetPath(Guid)==Path&&
+                    AssetDatabase.TryGetGUIDAndLocalFileIdentifier(actual,out string guid,out long id)&&guid==Guid&&id==localId,
+                    MaterialPredicate.OWNED_MATERIAL_IDENTITY,-1);
+            }
+            public void RequireState()
+            {
+                RequireIdentity(Material);
+                RequireMaterial(Material.shader==shader,MaterialPredicate.OWNED_MATERIAL_STATE,0);
+                RequireMaterial(Textures.Select(Material.GetTexture).SequenceEqual(textures),MaterialPredicate.OWNED_MATERIAL_STATE,1);
+                RequireMaterial(Textures.Select(Material.GetTextureScale).SequenceEqual(scales)&&Textures.Select(Material.GetTextureOffset).SequenceEqual(offsets),MaterialPredicate.OWNED_MATERIAL_STATE,2);
+                RequireMaterial(Floats.Select(Material.HasProperty).SequenceEqual(present)&&Floats.Select((name,i)=>present[i]?SingleBits(Material.GetFloat(name)):0).SequenceEqual(floats),MaterialPredicate.OWNED_MATERIAL_STATE,3);
+                RequireMaterial(new[]{Material.GetColor("_BaseColor"),Material.GetColor("_EmissionColor"),Material.GetColor("_Color")}.SequenceEqual(colors),MaterialPredicate.OWNED_MATERIAL_STATE,4);
+                RequireMaterial(Material.shaderKeywords.OrderBy(x=>x,StringComparer.Ordinal).SequenceEqual(keywords),MaterialPredicate.OWNED_MATERIAL_STATE,5);
+                RequireMaterial(Material.renderQueue==queue&&Material.GetTag("RenderType",false)==renderType&&Material.globalIlluminationFlags==gi&&Material.doubleSidedGI==doubleSided&&Material.enableInstancing==instancing,MaterialPredicate.OWNED_MATERIAL_STATE,6);
+            }
+        }
+        static void RequireOwnedMaterials(Dictionary<string,OwnedMaterialState> owned,MaterialTrace trace,int stage)
+        {foreach(var state in owned.Values){trace?.SelectMaterial(state.Name,stage);state.RequireState();}}
+        static void RemapModel(string path,bool room,Dictionary<string,OwnedMaterialState> owned)
+        {
+            var importer=AssetImporter.GetAtPath(path) as ModelImporter;if(importer==null)throw new InvalidOperationException("Model importer missing");
+            importer.globalScale=1;importer.useFileScale=true;importer.importAnimation=false;importer.importCameras=false;importer.importLights=false;
+            importer.materialImportMode=ModelImporterMaterialImportMode.ImportStandard;importer.addCollider=false;importer.isReadable=true;
+            if(room)importer.generateSecondaryUV=true;
+            foreach(var state in owned.Values)importer.AddRemap(new AssetImporter.SourceAssetIdentifier(typeof(Material),state.Name),state.Material);
+            importer.SaveAndReimport();
+        }
+        static void RequireModelBindings(string path,Dictionary<string,OwnedMaterialState> owned,MaterialTrace trace,int stage)
+        {
+            var importer=AssetImporter.GetAtPath(path) as ModelImporter;if(importer==null)throw new InvalidOperationException("Model importer missing after remap");
+            var remaps=importer.GetExternalObjectMap();
+            foreach(var state in owned.Values)
+            {
+                trace?.SelectMaterial(state.Name,stage);
+                RequireMaterial(remaps.TryGetValue(new AssetImporter.SourceAssetIdentifier(typeof(Material),state.Name),out var mapped)&&mapped==state.Material,MaterialPredicate.OWNED_MATERIAL_IDENTITY,-1);
+                state.RequireIdentity(mapped as Material);
+            }
+            RequireRendererBindings(AssetDatabase.LoadAssetAtPath<GameObject>(path),owned,trace,stage);
+        }
+        static void RequireRendererBindings(GameObject source,Dictionary<string,OwnedMaterialState> owned,MaterialTrace trace,int stage)
+        {
+            if(source==null)throw new InvalidOperationException("Prepared model or runtime prefab missing");
+            foreach(var renderer in source.GetComponentsInChildren<Renderer>(true))
+                foreach(var material in renderer.sharedMaterials)RequireRendererMaterial(material,owned,trace,stage);
+        }
+        static void RequireRendererMaterial(Material material,Dictionary<string,OwnedMaterialState> owned,MaterialTrace trace,int stage)
+        {
+            string name=material==null?"":material.name;trace?.SelectMaterial(name,stage);
+            RequireMaterial(material!=null&&owned.ContainsKey(name),MaterialPredicate.OWNED_MATERIAL_IDENTITY,-1);
+            owned[name].RequireIdentity(material);
+        }
+        static void BuildRuntimePrefab(GameObject source,string outputName,bool validateRoom,Dictionary<string,OwnedMaterialState> owned,MaterialTrace trace)
         {
             // Merge only static authored room meshes by material. Dynamic tickets,
             // state-bound tools and JSON interaction colliders remain independent.
@@ -262,6 +343,7 @@ namespace Lottery.G3.Editor
                         // Other rubber (doormat/feet) remains unchanged; no extra geometry.
                         if(validateRoom&&filter.name.StartsWith("Tool_Dock_Recess",StringComparison.Ordinal))
                             material=AssetDatabase.LoadAssetAtPath<Material>(Root+"/Materials/Tool_Dock_Liner.mat")??throw new InvalidOperationException("Missing dock liner material");
+                        RequireRendererMaterial(material,owned,trace,38);
                         string key=material.name+(material.renderQueue>=(int)RenderQueue.Transparent?"_glass_"+(transparent++):"");
                         if(!groups.ContainsKey(key)){groups[key]=new List<CombineInstance>();materials[key]=material;}
                         var matrix=filter.transform.localToWorldMatrix;var mesh=filter.sharedMesh;
@@ -288,7 +370,10 @@ namespace Lottery.G3.Editor
                     mesh.name="Static shop "+pair.Key;mesh.indexFormat=IndexFormat.UInt32;mesh.CombineMeshes(pair.Value.ToArray(),true,true);AlignWindingWithAuthoredNormals(mesh);mesh.RecalculateBounds();mesh.RecalculateTangents();EditorUtility.SetDirty(mesh);
                     var go=new GameObject(pair.Key);go.transform.SetParent(root.transform,false);go.AddComponent<MeshFilter>().sharedMesh=mesh;var renderer=go.AddComponent<MeshRenderer>();renderer.sharedMaterial=materials[pair.Key];renderer.receiveShadows=true;renderer.shadowCastingMode=materials[pair.Key].renderQueue>=(int)RenderQueue.Transparent?ShadowCastingMode.Off:ShadowCastingMode.On;
                 }
-                PrefabUtility.SaveAsPrefabAsset(root,Root+"/"+outputName+".prefab");AssetDatabase.SaveAssets();
+                string prefabPath=Root+"/"+outputName+".prefab";
+                PrefabUtility.SaveAsPrefabAsset(root,prefabPath);AssetDatabase.SaveAssets();
+                RequireOwnedMaterials(owned,trace,38);
+                RequireRendererBindings(AssetDatabase.LoadAssetAtPath<GameObject>(prefabPath),owned,trace,38);
                 Debug.Log("G3_SHOP_STATIC_BATCH opaque-by-material plus separate glass renderers="+groups.Count+"; performance on device remains NOT_RUN");
             }
             finally{foreach(var mesh in mirroredMeshes.Values)UnityEngine.Object.DestroyImmediate(mesh);UnityEngine.Object.DestroyImmediate(instance);UnityEngine.Object.DestroyImmediate(root);}
