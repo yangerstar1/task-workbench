@@ -12,7 +12,9 @@ Shader "Lottery/G3/LocalSilver"
             #pragma vertex vert
             #pragma fragment frag
             #pragma multi_compile _ _MAIN_LIGHT_SHADOWS _MAIN_LIGHT_SHADOWS_CASCADE _MAIN_LIGHT_SHADOWS_SCREEN
-            #pragma multi_compile_fragment _ _SHADOWS_SOFT
+            #pragma multi_compile _ _ADDITIONAL_LIGHTS
+            #pragma multi_compile_fragment _ _ADDITIONAL_LIGHT_SHADOWS
+            #pragma multi_compile_fragment _ _SHADOWS_SOFT _SHADOWS_SOFT_LOW _SHADOWS_SOFT_MEDIUM _SHADOWS_SOFT_HIGH
             #pragma multi_compile_fragment _ _REFLECTION_PROBE_BOX_PROJECTION
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
@@ -42,6 +44,19 @@ Shader "Lottery/G3/LocalSilver"
                 half3 halfDir=SafeNormalize(light.direction+view);
                 half glint=pow(saturate(dot(n,halfDir)),32)*light.shadowAttenuation;
                 half3 result=_Color.rgb*illumination+reflected*.30h+light.color*glint*.10h+(a-.5h)*.045h*keep;
+                #if defined(_ADDITIONAL_LIGHTS)
+                // Match the existing silver direct response for local practicals.
+                // Both diffuse and glint are occluded; confirmed coverage is untouched.
+                uint count=GetAdditionalLightsCount();
+                for(uint index=0;index<count;index++)
+                {
+                    Light additional=GetAdditionalLight(index,i.positionWS,half4(1,1,1,1));
+                    half attenuation=additional.distanceAttenuation*additional.shadowAttenuation;
+                    half diffuse=saturate(dot(n,additional.direction));
+                    half localGlint=pow(saturate(dot(n,SafeNormalize(additional.direction+view))),32);
+                    result+=additional.color*attenuation*(_Color.rgb*diffuse*.40h+localGlint*.10h);
+                }
+                #endif
                 // A one-pixel dark lip belongs only to still-covered pixels; no
                 // decorative holes or noise can reveal an unconfirmed outcome.
                 return half4(saturate(result*(1-cutEdge*.12h)),1);

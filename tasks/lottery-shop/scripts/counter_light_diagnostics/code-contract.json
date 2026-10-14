@@ -16,9 +16,9 @@
       "sha256": "2fc1e5b62878150b3b03bc22cbe33909acfa4087b0af08311464a06ab05077d4"
     },
     {
-      "bytes": 19067,
+      "bytes": 20401,
       "repositoryPath": "tasks/lottery-shop/scripts/counter_light_diagnostics/compose_evidence.py",
-      "sha256": "7146aef21dcf813909132c6c7b1b42d1d6b5fdaaf551bb18a3bd860a7c54cf5e"
+      "sha256": "5f3f144c53a9e89ce13d56fe72676b55d37438e083b1a71024e212074a5dc575"
     },
     {
       "bytes": 652,
@@ -26,9 +26,14 @@
       "sha256": "2a09b6292b0c6f3bab30625166862c7160950378527646860846bdd8615492ae"
     },
     {
-      "bytes": 1806,
+      "bytes": 2165,
       "repositoryPath": "tasks/lottery-shop/scripts/counter_light_diagnostics/diagnostic_plan.json",
-      "sha256": "4e9bf10d98e9299ad6957071e34ba2e94c58252f1ea9f7a976593c925c31a046"
+      "sha256": "57e1f4f0dec780910df1889432f65a27fe7b61de01c4668c46680e84c6ea45fc"
+    },
+    {
+      "bytes": 13278,
+      "repositoryPath": "tasks/lottery-shop/scripts/counter_light_diagnostics/export_observation.py",
+      "sha256": "43664ca5ac305824a4a8e6c2ffd93b302f2dd259e6db4610da3c43136dd7a14c"
     },
     {
       "bytes": 13557,
@@ -66,14 +71,19 @@
       "sha256": "df0d7524ac2dc29ce3abf48a410c0fe191d9988493887de91e7b00eee29b4caa"
     },
     {
-      "bytes": 19789,
+      "bytes": 19799,
       "repositoryPath": "tasks/lottery-shop/scripts/counter_light_diagnostics/verify_and_measure.py",
-      "sha256": "80dc1f37cbcd190733061b8720ef6cb1685a4445810564a95366bf2b551a99d4"
+      "sha256": "1b1302c0cbbd0762070594ad54458c68a7b1f1a76c3dee730f47a6b676ffd503"
     },
     {
       "bytes": 17956,
       "repositoryPath": "tasks/lottery-shop/scripts/play_split_ci.py",
       "sha256": "deeff31d4bb075ec4ecc6dfbbb630c6680d6a08087c1d96c3b99fb29d37ae141"
+    },
+    {
+      "bytes": 15011,
+      "repositoryPath": "tasks/lottery-shop/scripts/post_capture_safety.py",
+      "sha256": "0b147685f60880468046477b3f8d155c7180b1b873b80da86e3421183c7886db"
     },
     {
       "bytes": 31709,
@@ -96,9 +106,9 @@
       "sha256": "df0d7524ac2dc29ce3abf48a410c0fe191d9988493887de91e7b00eee29b4caa"
     },
     {
-      "bytes": 44655,
+      "bytes": 44828,
       "repositoryPath": "tasks/lottery-shop/unity/Assets/G3/Tests/VisualCandidate/CounterLightDiagnosticCapture.cs",
-      "sha256": "5a6f0eb860fda2b36b8ba1bb0351e172d65d3ef7cf43f28360c2f7991f0c85aa"
+      "sha256": "183eabdd2b885b264dd9731ce3e40c7d31c8991ae158a2663364e6a096bef7e0"
     },
     {
       "bytes": 60,

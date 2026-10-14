@@ -29,6 +29,8 @@ namespace Lottery.G3.VisualCandidate.Tests
         static readonly string[] Names = { "Soft window daylight", "Warm counter pendant",
             "Table reading pendant", "Shelf ambient fill", "Counter board wash" };
         static readonly float[] Expected = { .6f, 1.15f, 1.6f, .55f, .06f };
+        static readonly LightShadows[] ExpectedShadows = { LightShadows.Soft, LightShadows.None,
+            LightShadows.Soft, LightShadows.None, LightShadows.None };
         static string Arg(string name)
         {
             var a = Environment.GetCommandLineArgs();
@@ -133,7 +135,7 @@ namespace Lottery.G3.VisualCandidate.Tests
                     Require(lights[i].isActiveAndEnabled && Mathf.Abs(intensities[i] - Expected[i]) < .000001f &&
                         lights[i].type == (i == 0 ? LightType.Directional : LightType.Spot), "DAY_LIGHT_BASELINE_DRIFT");
                 Require(Object.FindObjectsByType<Light>(FindObjectsSortMode.None).Count(l => l.isActiveAndEnabled) == 5, "EXTRA_ACTIVE_LIGHT");
-                Require(lights.Skip(1).All(l => l.shadows == LightShadows.None), "PRACTICAL_SHADOW_BASELINE_DRIFT");
+                Require(lights.Select(l => l.shadows).SequenceEqual(ExpectedShadows), "TABLE_KEY_SHADOW_BASELINE_DRIFT");
                 probe = env.GetComponentsInChildren<ReflectionProbe>(true).Single();
                 Require(probe.name == "Shop material reflection" && probe.mode == ReflectionProbeMode.Custom &&
                     probe.customBakedTexture != null && probe.isActiveAndEnabled, "REFLECTION_BASELINE_DRIFT");

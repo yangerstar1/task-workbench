@@ -371,6 +371,11 @@ namespace Lottery.G3.Interaction
         {
             bool visible=PanelVisible&&!current.PhoneVisible;modal.gameObject.SetActive(visible);modalRule.gameObject.SetActive(visible);panelTitle.gameObject.SetActive(visible);panelBody.gameObject.SetActive(visible);panelFoot.gameObject.SetActive(visible);
             if(!visible)return;
+            // Debt totals need a quiet, fully opaque backplate. Reapply the normal
+            // tint for every other drawer so leaving Bill never leaks its opacity.
+            Color drawerFill=G3HudTheme.Ink;
+            if(current.Panel==G3Panel.Bill)drawerFill.a=1f;
+            modal.GetComponent<G3HudSurface>().Tint(drawerFill,G3HudTheme.Rule);
             // Context drawer keeps the left-hand room visible. Dense explanations may
             // expand rather than shrink the 16 sp body or 48 dp touch targets.
             string footnote=PlayerFeedback(model.Footnote);panelFoot.gameObject.SetActive(!string.IsNullOrEmpty(footnote));

@@ -109,7 +109,10 @@ class ColdPrepareTests(unittest.TestCase):
     def assert_rejected(self, error):
         p = self.prepare()
         self.assertNotEqual(p.returncode, 0)
-        self.assertIn(error, p.stderr)
+        self.assertEqual(p.stderr, '')
+        payload=json.loads(p.stdout)
+        self.assertEqual(payload['status'],'BLOCKED')
+        self.assertEqual(payload['code'], error if error.replace('_','').isalnum() and error.isupper() else 'INPUT_OR_DEPENDENCY_REJECTED')
         self.assertFalse((self.root/PREPARED).exists())
 
     def test_actual_cold_prepare_returns_bound_identity_and_all_code_hashes(self):

@@ -116,7 +116,7 @@ def validate_controls_shape(c):
     for key in ('lightIntensities','lightRanges','lightSpotAngles','lightInnerSpotAngles'):
         require(type(c[key]) is list and len(c[key])==5 and all(finite(x) for x in c[key]), 'Light scalar observation missing')
     require(c['lightEnabled']==[True]*5 and all(type(x) is bool for x in c['lightEnabled']), 'Light enabled observation invalid')
-    require(c['lightShadows']==['Soft','None','None','None','None'], 'Light shadows drift')
+    require(c['lightShadows']==['Soft','None','Soft','None','None'], 'Table-key light shadows drift')
     require(type(c['lightCullingMasks']) is list and len(c['lightCullingMasks'])==5 and all(type(x) is int for x in c['lightCullingMasks']), 'Light masks missing')
     require(type(c['ambientSH']) is list and len(c['ambientSH'])==27 and all(finite(x) for x in c['ambientSH']), 'SH observations missing')
     for key,keys in [('oakBaseColor','rgba'),('oakEmissionColor','rgba'),('oakBaseScale','xy'),('oakBaseOffset','xy')]:

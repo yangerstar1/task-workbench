@@ -15,6 +15,7 @@ import stat
 import subprocess
 import sys
 import time
+import post_capture_safety as telemetry
 
 sys.dont_write_bytecode = True
 TASK = 'tasks/lottery-shop'
@@ -30,6 +31,8 @@ STATES = {'NATIVE_SUCCEEDED', 'NATIVE_FAILED', 'INCONSISTENT_NATIVE_RESULT',
           'ADAPTER_FAILED', 'SESSION_OR_TEST_ADAPTER_FAILED',
           'RETURN_NOT_RUN_SESSION_BLOCKED', 'RETURN_NOT_RUN_OWNERSHIP_UNVERIFIED',
           'CLEANUP_NOT_VERIFIED', 'NOT_STARTED', 'START_ADAPTER_FAILED'}
+
+OBSERVER_CODES = ['ANCESTOR_REPLACED', 'BEFORE_CLAIMS', 'BEFORE_CONTEXT', 'BEFORE_EXPECTED_HASH', 'BEFORE_FILES', 'BEFORE_HASH', 'BEFORE_IDENTITY_MISMATCH', 'BEFORE_NOT_COLD_SOURCE', 'BEFORE_PATHS', 'BEFORE_PROJECTION_LABEL', 'BEFORE_PROJECTION_TAMPERED', 'BEFORE_RECORD', 'BEFORE_RECORD_TYPE', 'BEFORE_SAFE_FIELDS', 'BEFORE_SCHEMA', 'BEFORE_SNAPSHOT_TAMPERED', 'CLI_ARGUMENTS', 'DIRECTORY_CHANGED', 'DIRECTORY_LINK_OR_TYPE', 'DIRECTORY_RACE', 'DIRECTORY_REPLACED', 'ENTRY_LIMIT', 'FILE_ALIAS', 'FILE_CHANGED_DURING_READ', 'FILE_EXECUTABLE', 'FILE_LINK_OR_TYPE', 'FILE_RACE', 'FILE_REPLACED', 'FILE_SIZE', 'FROZEN_INPUT_DRIFT', 'FROZEN_SOURCE_MISSING', 'GAME_SOURCE_MISMATCH', 'IDENTITY_COMMIT', 'IDENTITY_CONTEXT', 'IDENTITY_FIELDS', 'IDENTITY_RUN', 'INPUT_DRIFT', 'INPUT_OR_IO_REJECTED', 'JSON_DUPLICATE_KEY', 'JSON_INVALID', 'JSON_NONFINITE', 'JSON_TOO_LARGE', 'MESH_OBSERVATION_LIMIT', 'META_DUPLICATE_KEY', 'META_ENCODING', 'META_ENCODING_OR_SIZE', 'META_LINE_SIZE', 'META_SENSITIVE_KEY', 'META_SENSITIVE_OR_BUNDLE_VALUE', 'META_SIZE', 'META_UNSUPPORTED_FLOW', 'META_UNSUPPORTED_SCALAR', 'META_UNSUPPORTED_STRUCTURE', 'META_UNSUPPORTED_SYNTAX', 'NATIVE_EXIT_INVALID', 'OUTPUT_INSIDE_PROJECT', 'OUTPUT_LINK_CHANGED', 'OUTPUT_REPLACED', 'PATH_REJECTED', 'PHASE_REJECTED', 'POLICY_DRIFT', 'RECIPE_COLLISION', 'RECIPE_NAME', 'REFLECTION_GUID', 'REFLECTION_META_DUPLICATE_KEY', 'REFLECTION_META_FIELD_OR_VALUE_REJECTED', 'REFLECTION_META_IMPORT_REJECTED', 'REFLECTION_META_LINE_REJECTED', 'REFLECTION_META_LIST_REJECTED', 'REFLECTION_META_PLATFORM_REJECTED', 'REFLECTION_META_ROOT_REJECTED', 'REFLECTION_META_SIZE_REJECTED', 'REFLECTION_META_STRUCTURE_REJECTED', 'REPORT_SIZE', 'ROOT_NOT_ABSOLUTE', 'SOURCE_DUPLICATE', 'TOTAL_SIZE', 'TRACKED_GUID_CHANGED', 'UNKNOWN_DIRECTORY', 'UNKNOWN_PATH']
 
 class Blocked(ValueError):
     pass
@@ -255,6 +258,8 @@ def observer_cli(home, inv, ident, project, phase, native=None):
                             env={**os.environ, 'PYTHONDONTWRITEBYTECODE':'1'})
     require(len(result.stdout) <= 4096 and result.stderr == b'', 'OBSERVER_OUTPUT')
     envelope = parse(result.stdout)
+    if result.returncode == 3 and type(envelope) is dict and set(envelope) == {'status','code'} and envelope['status'] == 'BLOCKED' and envelope['code'] in OBSERVER_CODES:
+        raise Blocked('OBSERVER_' + envelope['code'])
     require(result.returncode == (0 if phase == 'before' else 2), 'OBSERVER_EXIT')
     require(type(envelope) is dict and set(envelope) == {'status','reportSha256'} and envelope['status'] == 'CAPTURED_NOT_APPROVED', 'OBSERVER_ENVELOPE')
     raw = regular(home/(phase+'.json')); require(sha(raw) == envelope['reportSha256'], 'OBSERVER_REPORT_HASH')
@@ -355,17 +360,24 @@ def before(root, home):
 
 def current_observations(root,home,parts):
     visual,g2,private,inv,state,ident,baseline = parts
+    telemetry.checkpoint('RECEIPTS')
     evidence = root/TASK/'evidence/visual-candidate'
     native = receipt_summary(load(evidence/'safe-capture.json'),load(evidence/'safe-finish.json'),load(evidence/'safe-session.json'),state['guard'],private)
+    telemetry.checkpoint('NATIVE_WRITER_ABSENCE')
     stopped(state['guard'])
+    telemetry.checkpoint('FONT')
     require(sha(regular(root/TASK/'unity/Assets/Resources/ProbeChinese.otf',MAX_INPUT)) == visual.bounded.FONT_SHA, 'FONT_DRIFT')
+    telemetry.checkpoint('SETTINGS')
     settings = settings_gate(root,baseline,g2)
+    telemetry.checkpoint('WORKSPACE')
     workspace = input_tree(root,state['sourceFiles'])
     return native,settings,workspace
 
 def after(root,home):
+    telemetry.checkpoint('CONTEXT')
     parts = context(root,home); visual,g2,private,inv,state,ident,baseline = parts
     native,settings,workspace = current_observations(root,home,parts)
+    telemetry.checkpoint('OBSERVER')
     after_hash = observer_cli(home,inv,ident,root/TASK/'unity','after',native['captureNativeExit'])
     write_new(home/'after-state.json',{'schemaVersion':1,'afterSha256':after_hash,'native':native,'settings':settings,'workspace':workspace})
 
@@ -381,11 +393,13 @@ def validate_report(raw,expected_hash,inv,ident,project,before_raw,before_hash,n
     return value
 
 def publish(root,home):
+    telemetry.checkpoint('CONTEXT')
     parts = context(root,home); visual,g2,private,inv,state,ident,baseline = parts
     native,settings,workspace = current_observations(root,home,parts)
     after_state = load(home/'after-state.json')
     require(set(after_state) == {'schemaVersion','afterSha256','native','settings','workspace'} and type(after_state['schemaVersion']) is int and after_state['schemaVersion'] == 1 and
             after_state['native'] == native and after_state['settings'] == settings and after_state['workspace'] == workspace, 'AFTER_STATE_DRIFT')
+    telemetry.checkpoint('REPORT')
     report = validate_report(regular(home/'after.json'),after_state['afterSha256'],inv,ident,root/TASK/'unity',regular(home/'before.json'),state['beforeSha256'],native['captureNativeExit'])
     envelope = {'schemaVersion':1,'scope':SCOPE,'status':'INCONCLUSIVE_OBSERVATION_ONLY','identity':ident,
         'collectionExitCode':2,'guardSourceReceiptSha256':sha(regular(home/'source-receipt.json')),
@@ -393,6 +407,7 @@ def publish(root,home):
         'settingsSafety':settings,'workspaceObservation':workspace,'formalSourceWaiver':False,'g3Pass':False,
         'formalEligibility':'NOT_EVALUATED','publicationMeaning':'SAFE_DIAGNOSTIC_JSON_ONLY_NOT_NATIVE_OR_SOURCE_ACCEPTANCE'}
     destination = root/TASK/'evidence/visual-candidate'/PUBLIC_NAME
+    telemetry.checkpoint('PUBLISH')
     checksum = write_new(destination,envelope)
     # Upload action has an exact path, and this output exists only after full validation.
     output = Path(os.environ['GITHUB_OUTPUT'])
@@ -401,14 +416,15 @@ def publish(root,home):
 def main():
     try:
         require(len(sys.argv) == 2 and sys.argv[1] in {'before','after','publish'}, 'CLI_ARGUMENTS')
+        telemetry.begin('inventory',sys.argv[1])
         root,home = paths()
         if sys.argv[1] == 'before': before(root,home)
         else:
             require(Path(__file__).absolute() == home/'code/stage_a_inventory_ci.py', 'PROTECTED_ADAPTER_REQUIRED')
             (after if sys.argv[1] == 'after' else publish)(root,home)
+        telemetry.checkpoint('DONE');telemetry.persist('COMPLETED','NONE')
         print(json.dumps({'status':'STAGE_A_COMPLETED_NOT_APPROVED','phase':sys.argv[1]})); return 0
     except BaseException as error:
-        code = str(error) if type(error) is Blocked and re.fullmatch(r'[A-Z0-9_]{1,80}',str(error)) else 'INPUT_OR_DEPENDENCY_REJECTED'
-        print(json.dumps({'status':'BLOCKED','code':code})); return 3
+        return telemetry.fail(error)
 
 if __name__ == '__main__': raise SystemExit(main())

@@ -1,7 +1,10 @@
 {
   "schemaVersion": 1,
-  "scope": "SOURCE_ONLY_COUNTER_LIGHT_DIAGNOSTIC_CANDIDATE_NOT_NATIVE_VALIDATION",
+  "scope": "SOURCE_ONLY_COUNTER_LIGHT_TABLE_KEY_V1_CANDIDATE_NOT_NATIVE_VALIDATION",
   "frozenCommit": "02a6440209c26bcc94c50fdf73a87345b563b5ed",
+  "lightingBaseline": "TABLE_KEY_SHADOWS_V1",
+  "expectedLightShadows": ["Soft", "None", "Soft", "None", "None"],
+  "baselineNote": "frozenCommit is inherited diagnostic source lineage only. This new runtime baseline is bound by receipt sourceCommit, reviewed code-contract and the exact lightShadows vector. Run26 images are not this candidate baseline.",
   "nativeCompile": "NOT_RUN",
   "nativeCapture": "NOT_RUN",
   "normalFrame": "phone-mom-pending",

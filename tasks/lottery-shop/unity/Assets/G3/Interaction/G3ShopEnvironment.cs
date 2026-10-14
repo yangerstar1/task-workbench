@@ -117,7 +117,7 @@ namespace Lottery.G3.Interaction
             // Real ceiling/pendant sources supply local shape and contact shadows.
             // Explicit ambient SH below supplies the bounce that an unbaked room lacks.
             Practical("Warm counter pendant",AnchorPosition("light_counter",new Vector3(1.12f,2.30f,-.9f)),new Color(1,.89f,.72f),PracticalStrengths[0],4.8f,new Vector3(.4f,.9f,-1.7f),false);
-            Practical("Table reading pendant",AnchorPosition("light_table",new Vector3(-1.71f,2.30f,-.24f)),new Color(1,.95f,.86f),PracticalStrengths[1],4.2f,TicketPosition,false);
+            Practical("Table reading pendant",AnchorPosition("light_table",new Vector3(-1.71f,2.30f,-.24f)),new Color(1,.95f,.86f),PracticalStrengths[1],4.2f,TicketPosition,true);
             Practical("Shelf ambient fill",AnchorPosition("light_shelf",new Vector3(2.2f,2.2f,-.4f)),new Color(.83f,.91f,1),PracticalStrengths[2],4,new Vector3(2.1f,1.1f,-.4f),false);
             Practical("Counter board wash",new Vector3(.45f,2.04f,-2.287f),new Color(1,.93f,.81f),PracticalStrengths[3],2f,new Vector3(.45f,1.6f,-2.5f),false);
             var probe=new GameObject("Shop material reflection");probe.transform.SetParent(transform,false);probe.transform.localPosition=new Vector3(-.4f,1.35f,-.2f);

@@ -91,6 +91,7 @@ jobs:
           python3 -m venv "$LIGHT_ENV"
           "$LIGHT_ENV/bin/python" -m pip --isolated install --index-url https://pypi.org/simple --only-binary=:all: --no-deps --no-cache-dir --disable-pip-version-check 'numpy==2.3.5' 'Pillow==12.3.0'
           "$LIGHT_ENV/bin/python" tasks/lottery-shop/scripts/test_counter_light_prepare_ci.py --dependencies-only -v
+          "$LIGHT_ENV/bin/python" tasks/lottery-shop/scripts/test_post_capture_safety_ci.py -v
       - name: Capture protected cold Stage-A inventory before project preparation
         id: inventorybefore
         timeout-minutes: 5
@@ -344,6 +345,19 @@ jobs:
             tasks/lottery-shop/evidence/visual-candidate/regression-play-world/test-receipt.json
           if-no-files-found: error
           retention-days: 7
+      - name: Collect screened counter-light originals independently of semantic acceptance
+        id: counterlightobservation
+        if: ${{ always() && steps.guard.outcome == 'success' && steps.counterlightdeps.outcome == 'success' && steps.capture.outcome != 'skipped' }}
+        timeout-minutes: 5
+        run: PYTHONDONTWRITEBYTECODE=1 "$RUNNER_TEMP/lottery-counter-light-python-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT/bin/python" tasks/lottery-shop/scripts/counter_light_diagnostics/export_observation.py
+      - name: Upload safe partial observations with no native or art acceptance claim
+        if: ${{ always() && steps.counterlightobservation.outputs.safe_observation == 'true' }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: lottery-counter-light-unvalidated-observations-not-g3-pass-${{ github.run_id }}-${{ github.run_attempt }}
+          path: tasks/lottery-shop/artifacts/counter-light-observation
+          if-no-files-found: error
+          retention-days: 7
       - name: Revalidate native and normal evidence before packaging counter-light diagnostic
         id: counterlightfinalize
         if: ${{ always() && steps.guard.outcome == 'success' && steps.counterlightprepare.outcome == 'success' && steps.counterlightdeps.outcome == 'success' && steps.capture.outcome == 'success' && steps.regressionedit.outcome == 'success' && steps.regressionplaycore.outcome == 'success' && steps.regressionplayworld.outcome == 'success' }}
@@ -373,6 +387,19 @@ jobs:
         with:
           name: lottery-shop-inventory-not-source-waiver-not-g3-pass-${{ github.run_id }}-${{ github.run_attempt }}
           path: tasks/lottery-shop/evidence/visual-candidate/shop-inventory-not-source-waiver-not-g3-pass.json
+          if-no-files-found: error
+          retention-days: 7
+      - name: Independently screen post-step statuses into fresh bounded staging
+        id: poststatuscollect
+        if: ${{ always() && steps.guard.outcome == 'success' }}
+        timeout-minutes: 1
+        run: PYTHONDONTWRITEBYTECODE=1 python3 tasks/lottery-shop/scripts/post_capture_safety.py collect-statuses
+      - name: Preserve only freshly screened fixed post-step statuses
+        if: ${{ always() && steps.poststatuscollect.outcome == 'success' && steps.poststatuscollect.outputs.safe_statuses == 'true' }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: lottery-post-step-fixed-status-not-g3-pass-${{ github.run_id }}-${{ github.run_attempt }}
+          path: tasks/lottery-shop/artifacts/post-capture-screened-status
           if-no-files-found: error
           retention-days: 7
       - name: Preserve explicit inventory failure after all original evidence and cleanup

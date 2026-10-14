@@ -13,7 +13,8 @@ Shader "Lottery/G3/TicketPaper"
             #pragma fragment frag
             #pragma multi_compile _ _MAIN_LIGHT_SHADOWS _MAIN_LIGHT_SHADOWS_CASCADE _MAIN_LIGHT_SHADOWS_SCREEN
             #pragma multi_compile _ _ADDITIONAL_LIGHTS
-            #pragma multi_compile_fragment _ _SHADOWS_SOFT
+            #pragma multi_compile_fragment _ _ADDITIONAL_LIGHT_SHADOWS
+            #pragma multi_compile_fragment _ _SHADOWS_SOFT _SHADOWS_SOFT_LOW _SHADOWS_SOFT_MEDIUM _SHADOWS_SOFT_HIGH
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
             struct Attributes { float4 positionOS:POSITION; float3 normalOS:NORMAL; float2 uv:TEXCOORD0; };
@@ -26,7 +27,7 @@ Shader "Lottery/G3/TicketPaper"
                 half3 n=normalize(i.normalWS);Light light=GetMainLight(i.shadowCoord);
                 half3 illumination=SampleSH(n)*.68h+light.color*(saturate(dot(n,light.direction))*light.distanceAttenuation*light.shadowAttenuation*.68h);
                 #if defined(_ADDITIONAL_LIGHTS)
-                uint count=GetAdditionalLightsCount();for(uint index=0;index<count;index++){Light a=GetAdditionalLight(index,i.positionWS);illumination+=a.color*(saturate(dot(n,a.direction))*a.distanceAttenuation*.42h);}
+                uint count=GetAdditionalLightsCount();for(uint index=0;index<count;index++){Light a=GetAdditionalLight(index,i.positionWS,half4(1,1,1,1));illumination+=a.color*(saturate(dot(n,a.direction))*a.distanceAttenuation*a.shadowAttenuation*.42h);}
                 #endif
                 // Soft lower bound protects runtime number legibility, without turning
                 // the approved source texture into an emissive billboard.

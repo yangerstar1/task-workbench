@@ -19,6 +19,8 @@ import sys
 import tempfile
 import zipfile
 import verify_and_measure as inc
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+import post_capture_safety as telemetry
 
 HERE = Path(__file__).resolve().parent
 TASK = 'tasks/lottery-shop'
@@ -79,6 +81,7 @@ def code_contract(root, reviewed):
     return contract
 
 def prepare(root):
+    telemetry.checkpoint('CONTEXT')
     v,_,_=modules(); ident=context(root)
     # This is the actual unchanged gate, before native/import mutations.
     original=v.guard(root); identity(original,ident)
@@ -123,6 +126,7 @@ def verify_bound_inputs(bundle, ident):
     A caller-controlled 'passed' field is never used instead of these computations.
     """
     v,split,ap=modules();up=bundle/'upstream';diag=bundle/'diagnostic'
+    if telemetry.ACTIVE: telemetry.checkpoint('UPSTREAM_NATIVE')
     prepared=read(bundle/'prepared-context.json');identity(prepared,ident)
     require(prepared['scope']==SCOPE and prepared['schemaVersion']==1 and prepared.get('repository')=='yangerstar1/task-workbench' and prepared.get('workflowPath')=='.github/workflows/lottery-visual-candidate.yml','PREPARED_CONTEXT_SCOPE')
     require(prepared['guardSourceReceiptSha256']==digest(up/'source-receipt.json') and prepared['sourceBeforeSha256']==digest(up/'source-before.json'),'REAL_GUARD_INPUT_BINDING_MISMATCH')
@@ -132,6 +136,7 @@ def verify_bound_inputs(bundle, ident):
     native_process(read(up/'safe-finish.json'),'finish',ident,ap)
     finish=read(up/'safe-finish.json');session=read(up/'safe-session.json');identity(session,ident)
     require(finish.get('cleanup')=={'status':'ABSENCE_VERIFIED','removalExitCode':0} and session.get('status')=='CLOSED' and session.get('cleanup')==finish['cleanup'],'OWNED_NATIVE_CLEANUP_UNVERIFIED')
+    if telemetry.ACTIVE: telemetry.checkpoint('SOURCE_MUTATION')
     before=read(up/'source-before.json');after=read(up/'source-after.json');changes=read(up/'source-changes.json')
     for row in (before,after,changes):identity(row,ident)
     old={x['path']:x for x in before['files']};new={x['path']:x for x in after['files']}
@@ -149,6 +154,7 @@ def verify_bound_inputs(bundle, ident):
         ci=root/TASK/'ci';ci.mkdir(parents=True)
         for name in ('g2-test-contract.json','g3-test-contract.json'):shutil.copyfile(HERE/'pinned_dependencies'/name,ci/name)
         for stage in STAGES:
+            if telemetry.ACTIVE: telemetry.checkpoint({'capture':'REGRESSION_CAPTURE','regression-edit':'REGRESSION_EDIT','regression-play-core':'REGRESSION_CORE','regression-play-world':'REGRESSION_WORLD'}[stage])
             old_receipt=read(up/stage/'test-receipt.json');identity(old_receipt,ident)
             xml=up/stage/'raw-test-results.xml'
             require(old_receipt.get('rawXmlSha256')==digest(xml),'STALE_XML_RECEIPT_BINDING')
@@ -169,23 +175,32 @@ def verify_bound_inputs(bundle, ident):
             calculated=read(ev/stage/'test-receipt.json')
             require(calculated==old_receipt,'UPSTREAM_NATIVE_RECEIPT_NOT_REPRODUCIBLE')
             results[stage]={'rawXmlSha256':digest(xml),'nativeReceiptSha256':digest(up/('safe-'+stage+'.json'))}
+        if telemetry.ACTIVE: telemetry.checkpoint('PLAY_AGGREGATE')
         split.aggregate(root)
+        if telemetry.ACTIVE: telemetry.checkpoint('NORMAL_CAPTURE')
         src=root/TASK/'artifacts/visual-candidate/captures';shutil.copytree(up/'captures',src)
         v.export_captures(root,True)
         require(digest(ev/'captures/capture-receipt.json')==digest(up/'captures/capture-receipt.json'),'NORMAL_RECEIPT_REWRITE')
+    if telemetry.ACTIVE: telemetry.checkpoint('DIAGNOSTIC_VALIDATE')
     measured=inc._validate_increment(diag,up/'captures',up/'capture/raw-test-results.xml',ident['sourceCommit'])
     return {'recomputedExistingGates':results,'normalReceiptSha256':digest(up/'captures/capture-receipt.json'),
             'diagnosticReceiptSha256':digest(diag/'diagnostic-receipt.json'),'measurements':measured['measurements']}
 
 
 def finalize(root,diag,output):
-    ident=context(root);contract=code_contract(root,ident['reviewedCandidateCommit'])
+    telemetry.checkpoint('CONTEXT')
+    ident=context(root)
+    telemetry.checkpoint('CONTRACT')
+    contract=code_contract(root,ident['reviewedCandidateCommit'])
+    telemetry.checkpoint('PREPARED')
     prepared=read(root/PREPARED);identity(prepared,ident)
     require(prepared['dependencyPinsSha256']==digest(HERE/'dependency-pins.json'),'DEPENDENCY_PINS_CHANGED_AFTER_PREPARE')
     require(hashlib.sha256(compact(contract)).hexdigest()==prepared['codeContractSha256'],'CODE_CHANGED_AFTER_PREPARE')
     require(not output.exists(),'BUNDLE_OUTPUT_ALREADY_EXISTS')
     output.mkdir(parents=True)
+    telemetry.checkpoint('INPUT_PATHS')
     paths=input_paths(root/EVIDENCE,diag)
+    telemetry.checkpoint('COPY_INPUTS')
     for name,source in paths.items():
         destination=output/name;destination.parent.mkdir(parents=True,exist_ok=True);shutil.copyfile(source,destination)
     shutil.copyfile(root/PREPARED,output/'prepared-context.json');write(output/'code-contract.json',contract)
@@ -194,6 +209,7 @@ def finalize(root,diag,output):
     bindings=[{'path':str(p.relative_to(output)),'bytes':p.stat().st_size,'sha256':digest(p)} for p in sorted(output.rglob('*')) if p.is_file()]
     gate={'schemaVersion':1,'scope':SCOPE,**ident,'bindings':bindings,'codeContractSha256':prepared['codeContractSha256'],
           'dependencyPinsSha256':digest(HERE/'dependency-pins.json'),'checks':{k:v for k,v in result.items() if k!='measurements'}}
+    telemetry.checkpoint('GATE_WRITE')
     write(output/'counter-light-gate.json',gate)
     return gate
 
@@ -240,8 +256,11 @@ def verify_download(zip_path, expected, expected_artifact_id, expected_artifact_
                 'externalArtifactSha256':expected_artifact_sha256,**expected,**result}
 
 
+class SafeArgumentParser(argparse.ArgumentParser):
+    def error(self, message): raise ValueError('CLI_ARGUMENTS')
+
 def main():
-    p=argparse.ArgumentParser();sub=p.add_subparsers(dest='mode',required=True)
+    p=SafeArgumentParser();sub=p.add_subparsers(dest='mode',required=True)
     for mode in ('prepare','finalize'):
         x=sub.add_parser(mode);x.add_argument('--repo-root',type=Path,required=True)
         if mode=='finalize':x.add_argument('--diagnostic',type=Path,required=True);x.add_argument('--output',type=Path,required=True)
@@ -249,10 +268,17 @@ def main():
     for flag in ('source-commit','reviewed-commit','run-id','run-attempt','artifact-sha256','code-contract-sha256'):x.add_argument('--expected-'+flag,required=True)
     x.add_argument('--expected-artifact-id',type=int,required=True);x.add_argument('--output',type=Path,required=True)
     a=p.parse_args()
+    if a.mode in ('prepare','finalize'): telemetry.begin('counter-light',a.mode)
     if a.mode=='prepare':prepare(a.repo_root)
     elif a.mode=='finalize':finalize(a.repo_root,a.diagnostic,a.output)
     else:
         expected={'sourceCommit':a.expected_source_commit,'reviewedCandidateCommit':a.expected_reviewed_commit,'runId':a.expected_run_id,'runAttempt':a.expected_run_attempt}
         result=verify_download(a.archive,expected,a.expected_artifact_id,a.expected_artifact_sha256,a.expected_code_contract_sha256);write(a.output,result)
 
-if __name__=='__main__':main()
+if __name__=='__main__':
+    try:
+        main()
+        if telemetry.ACTIVE:
+            telemetry.checkpoint('DONE');telemetry.persist('COMPLETED','NONE')
+    except BaseException as error:
+        raise SystemExit(telemetry.fail(error)) from None

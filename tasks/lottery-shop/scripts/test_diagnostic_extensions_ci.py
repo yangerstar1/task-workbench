@@ -107,13 +107,29 @@ class CombinedDiagnosticTests(unittest.TestCase):
             self.assertIn('actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02',b)
             self.assertNotIn('*',b);self.assertNotIn('.log',b);self.assertNotIn('ProjectSettings',b)
 
+    def test_safe_observation_and_status_upload_are_independent(self):
+        text=WORKFLOW.read_text();block=with_id(text,'counterlightobservation')
+        self.assertIn('always()',block);self.assertNotIn('counterlightfinalize',block)
+        self.assertLess(text.index('safe_project_ci.py finish'),text.index('id: counterlightobservation'))
+        self.assertLess(text.index('id: counterlightobservation'),text.index('id: counterlightfinalize'))
+        partial=[b for b in blocks(text) if 'name: lottery-counter-light-unvalidated-' in b]
+        statuses=[b for b in blocks(text) if 'name: lottery-post-step-fixed-status-' in b]
+        self.assertEqual(len(partial),1);self.assertEqual(len(statuses),1)
+        self.assertIn("steps.counterlightobservation.outputs.safe_observation == 'true'",partial[0])
+        for b in partial+statuses:
+            self.assertNotIn('*',b);self.assertNotIn('.log',b);self.assertNotIn('ProjectSettings',b)
+        self.assertIn("steps.poststatuscollect.outcome == 'success'",statuses[0]);self.assertIn("steps.poststatuscollect.outputs.safe_statuses == 'true'",statuses[0])
+        self.assertIn('path: tasks/lottery-shop/artifacts/post-capture-screened-status',statuses[0]);self.assertNotIn('evidence/visual-candidate',statuses[0])
+        collector=with_id(text,'poststatuscollect');self.assertIn('always()',collector);self.assertIn('post_capture_safety.py collect-statuses',collector)
+
     def test_counter_contract_matches_every_exact_file(self):
         folder=SCRIPTS/'counter_light_diagnostics';data=json.loads((folder/'code-contract.json').read_bytes())
         names=[]
         for row in data['files']:
             names.append(row['repositoryPath']);raw=(ROOT/row['repositoryPath']).read_bytes()
             self.assertEqual(len(raw),row['bytes']);self.assertEqual(hashlib.sha256(raw).hexdigest(),row['sha256'])
-        self.assertEqual(len(names),len(set(names)));self.assertEqual(len(names),22)
+        self.assertEqual(len(names),len(set(names)));self.assertEqual(len(names),24)
+        for new in ('tasks/lottery-shop/scripts/post_capture_safety.py','tasks/lottery-shop/scripts/counter_light_diagnostics/export_observation.py'):self.assertIn(new,names)
         pins=json.loads((folder/'dependency-pins.json').read_bytes())
         for name,digest in pins.items():self.assertEqual(hashlib.sha256((folder/'pinned_dependencies'/name).read_bytes()).hexdigest(),digest)
 
