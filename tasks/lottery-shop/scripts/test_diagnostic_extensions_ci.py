@@ -32,10 +32,10 @@ class CombinedDiagnosticTests(unittest.TestCase):
 
     def test_cold_prepare_order_before_native(self):
         text=WORKFLOW.read_text()
-        names=['id: guard','visual_candidate_ci.py restore-font','id: counterlightprepare','id: inventorybefore','id: safestart','id: capture']
+        names=['id: guard','visual_candidate_ci.py restore-font','id: counterlightprepare','id: counterlightdeps','id: inventorybefore','id: safestart','id: capture']
         positions=[text.index(x) for x in names]
         self.assertEqual(positions,sorted(positions))
-        for n in ('counterlightprepare','inventorybefore'):
+        for n in ('counterlightprepare','counterlightdeps','inventorybefore'):
             self.assertNotIn('always()',with_id(text,n))
         self.assertNotIn('continue-on-error',text)
 
@@ -68,10 +68,23 @@ class CombinedDiagnosticTests(unittest.TestCase):
         pos=text.index('id: counterlightfinalize')
         for earlier in ('safe_project_ci.py finish','visual_candidate_ci.py snapshot-after','name: Upload bounded regression and source mutation evidence'):
             self.assertLess(text.index(earlier),pos)
-        for n in ('guard','counterlightprepare','capture','regressionedit','regressionplaycore','regressionplayworld'):
+        for n in ('guard','counterlightprepare','counterlightdeps','capture','regressionedit','regressionplaycore','regressionplayworld'):
             self.assertIn('steps.'+n+".outcome == 'success'",f)
         self.assertIn('always()',f)
         self.assertIn('compose_evidence.py finalize --repo-root "$GITHUB_WORKSPACE"',f)
+
+    def test_image_dependency_setup_fails_closed_before_native(self):
+        text=WORKFLOW.read_text();setup=with_id(text,'counterlightdeps')
+        for required in ('set -euo pipefail', 'COUNTER_LIGHT_DEPENDENCY_SETUP_FAILED_BEFORE_NATIVE',
+                         'test ! -e "$LIGHT_ENV"', 'python3 -m venv "$LIGHT_ENV"',
+                         '--isolated install --index-url https://pypi.org/simple --only-binary=:all:',
+                         "'numpy==2.3.5' 'Pillow==12.3.0'", '--dependencies-only -v'):
+            self.assertIn(required,setup)
+        self.assertNotIn('always()',setup);self.assertNotIn('secrets.',setup)
+        python='"$RUNNER_TEMP/lottery-counter-light-python-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT/bin/python"'
+        self.assertIn(python+' tasks/lottery-shop/scripts/counter_light_diagnostics/compose_evidence.py finalize',with_id(text,'counterlightfinalize'))
+        command='python3 -S tasks/lottery-shop/scripts/test_counter_light_prepare_ci.py -v'
+        self.assertEqual(text.count(command),1);self.assertLess(text.index(command),text.index('id: safestart'))
 
     def test_inventory_does_not_depend_on_light_finalize_result(self):
         text=WORKFLOW.read_text()

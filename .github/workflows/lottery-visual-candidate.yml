@@ -48,6 +48,7 @@ jobs:
           PYTHONDONTWRITEBYTECODE=1 python3 tasks/lottery-shop/scripts/test_diagnostic_early_stop_ci.py -v
           PYTHONDONTWRITEBYTECODE=1 python3 tasks/lottery-shop/scripts/test_independent_g3_frames_ci.py -v
           PYTHONDONTWRITEBYTECODE=1 python3 tasks/lottery-shop/scripts/test_diagnostic_extensions_ci.py -v
+          PYTHONDONTWRITEBYTECODE=1 python3 -S tasks/lottery-shop/scripts/test_counter_light_prepare_ci.py -v
           PYTHONDONTWRITEBYTECODE=1 python3 tasks/lottery-shop/scripts/test_stage_a_combined_receipt_ci.py -v
       - name: Prepare existing authorized disposable runner disk layout
         run: |
@@ -78,6 +79,18 @@ jobs:
         id: counterlightprepare
         timeout-minutes: 5
         run: PYTHONDONTWRITEBYTECODE=1 python3 tasks/lottery-shop/scripts/counter_light_diagnostics/compose_evidence.py prepare --repo-root "$GITHUB_WORKSPACE"
+      - name: Verify pinned image measurement dependencies before any native activation
+        id: counterlightdeps
+        timeout-minutes: 5
+        shell: bash
+        run: |
+          set -euo pipefail
+          trap 'echo COUNTER_LIGHT_DEPENDENCY_SETUP_FAILED_BEFORE_NATIVE >&2' ERR
+          LIGHT_ENV="$RUNNER_TEMP/lottery-counter-light-python-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+          test ! -e "$LIGHT_ENV"
+          python3 -m venv "$LIGHT_ENV"
+          "$LIGHT_ENV/bin/python" -m pip --isolated install --index-url https://pypi.org/simple --only-binary=:all: --no-deps --no-cache-dir --disable-pip-version-check 'numpy==2.3.5' 'Pillow==12.3.0'
+          "$LIGHT_ENV/bin/python" tasks/lottery-shop/scripts/test_counter_light_prepare_ci.py --dependencies-only -v
       - name: Capture protected cold Stage-A inventory before project preparation
         id: inventorybefore
         timeout-minutes: 5
@@ -333,9 +346,9 @@ jobs:
           retention-days: 7
       - name: Revalidate native and normal evidence before packaging counter-light diagnostic
         id: counterlightfinalize
-        if: ${{ always() && steps.guard.outcome == 'success' && steps.counterlightprepare.outcome == 'success' && steps.capture.outcome == 'success' && steps.regressionedit.outcome == 'success' && steps.regressionplaycore.outcome == 'success' && steps.regressionplayworld.outcome == 'success' }}
+        if: ${{ always() && steps.guard.outcome == 'success' && steps.counterlightprepare.outcome == 'success' && steps.counterlightdeps.outcome == 'success' && steps.capture.outcome == 'success' && steps.regressionedit.outcome == 'success' && steps.regressionplaycore.outcome == 'success' && steps.regressionplayworld.outcome == 'success' }}
         timeout-minutes: 5
-        run: PYTHONDONTWRITEBYTECODE=1 python3 tasks/lottery-shop/scripts/counter_light_diagnostics/compose_evidence.py finalize --repo-root "$GITHUB_WORKSPACE" --diagnostic "$GITHUB_WORKSPACE/tasks/lottery-shop/artifacts/counter-light-diagnostic/run-$GITHUB_RUN_ID-attempt-$GITHUB_RUN_ATTEMPT" --output "$GITHUB_WORKSPACE/tasks/lottery-shop/artifacts/counter-light-package"
+        run: PYTHONDONTWRITEBYTECODE=1 "$RUNNER_TEMP/lottery-counter-light-python-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT/bin/python" tasks/lottery-shop/scripts/counter_light_diagnostics/compose_evidence.py finalize --repo-root "$GITHUB_WORKSPACE" --diagnostic "$GITHUB_WORKSPACE/tasks/lottery-shop/artifacts/counter-light-diagnostic/run-$GITHUB_RUN_ID-attempt-$GITHUB_RUN_ATTEMPT" --output "$GITHUB_WORKSPACE/tasks/lottery-shop/artifacts/counter-light-package"
       - name: Upload only the strictly composed counter-light diagnostic evidence bundle
         if: ${{ always() && steps.counterlightfinalize.outcome == 'success' }}
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02

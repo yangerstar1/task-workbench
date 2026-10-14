@@ -2,6 +2,7 @@
 """Read-only diagnostics validation and code-value statistics; never art approval.
 Uses original PNG files, writes JSON only when --output is explicitly given.
 Does not launch Unity, change assets, copy frames, or replace existing gate tools.
+Image dependencies load only inside image/matrix work; metadata-only prepare is stdlib.
 """
 import argparse
 import copy
@@ -11,8 +12,6 @@ import json
 from pathlib import Path
 import re
 import xml.etree.ElementTree as ET
-import numpy as np
-from PIL import Image
 
 ROOT = Path(__file__).resolve().parent
 PLAN = json.loads((ROOT / 'diagnostic_plan.json').read_text())
@@ -53,6 +52,8 @@ def load(path, maximum=2097152):
 
 
 def png(path, digest=None, count=None, size=(1280, 720)):
+    import numpy as np
+    from PIL import Image
     require(path.is_file() and not path.is_symlink(), 'Missing or symlink PNG: ' + path.name)
     b = path.read_bytes()
     require(10000 < len(b) <= 8*1024*1024, 'PNG byte bound')
@@ -76,6 +77,7 @@ def checked_payload(text, digest, observation):
 
 
 def validate_camera(c):
+    import numpy as np
     require(type(c) is dict, 'Camera missing')
     for k in ['instanceId','targetId','expectedTargetId','urpInstanceId','volumeTriggerId','width','height','antiAliasing','cullingMask']:
         require(type(c.get(k)) is int, 'Camera integer observation missing: '+k)
@@ -199,6 +201,7 @@ def filename(label):
 
 
 def stats(a):
+    import numpy as np
     # Gamma/LDR image code values, intentionally NOT a radiometric light-energy estimate.
     v = a.reshape(-1, 3)
     y = v @ np.array([.2126, .7152, .0722])
@@ -209,6 +212,7 @@ def stats(a):
 
 
 def measures(base, cases):
+    import numpy as np
     result = {}
     for key,(x0,y0,x1,y1) in PLAN['rois'].items():
         b = base[y0:y1,x0:x1]; by_case = {}
