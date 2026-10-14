@@ -3,6 +3,7 @@
 Default suite uses only stdlib and launches the actual prepare CLI with python -S.
 --dependencies-only checks pinned image packages in the disposable CI venv.
 """
+import ast
 import hashlib
 import inspect
 import json
@@ -74,7 +75,7 @@ class ColdPrepareTests(unittest.TestCase):
         self.assertEqual(p.returncode, 0, p.stderr)
         return p.stdout.strip()
 
-    def commit_pair(self, wrong_review=False, extra_trigger_file=False):
+    def commit_pair(self, wrong_review=False, extra_trigger_file=False, schema=1, android_override=None):
         self.git('add', '.')
         self.git('commit', '-qm', 'Synthetic separately reviewed source')
         reviewed = self.git('rev-parse', 'HEAD')
@@ -84,6 +85,14 @@ class ColdPrepareTests(unittest.TestCase):
                                     'status': 'APPROVED_FOR_DIAGNOSTIC_CAPTURE_ONLY',
                                     'reviewedAtUtc': '2020-01-01T00:00:00Z',
                                     'reviewId': 'visual-source-20261014-26', 'reviewer': 'independent-source-review'}}
+        if schema in (2,3):
+            request.update(schemaVersion=schema,executionProfile='FULL_DIAGNOSTIC')
+        if schema==3:
+            request.update(androidBuild='DEVELOPMENT_CANDIDATE_APK',androidReview={
+                'sourceCommit':reviewed,'status':'APPROVED_FOR_DIAGNOSTIC_ANDROID_ONLY',
+                'reviewedAtUtc':'2020-01-01T00:00:00Z','reviewId':'android-source-20261014-26',
+                'reviewer':'independent-source-review'})
+            if android_override:request['androidReview'].update(android_override)
         write(self.root/REQUEST, request)
         if extra_trigger_file:
             (self.root/TASK/'scripts/unauthorized-trigger.txt').write_text('synthetic')
@@ -115,8 +124,8 @@ class ColdPrepareTests(unittest.TestCase):
         self.assertEqual(payload['code'], error if error.replace('_','').isalnum() and error.isupper() else 'INPUT_OR_DEPENDENCY_REJECTED')
         self.assertFalse((self.root/PREPARED).exists())
 
-    def test_actual_cold_prepare_returns_bound_identity_and_all_code_hashes(self):
-        ident = self.commit_pair()
+    def assert_bound_prepare(self, schema):
+        ident = self.commit_pair(schema=schema)
         p = self.prepare()
         self.assertEqual(p.returncode, 0, p.stderr)
         prepared = json.loads((self.root/PREPARED).read_bytes())
@@ -135,8 +144,40 @@ class ColdPrepareTests(unittest.TestCase):
         self.assertEqual(self.git('diff', '--name-only', 'HEAD'), '')
         self.assertFalse(any(self.root.rglob('__pycache__')))
 
+    def test_actual_cold_prepare_returns_bound_identity_and_all_code_hashes(self):
+        self.assert_bound_prepare(1)
+
+    def test_schema2_actual_cold_prepare_keeps_bound_identity(self):
+        self.assert_bound_prepare(2)
+
+    def test_schema3_actual_cold_prepare_keeps_both_review_scopes(self):
+        self.assert_bound_prepare(3)
+        request=json.loads((self.root/REQUEST).read_bytes())
+        source=json.loads((self.root/EVIDENCE/'source-receipt.json').read_bytes())
+        self.assertEqual(source['sourceReview'],request['sourceReview'])
+        self.assertEqual(source['sourceReview']['status'],'APPROVED_FOR_DIAGNOSTIC_CAPTURE_ONLY')
+        self.assertEqual(request['androidReview']['status'],'APPROVED_FOR_DIAGNOSTIC_ANDROID_ONLY')
+
+    def test_schema3_wrong_android_source_is_rejected(self):
+        self.commit_pair(schema=3,android_override={'sourceCommit':'f'*40})
+        self.assert_rejected('Diagnostic APK source review rejected')
+
+    def test_schema3_capture_review_does_not_authorize_android(self):
+        self.commit_pair(schema=3,android_override={'status':'APPROVED_FOR_DIAGNOSTIC_CAPTURE_ONLY'})
+        self.assert_rejected('Diagnostic APK source review rejected')
+
+    def test_schema3_unknown_android_review_key_is_rejected(self):
+        self.commit_pair(schema=3,android_override={'unknown':'SYNTHETIC'})
+        self.assert_rejected('Diagnostic APK fresh review required')
+
     def test_actual_pinned_signatures_identity_and_imports_are_stdlib(self):
-        self.commit_pair()
+        self.commit_pair(schema=3)
+        def profile(path):
+            return ast.dump(next(n for n in ast.parse(path.read_text()).body
+                                 if isinstance(n,ast.FunctionDef) and n.name=='request_profile'),
+                            include_attributes=False)
+        self.assertEqual(profile(ROOT/TASK/'scripts/visual_candidate_ci.py'),
+                         profile(ROOT/FOLDER/'pinned_dependencies/visual_candidate_ci.py'))
         code = """import inspect,json,sys
 from pathlib import Path
 sys.path.insert(0,sys.argv[1])
@@ -154,7 +195,7 @@ print(json.dumps({'guard':str(inspect.signature(v.guard)),'snapshot':str(inspect
                                   'identity': self.ident, 'imageLoaded': False})
 
     def test_second_guard_after_ignored_font_restore_outputs_remains_clean(self):
-        self.commit_pair()
+        self.commit_pair(schema=3)
         code = """import hashlib,sys
 from pathlib import Path
 sys.path.insert(0,sys.argv[1])

@@ -102,7 +102,17 @@ def request_profile(request):
     if request["schemaVersion"] == 1:
         require(set(request) == keys, "Diagnostic request keys mismatch")
         return FULL_DIAGNOSTIC
-    require(request["schemaVersion"] == 2 and set(request) == keys | {"executionProfile"}, "Diagnostic request keys mismatch")
+    if request["schemaVersion"] == 3:
+        require(set(request) == keys | {"executionProfile", "androidBuild", "androidReview"}, "Diagnostic APK request keys mismatch")
+        require(request["androidBuild"] == "DEVELOPMENT_CANDIDATE_APK", "Diagnostic APK capability rejected")
+        review = request["androidReview"]
+        require(type(review) is dict and set(review) == {"sourceCommit", "status", "reviewedAtUtc", "reviewId", "reviewer"}, "Diagnostic APK fresh review required")
+        require(review["sourceCommit"] == request["sourceCommit"] and review["status"] == "APPROVED_FOR_DIAGNOSTIC_ANDROID_ONLY" and review["reviewer"] == "independent-source-review", "Diagnostic APK source review rejected")
+        require(type(review["reviewId"]) is str and re.fullmatch(r"android-source-[0-9]{8}-[0-9]{2,3}", review["reviewId"]), "Diagnostic APK review identity rejected")
+        stamp = datetime.fromisoformat(review["reviewedAtUtc"].replace("Z", "+00:00"))
+        require(stamp.tzinfo is not None and stamp.utcoffset().total_seconds() == 0 and stamp <= datetime.now(timezone.utc), "Diagnostic APK review time rejected")
+    else:
+        require(request["schemaVersion"] == 2 and set(request) == keys | {"executionProfile"}, "Diagnostic request keys mismatch")
     require(type(request["executionProfile"]) is str and request["executionProfile"] in {FULL_DIAGNOSTIC, EARLY_STOP}, "Diagnostic execution profile rejected")
     return request["executionProfile"]
 

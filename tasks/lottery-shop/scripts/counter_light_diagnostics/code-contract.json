@@ -23,7 +23,7 @@
     {
       "bytes": 652,
       "repositoryPath": "tasks/lottery-shop/scripts/counter_light_diagnostics/dependency-pins.json",
-      "sha256": "2a09b6292b0c6f3bab30625166862c7160950378527646860846bdd8615492ae"
+      "sha256": "ea257c74c71392248db782f338aea93761651cb002303681c32f9ba3b87c1c83"
     },
     {
       "bytes": 4567,
@@ -66,9 +66,9 @@
       "sha256": "6c0eafdaec2cac335ff3cec6bddd5663514ae941f0a2ab627f5216b84cb604ed"
     },
     {
-      "bytes": 46904,
+      "bytes": 48051,
       "repositoryPath": "tasks/lottery-shop/scripts/counter_light_diagnostics/pinned_dependencies/visual_candidate_ci.py",
-      "sha256": "df0d7524ac2dc29ce3abf48a410c0fe191d9988493887de91e7b00eee29b4caa"
+      "sha256": "a8d07dfab9a9da96833504417e829ce15f18828d9d12a1ac2e71f15a079be8e7"
     },
     {
       "bytes": 21289,
