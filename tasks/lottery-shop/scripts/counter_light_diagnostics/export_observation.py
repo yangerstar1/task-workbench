@@ -31,6 +31,9 @@ def controls(c):
  for k in ['lightColors','lightPositions','lightRotations']:array(c[k],5,lambda x:vector(x,{'lightColors':'rgba','lightPositions':'xyz','lightRotations':'xyzw'}[k]))
  for k in ['lightIntensities','lightRanges','lightSpotAngles','lightInnerSpotAngles']:array(c[k],5,num)
  array(c['lightShadows'],5,lambda x:enum(x,{'None','Hard','Soft'}));array(c['lightEnabled'],5,boolean);array(c['lightCullingMasks'],5,integer);array(c['ambientSH'],27,num)
+ enum(c['ambientMode'],{'Skybox','Trilight','Flat','Custom'});num(c['ambientIntensity']);S(0<=c['ambientIntensity']<=8)
+ for k in ['ambientSkyColor','ambientEquatorColor','ambientGroundColor','ambientLight']:
+  vector(c[k],'rgba');S(all(0<=c[k][n]<=8 for n in 'rgb') and 0<=c[k]['a']<=1)
  for k in ['probeIntensity','reflectionIntensity','oakSmoothness','oakNormalStrength','oakSpecularHighlights','oakMetallic','oakCull','oakSurface','oakZWrite','oakSrcBlend','oakDstBlend']:num(c[k])
  for k in ['oakMaterialId','oakRenderQueue']:integer(c[k])
  for k in ['oakEnableInstancing','oakDoubleSidedGI']:boolean(c[k])
@@ -59,7 +62,7 @@ def payload(text,h,observed,bind_observed=True):
  if bind_observed:S(parsed==observed)
 def receipt(raw,ident):
  d=inc.strict_json(raw.decode('utf-8'));obj(d,RECEIPT_KEYS)
- S(type(d['schemaVersion'])is int and d['schemaVersion']==2)
+ S(type(d['schemaVersion'])is int and d['schemaVersion']==3)
  enum(d['scope'],{'DIAGNOSTIC_COUNTER_LIGHT_NOT_ART_APPROVAL_NOT_G3_PASS'});enum(d['status'],{'RUNNING','COMPLETE_DIAGNOSTIC_RESTORED','FAILED_DIAGNOSTIC_RESTORED','FAILED_RESTORE_NOT_PROVEN','FAILED_BUDGET_AT_RECEIPT_WRITE'})
  S(all(d[k]==v for k,v in ident.items()));S(d['baselineSourceFreeze']==inc.PLAN['frozenCommit'])
  enum(d['stateOrigin'],{'SAME_RUNTIME_PHONE_PENDING_NO_INPUT_NO_SERVICE_ACTION'});enum(d['faultRequest'],{''})

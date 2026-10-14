@@ -1,31 +1,139 @@
 {
   "schemaVersion": 1,
-  "scope": "SOURCE_ONLY_COUNTER_LIGHT_TABLE_KEY_V1_CANDIDATE_NOT_NATIVE_VALIDATION",
+  "scope": "SOURCE_ONLY_COUNTER_LIGHT_TRILIGHT_ABLATION_V1_CANDIDATE_NOT_NATIVE_VALIDATION",
   "frozenCommit": "02a6440209c26bcc94c50fdf73a87345b563b5ed",
   "lightingBaseline": "TABLE_KEY_SHADOWS_V1",
-  "expectedLightShadows": ["Soft", "None", "Soft", "None", "None"],
+  "expectedLightShadows": [
+    "Soft",
+    "None",
+    "Soft",
+    "None",
+    "None"
+  ],
   "baselineNote": "frozenCommit is inherited diagnostic source lineage only. This new runtime baseline is bound by receipt sourceCommit, reviewed code-contract and the exact lightShadows vector. Run26 images are not this candidate baseline.",
   "nativeCompile": "NOT_RUN",
   "nativeCapture": "NOT_RUN",
   "normalFrame": "phone-mom-pending",
   "normalFrameSha256Run24": "da2a10a2039d590599871f76be907a60ddea0b09f18a7ed73839585f1d4e70d7",
-  "normalCameraRun24": {"position": [1.5700000524520874, 1.2020645141601562, -1.1998244524002075], "euler": [12, 180, 0], "fov": 28, "width": 1280, "height": 720},
-  "cases": ["pendant-zero", "boardwash-zero", "counter-pair-zero", "daylight-zero", "reading-zero", "shelf-zero", "all-direct-zero", "probe-intensity-zero", "global-reflection-zero", "reflection-controls-zero", "ambient-sh-zero", "counter-and-reflection-controls-zero", "oak-specular-highlights-off", "oak-normal-flat", "oak-roughness-one", "oak-texture-only", "oak-target-mask"],
+  "normalCameraRun24": {
+    "position": [
+      1.5700000524520874,
+      1.2020645141601562,
+      -1.1998244524002075
+    ],
+    "euler": [
+      12,
+      180,
+      0
+    ],
+    "fov": 28,
+    "width": 1280,
+    "height": 720
+  },
+  "cases": [
+    "pendant-zero",
+    "boardwash-zero",
+    "counter-pair-zero",
+    "daylight-zero",
+    "reading-zero",
+    "shelf-zero",
+    "all-direct-zero",
+    "probe-intensity-zero",
+    "global-reflection-zero",
+    "reflection-controls-zero",
+    "ambient-sh-zero",
+    "counter-and-reflection-controls-zero",
+    "oak-specular-highlights-off",
+    "oak-normal-flat",
+    "oak-roughness-one",
+    "oak-texture-only",
+    "oak-target-mask"
+  ],
   "roiCoordinateSystem": "PNG top-left, half-open x0 y0 x1 y1, no crop or rescale of originals",
   "rois": {
-    "fascia_lit": [840, 112, 1210, 192],
-    "fascia_lower": [840, 218, 1210, 248],
-    "counter_foreground": [875, 485, 1200, 665],
-    "ceramic_right": [990, 285, 1110, 420],
-    "ceramic_left": [268, 290, 351, 445],
-    "green_wall_control": [830, 285, 930, 373],
-    "phone_screen_control": [500, 65, 775, 640]
+    "fascia_lit": [
+      840,
+      112,
+      1210,
+      192
+    ],
+    "fascia_lower": [
+      840,
+      218,
+      1210,
+      248
+    ],
+    "counter_foreground": [
+      875,
+      485,
+      1200,
+      665
+    ],
+    "ceramic_right": [
+      990,
+      285,
+      1110,
+      420
+    ],
+    "ceramic_left": [
+      268,
+      290,
+      351,
+      445
+    ],
+    "green_wall_control": [
+      830,
+      285,
+      930,
+      373
+    ],
+    "phone_screen_control": [
+      500,
+      65,
+      775,
+      640
+    ]
   },
-  "materialTarget": {"rendererName": "Warm_Oak", "materialName": "Warm_Oak", "shader": "Universal Render Pipeline/Lit", "coverage": "ALL_MERGED_WARM_OAK_GEOMETRY_NOT_FASCIA_ONLY", "requireMaskCoverageForMaterialInterpretation": 0.95},
+  "materialTarget": {
+    "rendererName": "Warm_Oak",
+    "materialName": "Warm_Oak",
+    "shader": "Universal Render Pipeline/Lit",
+    "coverage": "ALL_MERGED_WARM_OAK_GEOMETRY_NOT_FASCIA_ONLY",
+    "requireMaskCoverageForMaterialInterpretation": 0.95
+  },
   "normalFramesCountRequired": 23,
   "diagnosticPngCount": 19,
   "additionalRestoreOnlyRenderCount": 17,
   "effectRankingThresholdCodeValue": 2,
   "automaticArtApproval": false,
-  "launchOrPublicationAuthorizedByThisPackage": false
+  "launchOrPublicationAuthorizedByThisPackage": false,
+  "diagnosticReceiptSchemaVersion": 3,
+  "ambientAblation": {
+    "case": "ambient-sh-zero",
+    "method": "TRILIGHT_SOURCE_COLOR_RGB_ZERO_ALPHA_PRESERVED",
+    "meaning": "Current Trilight environment-light source ablation. Direct-light, reflection-intensity, probe and cubemap settings stay fixed. Any SH-dependent glossy fallback may also change; this does not isolate pure diffuse energy or grant art approval.",
+    "changedControls": [
+      "ambientSkyColor.rgb",
+      "ambientEquatorColor.rgb",
+      "ambientGroundColor.rgb"
+    ],
+    "derivedObservations": [
+      "ambientLight alias of ambientSkyColor",
+      "27 effective ambientSH coefficients must equal zero"
+    ],
+    "unchangedControls": [
+      "ambientMode Trilight",
+      "ambientIntensity",
+      "all ambient alpha components",
+      "all direct light controls",
+      "all reflection controls",
+      "all material controls",
+      "all other existing controls"
+    ],
+    "restoration": "All recorded ambient controls and effective SH must equal initial values; scene/material/state/disk proof and per-case exact baseline PNG restoration remain required.",
+    "effectProof": "Different encoded PNG and at least one different decoded RGB code value; no artistic or minimum-magnitude acceptance threshold.",
+    "protocolCompatibility": "Schema 3 adds six real ambient control fields. Schema 2 is rejected by this new verifier/safety screen; old artifacts require their frozen verifier and never gain acceptance by upgrade.",
+    "nativeStatus": "CANDIDATE_NOT_YET_RUN_IN_UNITY: immediate effective-SH recomputation and decoded pixel effect must both be established by a fresh native run.",
+    "observationSafety": "Six added fields have exact keys/types: ambientMode is a fixed Unity enum; intensity is finite 0..8; RGB is finite 0..8; alpha is finite 0..1. Semantic validation additionally requires Trilight, the fixed day baseline, exact RGB zero only in this case, and exact unchanged intensity/alpha."
+  }
 }

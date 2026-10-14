@@ -92,6 +92,7 @@ jobs:
           "$LIGHT_ENV/bin/python" -m pip --isolated install --index-url https://pypi.org/simple --only-binary=:all: --no-deps --no-cache-dir --disable-pip-version-check 'numpy==2.3.5' 'Pillow==12.3.0'
           "$LIGHT_ENV/bin/python" tasks/lottery-shop/scripts/test_counter_light_prepare_ci.py --dependencies-only -v
           "$LIGHT_ENV/bin/python" tasks/lottery-shop/scripts/test_post_capture_safety_ci.py -v
+          "$LIGHT_ENV/bin/python" tasks/lottery-shop/scripts/test_ambient_diagnostic_ci.py -v
       - name: Capture protected cold Stage-A inventory before project preparation
         id: inventorybefore
         timeout-minutes: 5

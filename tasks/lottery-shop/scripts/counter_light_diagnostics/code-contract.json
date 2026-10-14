@@ -26,14 +26,14 @@
       "sha256": "2a09b6292b0c6f3bab30625166862c7160950378527646860846bdd8615492ae"
     },
     {
-      "bytes": 2165,
+      "bytes": 4567,
       "repositoryPath": "tasks/lottery-shop/scripts/counter_light_diagnostics/diagnostic_plan.json",
-      "sha256": "57e1f4f0dec780910df1889432f65a27fe7b61de01c4668c46680e84c6ea45fc"
+      "sha256": "eef77a91969d9ddd697cf0c1e4b38b290820cc3750b9a056bd45a494754fecd0"
     },
     {
-      "bytes": 13278,
+      "bytes": 13566,
       "repositoryPath": "tasks/lottery-shop/scripts/counter_light_diagnostics/export_observation.py",
-      "sha256": "43664ca5ac305824a4a8e6c2ffd93b302f2dd259e6db4610da3c43136dd7a14c"
+      "sha256": "b80f341fc672fdbb383d12a9f52c5325f0da339ec9b7e9a7fab9bb8e72fb0685"
     },
     {
       "bytes": 13557,
@@ -71,9 +71,9 @@
       "sha256": "df0d7524ac2dc29ce3abf48a410c0fe191d9988493887de91e7b00eee29b4caa"
     },
     {
-      "bytes": 19799,
+      "bytes": 21289,
       "repositoryPath": "tasks/lottery-shop/scripts/counter_light_diagnostics/verify_and_measure.py",
-      "sha256": "1b1302c0cbbd0762070594ad54458c68a7b1f1a76c3dee730f47a6b676ffd503"
+      "sha256": "725a3a99bd8727f4535aa8a05a8c3ced648f6850000e8a0f9f4367cd6f058ab8"
     },
     {
       "bytes": 17956,
@@ -81,9 +81,9 @@
       "sha256": "deeff31d4bb075ec4ecc6dfbbb630c6680d6a08087c1d96c3b99fb29d37ae141"
     },
     {
-      "bytes": 15011,
+      "bytes": 16303,
       "repositoryPath": "tasks/lottery-shop/scripts/post_capture_safety.py",
-      "sha256": "0b147685f60880468046477b3f8d155c7180b1b873b80da86e3421183c7886db"
+      "sha256": "5179d6e55ff8cbd8c3366dd2ef499a491f705a50a59be17e5a38c19978f33b93"
     },
     {
       "bytes": 31709,
@@ -106,9 +106,9 @@
       "sha256": "df0d7524ac2dc29ce3abf48a410c0fe191d9988493887de91e7b00eee29b4caa"
     },
     {
-      "bytes": 44828,
+      "bytes": 49197,
       "repositoryPath": "tasks/lottery-shop/unity/Assets/G3/Tests/VisualCandidate/CounterLightDiagnosticCapture.cs",
-      "sha256": "183eabdd2b885b264dd9731ce3e40c7d31c8991ae158a2663364e6a096bef7e0"
+      "sha256": "cfa990736dec3a548dec2a44d9bdc27f0d4f929edfaf06edfcf9c172646d56b0"
     },
     {
       "bytes": 60,
@@ -116,9 +116,9 @@
       "sha256": "69843d46f3228ef774a1c7d4b3e73b9db34a2640b2c6872e878fce861199d508"
     },
     {
-      "bytes": 81408,
+      "bytes": 81607,
       "repositoryPath": "tasks/lottery-shop/unity/Assets/G3/Tests/VisualCandidate/VisualCandidateCaptureTests.cs",
-      "sha256": "f9b26efdc91c272071ba5e6d674c60aca1fe89cc3183140cb9bf894e38f6451f"
+      "sha256": "78a3b11433f92d2d25d46da476d8534f44d1cc7a44bc2cf9ca0e5f1181fb274e"
     }
   ],
   "schemaVersion": 1,

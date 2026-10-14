@@ -388,7 +388,10 @@ namespace Lottery.G3.VisualCandidate.Tests
             finally{BoundedGlyphLabel.EndCostObservation();G3InputRouter.EndCostObservation();}
         }
 
+        // Match the runner watchdog to the existing capture-infrastructure budget.
+        // This is not a gameplay or device-performance allowance.
         [UnityTest]
+        [Timeout((int)(RuntimeSeconds * 1000))]
         public IEnumerator ScenarioStateCaptureRetainsTwentyThreeViewsFromRealTransactionsV2()
         {
             // Entry and explicitly labelled exterior diagnostics are fixture-positioned.

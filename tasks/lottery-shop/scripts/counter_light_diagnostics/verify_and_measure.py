@@ -104,7 +104,7 @@ MATERIAL_KEYS = {'oakMaterialId','oakShader','oakKeywords','oakSmoothness','oakN
     'oakBaseMapId','oakBaseMapName','oakBaseColor','oakBaseScale','oakBaseOffset','oakBumpMapId','oakPackedMapId','oakEmissionMapId',
     'oakMetallic','oakEmissionColor','oakCull','oakSurface','oakZWrite','oakSrcBlend','oakDstBlend','oakRenderQueue','oakEnableInstancing','oakDoubleSidedGI','oakGIFlags'}
 CONTROL_KEYS = MATERIAL_KEYS | {'lightNames','lightIntensities','lightColors','lightPositions','lightRotations','lightRanges',
-    'lightSpotAngles','lightInnerSpotAngles','lightShadows','lightEnabled','lightCullingMasks','probeIntensity','reflectionIntensity','probeTextureId','probeTextureName','ambientSH'}
+    'lightSpotAngles','lightInnerSpotAngles','lightShadows','lightEnabled','lightCullingMasks','probeIntensity','reflectionIntensity','probeTextureId','probeTextureName','ambientSH','ambientMode','ambientIntensity','ambientSkyColor','ambientEquatorColor','ambientGroundColor','ambientLight'}
 
 
 def validate_controls_shape(c):
@@ -119,6 +119,10 @@ def validate_controls_shape(c):
     require(c['lightShadows']==['Soft','None','Soft','None','None'], 'Table-key light shadows drift')
     require(type(c['lightCullingMasks']) is list and len(c['lightCullingMasks'])==5 and all(type(x) is int for x in c['lightCullingMasks']), 'Light masks missing')
     require(type(c['ambientSH']) is list and len(c['ambientSH'])==27 and all(finite(x) for x in c['ambientSH']), 'SH observations missing')
+    require(c['ambientMode'] == 'Trilight' and finite(c['ambientIntensity']) and 0 <= c['ambientIntensity'] <= 8, 'Ambient mode/intensity invalid')
+    for key in ('ambientSkyColor','ambientEquatorColor','ambientGroundColor','ambientLight'):
+        require(vector(c[key],'rgba'), 'Ambient color observation missing: '+key)
+    require(c['ambientLight'] == c['ambientSkyColor'], 'Ambient sky alias mismatch')
     for key,keys in [('oakBaseColor','rgba'),('oakEmissionColor','rgba'),('oakBaseScale','xy'),('oakBaseOffset','xy')]:
         require(vector(c[key],keys), 'Material vector observation missing: '+key)
     for key in ('probeIntensity','reflectionIntensity','oakSmoothness','oakNormalStrength','oakSpecularHighlights','oakMetallic','oakCull','oakSurface','oakZWrite','oakSrcBlend','oakDstBlend'):
@@ -151,7 +155,7 @@ def material_expected(initial, label, actual_id):
 
 
 def validate_receipt(d, normal_sha, commit):
-    require(d.get('schemaVersion') == 2 and d.get('scope') == 'DIAGNOSTIC_COUNTER_LIGHT_NOT_ART_APPROVAL_NOT_G3_PASS', 'Wrong scope/schema')
+    require(type(d.get('schemaVersion')) is int and d.get('schemaVersion') == 3 and d.get('scope') == 'DIAGNOSTIC_COUNTER_LIGHT_NOT_ART_APPROVAL_NOT_G3_PASS', 'Wrong scope/schema')
     require(d.get('status') == 'COMPLETE_DIAGNOSTIC_RESTORED' and d.get('complete') is True and d.get('restored') is True and d.get('propertiesRestored') is True and d.get('pixelRestoreProof') == 'VERIFIED_EXACT_PNG', 'Diagnostic not complete/restored')
     require(d.get('diagnosticOptIn') is True and d.get('faultRequest','') == '', 'Opt-in missing or fault-injected capture')
     require(d.get('failureCode','') in ('',None), 'Complete receipt has failureCode')
@@ -171,6 +175,8 @@ def validate_receipt(d, normal_sha, commit):
     validate_controls_shape(initial)
     require(initial['lightNames'] == NAMES and len(initial['lightIntensities']) == 5 and all(near(a,b) for a,b in zip(initial['lightIntensities'],EXPECTED)), 'Initial light values drift')
     require(near(initial['probeIntensity'],.85) and initial['reflectionIntensity'] == 1 and len(initial['ambientSH']) == 27, 'Initial indirect values drift')
+    for key, rgb in [('ambientSkyColor',(.68,.74,.80)),('ambientEquatorColor',(.58,.57,.51)),('ambientGroundColor',(.34,.31,.26))]:
+        require(all(near(initial[key][c],n) for c,n in zip('rgb',rgb)) and initial[key]['a']==1, 'Initial Trilight color baseline drift')
     require(initial['oakShader'] == 'Universal Render Pipeline/Lit' and initial['oakKeywords'] == sorted(initial['oakKeywords']), 'Initial Lit shader/keywords invalid')
     require(d.get('oakMaterialCoverage') == 'ALL_MERGED_WARM_OAK_GEOMETRY_NOT_FASCIA_ONLY', 'Target coverage not disclosed')
     require([x['id'] for x in d['cases']] == CASES, 'Case identity/order drift')
@@ -192,6 +198,10 @@ def validate_receipt(d, normal_sha, commit):
         expected['probeIntensity']=0 if label in probe_zero else initial['probeIntensity']
         expected['reflectionIntensity']=0 if label in global_zero else initial['reflectionIntensity']
         expected['ambientSH']=[0]*27 if label=='ambient-sh-zero' else initial['ambientSH']
+        if label=='ambient-sh-zero':
+            for key in ('ambientSkyColor','ambientEquatorColor','ambientGroundColor','ambientLight'):
+                expected[key]={'r':0,'g':0,'b':0,'a':initial[key]['a']}
+            require(type(row.get('sha256')) is str and re.fullmatch('[0-9a-f]{64}',row['sha256']) and row['sha256'] != normal_sha, 'Ambient ablation encoded image unchanged')
         expected.update(material_expected(initial,label,controls.get('oakMaterialId')))
         require(controls == expected, 'Experiment contains non-allowlisted control/material mutation: '+label)
 
@@ -251,8 +261,14 @@ def _validate_increment(diag, normal, xml, commit):
     for label in ('baseline-before','baseline-after'):
         png(diag/filename(label), pending['sha256'])
     images = {r['id']:png(diag/r['file'],r['sha256'],r['bytes']) for r in d['cases']}
+    validate_ambient_pixel_effect(base,images['ambient-sh-zero'])
     return {'scope':'DIAGNOSTIC_ARTIFACT_INTEGRITY_AND_DESCRIPTIVE_PIXELS_NOT_ART_APPROVAL', 'diagnosticIncrementConsistent':True,
             'existingNormalValidatorStillRequired':True, 'sourceCommit':commit, 'measurements':measures(base,images)}
+
+
+def validate_ambient_pixel_effect(baseline, ablated):
+    import numpy as np
+    require(baseline.shape == ablated.shape and not np.array_equal(baseline,ablated), 'Ambient ablation decoded pixels unchanged')
 
 
 def validate_native(*args, **kwargs):

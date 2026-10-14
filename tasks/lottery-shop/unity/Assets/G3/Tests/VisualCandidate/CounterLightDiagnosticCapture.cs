@@ -90,6 +90,9 @@ namespace Lottery.G3.VisualCandidate.Tests
             readonly ReflectionProbe probe;
             readonly float probeIntensity, reflectionIntensity;
             readonly SphericalHarmonicsL2 ambient;
+            readonly AmbientMode ambientMode;
+            readonly float ambientIntensity;
+            readonly Color ambientSky, ambientEquator, ambientGround, ambientAlias;
             readonly Renderer[] renderers;
             readonly Material[][] bindings;
             readonly Material[] originalMaterials;
@@ -140,6 +143,13 @@ namespace Lottery.G3.VisualCandidate.Tests
                 Require(probe.name == "Shop material reflection" && probe.mode == ReflectionProbeMode.Custom &&
                     probe.customBakedTexture != null && probe.isActiveAndEnabled, "REFLECTION_BASELINE_DRIFT");
                 probeIntensity = probe.intensity; reflectionIntensity = RenderSettings.reflectionIntensity; ambient = RenderSettings.ambientProbe;
+                ambientMode = RenderSettings.ambientMode; ambientIntensity = RenderSettings.ambientIntensity;
+                ambientSky = RenderSettings.ambientSkyColor; ambientEquator = RenderSettings.ambientEquatorColor;
+                ambientGround = RenderSettings.ambientGroundColor; ambientAlias = RenderSettings.ambientLight;
+                Require(ambientMode == AmbientMode.Trilight && !float.IsNaN(ambientIntensity) && !float.IsInfinity(ambientIntensity) &&
+                    ambientIntensity >= 0 && ambientIntensity <= 8 && ambientAlias.Equals(ambientSky), "AMBIENT_BASELINE_MODE_OR_ALIAS_DRIFT");
+                Require(ambientSky.Equals(new Color(.68f, .74f, .80f)) && ambientEquator.Equals(new Color(.58f, .57f, .51f)) &&
+                    ambientGround.Equals(new Color(.34f, .31f, .26f)), "AMBIENT_TRILIGHT_BASELINE_DRIFT");
                 Require(Mathf.Abs(probeIntensity - .85f) < .000001f && reflectionIntensity == 1f && RenderSettings.sun == lights[0],
                     "DAY_REFLECTION_BASELINE_DRIFT");
                 renderers = env.GetComponentsInChildren<Renderer>(true).OrderBy(r => r.GetInstanceID()).ToArray();
@@ -233,10 +243,14 @@ namespace Lottery.G3.VisualCandidate.Tests
                     Apply(id); Fault(id + ":after-mutation"); RequireStateAndCamera(); row.controls = Controls();
                     row.controlsBeforeJson = JsonUtility.ToJson(row.controls);
                     row.controlsBeforeSha256 = Hash(row.controlsBeforeJson);
+                    // Fail closed if the effective probe has not synchronously updated; do not advance a frame.
+                    RequireAmbientCase(id);
                     Fault(id + ":before-capture"); var png = Capture(id, true); row.file = png.file; row.sha256 = png.sha256; row.bytes = png.bytes;
                     Fault(id + ":after-png"); RequireStateAndCamera();
                     row.controlsAfterJson = JsonUtility.ToJson(Controls());
                     row.controlsAfterSha256 = Hash(row.controlsAfterJson);
+                    RequireAmbientCase(id);
+                    if(id == "ambient-sh-zero") Require(row.sha256 != normalSha, "AMBIENT_ABLATION_ENCODED_IMAGE_UNCHANGED");
                     Require(row.controlsBeforeSha256 == row.controlsAfterSha256, "CONTROL_MUTATION_DURING_RENDER");
                     row.controlsStable = true; row.captured = true;
                 }
@@ -293,7 +307,12 @@ namespace Lottery.G3.VisualCandidate.Tests
                     case "probe-intensity-zero": probe.intensity = 0; break;
                     case "global-reflection-zero": RenderSettings.reflectionIntensity = 0; break;
                     case "reflection-controls-zero": probe.intensity = 0; RenderSettings.reflectionIntensity = 0; break;
-                    case "ambient-sh-zero": RenderSettings.ambientProbe = new SphericalHarmonicsL2(); break;
+                    case "ambient-sh-zero":
+                        // Trilight's effective probe is derived from its three colors.
+                        // Preserve mode, intensity, alpha, direct-light and reflection settings.
+                        RenderSettings.ambientSkyColor = ZeroRgb(ambientSky);
+                        RenderSettings.ambientEquatorColor = ZeroRgb(ambientEquator);
+                        RenderSettings.ambientGroundColor = ZeroRgb(ambientGround); break;
                     case "counter-and-reflection-controls-zero":
                         lights[1].intensity = 0; lights[4].intensity = 0; probe.intensity = 0; RenderSettings.reflectionIntensity = 0; break;
                     case "oak-specular-highlights-off":
@@ -304,6 +323,21 @@ namespace Lottery.G3.VisualCandidate.Tests
                     case "oak-target-mask": UnlitClone(true); break;
                     default: throw new InvalidOperationException("UNKNOWN_DIAGNOSTIC_CASE");
                 }
+            }
+            static Color ZeroRgb(Color value) => new Color(0, 0, 0, value.a);
+            void RequireAmbientCase(string id)
+            {
+                bool zero = id == "ambient-sh-zero";
+                Require(RenderSettings.ambientMode == ambientMode && RenderSettings.ambientIntensity == ambientIntensity,
+                    "AMBIENT_MODE_OR_INTENSITY_MUTATED");
+                Require(RenderSettings.ambientSkyColor.Equals(zero ? ZeroRgb(ambientSky) : ambientSky) &&
+                    RenderSettings.ambientEquatorColor.Equals(zero ? ZeroRgb(ambientEquator) : ambientEquator) &&
+                    RenderSettings.ambientGroundColor.Equals(zero ? ZeroRgb(ambientGround) : ambientGround) &&
+                    RenderSettings.ambientLight.Equals(zero ? ZeroRgb(ambientAlias) : ambientAlias), "AMBIENT_COLOR_OR_ALIAS_DRIFT");
+                var effective = RenderSettings.ambientProbe;
+                for(int channel = 0; channel < 3; channel++) for(int coefficient = 0; coefficient < 9; coefficient++)
+                    Require(effective[channel, coefficient] == (zero ? 0f : ambient[channel, coefficient]),
+                        "AMBIENT_EFFECTIVE_SH_NOT_EXPECTED");
             }
             Material LitClone()
             {
@@ -334,6 +368,13 @@ namespace Lottery.G3.VisualCandidate.Tests
                 for(int i = 0; i < lights.Length; i++) { int n = i; Attempt(() => { if(lights[n].intensity != intensities[n]) lights[n].intensity = intensities[n]; }, errors); }
                 Attempt(() => probe.intensity = probeIntensity, errors);
                 Attempt(() => RenderSettings.reflectionIntensity = reflectionIntensity, errors);
+                Attempt(() => { if(RenderSettings.ambientMode != ambientMode) RenderSettings.ambientMode = ambientMode; }, errors);
+                Attempt(() => { if(RenderSettings.ambientIntensity != ambientIntensity) RenderSettings.ambientIntensity = ambientIntensity; }, errors);
+                // ambientLight is the native alias of ambientSkyColor; restore once,
+                // then RequireUnchanged compares both real getters in Controls().
+                Attempt(() => { if(!RenderSettings.ambientSkyColor.Equals(ambientSky)) RenderSettings.ambientSkyColor = ambientSky; }, errors);
+                Attempt(() => { if(!RenderSettings.ambientEquatorColor.Equals(ambientEquator)) RenderSettings.ambientEquatorColor = ambientEquator; }, errors);
+                Attempt(() => { if(!RenderSettings.ambientGroundColor.Equals(ambientGround)) RenderSettings.ambientGroundColor = ambientGround; }, errors);
                 Attempt(() => RenderSettings.ambientProbe = ambient, errors);
                 Attempt(() => RenderTexture.active = initialActive, errors);
                 foreach(var texture in ownedTargets.ToArray()) Attempt(() => {
@@ -476,7 +517,10 @@ namespace Lottery.G3.VisualCandidate.Tests
                 lightSpotAngles = lights.Select(l => l.spotAngle).ToArray(), lightInnerSpotAngles = lights.Select(l => l.innerSpotAngle).ToArray(),
                 lightShadows = lights.Select(l => l.shadows.ToString()).ToArray(), lightEnabled = lights.Select(l => l.enabled).ToArray(),
                 lightCullingMasks = lights.Select(l => l.cullingMask).ToArray(), probeIntensity = probe.intensity,
-                reflectionIntensity = RenderSettings.reflectionIntensity, probeTextureId = Id(probe.customBakedTexture),
+                reflectionIntensity = RenderSettings.reflectionIntensity,
+                ambientMode = RenderSettings.ambientMode.ToString(), ambientIntensity = RenderSettings.ambientIntensity,
+                ambientSkyColor = RenderSettings.ambientSkyColor, ambientEquatorColor = RenderSettings.ambientEquatorColor,
+                ambientGroundColor = RenderSettings.ambientGroundColor, ambientLight = RenderSettings.ambientLight, probeTextureId = Id(probe.customBakedTexture),
                 probeTextureName = probe.customBakedTexture.name, ambientSH = Enumerable.Range(0, 27).Select(i => RenderSettings.ambientProbe[i/9, i%9]).ToArray(),
                 oakShader = oak.sharedMaterial.shader.name, oakMaterialId = oak.sharedMaterial.GetInstanceID(),
                 oakKeywords = oak.sharedMaterial.shaderKeywords.OrderBy(x => x, StringComparer.Ordinal).ToArray(),
@@ -547,6 +591,8 @@ namespace Lottery.G3.VisualCandidate.Tests
             public string[] lightNames, lightShadows, oakKeywords; public float[] lightIntensities, lightRanges, lightSpotAngles, lightInnerSpotAngles, ambientSH;
             public Color[] lightColors; public Vector3[] lightPositions; public Quaternion[] lightRotations; public bool[] lightEnabled; public int[] lightCullingMasks;
             public float probeIntensity, reflectionIntensity, oakSmoothness, oakNormalStrength, oakSpecularHighlights;
+            public string ambientMode; public float ambientIntensity;
+            public Color ambientSkyColor, ambientEquatorColor, ambientGroundColor, ambientLight;
             public string probeTextureId, probeTextureName, oakShader; public int oakMaterialId;
             public string oakBaseMapId, oakBaseMapName, oakBumpMapId, oakPackedMapId, oakEmissionMapId, oakGIFlags;
             public Color oakBaseColor, oakEmissionColor; public Vector2 oakBaseScale, oakBaseOffset;
@@ -555,7 +601,7 @@ namespace Lottery.G3.VisualCandidate.Tests
         }
         [Serializable] sealed class Receipt
         {
-            public int schemaVersion = 2; public string scope = Scope, status = "RUNNING", sourceCommit, runId, runAttempt;
+            public int schemaVersion = 3; public string scope = Scope, status = "RUNNING", sourceCommit, runId, runAttempt;
             public string baselineSourceFreeze = "02a6440209c26bcc94c50fdf73a87345b563b5ed";
             public string stateOrigin = "SAME_RUNTIME_PHONE_PENDING_NO_INPUT_NO_SERVICE_ACTION";
             public string expectedNormalPngSha256, baselineBeforeSha256, baselineAfterSha256, stateBeforeSha256, stateAfterSha256,

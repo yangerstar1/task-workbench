@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Combined diagnostic wiring checks. Source-only; never runs Unity or Docker."""
+import ast
 import hashlib
 import json
 from pathlib import Path
@@ -137,5 +138,104 @@ class CombinedDiagnosticTests(unittest.TestCase):
         text=WORKFLOW.read_text();cmd='python3 tasks/lottery-shop/scripts/test_diagnostic_extensions_ci.py -v'
         self.assertEqual(text.count(cmd),1);self.assertLess(text.index(cmd),text.index('id: safestart'))
 
+
+
+
+# Capture runner budget binding: source-only, not a device-performance target.
+FIXTURE=TASK/'unity/Assets/G3/Tests/VisualCandidate/VisualCandidateCaptureTests.cs'
+DIAGNOSTIC=TASK/'unity/Assets/G3/Tests/VisualCandidate/CounterLightDiagnosticCapture.cs'
+METHOD='ScenarioStateCaptureRetainsTwentyThreeViewsFromRealTransactionsV2'
+
+def capture_budget(source):
+    """Reject missing, literal, detached, or unbounded watchdog declarations."""
+    runtime=re.findall(r'const double RuntimeSeconds = (\d+), FaceSeconds = (\d+), WalkSeconds = (\d+), UnloadSeconds = (\d+);',source)
+    if runtime!=[('900','120','180','10')]:raise ValueError('CAPTURE_DECLARED_BUDGET_DRIFT')
+    header=r'\[UnityTest\]\s*\[Timeout\(\(int\)\(RuntimeSeconds \* 1000\)\)\]\s*public IEnumerator '+METHOD+r'\(\)'
+    if len(re.findall(header,source))!=1 or len(re.findall(r'\[Timeout\s*\(',source))!=1:
+        raise ValueError('CAPTURE_RUNNER_BUDGET_UNBOUND')
+    if 'runtimeProgress.ElapsedSeconds >= RuntimeSeconds' not in source or 'Assert.Fail("Visual fixture runtime exceeded 900 seconds; this is a diagnostic failure, never a skip or pass")' not in source:
+        raise ValueError('CAPTURE_COOPERATIVE_GATE_DRIFT')
+    return int(runtime[0][0])*1000
+
+class CaptureTimeoutBudgetTests(unittest.TestCase):
+    def test_declared_runtime_and_method_attribute_share_one_budget(self):
+        self.assertEqual(capture_budget(FIXTURE.read_text()),900000)
+
+    def test_bound_attribute_is_on_exact_capture_case_only(self):
+        s=FIXTURE.read_text()
+        self.assertEqual(s.count('[UnityTest]'),1)
+        self.assertEqual(s.count('public IEnumerator '+METHOD+'()'),1)
+        self.assertNotIn('[assembly: Timeout',s)
+        self.assertNotIn('[TestFixture, Timeout',s)
+        self.assertLess(s.index('public sealed class VisualCandidateCaptureTests'),s.index('[Timeout('))
+
+    def test_cooperative_runtime_timeout_remains_failure(self):
+        s=FIXTURE.read_text();body=s.split('void CheckRuntimeBudget()',1)[1].split('void Milestone(',1)[0]
+        self.assertIn('>= RuntimeSeconds',body);self.assertIn('Milestone("runtime-timeout")',body)
+        self.assertIn('Assert.Fail(',body);self.assertNotIn('Assert.Ignore',body);self.assertNotIn('Assert.Pass',body)
+
+    def test_nested_diagnostic_budget_still180seconds(self):
+        s=DIAGNOSTIC.read_text();self.assertIn('const long BudgetMs = 180000;',s)
+        self.assertIn('timer.ElapsedMilliseconds < BudgetMs',s)
+        self.assertIn('"DIAGNOSTIC_TIME_BUDGET"',s)
+        self.assertIn('ThrowIfAny(errors); // Never let a diagnostic failure proceed to a normal frame.',s)
+
+    def test_diagnostic17cases_restore_checks_and_schema_remain(self):
+        p=TASK/'scripts/counter_light_diagnostics/diagnostic_plan.json';plan=json.loads(p.read_text())
+        self.assertEqual(len(plan['cases']),17);self.assertIn('ambient-sh-zero',plan['cases'])
+        s=DIAGNOSTIC.read_text();self.assertIn('PER_CASE_RESTORED_PIXEL_MISMATCH',s)
+        self.assertIn('FINAL_RESTORED_PIXEL_MISMATCH',s);self.assertIn('public int schemaVersion = 3;',s)
+
+    def test_capture_process_remains1800_other_process_budgets480(self):
+        tree=ast.parse((TASK/'scripts/safe_project_ci.py').read_text())
+        node=next(n.value for n in tree.body if isinstance(n,ast.Assign) and any(isinstance(t,ast.Name) and t.id=='PHASES' for t in n.targets))
+        # Other tuple members include imported assembly selectors; inspect only fixed budgets.
+        budgets={ast.literal_eval(k):ast.literal_eval(v.elts[3]) for k,v in zip(node.keys,node.values)}
+        self.assertEqual(budgets['capture'],1800)
+        for p in ('regression-edit','regression-play-core','regression-play-world'):self.assertEqual(budgets[p],480)
+        self.assertLess(capture_budget(FIXTURE.read_text()),budgets['capture']*1000)
+
+    def test_workflow_capture_and_job_budgets_unchanged(self):
+        text=(ROOT/'.github/workflows/lottery-visual-candidate.yml').read_text()
+        block=text.split('        id: capture\n',1)[1].split('      - name:',1)[0]
+        self.assertIn('timeout-minutes: 32',block);self.assertIn('timeout-minutes: 75',text)
+        self.assertIn('safe_project_ci.py capture --counter-light-diagnostic',block)
+
+    def test_normal23_frames_and_completion_gate_remain(self):
+        s=FIXTURE.read_text();self.assertIn('Assert.That(frames.Count, Is.EqualTo(23));',s)
+        self.assertIn('yield return ExteriorFixtureViews(true);',s)
+        self.assertIn('Capture("night-bill", "NORMAL_BILL_INFORMATION_HIERARCHY");',s)
+        self.assertIn('WriteReceipt(true);\n            Milestone("scenario-complete");',s)
+
+    def test_fixture_bound_in_code_contract(self):
+        contract=json.loads((TASK/'scripts/counter_light_diagnostics/code-contract.json').read_text())
+        rel=FIXTURE.relative_to(ROOT).as_posix();rows=[r for r in contract['files'] if r['repositoryPath']==rel]
+        self.assertEqual(len(rows),1);raw=FIXTURE.read_bytes()
+        self.assertEqual((rows[0]['bytes'],rows[0]['sha256']),(len(raw),hashlib.sha256(raw).hexdigest()))
+
+    def test_framework_manifest_and_lock_pin1_6_builtin(self):
+        p=TASK/'unity/Packages';manifest=json.loads((p/'manifest.json').read_text());lock=json.loads((p/'packages-lock.json').read_text())
+        self.assertEqual(manifest['dependencies']['com.unity.test-framework'],'1.6.0')
+        self.assertEqual(lock['dependencies']['com.unity.test-framework']['version'],'1.6.0')
+        self.assertEqual(lock['dependencies']['com.unity.test-framework']['source'],'builtin')
+
+    def test_missing_or_literal_runner_timeout_is_rejected(self):
+        s=FIXTURE.read_text();attribute='[Timeout((int)(RuntimeSeconds * 1000))]'
+        for replacement in ('','[Timeout(900000)]','[Timeout(180000)]','[Timeout(0)]','[Timeout((int)(RuntimeSeconds * 100))]'):
+            with self.subTest(replacement=replacement),self.assertRaisesRegex(ValueError,'CAPTURE_RUNNER_BUDGET_UNBOUND'):
+                capture_budget(s.replace(attribute,replacement,1))
+
+    def test_detached_declaration_or_cooperative_failure_is_rejected(self):
+        s=FIXTURE.read_text()
+        for old,new in [('RuntimeSeconds = 900','RuntimeSeconds = 901'),('runtimeProgress.ElapsedSeconds >= RuntimeSeconds','runtimeProgress.ElapsedSeconds >= 1800'),('Assert.Fail("Visual fixture runtime exceeded 900 seconds','Assert.Pass("Visual fixture runtime exceeded 900 seconds')]:
+            with self.subTest(replacement=new),self.assertRaises(ValueError):capture_budget(s.replace(old,new,1))
+
+    def test_budget_guard_is_in_executed_pre_native_entrypoint(self):
+        command='python3 tasks/lottery-shop/scripts/test_diagnostic_extensions_ci.py -v'
+        workflow=(ROOT/'.github/workflows/lottery-visual-candidate.yml').read_text()
+        self.assertEqual(workflow.count(command),1)
+        self.assertLess(workflow.index(command),workflow.index('id: safestart'))
+        source=(TASK/'scripts/test_diagnostic_extensions_ci.py').read_text()
+        self.assertLess(source.index('class CaptureTimeoutBudgetTests'),source.index("if __name__=='__main__'"))
 
 if __name__=='__main__':unittest.main()

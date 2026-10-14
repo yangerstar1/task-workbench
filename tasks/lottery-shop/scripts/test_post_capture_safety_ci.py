@@ -20,6 +20,8 @@ def fixture():
  'lightPositions':[dict(x=0,y=0,z=0) for _ in range(5)],'lightRotations':[dict(x=0,y=0,z=0,w=1) for _ in range(5)],
  'lightRanges':[10,4.8,4.2,4,2],'lightSpotAngles':[115]*5,'lightInnerSpotAngles':[70]*5,'lightShadows':['Soft','None','Soft','None','None'],
  'lightEnabled':[True]*5,'lightCullingMasks':[-1]*5,'probeIntensity':.85,'reflectionIntensity':1,'probeTextureId':'31','probeTextureName':'Day','ambientSH':[.2]*27,
+ 'ambientMode':'Trilight','ambientIntensity':1,'ambientSkyColor':dict(r=.68,g=.74,b=.80,a=1),'ambientEquatorColor':dict(r=.58,g=.57,b=.51,a=1),
+ 'ambientGroundColor':dict(r=.34,g=.31,b=.26,a=1),'ambientLight':dict(r=.68,g=.74,b=.80,a=1),
  'oakShader':'Universal Render Pipeline/Lit','oakMaterialId':10,'oakKeywords':['_METALLICSPECGLOSSMAP','_NORMALMAP'],
  'oakSmoothness':1,'oakNormalStrength':.28,'oakSpecularHighlights':1,'oakBaseMapId':'21','oakBaseMapName':'Walnut_v15_BaseColor',
  'oakBaseColor':dict(r=1,g=1,b=1,a=1),'oakBaseScale':dict(x=1,y=1),'oakBaseOffset':dict(x=0,y=0),
@@ -31,7 +33,7 @@ def fixture():
  'format':'ARGB32','orthographic':False,'targetCreated':True,'enabled':True,'urpStackIds':[],'urpSerializedSha256':'e'*64,
  'position':dict(x=1.57,y=1.2,z=-1.2),'rotation':dict(x=0,y=0,z=0,w=1),'background':dict(r=0,g=0,b=0,a=1),
  'projection':mat,'worldToCamera':mat,'viewport':[0,0,1,1],'allowHDR':False,'allowMSAA':True,'sRGB':False,'clearFlags':'SolidColor','fov':28,'aspect':1280/720,'near':.02,'far':30}
- d={'schemaVersion':2,'scope':'DIAGNOSTIC_COUNTER_LIGHT_NOT_ART_APPROVAL_NOT_G3_PASS','status':'COMPLETE_DIAGNOSTIC_RESTORED',
+ d={'schemaVersion':3,'scope':'DIAGNOSTIC_COUNTER_LIGHT_NOT_ART_APPROVAL_NOT_G3_PASS','status':'COMPLETE_DIAGNOSTIC_RESTORED',
  'complete':True,'restored':True,'propertiesRestored':True,'pixelRestoreProof':'VERIFIED_EXACT_PNG','diagnosticOptIn':True,'faultRequest':'','failureCode':'',
  'elapsedMs':1000,'frameCount':42,'graphicsDeviceType':'OpenGLCore','sourceCommit':'b'*40,'baselineSourceFreeze':v.PLAN['frozenCommit'],
  'ownedMaterialCountAfter':0,'ownedTargetCountAfter':0,'colorSpace':'Gamma','unityVersion':'6000.3.19f1','camera':cam,'initialControls':ctrl,
@@ -44,7 +46,9 @@ def fixture():
   for n in zeros.get(label,[]):cc['lightIntensities'][n]=0
   if label in ('probe-intensity-zero','reflection-controls-zero','counter-and-reflection-controls-zero'):cc['probeIntensity']=0
   if label in ('global-reflection-zero','reflection-controls-zero','counter-and-reflection-controls-zero'):cc['reflectionIntensity']=0
-  if label=='ambient-sh-zero':cc['ambientSH']=[0]*27
+  if label=='ambient-sh-zero':
+   cc['ambientSH']=[0]*27
+   for key in ['ambientSkyColor','ambientEquatorColor','ambientGroundColor','ambientLight']:cc[key]=dict(r=0,g=0,b=0,a=1)
   if label.startswith('oak-'):cc['oakMaterialId']=100+i
   if label=='oak-specular-highlights-off':cc['oakSpecularHighlights']=0;cc['oakKeywords']=sorted(cc['oakKeywords']+['_SPECULARHIGHLIGHTS_OFF'])
   if label=='oak-normal-flat':cc['oakNormalStrength']=0
@@ -58,7 +62,7 @@ def fixture():
 
 def full_receipt():
  d=fixture();d.update(runId='123',runAttempt='1',stateOrigin='SAME_RUNTIME_PHONE_PENDING_NO_INPUT_NO_SERVICE_ACTION',oakRendererInstanceId=6,oakMaterialInstanceId=10,oakShader='Universal Render Pipeline/Lit',oakBaseMap='Walnut_v15_BaseColor',oakBaseColor=dict(r=1,g=1,b=1,a=1))
- for row in d['cases']:row.update(sha256='a'*64,bytes=10001)
+ for row in d['cases']:row.update(sha256=('b' if row['id']=='ambient-sh-zero' else 'a')*64,bytes=10001)
  return d
 IDENT={'sourceCommit':'b'*40,'runId':'123','runAttempt':'1'}
 def encode(d):return json.dumps(d).encode()
@@ -176,4 +180,186 @@ class SafetyTests(unittest.TestCase):
  def test_malformed_cli_no_raw_stdout_stderr(self):
   p=subprocess.run([sys.executable,str(S/'counter_light_diagnostics/compose_evidence.py'),'PRIVATE_SENTINEL'],capture_output=True,text=True)
   self.assertNotEqual(p.returncode,0);self.assertEqual(p.stderr,'');self.assertNotIn('PRIVATE_SENTINEL',p.stdout)
+
+class MetaFlowDiagnosticTests(unittest.TestCase):
+ """Synthetic rejection diagnostics, never a native/schema acceptance claim."""
+ @classmethod
+ def setUpClass(cls):
+  import importlib.util
+  spec=importlib.util.spec_from_file_location('meta_flow_observer',S/'stage_a_inventory/g3_shop_inventory.py')
+  cls.inv=importlib.util.module_from_spec(spec);spec.loader.exec_module(cls.inv)
+  cls.materials=frozenset(cls.inv.load_policy().names)
+ def fixture(self,value,owner='externalObjects',key='first',root='ModelImporter'):
+  return ('fileFormatVersion: 2\nguid: '+'a'*32+'\n'+root+':\n  '+owner+':\n  - '+key+': '+value+'\n').encode()
+ def rejected(self,raw,asset='MODEL_INTERIOR'):
+  with self.assertRaises(self.inv.Rejected) as caught:
+   self.inv.screen_other_meta(raw,asset,self.materials)
+  return str(caught.exception)
+ def test_finite_alphabet_identical_at_all_three_export_boundaries(self):
+  self.assertEqual(len(self.inv.META_FLOW_CODES),900)
+  self.assertEqual(self.inv.META_FLOW_CODES,inventory.META_FLOW_CODES)
+  self.assertEqual(self.inv.META_FLOW_CODES,safe.META_FLOW_CODES)
+  for code in self.inv.META_FLOW_CODES:
+   self.assertIn(code,inventory.OBSERVER_CODES)
+   self.assertEqual(safe.error_code(ValueError('OBSERVER_'+code)),'OBSERVER_'+code)
+   self.assertLess(len(code),200)
+ def test_every_shape_has_a_bounded_explicit_example(self):
+  examples={
+   'MATERIAL_CORE_KNOWN':'{type: Material, assembly: UnityEngine.CoreModule, name: Warm_Oak}',
+   'MATERIAL_LEGACY_KNOWN':'{type: Material, assembly: UnityEngine, name: Warm_Oak}',
+   'MATERIAL_CORE_UNKNOWN_NAME':'{type: Material, assembly: UnityEngine.CoreModule, name: PRIVATE_SENTINEL}',
+   'TYPED_IDENTIFIER_OTHER':'{type: PRIVATE_SENTINEL, assembly: PRIVATE_SENTINEL, name: Warm_Oak}',
+   'INTEGER_PAIR_BOUNDED':'{43: -9223372036854775808}',
+   'INTEGER_PAIR_OTHER':'{43: 9223372036854775808}',
+   'RGBA_FINITE_BOUNDED':'{r: 1, g: -1.2e-3, b: 0, a: 1}',
+   'RGBA_OTHER':'{r: 1e999, g: 0, b: 0, a: 1}',
+   'REFERENCE_BOUNDED_NONCANONICAL':'{type: 3, guid: '+'b'*32+', fileID: 1}',
+   'REFERENCE_OTHER':'{type: 999, guid: '+'b'*32+', fileID: 1}',
+   'DUPLICATE_KEYS':'{type: Material, type: Material}',
+   'NESTED_COLLECTION':'{first: {PRIVATE_SENTINEL: 1}}',
+   'YAML_SPECIAL':'{first: &PRIVATE_SENTINEL 1}',
+   'LIMIT':'{'+', '.join('k'+str(i)+': 1' for i in range(9))+'}',
+   'OTHER':'{PRIVATE_SENTINEL: 1}'}
+  self.assertEqual(set(examples),set(self.inv.META_FLOW_SHAPES))
+  for expected,value in examples.items():
+   with self.subTest(shape=expected):
+    self.assertEqual(self.inv.meta_flow_shape(value,self.materials),expected)
+    code=self.rejected(self.fixture(value))
+    self.assertEqual(code,'META_UNSUPPORTED_FLOW__MODEL_INTERIOR__MODEL_EXTERNAL_FIRST__'+expected)
+    self.assertNotIn('PRIVATE_SENTINEL',code);self.assertNotIn('Warm_Oak',code);self.assertNotIn('b'*32,code)
+ def test_exact_four_model_identities_and_existing_roles_only(self):
+  expected={'LotteryShop_Interior':'MODEL_INTERIOR','Tool_inspection_lamp':'MODEL_LAMP',
+            'Tool_large_prize_stamp':'MODEL_STAMP','Tool_small_prize_box':'MODEL_BOX'}
+  for name,label in expected.items():
+   self.assertEqual(self.inv.meta_flow_asset(self.inv.SHOP+'/'+name+'.fbx.meta','SOURCE_PAIRED_META'),label)
+  roles={'SOURCE_PAIRED_META':'SOURCE_PAIRED_META','SOURCE_DIRECTORY_META':'SOURCE_DIRECTORY_META',
+         'GENERATED_DIRECTORY_META':'GENERATED_DIRECTORY_META','GENERATED_ASSET_META':'GENERATED_ASSET_META',
+         'BOUNDED_MESH_CANDIDATE_META':'BOUNDED_MESH_META'}
+  for role,label in roles.items():self.assertEqual(self.inv.meta_flow_asset('/PRIVATE_SENTINEL',role),label)
+  self.assertEqual(self.inv.meta_flow_asset('/PRIVATE_SENTINEL','PRIVATE_SENTINEL'),'OTHER_META')
+  code=self.rejected(self.fixture('{unknown: 1}'),asset='/PRIVATE_SENTINEL')
+  self.assertIn('__OTHER_META__',code);self.assertNotIn('PRIVATE_SENTINEL',code)
+ def test_fixed_field_ids_and_no_unknown_key_or_root_export(self):
+  for owner,stem in [('externalObjects','MODEL_EXTERNAL'),('internalIDToNameTable','MODEL_INTERNAL_ID')]:
+   for key in ['first','second']:
+    code=self.rejected(self.fixture('{unknown: 1}',owner,key))
+    self.assertIn('__'+stem+'_'+key.upper()+'__',code)
+  code=self.rejected(self.fixture('{unknown: 1}','PRIVATE_SENTINEL','PRIVATE_SENTINEL'))
+  self.assertIn('__MODEL_OTHER__',code);self.assertNotIn('PRIVATE_SENTINEL',code)
+  code=self.rejected(self.fixture('{unknown: 1}',root='PRIVATE_SENTINEL'))
+  self.assertIn('__OTHER__',code);self.assertNotIn('PRIVATE_SENTINEL',code)
+ def test_known_type_assembly_and_material_membership_cannot_be_spoofed(self):
+  for value in ['{type: Material, assembly: UnityEngine.CoreModule, name: Warm_Oak_PRIVATE_SENTINEL}',
+                '{type: Material, assembly: UnityEngine.CoreModule, name: "Warm_Oak"}',
+                '{type: Material, assembly: UnityEngine.CoreModule, name: Warm_Oak, extra: 1}',
+                '{type: MaterialX, assembly: UnityEngine.CoreModule, name: Warm_Oak}',
+                '{type: Material, assembly: UnityEngine.CoreModuleX, name: Warm_Oak}']:
+   shape=self.inv.meta_flow_shape(value,self.materials)
+   self.assertNotIn(shape,{'MATERIAL_CORE_KNOWN','MATERIAL_LEGACY_KNOWN'})
+   self.assertIn(self.rejected(self.fixture(value)),self.inv.META_FLOW_CODES)
+ def test_original_accepted_flow_and_plain_scalar_examples_still_accepted(self):
+  for value in ['', '{}','[]','0','-1','Plain_Name',
+                '{fileID: 0}','{fileID: -123, guid: '+'a'*32+', type: 3}',
+                '{x: 0, y: 1}','{x: -1.5, y: 2e-3, z: 1}',
+                '{x: 0, y: 0, z: 0, w: 1}']:
+   with self.subTest(value=value):self.inv.screen_other_meta(self.fixture(value),'MODEL_INTERIOR',self.materials)
+ def test_duplicate_nested_anchor_tag_alias_and_unknown_flows_stay_rejected(self):
+  for value in ['{type: Material, type: Material}', '{a: {b: 1}}','{a: [1]}',
+                '{a: &PRIVATE_SENTINEL 1}','{a: *PRIVATE_SENTINEL}','{a: !!str PRIVATE_SENTINEL}',
+                '{"PRIVATE_SENTINEL": 1}','{r: NaN, g: 0, b: 0, a: 1}',
+                '{r: Infinity, g: 0, b: 0, a: 1}', '{unknown: PRIVATE_SENTINEL}']:
+   code=self.rejected(self.fixture(value));self.assertIn(code,self.inv.META_FLOW_CODES);self.assertNotIn('PRIVATE_SENTINEL',code)
+ def test_original_utf8_size_sensitive_structure_and_duplicate_guards_remain(self):
+  cases=[(b'\xff','META_ENCODING'),(b'a: '+b'x'*1024+b'\n','META_LINE_SIZE'),
+         (b'password: PRIVATE_SENTINEL\n','META_SENSITIVE_KEY'),
+         (b'userData: PRIVATE_SENTINEL\n','META_SENSITIVE_OR_BUNDLE_VALUE'),
+         (b'a: 1\na: 2\n','META_DUPLICATE_KEY'),
+         (b'"PRIVATE_SENTINEL": 1\n','META_UNSUPPORTED_SYNTAX'),
+         (b'a: \n    b: 1\n','META_UNSUPPORTED_STRUCTURE'),
+         (b'a: []\n  b: 1\n','META_UNSUPPORTED_STRUCTURE'),
+         (b'a: \n'+b'  '*11+b'b: 1\n','META_UNSUPPORTED_STRUCTURE')]
+  for raw,expected in cases:
+   with self.subTest(expected=expected):self.assertEqual(self.rejected(raw),expected)
+ def test_classifier_length_pair_count_depth_and_numeric_limits(self):
+  for value in [None,[],{},b'x','{a: '+'x'*1024+'}','\u4e2d']:
+   self.assertEqual(self.inv.meta_flow_shape(value,self.materials),'LIMIT')
+  self.assertEqual(self.inv.meta_flow_shape('{'*500+'}'*500,self.materials),'NESTED_COLLECTION')
+  for value in ['{43: 9223372036854775808}','{43: -9223372036854775809}','{-1: 1}']:
+   self.assertEqual(self.inv.meta_flow_shape(value,self.materials),'INTEGER_PAIR_OTHER')
+  for value in ['{r: 2147483649, g: 0, b: 0, a: 1}','{r: 1e999, g: 0, b: 0, a: 1}',
+                '{r: '+('1'*33)+', g: 0, b: 0, a: 1}']:
+   self.assertEqual(self.inv.meta_flow_shape(value,self.materials),'RGBA_OTHER')
+  for value in ['{fileID: 9223372036854775808}','{fileID: 1, guid: BAD, type: 3}',
+                '{type: 4, guid: '+'a'*32+', fileID: 1}']:
+   self.assertEqual(self.inv.meta_flow_shape(value,self.materials),'REFERENCE_OTHER')
+ def test_rejection_emits_original_two_field_envelope_exit3_no_report(self):
+  raw=self.fixture('{type: Material, assembly: UnityEngine.CoreModule, name: Warm_Oak}')
+  with tempfile.TemporaryDirectory() as directory:
+   root=pathlib.Path(directory);project=root/'project';project.mkdir();out=root/'never-written.json'
+   ident={'sourceCommit':'1'*40,'gameSourceCommit':self.inv.PIN,'triggerCommit':'2'*40,
+          'runId':'123','runAttempt':'1','context':'SHOP_IMPORT_INVENTORY_DIAGNOSTIC'}
+   argv=['observer','before','--project',str(project),'--identity',str(root/'identity.json'),'--output',str(out)]
+   def rejected_snapshot(*args):self.inv.screen_other_meta(raw,'MODEL_INTERIOR',self.materials)
+   with mock.patch.object(sys,'argv',argv),mock.patch.object(self.inv,'load_policy'),\
+        mock.patch.object(self.inv,'load_local',return_value=json.dumps(ident).encode()),\
+        mock.patch.object(self.inv,'snapshot',side_effect=rejected_snapshot),\
+        mock.patch('sys.stdout',new_callable=io.StringIO) as captured:
+    self.assertEqual(self.inv.main(),3)
+   payload=json.loads(captured.getvalue());self.assertEqual(set(payload),{'status','code'})
+   self.assertEqual(payload['status'],'BLOCKED');self.assertIn(payload['code'],self.inv.META_FLOW_CODES)
+   self.assertFalse(out.exists());self.assertNotIn('Warm_Oak',captured.getvalue());self.assertNotIn(str(root),captured.getvalue())
+ def test_every_fixed_code_survives_adapter_while_unknown_and_extra_fields_fail(self):
+  with tempfile.TemporaryDirectory() as directory:
+   home=pathlib.Path(directory)
+   for code in self.inv.META_FLOW_CODES:
+    result=subprocess.CompletedProcess([],3,stdout=json.dumps({'status':'BLOCKED','code':code}).encode(),stderr=b'')
+    with mock.patch.object(inventory.subprocess,'run',return_value=result),self.assertRaises(inventory.Blocked) as caught:
+     inventory.observer_cli(home,None,{},home,'before')
+    self.assertEqual(str(caught.exception),'OBSERVER_'+code)
+   good=next(iter(self.inv.META_FLOW_CODES))
+   for payload in [{'status':'BLOCKED','code':good,'extra':'PRIVATE_SENTINEL'},
+                   {'status':'BLOCKED','code':good+'__PRIVATE_SENTINEL'},
+                   {'status':'BLOCKED','code':float('nan')}]:
+    result=subprocess.CompletedProcess([],3,stdout=json.dumps(payload).encode(),stderr=b'')
+    with mock.patch.object(inventory.subprocess,'run',return_value=result),self.assertRaises(ValueError) as caught:
+     inventory.observer_cli(home,None,{},home,'before')
+    self.assertNotIn('PRIVATE_SENTINEL',str(caught.exception));self.assertNotEqual(str(caught.exception),'OBSERVER_'+good)
+ def test_status_schema_and_collector_retain_finite_code_without_new_fields(self):
+  code='OBSERVER_'+self.rejected(self.fixture('{type: Material, assembly: UnityEngine.CoreModule, name: PRIVATE_SENTINEL}'))
+  with tempfile.TemporaryDirectory() as directory:
+   root=pathlib.Path(directory);old=copy.deepcopy(safe.ACTIVE)
+   try:
+    with mock.patch.dict(os.environ,{'GITHUB_WORKSPACE':str(root),'GITHUB_SHA':'b'*40,'GITHUB_RUN_ID':'123','GITHUB_RUN_ATTEMPT':'1'}):
+     safe.ACTIVE.clear();safe.begin('inventory','after');safe.checkpoint('OBSERVER')
+     with mock.patch('sys.stdout',new_callable=io.StringIO) as captured:self.assertEqual(safe.fail(ValueError(code)),3)
+     path=root/e.TASK/'evidence/visual-candidate/post-inventory-after.json';raw=path.read_bytes()
+     data=json.loads(raw);self.assertEqual(set(data),safe.STATUS_KEYS);self.assertEqual(data['code'],code)
+     self.assertEqual(data['acceptance'],'NOT_EVALUATED');self.assertNotIn('PRIVATE_SENTINEL',raw.decode())
+     self.assertEqual(safe.screened_status(raw,path.name,IDENT),raw)
+     for change in [{'code':code+'__PRIVATE_SENTINEL'},{'code':float('nan')},{'extra':'PRIVATE_SENTINEL'}]:
+      bad=(json.dumps(dict(data,**change),sort_keys=True,separators=(',',':'))+'\n').encode()
+      self.assertRaises(ValueError,safe.screened_status,bad,path.name,IDENT)
+     report=safe.collect_statuses(root,IDENT);self.assertEqual([x['file'] for x in report['files']],[path.name])
+     staged=root/e.TASK/'artifacts/post-capture-screened-status'/path.name;self.assertEqual(staged.read_bytes(),raw)
+   finally:safe.ACTIVE.clear();safe.ACTIVE.update(old)
+ def test_observer_no_follow_and_hardlink_guards_remain(self):
+  with tempfile.TemporaryDirectory() as directory:
+   root=pathlib.Path(directory);source=root/'file.meta';source.write_text('a: 1\n')
+   linked=root/'link.meta';linked.symlink_to(source)
+   with self.inv.SecureTree(root) as tree:self.assertRaises(self.inv.Rejected,tree.read,'link.meta',65536)
+   linked.unlink();os.link(source,linked)
+   with self.inv.SecureTree(root) as tree:self.assertRaises(self.inv.Rejected,tree.read,'file.meta',65536)
+   folder=root/'real';folder.mkdir();(root/'symlink-directory').symlink_to(folder,target_is_directory=True)
+   self.assertRaises(self.inv.Rejected,self.inv.SecureTree,root/'symlink-directory')
+ def test_observe_calls_diagnostic_only_after_policy_classification(self):
+  # Minimal synthetic policy/tree, not a Unity fixture or native result.
+  path=self.inv.SHOP+'/LotteryShop_Interior.fbx.meta';raw=self.fixture('{43: 4300000}','internalIDToNameTable')
+  policy=mock.Mock();policy.allowed_dirs=set();policy.sources={};policy.pothos=set();policy.names={'Warm_Oak':{}}
+  policy.classify.return_value='SOURCE_PAIRED_META';policy.limit.return_value=65536
+  tree=mock.Mock();tree.walk.return_value=[path];tree.exists.return_value=False;tree.read.return_value=raw
+  with self.assertRaises(self.inv.Rejected) as caught:self.inv.observe(tree,policy,'AFTER')
+  self.assertEqual(str(caught.exception),'META_UNSUPPORTED_FLOW__MODEL_INTERIOR__MODEL_INTERNAL_ID_FIRST__INTEGER_PAIR_BOUNDED')
+  policy.classify.assert_called_once_with(path);tree.read.assert_called_once_with(path,65536)
+  tree.finish.assert_not_called()
+
 if __name__=='__main__':unittest.main()

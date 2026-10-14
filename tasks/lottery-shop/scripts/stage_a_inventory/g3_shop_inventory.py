@@ -381,7 +381,120 @@ def texture_projection(data):
     return {scope+"/"+key: value for (scope,key),value in sorted(seen.items())}
 
 
-def screen_other_meta(raw):
+# Finite diagnostic alphabet only. None of these labels is copied from input.
+META_FLOW_ASSETS = ('MODEL_INTERIOR', 'MODEL_LAMP', 'MODEL_STAMP', 'MODEL_BOX',
+                    'SOURCE_PAIRED_META', 'SOURCE_DIRECTORY_META',
+                    'GENERATED_DIRECTORY_META', 'GENERATED_ASSET_META',
+                    'BOUNDED_MESH_META', 'OTHER_META')
+META_FLOW_FIELDS = ('MODEL_EXTERNAL_FIRST', 'MODEL_EXTERNAL_SECOND',
+                    'MODEL_INTERNAL_ID_FIRST', 'MODEL_INTERNAL_ID_SECOND',
+                    'MODEL_OTHER', 'OTHER')
+META_FLOW_SHAPES = ('MATERIAL_CORE_KNOWN', 'MATERIAL_LEGACY_KNOWN',
+                    'MATERIAL_CORE_UNKNOWN_NAME', 'TYPED_IDENTIFIER_OTHER',
+                    'INTEGER_PAIR_BOUNDED', 'INTEGER_PAIR_OTHER',
+                    'RGBA_FINITE_BOUNDED', 'RGBA_OTHER',
+                    'REFERENCE_BOUNDED_NONCANONICAL', 'REFERENCE_OTHER',
+                    'DUPLICATE_KEYS', 'NESTED_COLLECTION', 'YAML_SPECIAL',
+                    'LIMIT', 'OTHER')
+META_FLOW_CODES = frozenset('META_UNSUPPORTED_FLOW__' + asset + '__' + field + '__' + shape
+                            for asset in META_FLOW_ASSETS for field in META_FLOW_FIELDS
+                            for shape in META_FLOW_SHAPES)
+
+
+def meta_flow_asset(path, role):
+    # Exact frozen source identities, then already-classified policy role only.
+    models = {SHOP + '/LotteryShop_Interior.fbx.meta': 'MODEL_INTERIOR',
+              SHOP + '/Tool_inspection_lamp.fbx.meta': 'MODEL_LAMP',
+              SHOP + '/Tool_large_prize_stamp.fbx.meta': 'MODEL_STAMP',
+              SHOP + '/Tool_small_prize_box.fbx.meta': 'MODEL_BOX'}
+    if path in models: return models[path]
+    roles = {'SOURCE_PAIRED_META': 'SOURCE_PAIRED_META',
+             'SOURCE_DIRECTORY_META': 'SOURCE_DIRECTORY_META',
+             'GENERATED_DIRECTORY_META': 'GENERATED_DIRECTORY_META',
+             'GENERATED_ASSET_META': 'GENERATED_ASSET_META',
+             'BOUNDED_MESH_CANDIDATE_META': 'BOUNDED_MESH_META'}
+    return roles.get(role, 'OTHER_META')
+
+
+def meta_flow_field(containers, depth, key):
+    if containers.get(0) != ('ModelImporter', ''): return 'OTHER'
+    if depth == 4:
+        owner = containers.get(2)
+        if owner == ('externalObjects', ''):
+            if key == 'first': return 'MODEL_EXTERNAL_FIRST'
+            if key == 'second': return 'MODEL_EXTERNAL_SECOND'
+        if owner == ('internalIDToNameTable', ''):
+            if key == 'first': return 'MODEL_INTERNAL_ID_FIRST'
+            if key == 'second': return 'MODEL_INTERNAL_ID_SECOND'
+    return 'MODEL_OTHER'
+
+
+def meta_flow_shape(value, material_names):
+    """Classify a REJECTED flow; never parses YAML or returns input text.
+
+    Maximum 1024 ASCII characters, eight flat pairs, zero nested collections.
+    No recursion, deserialization, eval, name/path/GUID export or acceptance.
+    Numbers are only tested after lexical length bounds. The supplied material
+    set comes from the exact-hash frozen policy; membership emits one fixed label.
+    """
+    if type(value) is not str or not 0 < len(value) <= 1024 or not value.isascii():
+        return 'LIMIT'
+    if any(c in value for c in '&*!'): return 'YAML_SPECIAL'
+    if value.count('{') > 1 or value.count('}') > 1 or '[' in value or ']' in value:
+        return 'NESTED_COLLECTION'
+    if not (value.startswith('{') and value.endswith('}')): return 'OTHER'
+    parts = value[1:-1].split(',')
+    if len(parts) > 8: return 'LIMIT'
+    pairs = {}
+    for part in parts:
+        if ':' not in part: return 'OTHER'
+        key, scalar = (x.strip(' ') for x in part.split(':', 1))
+        if not re.fullmatch(r'[A-Za-z_][A-Za-z0-9_]{0,63}|-?[0-9]{1,19}', key):
+            return 'OTHER'
+        if key in pairs: return 'DUPLICATE_KEYS'
+        pairs[key] = scalar
+    keys = set(pairs)
+    if keys == {'type', 'assembly', 'name'}:
+        name = pairs['name']
+        bounded_name = re.fullmatch(r'[A-Za-z][A-Za-z0-9_]{0,63}', name) is not None
+        if pairs['type'] == 'Material' and bounded_name:
+            known = name in material_names
+            if pairs['assembly'] == 'UnityEngine.CoreModule':
+                return 'MATERIAL_CORE_KNOWN' if known else 'MATERIAL_CORE_UNKNOWN_NAME'
+            if pairs['assembly'] == 'UnityEngine' and known: return 'MATERIAL_LEGACY_KNOWN'
+        return 'TYPED_IDENTIFIER_OTHER'
+    if len(pairs) == 1 and re.fullmatch(r'-?[0-9]{1,19}', next(iter(pairs))):
+        key, scalar = next(iter(pairs.items()))
+        bounded = (re.fullmatch(r'[0-9]{1,3}', key) is not None and
+                   re.fullmatch(r'-?[0-9]{1,19}', scalar) is not None and
+                   -(2**63) <= int(scalar) < 2**63)
+        return 'INTEGER_PAIR_BOUNDED' if bounded else 'INTEGER_PAIR_OTHER'
+    if keys == {'r', 'g', 'b', 'a'}:
+        bounded = all(len(v) <= 32 and re.fullmatch(NUMBER, v) is not None and
+                      math.isfinite(float(v)) and abs(float(v)) <= 2147483648
+                      for v in pairs.values())
+        return 'RGBA_FINITE_BOUNDED' if bounded else 'RGBA_OTHER'
+    if keys in ({'fileID'}, {'fileID', 'guid', 'type'}):
+        file_id = pairs['fileID']
+        bounded = (re.fullmatch(r'-?[0-9]{1,19}', file_id) is not None and
+                   -(2**63) <= int(file_id) < 2**63)
+        if len(keys) == 3:
+            bounded = (bounded and re.fullmatch(r'[0-9a-f]{32}', pairs['guid']) is not None
+                       and pairs['type'] in {'0', '1', '2', '3'})
+        return 'REFERENCE_BOUNDED_NONCANONICAL' if bounded else 'REFERENCE_OTHER'
+    return 'OTHER'
+
+
+def meta_flow_failure(asset, containers, depth, key, value, material_names):
+    asset = asset if asset in META_FLOW_ASSETS else 'OTHER_META'
+    field = meta_flow_field(containers, depth, key)
+    shape = meta_flow_shape(value, material_names)
+    code = 'META_UNSUPPORTED_FLOW__' + asset + '__' + field + '__' + shape
+    # Defense in depth: arbitrary diagnostic text never reaches the envelope.
+    return code if code in META_FLOW_CODES else 'META_UNSUPPORTED_FLOW'
+
+
+def screen_other_meta(raw, asset='OTHER_META', material_names=frozenset()):
     """Conservative YAML-shaped screen; never a native-importer schema approval.
 
     Accept canonical block mapping/list-of-mapping syntax, empty collections,
@@ -442,8 +555,9 @@ def screen_other_meta(raw):
                 for axes in [('x','y'), ('x','y','z'), ('x','y','z','w')]:
                     vector = re.fullmatch(r'\{' + ', '.join(axis+': ('+number+')' for axis in axes) + r'\}', value)
                     if vector: break
-                require(reference is not None or (vector is not None and all(len(v) <= 32 and math.isfinite(float(v)) and abs(float(v)) <= 2147483648 for v in vector.groups())),
-                        'META_UNSUPPORTED_FLOW')
+                if not (reference is not None or (vector is not None and all(len(v) <= 32 and math.isfinite(float(v)) and abs(float(v)) <= 2147483648 for v in vector.groups()))):
+                    # Diagnostic refinement only: the original accepted set is unchanged.
+                    raise Rejected(meta_flow_failure(asset, containers, depth, key, value, material_names))
             else:
                 # Canonical plain scalar only. Quotes/escapes, YAML tags/anchors,
                 # aliases, comments, flow lists, block scalars, complex keys and
@@ -484,7 +598,7 @@ def observe(tree, policy, phase):
             if path.endswith('/Night.exr.meta'):
                 require(row['safeFields'].get('root/guid') == 'a54ec87d23ac49ea83e7cf7bad94381a', 'REFLECTION_GUID')
         elif source is None and path.endswith('.meta'):
-            screen_other_meta(raw)
+            screen_other_meta(raw, meta_flow_asset(path, role), frozenset(policy.names))
         records.append(row)
     tree.finish()
     return records
