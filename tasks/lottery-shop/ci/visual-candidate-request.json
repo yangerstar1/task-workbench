@@ -1,15 +1,19 @@
 {
-  "requestId": "lottery-visual-20261014-32",
-  "sourceCommit": "58b9d66bfddc397944c2c4a5d6f3fe5228819872",
+  "schemaVersion": 3,
+  "requestId": "lottery-visual-20261014-33",
+  "sourceCommit": "46ec66c4f18d232a706e19a7892e46d315db324f",
+  "purpose": "DIAGNOSTIC_VISUAL_CANDIDATE_NOT_G3_PASS",
   "sourceReview": {
-    "sourceCommit": "58b9d66bfddc397944c2c4a5d6f3fe5228819872",
+    "sourceCommit": "46ec66c4f18d232a706e19a7892e46d315db324f",
     "status": "APPROVED_FOR_DIAGNOSTIC_CAPTURE_ONLY",
     "reviewId": "visual-source-20261014-42",
     "reviewer": "independent-source-review",
     "reviewedAtUtc": "2026-10-14T15:01:04Z"
   },
+  "executionProfile": "EARLY_STOP_ON_PREBUILD_FAILURE",
+  "androidBuild": "DEVELOPMENT_CANDIDATE_APK",
   "androidReview": {
-    "sourceCommit": "58b9d66bfddc397944c2c4a5d6f3fe5228819872",
+    "sourceCommit": "46ec66c4f18d232a706e19a7892e46d315db324f",
     "status": "APPROVED_FOR_DIAGNOSTIC_ANDROID_ONLY",
     "reviewId": "android-source-20261014-42",
     "reviewer": "independent-source-review",
