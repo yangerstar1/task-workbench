@@ -47,7 +47,7 @@ def receipt():
             dayPhase="NIGHT_BILL" if night else "CLOSING_PREP",fixturePoseRestored=True,fixtureStateBefore=f["stateSha256"],fixtureStateAfter=f["stateSha256"],sha256=("b" if night else "a")*64,
             exterior=dict(basis="MATERIAL_METADATA_NOT_PIXEL_ACCEPTANCE",backdropShader="Lottery/G3/ExteriorBackdrop",textureName="Street-night" if night else "Street-day",
                 textureWidth=1882 if night else 1881,textureHeight=836,exposure=.72 if night else 1,backdropRendererCount=1,backdropFrustumRendererCount=1,glassFrustumRendererCount=1,
-                transparentGlassMaterialCount=1,glassAlpha=.5,glassSurface=1,glassZWrite=0,glassRenderQueue=3000,nearFieldTriangles=60,nearFieldColliderCount=0,feltNormalScale=.6,linerSmoothness=.08,brassSmoothness=1))
+                transparentGlassMaterialCount=1,glassAlpha=.5,glassSurface=1,glassZWrite=0,glassRenderQueue=3000,nearFieldTriangles=60,nearFieldColliderCount=0,feltNormalScale=.6,linerSmoothness=.08,brassSmoothness=.72))
     return dict(schemaVersion=5, candidatePresentation="V31_SCENARIO_STATE_VIEWS_NOT_WORLD_INPUT_PASS", scope=candidate.SCOPE, sourceCommit="1" * 40, runId="12345", runAttempt="1", unityVersion="6000.3.19f1",
                 graphicsDeviceType="OpenGLCore", inputEvidence="SIMULATED_UI_INPUT_WITH_DECLARED_SCENARIO_SETUP",
                 captureMethod="URP_STANDARD_REQUEST_READPIXELS", hudVisibilityBasis="ENABLED_CAMERA_LAYER_AND_FRUSTUM_TEST_NOT_PIXEL_OCCLUSION", complete=True, frames=frames, actions=[])

@@ -133,12 +133,12 @@ class Tests(unittest.TestCase):
   f=lambda x:struct.unpack('<f',struct.pack('<f',x))[0]
   bits=lambda x:struct.unpack('<I',struct.pack('<f',x))[0]
   for item in items:
-   r=f(item['roughness']);expected=1 if item.get('roughnessTexture') else 1-max(0,min(1,r));self.assertEqual(bits(f(expected)),bits(expected));self.assertTrue(0<=f(expected)<=1)
+   r=f(item['roughness']);expected=item.get('packedSmoothnessScale',1) if item.get('roughnessTexture') else 1-max(0,min(1,r));self.assertEqual(bits(f(expected)),bits(expected));self.assertTrue(0<=f(expected)<=1)
   for r in (-100,-0.0,0,2**-149,.5,1,100):self.assertEqual(bits(f(1-max(0,min(1,f(r))))),bits(1-max(0,min(1,f(r)))))
  def test_smoothness_source_zero_tolerance_and_no_setter_change(self):
   s=self.source();self.assertIn('material.SetFloat("_Smoothness",1-Mathf.Clamp01(item.roughness))',s);self.assertIn('return BitConverter.ToUInt32(BitConverter.GetBytes(value),0)',s)
   body=s.split('static void RequireSmoothness(',1)[1].split('static void RequireMaterial',1)[0]
-  self.assertIn('FiniteSingleBits(actual)&&FiniteSingleBits(expected)&&actual==expected',body);self.assertIn('trace?.ObserveSmoothness(actual,expected)',body)
+  self.assertIn('packed?PackedSmoothness(item):1-Mathf.Clamp01(item.roughness)',body);self.assertIn('FiniteSingleBits(actual)&&FiniteSingleBits(expected)&&actual==expected',body);self.assertIn('trace?.ObserveSmoothness(actual,expected)',body)
   for forbidden in ('Approximately','Abs(','SetFloat','epsilon','tolerance'):self.assertNotIn(forbidden,body)
  def test_stem_id34_failure_preserved(self):
   v=failure();v.update(materialId=34,firstFailureMaterial=34,smoothnessMaterialId=34);ci.validate(v,IDENT);p,raw,ok=self.export(v);self.assertFalse(ok);self.assertEqual(p.read_bytes(),raw)
@@ -216,10 +216,10 @@ class Tests(unittest.TestCase):
   manifest=json.loads((base/'Shop/Resources/G3/Shop/materials.json').read_text())['materials'];items={x['name']:x for x in manifest}
   self.assertEqual(items['Dark_Green_Felt']['normalStrength'],.6);self.assertEqual(items['Tool_Dock_Liner']['normalStrength'],.45)
   self.assertEqual(items['Tool_Dock_Liner']['roughness'],.92);self.assertFalse(items['Tool_Dock_Liner'].get('roughnessTexture'))
-  self.assertEqual(items['Brass_Worn']['normalStrength'],.18);self.assertTrue(items['Brass_Worn']['roughnessTexture'])
+  self.assertEqual({k:items[k]['packedSmoothnessScale'] for k in ('Warm_Oak','Brass_Worn','Dark_Green_Felt')},{'Warm_Oak':.78,'Brass_Worn':.72,'Dark_Green_Felt':.40});self.assertEqual(items['Brass_Worn']['normalStrength'],.18);self.assertTrue(items['Brass_Worn']['roughnessTexture'])
   fixture=(base/'Tests/VisualCandidate/VisualCandidateCaptureTests.cs').read_text()
   for token in ('felt.GetFloat("_BumpScale"), Is.EqualTo(.60f).Within(.0001f)','liner.GetFloat("_Smoothness"), Is.EqualTo(.08f).Within(.0001f)',
-                'brass.GetFloat("_BumpScale"), Is.EqualTo(.18f).Within(.0001f)','brass.GetFloat("_Smoothness"), Is.EqualTo(1f).Within(.0001f)',
+                'brass.GetFloat("_BumpScale"), Is.EqualTo(.18f).Within(.0001f)','brass.GetFloat("_Smoothness"), Is.EqualTo(.72f).Within(.0001f)',
                 'RequireOwnedRuntimeMaterial(felt,"Dark_Green_Felt")','RequireOwnedRuntimeMaterial(liner,"Tool_Dock_Liner")','RequireOwnedRuntimeMaterial(brass,"Brass_Worn")'):
    self.assertIn(token,fixture)
 

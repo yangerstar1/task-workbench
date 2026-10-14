@@ -12,7 +12,8 @@ FIELDS=frozenset('fileFormatVersion guid ModelImporter serializedVersion interna
 ATOMS=frozenset(('Material','UnityEngine.CoreModule','UnityEngine','true','false'))
 PUNCT={'{':'MAP_OPEN','}':'MAP_CLOSE','[':'LIST_OPEN',']':'LIST_CLOSE',':':'COLON',',':'COMMA'}
 KINDS=frozenset(('EMPTY','EMPTY_QUOTED','INTEGER','FLOAT','EXPONENT','NUMERIC_LIMIT','GUID','TEXT_REDACTED'))
-TOKENS=KINDS|frozenset(PUNCT.values())|frozenset('FIELD:'+k for k in FIELDS)|frozenset('ENUM:'+k for k in ATOMS)
+AVATAR_ZERO='AVATAR_INSTANCE_ID_ZERO'
+TOKENS=frozenset((AVATAR_ZERO,))|KINDS|frozenset(PUNCT.values())|frozenset('FIELD:'+k for k in FIELDS)|frozenset('ENUM:'+k for k in ATOMS)
 SENSITIVE={'userdata','assetbundlename','assetbundlevariant'}
 SECRET=re.compile(r'password|passcode|secret|token|credential|license|privatekey|apikey',re.I)
 NUMBER=re.compile(r'[+-]?[0-9]+(?:\.[0-9]+)?(?:[eE][+-]?[0-9]+)?\Z')
@@ -81,7 +82,8 @@ def project(raw,identity):
    if key=='guid':require(re.fullmatch('[0-9a-f]{32}',value) is not None)
    if key=='ModelImporter':require(value=='')
   else:require(owner=='ModelImporter')
-  tokens=value_tokens(value);token_count+=len(tokens);require(token_count<=MAX_TOKENS)
+  tokens=([AVATAR_ZERO] if owner=='ModelImporter' and indent==2 and not dash and
+          key=='lastHumanDescriptionAvatarSource' and value=='{instanceID: 0}' else value_tokens(value));token_count+=len(tokens);require(token_count<=MAX_TOKENS)
   rows.append(dict(line=index,indent=indent,dash=bool(dash),key=key if key in FIELDS else 'INTEGER_KEY' if key.isdigit() else 'UNKNOWN_KEY',tokens=tokens))
   previous_depth=depth;previous_key=key
  require(roots=={'fileFormatVersion','guid','ModelImporter'})
@@ -94,11 +96,15 @@ def screen(value):
  for key in ['runId','runAttempt']:require(type(value[key])is str and re.fullmatch('[1-9][0-9]{0,19}',value[key]) is not None)
  require(type(value['sourceSha256'])is str and re.fullmatch('[0-9a-f]{64}',value['sourceSha256']) is not None)
  require(type(value['sourceBytes'])is int and 0<value['sourceBytes']<=MAX_INPUT and type(value['sourceLines'])is int and 0<value['sourceLines']<=MAX_LINES)
- require(type(value['rows'])is list and len(value['rows'])==value['sourceLines']);total=0
+ require(type(value['rows'])is list and len(value['rows'])==value['sourceLines']);total=0;root_slot=None
  for i,row in enumerate(value['rows'],1):
   require(type(row)is dict and set(row)=={'line','indent','dash','key','tokens'} and type(row['line'])is int and row['line']==i and type(row['indent'])is int and 0<=row['indent']<=20 and row['indent']%2==0 and type(row['dash'])is bool)
   require(type(row['key'])is str and row['key'] in FIELDS|{'UNKNOWN_KEY','INTEGER_KEY'})
   require(type(row['tokens'])is list and 0<len(row['tokens'])<=256 and all(type(t)is str and t in TOKENS for t in row['tokens']));total+=len(row['tokens'])
+  if row['indent']==0:root_slot=(row['key'],row['dash'],row['tokens'])
+  if AVATAR_ZERO in row['tokens']:
+   require(root_slot==('ModelImporter',False,['EMPTY']))
+   require(row['indent']==2 and row['dash'] is False and row['key']=='lastHumanDescriptionAvatarSource' and row['tokens']==[AVATAR_ZERO])
  require(total<=MAX_TOKENS);return value
 def encode(value):
  screen(value);raw=(json.dumps(value,sort_keys=True,separators=(',',':'),ensure_ascii=True,allow_nan=False)+'\n').encode();require(len(raw)<=MAX_OUTPUT);return raw

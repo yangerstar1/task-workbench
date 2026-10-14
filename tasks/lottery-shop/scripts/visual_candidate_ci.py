@@ -288,7 +288,7 @@ def validate_capture(receipt, source, run, attempt, require_complete=True):
                 require(type(m.get(key)) is int and m[key] == expected, "Incorrect exterior/glazing topology or queue")
             for key in ("textureWidth","textureHeight","transparentGlassMaterialCount","glassFrustumRendererCount"):
                 require(type(m.get(key)) is int and m[key] > 0, "Missing exterior texture/glazing observation")
-            for key, expected in (("exposure",.72 if night else 1),("glassSurface",1),("glassZWrite",0),("feltNormalScale",.6),("linerSmoothness",.08),("brassSmoothness",1)):
+            for key, expected in (("exposure",.72 if night else 1),("glassSurface",1),("glassZWrite",0),("feltNormalScale",.6),("linerSmoothness",.08),("brassSmoothness",.72)):
                 require(type(m.get(key)) in (int,float) and math.isfinite(m[key]) and abs(m[key]-expected)<.0001, "Incorrect exterior/glazing/material property")
             require(type(m.get("glassAlpha")) in (int,float) and .001 <= m["glassAlpha"] <= .999, "Glass must remain transparent")
         # These observations intentionally do not confer art/layout acceptance.

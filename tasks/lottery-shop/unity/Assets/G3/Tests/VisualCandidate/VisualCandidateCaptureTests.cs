@@ -678,7 +678,7 @@ namespace Lottery.G3.VisualCandidate.Tests
         static void RequireBrassProperties(Material brass,Texture baseMap,Texture normal,Texture packed)
         {
             Assert.That(BrassPbrBindingMatches(brass,baseMap,normal,packed), Is.True, "Brass PBR binding/keywords differ from frozen source");
-            Assert.That(brass.GetFloat("_Smoothness"), Is.EqualTo(1f).Within(.0001f));
+            Assert.That(brass.GetFloat("_Smoothness"), Is.EqualTo(.72f).Within(.0001f));
             Assert.That(brass.GetFloat("_SmoothnessTextureChannel"), Is.EqualTo(0f));
             Assert.That(brass.GetFloat("_Metallic"), Is.EqualTo(.78f).Within(.0001f));
             Assert.That(brass.GetFloat("_BumpScale"), Is.EqualTo(.18f).Within(.0001f));
@@ -972,7 +972,7 @@ namespace Lottery.G3.VisualCandidate.Tests
             Assert.That(readingSource,Is.Not.Null,"The authored reading source must remain present");
             var readingLight=readingSource.GetComponent<Light>();
             Assert.That(readingLight,Is.Not.Null);
-            Assert.That(readingLight.intensity,Is.EqualTo(lightingNight?1.3f:1.6f).Within(.00001f),"Local day fill changes while original night reading energy remains intact");
+            Assert.That(readingLight.intensity,Is.EqualTo(1.6f).Within(.00001f),"Authored reading baseline remains legible in day and night");
             P.View.RefreshGlyphGeometry();
             Assert.That(P.View.AllHudLabelsFit, Is.True, string.Join(" | ", P.View.OverflowingHudLabels));
             var hud = app.SceneCamera.transform.Find("Same-camera readable HUD");

@@ -39,6 +39,14 @@ MUTATION_ALLOWLIST = {
  TASK+'/unity/ProjectSettings/QualitySettings.asset'}
 require = inc.require
 
+def verify_native_budget(stage, process):
+    # Exact existing process contracts; this check does not set native timeouts.
+    budgets = {'capture': 1800, 'regression-edit': 480,
+               'regression-play-core': 720, 'regression-play-world': 480}
+    budget = process.get('processBudgetSeconds')
+    require(stage in budgets and type(budget) is int and budget == budgets[stage],
+            'ORIGINAL_NATIVE_BUDGET_CHANGED')
+
 def digest(p): return hashlib.sha256(p.read_bytes()).hexdigest()
 def compact(v): return json.dumps(v,sort_keys=True,separators=(',',':'),ensure_ascii=False).encode()
 def read(p, maximum=2097152): return inc.load(p, maximum)
@@ -169,7 +177,7 @@ def verify_bound_inputs(bundle, ident):
             t0=datetime.fromisoformat(tree.attrib['start-time'].replace('Z','+00:00')).timestamp()
             t1=datetime.fromisoformat(tree.attrib['end-time'].replace('Z','+00:00')).timestamp()
             require(started/1e9-1 <= t0 <= t1 <= started/1e9+process['elapsedMs']/1000+1,'STALE_NATIVE_XML_TIME')
-            require(process['processBudgetSeconds']==(1800 if stage=='capture' else 480),'ORIGINAL_NATIVE_BUDGET_CHANGED')
+            verify_native_budget(stage, process)
             # Native root/result/assembly/fullname/counters are checked by unchanged originals.
             v.export_tests(root,stage)
             calculated=read(ev/stage/'test-receipt.json')

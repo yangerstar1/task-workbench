@@ -116,7 +116,7 @@ namespace Lottery.G3.Interaction
             daylight.GetUniversalAdditionalLightData().usePipelineSettings=false;RenderSettings.sun=daylight;
             // Real ceiling/pendant sources supply local shape and contact shadows.
             // Explicit ambient SH below supplies the bounce that an unbaked room lacks.
-            Practical("Warm counter pendant",AnchorPosition("light_counter",new Vector3(1.12f,2.30f,-.9f)),new Color(1,.89f,.72f),PracticalStrengths[0],4.8f,new Vector3(.4f,.9f,-1.7f),false);
+            Practical("Warm counter pendant",AnchorPosition("light_counter",new Vector3(1.12f,2.30f,-.9f)),new Color(1,.89f,.72f),PracticalStrengths[0],4.8f,new Vector3(.4f,.9f,-1.7f),true);
             Practical("Table reading pendant",AnchorPosition("light_table",new Vector3(-1.71f,2.30f,-.24f)),new Color(1,.95f,.86f),PracticalStrengths[1],4.2f,TicketPosition,true);
             Practical("Shelf ambient fill",AnchorPosition("light_shelf",new Vector3(2.2f,2.2f,-.4f)),new Color(.83f,.91f,1),PracticalStrengths[2],4,new Vector3(2.1f,1.1f,-.4f),false);
             Practical("Counter board wash",new Vector3(.45f,2.04f,-2.287f),new Color(1,.93f,.81f),PracticalStrengths[3],2f,new Vector3(.45f,1.6f,-2.5f),false);
@@ -231,7 +231,9 @@ namespace Lottery.G3.Interaction
             var bounce=new SphericalHarmonicsL2();bounce.AddAmbientLight(value?new Color(.20f,.21f,.24f):new Color(.336f,.368f,.344f));
             bounce.AddDirectionalLight(Vector3.up,value?new Color(.16f,.13f,.10f):new Color(.20f,.22f,.25f),.7f);
             RenderSettings.ambientProbe=bounce;RenderSettings.reflectionIntensity=value ? .7f : 1;
-            for(int i=0;i<practicals.Count;i++)practicals[i].intensity=(!value&&i==1?1.6f:PracticalStrengths[i])*(value?1.04f:1);
+            // The reading pendant is the baseline, independent of purchased tools.
+            // Night previously reduced it to 1.30 while the daylight was also removed.
+            for(int i=0;i<practicals.Count;i++)practicals[i].intensity=i==1?1.6f:PracticalStrengths[i]*(value?1.04f:1);
             roomReflection.backgroundColor=value?new Color(.08f,.10f,.15f):new Color(.40f,.45f,.49f);
             if(!bakingReflection)roomReflection.customBakedTexture=value?nightReflection:dayReflection;
             if(exteriorMaterial!=null){exteriorMaterial.SetTexture("_BaseMap",value?exteriorNight:exteriorDay);exteriorMaterial.SetFloat("_Exposure",value?.72f:1f);}

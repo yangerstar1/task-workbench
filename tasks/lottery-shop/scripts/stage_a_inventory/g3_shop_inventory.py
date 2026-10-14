@@ -16,7 +16,7 @@ import sys
 
 BASE = Path(__file__).absolute().parent
 PIN = '02a6440209c26bcc94c50fdf73a87345b563b5ed'
-POLICY_SHA256 = '98bd252fdb6e18e91b27ab711792070c0a4e1e0e3787ffcb5cd18b337ef1ae16'
+POLICY_SHA256 = '05da9744bfeed4bf0d60dfc68c5aa08f2e2a2253a808471a4e021b3c8d20827b'
 SHOP = 'Assets/G3/Shop/Resources/G3/Shop'
 SCOPE = 'Assets/G3/Shop'
 SCHEMA = 1
@@ -555,8 +555,13 @@ def screen_other_meta(raw, asset='OTHER_META', material_names=frozenset()):
                 for axes in [('x','y'), ('x','y','z'), ('x','y','z','w')]:
                     vector = re.fullmatch(r'\{' + ', '.join(axis+': ('+number+')' for axis in axes) + r'\}', value)
                     if vector: break
-                if not (reference is not None or (vector is not None and all(len(v) <= 32 and math.isfinite(float(v)) and abs(float(v)) <= 2147483648 for v in vector.groups()))):
-                    # Diagnostic refinement only: the original accepted set is unchanged.
+                # Unity's documented sample null avatar reference only, in its exact slot.
+                # No nonzero IDs, other fields, nested slots or arbitrary maps.
+                null_avatar = (asset in {'MODEL_INTERIOR', 'MODEL_LAMP', 'MODEL_STAMP', 'MODEL_BOX'} and not dash and depth == 2 and
+                               containers.get(0) == ('ModelImporter', '') and
+                               key == 'lastHumanDescriptionAvatarSource' and value == '{instanceID: 0}')
+                if not (null_avatar or reference is not None or (vector is not None and all(len(v) <= 32 and math.isfinite(float(v)) and abs(float(v)) <= 2147483648 for v in vector.groups()))):
+                    # All other unsupported flows retain the finite rejection diagnostic.
                     raise Rejected(meta_flow_failure(asset, containers, depth, key, value, material_names))
             else:
                 # Canonical plain scalar only. Quotes/escapes, YAML tags/anchors,

@@ -29,7 +29,7 @@ namespace Lottery.G3.VisualCandidate.Tests
         static readonly string[] Names = { "Soft window daylight", "Warm counter pendant",
             "Table reading pendant", "Shelf ambient fill", "Counter board wash" };
         static readonly float[] Expected = { .6f, 1.15f, 1.6f, .55f, .06f };
-        static readonly LightShadows[] ExpectedShadows = { LightShadows.Soft, LightShadows.None,
+        static readonly LightShadows[] ExpectedShadows = { LightShadows.Soft, LightShadows.Soft,
             LightShadows.Soft, LightShadows.None, LightShadows.None };
         static string Arg(string name)
         {

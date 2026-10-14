@@ -99,7 +99,8 @@
       "normalTexture": "textures/BrushedBrass_v24_Normal.png",
       "roughnessTexture": "textures/BrushedBrass_v24_Roughness.png",
       "roughnessColorSpace": "Linear",
-      "roughnessEncoding": "Grayscale roughness; Unity smoothness=1-R."
+      "roughnessEncoding": "Grayscale roughness; Unity smoothness=1-R.",
+      "packedSmoothnessScale": 0.72
     },
     {
       "name": "Ceramic_Glazed",
@@ -337,7 +338,8 @@
       "roughnessTexture": "textures/Felt_v15_Roughness.png",
       "roughnessColorSpace": "Linear",
       "roughnessEncoding": "Grayscale roughness; Unity smoothness=1-R.",
-      "normalTexture": "textures/Felt_v15_Normal.png"
+      "normalTexture": "textures/Felt_v15_Normal.png",
+      "packedSmoothnessScale": 0.4
     },
     {
       "name": "Decoration_Print_Atlas",
@@ -820,7 +822,7 @@
       "normalStrength": 0,
       "transmission": 0.0,
       "ior": 1.5,
-      "emission": 0.20,
+      "emission": 0.2,
       "emissionColor": [
         1.0,
         1.0,
@@ -1040,7 +1042,8 @@
       "roughnessTexture": "textures/OakGrain_v15_Roughness.png",
       "roughnessColorSpace": "Linear",
       "roughnessEncoding": "Grayscale roughness; Unity smoothness=1-R.",
-      "normalTexture": "textures/OakGrain_v15_Normal.png"
+      "normalTexture": "textures/OakGrain_v15_Normal.png",
+      "packedSmoothnessScale": 0.78
     },
     {
       "name": "Warm_Terrazzo",

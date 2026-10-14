@@ -28,6 +28,19 @@ OUT = private.TASK + '/artifacts/android-candidate-delivery'
 require = private.require
 
 
+def signature_command():
+    # The SDK wrapper invokes java from PATH. Bind it to this pinned image's
+    # Unity-bundled JDK, independent of the docker exec shell environment.
+    return ('(set -e -o pipefail\n'
+            'export JAVA_HOME=/opt/unity/Editor/Data/PlaybackEngines/AndroidPlayer/OpenJDK\n'
+            'test -x "$JAVA_HOME/bin/java"\n'
+            'export PATH="$JAVA_HOME/bin:/usr/bin:/bin"\n'
+            'mapfile -t tools < <(find /opt/unity/Editor/Data/PlaybackEngines/AndroidPlayer/SDK/build-tools -maxdepth 2 -type f -name apksigner | sort -V)\n'
+            'test "${#tools[@]}" -ge 1 && test "${#tools[@]}" -le 16\n'
+            'test -x "${tools[-1]}"\n'
+            '"${tools[-1]}" verify --verbose --print-certs /github/workspace/' + BUILD + '/' + APK + '\n)')
+
+
 def regular(path, root, maximum):
     g3.check_ancestors(root, path)
     info = g3.regular_unaliased(path, root)
@@ -202,8 +215,7 @@ def run(root):
         result['apk'] = inspect_apk(root, ident)
         scan = SignatureScan()
         # Tool selection is confined to fixed SDK build-tools under the pinned image.
-        command = 'set -o pipefail\nmapfile -t tools < <(find /opt/unity/Editor/Data/PlaybackEngines/AndroidPlayer/SDK/build-tools -maxdepth 2 -type f -name apksigner | sort -V)\n' + \
-            'test "${#tools[@]}" -ge 1 && test "${#tools[@]}" -le 16 && "${tools[-1]}" verify --verbose --print-certs /github/workspace/' + BUILD + '/' + APK
+        command = signature_command()
         result['signature'] = process(ident, safe.shell(command), 120, scan)
         require(result['signature']['status'] == 'NATIVE_SUCCEEDED' and len(scan.certificates) == 1, 'SIGNATURE_FAILED')
         result['signature']['certificateSha256'] = scan.certificates[0]

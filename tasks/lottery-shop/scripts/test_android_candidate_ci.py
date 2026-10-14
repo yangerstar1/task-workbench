@@ -76,6 +76,14 @@ class RequestTests(unittest.TestCase):
 
 
 class SafetyTests(unittest.TestCase):
+    def test_signature_uses_only_fixed_bundled_java_and_sdk(self):
+        command=ci.signature_command()
+        self.assertIn('export JAVA_HOME=/opt/unity/Editor/Data/PlaybackEngines/AndroidPlayer/OpenJDK', command)
+        self.assertIn('test -x "$JAVA_HOME/bin/java"', command)
+        self.assertIn('export PATH="$JAVA_HOME/bin:/usr/bin:/bin"', command)
+        self.assertIn('verify --verbose --print-certs /github/workspace/'+ci.BUILD+'/'+ci.APK, command)
+        self.assertNotIn('apt-get',command)
+        self.assertNotIn('curl',command)
     def test_signature_fixed_hex_across_chunks(self):
         raw=b'Signer #1 certificate SHA-256 digest: '+b'a'*64+b'\nSECRET_DN_and_native_noise\nSAFE_PROJECT_NATIVE_EXIT_CODE=0\n'
         for n in (1,7,512):

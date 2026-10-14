@@ -2,10 +2,10 @@
   "schemaVersion": 1,
   "scope": "SOURCE_ONLY_COUNTER_LIGHT_TRILIGHT_ABLATION_V1_CANDIDATE_NOT_NATIVE_VALIDATION",
   "frozenCommit": "02a6440209c26bcc94c50fdf73a87345b563b5ed",
-  "lightingBaseline": "TABLE_KEY_SHADOWS_V1",
+  "lightingBaseline": "TABLE_AND_COUNTER_SOFT_SHADOWS_V2",
   "expectedLightShadows": [
     "Soft",
-    "None",
+    "Soft",
     "Soft",
     "None",
     "None"

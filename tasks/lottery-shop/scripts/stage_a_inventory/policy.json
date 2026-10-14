@@ -298,9 +298,9 @@
       "sha256": "7b1b8b78532814cda88b72efa3e9b1769ba1d8e4a1e3ed6fa49bdedadc993fd8"
     },
     {
-      "bytes": 44292,
+      "bytes": 44879,
       "path": "Assets/G3/Editor/G3ShopArtImporter.cs",
-      "sha256": "8b6d4a49a7222a95764cc33e61cfcbcc218d465df0ac264fa464689e9480485c"
+      "sha256": "bdc3c31b76e7764bc873573c639f32b8dfada5275067e07da8828b66849790fc"
     },
     {
       "bytes": 47274,
@@ -308,9 +308,9 @@
       "sha256": "2d53a3fba817002d3778aaf3776319efd335813c511cb5c3722162bec1fb6a68"
     },
     {
-      "bytes": 25459,
+      "bytes": 25620,
       "path": "Assets/G3/Interaction/G3ShopEnvironment.cs",
-      "sha256": "c38a97925e39da8306e10f03b769808027156fc88c9c10942cb8464c31662f62"
+      "sha256": "540d949351147885ff9587215766795f6c8f9a2074997a3c52ec9a2bdb979d82"
     },
     {
       "bytes": 1560,
@@ -678,9 +678,9 @@
       "sha256": "6f1cdd2c21d85ee2f7ced41c7108b39bba52f39a37b7c2a6ae017238a0913f39"
     },
     {
-      "bytes": 25253,
+      "bytes": 25362,
       "path": "Assets/G3/Shop/Resources/G3/Shop/materials.json",
-      "sha256": "8223975ec9bd168cd610756fa9914715dd81681989147415db4f8a69792257ad"
+      "sha256": "b03db6ee4b1a2e9db4c5ab900e668b5dd57796e115399baff44792e18bbcf132"
     },
     {
       "bytes": 13688,

@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.Rendering.Universal;
 namespace Lottery.G3.Interaction
 {
     // Three small physical still-life objects. Authority stays in ConfigurationSnapshot.
@@ -15,8 +16,8 @@ namespace Lottery.G3.Interaction
         {var g=GameObject.CreatePrimitive(type);g.name=name;g.transform.SetParent(model.transform,false);g.transform.localPosition=p;g.transform.localScale=size;g.GetComponent<Renderer>().sharedMaterial=m;Destroy(g.GetComponent<Collider>());return g;}
         public void Show(string id)
         {
-            if(shown==id)return;shown=id;if(model!=null)Destroy(model);foreach(var m in owned)if(m!=null)Destroy(m);owned.Clear();
-            if(string.IsNullOrEmpty(id))return;var authored=Resources.Load<GameObject>("G3/Shop/Tool_"+id+"_Runtime");if(authored!=null){model=Instantiate(authored,transform);model.name="Snapshot-bound authored "+id;model.transform.localScale*=id=="inspection_lamp" ? .53f : .55f;ApplySelectedFinish(id);return;}if(id=="small_prize_box"||id=="inspection_lamp"||id=="large_prize_stamp")throw new System.InvalidOperationException("Normalized authored tool prefab missing: "+id);model=new GameObject("Snapshot-bound "+id);model.transform.SetParent(transform,false);model.transform.localScale=Vector3.one*.45f;
+            if(shown==id)return;shown=id;if(model!=null){model.SetActive(false);Destroy(model);}foreach(var m in owned)if(m!=null)Destroy(m);owned.Clear();
+            if(string.IsNullOrEmpty(id))return;var authored=Resources.Load<GameObject>("G3/Shop/Tool_"+id+"_Runtime");if(authored!=null){model=Instantiate(authored,transform);model.name="Snapshot-bound authored "+id;model.transform.localScale*=id=="inspection_lamp" ? .53f : .55f;ApplySelectedFinish(id);BuildInspectionLight(id);return;}if(id=="small_prize_box"||id=="inspection_lamp"||id=="large_prize_stamp")throw new System.InvalidOperationException("Normalized authored tool prefab missing: "+id);model=new GameObject("Snapshot-bound "+id);model.transform.SetParent(transform,false);model.transform.localScale=Vector3.one*.45f;
             var brass=Mat("Brushed brass",new Color(.65f,.45f,.18f),.78f,.52f);var wood=Mat("Dark walnut",new Color(.23f,.105f,.055f),0,.22f);
             var ceramic=Mat("Warm cream enamel",new Color(.84f,.80f,.67f),.12f,.42f);var jade=Mat("Green enamel",new Color(.045f,.19f,.14f),.20f,.4f);
             if(id=="small_prize_box")
@@ -50,6 +51,31 @@ namespace Lottery.G3.Interaction
                 Shape("Stamp rounded grip",PrimitiveType.Sphere,new Vector3(0,.205f,0),new Vector3(.11f,.08f,.10f),id=="large_prize_stamp"?jade:ceramic);
                 Shape("Handle brass collar",PrimitiveType.Cylinder,new Vector3(0,.095f,0),new Vector3(.075f,.01f,.075f),brass);
             }
+        }
+        void BuildInspectionLight(string id)
+        {
+            if(id!="inspection_lamp")return;
+            var view=GetComponentInParent<G3SceneView>();
+            if(view==null||view.Environment==null)return;
+            // The importer combines meshes by material; Warm_Light contains only
+            // the inspected LED ring in this tool. Use its world-space bounds.
+            // This light is presentation only; it never reads or changes game rules.
+            Renderer emitter=null;
+            foreach(var renderer in model.GetComponentsInChildren<Renderer>())
+                if(renderer.sharedMaterial!=null&&renderer.sharedMaterial.name=="Warm_Light"){emitter=renderer;break;}
+            if(emitter==null)throw new System.InvalidOperationException("Inspection lamp emitter mesh missing");
+            var target=view.Environment.TicketPosition;
+            var direction=(target-emitter.bounds.center).normalized;
+            var go=new GameObject("Inspection lamp local paper light");go.transform.SetParent(model.transform,false);
+            // Clear the lens/bezel before tracing toward the paper, in world metres.
+            go.transform.position=emitter.bounds.center+direction*.018f;go.transform.LookAt(target);
+            var light=go.AddComponent<Light>();light.type=LightType.Spot;
+            light.color=new Color(1f,.94f,.82f);light.intensity=.12f;light.range=.85f;
+            light.spotAngle=110f;light.innerSpotAngle=75f;
+            // A small local source with no extra shadow atlas slot. The ceiling
+            // reading source already supplies the tabletop's soft cast shadows.
+            light.shadows=LightShadows.None;light.renderMode=LightRenderMode.ForcePixel;
+            light.GetUniversalAdditionalLightData().usePipelineSettings=false;
         }
         void ApplySelectedFinish(string id)
         {

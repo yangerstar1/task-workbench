@@ -13,7 +13,7 @@ namespace Lottery.G3.Editor
         public const string Root="Assets/G3/Shop/Resources/G3/Shop";
         public const string PipelinePath=Root+"/G3VisualPipeline.asset";
         [Serializable] sealed class Materials { public MaterialEntry[] materials; }
-        [Serializable] sealed class MaterialEntry { public string name,baseColorTexture,normalTexture,roughnessTexture,emissionTexture;public float[] baseColor,baseColorFactor,mainTextureScale,emissionColor;public float metallic,roughness,transmission,emission,normalStrength=1; }
+        [Serializable] sealed class MaterialEntry { public string name,baseColorTexture,normalTexture,roughnessTexture,emissionTexture;public float[] baseColor,baseColorFactor,mainTextureScale,emissionColor;public float metallic,roughness,transmission,emission,normalStrength=1,packedSmoothnessScale; }
         [MenuItem("Lottery/G3/Prepare original shop art")]
         public static void Prepare()
         {
@@ -63,7 +63,7 @@ namespace Lottery.G3.Editor
                 if(!string.IsNullOrEmpty(item.normalTexture)){material.SetTexture("_BumpMap",Texture(item.normalTexture,true));material.EnableKeyword("_NORMALMAP");material.SetFloat("_BumpScale",item.normalStrength);}
                 material.SetTexture("_MetallicGlossMap",null);material.DisableKeyword("_METALLICSPECGLOSSMAP");material.SetFloat("_SmoothnessTextureChannel",0);
                 if(!string.IsNullOrEmpty(item.roughnessTexture))
-                {material.SetTexture("_MetallicGlossMap",PackRoughness(item));material.SetFloat("_Smoothness",1);material.EnableKeyword("_METALLICSPECGLOSSMAP");}
+                {material.SetTexture("_MetallicGlossMap",PackRoughness(item));material.SetFloat("_Smoothness",PackedSmoothness(item));material.EnableKeyword("_METALLICSPECGLOSSMAP");}
                 material.SetFloat("_Surface",0);material.SetFloat("_SrcBlend",(float)BlendMode.One);material.SetFloat("_DstBlend",(float)BlendMode.Zero);material.SetFloat("_ZWrite",1);material.DisableKeyword("_SURFACE_TYPE_TRANSPARENT");material.renderQueue=(int)RenderQueue.Geometry;
                 if(item.transmission>0){material.SetFloat("_Surface",1);material.SetFloat("_SrcBlend",(float)BlendMode.SrcAlpha);material.SetFloat("_DstBlend",(float)BlendMode.OneMinusSrcAlpha);material.SetFloat("_ZWrite",0);material.EnableKeyword("_SURFACE_TYPE_TRANSPARENT");material.renderQueue=(int)RenderQueue.Transparent;}
                 material.DisableKeyword("_EMISSION");material.SetColor("_EmissionColor",Color.black);material.SetTexture("_EmissionMap",null);
@@ -159,9 +159,18 @@ namespace Lottery.G3.Editor
         // not an arithmetic temporary that the CLI may retain at higher precision.
         static uint SingleBits(float value){return BitConverter.ToUInt32(BitConverter.GetBytes(value),0);}
         static bool FiniteSingleBits(uint bits){return (bits&0x7f800000U)!=0x7f800000U;}
+        // Zero means the historical omitted/default multiplier of one.
+        // Explicit authored finishes remain in the validated external material asset.
+        static float PackedSmoothness(MaterialEntry item)
+        {
+            float scale=item.packedSmoothnessScale==0?1:item.packedSmoothnessScale;
+            if(float.IsNaN(scale)||float.IsInfinity(scale)||scale<=0||scale>1)
+                throw new InvalidOperationException("Invalid authored packed smoothness scale");
+            return scale;
+        }
         static void RequireSmoothness(Material material,MaterialEntry item,bool packed,MaterialTrace trace)
         {
-            uint actual=SingleBits(material.GetFloat("_Smoothness")),expected=SingleBits(packed?1:1-Mathf.Clamp01(item.roughness));
+            uint actual=SingleBits(material.GetFloat("_Smoothness")),expected=SingleBits(packed?PackedSmoothness(item):1-Mathf.Clamp01(item.roughness));
             trace?.ObserveSmoothness(actual,expected);
             RequireMaterial(FiniteSingleBits(actual)&&FiniteSingleBits(expected)&&actual==expected,MaterialPredicate.AUTHOR_SMOOTHNESS,-1);
         }

@@ -16,19 +16,19 @@
       "sha256": "2fc1e5b62878150b3b03bc22cbe33909acfa4087b0af08311464a06ab05077d4"
     },
     {
-      "bytes": 20401,
+      "bytes": 20759,
       "repositoryPath": "tasks/lottery-shop/scripts/counter_light_diagnostics/compose_evidence.py",
-      "sha256": "5f3f144c53a9e89ce13d56fe72676b55d37438e083b1a71024e212074a5dc575"
+      "sha256": "958e766eeef8be0caba4e3bcf8f848933eb4bd606a0eaf0cd69f5f0557c5ca79"
     },
     {
       "bytes": 652,
       "repositoryPath": "tasks/lottery-shop/scripts/counter_light_diagnostics/dependency-pins.json",
-      "sha256": "13dfbeacba3ff684b6447aa63d4e0d4afedb106e5ef7660cc1b0ef1b1086328f"
+      "sha256": "5c78781648fa629d9a614357cfa3cb240b280dc3edfb6d75d1917b5d464980b1"
     },
     {
-      "bytes": 4567,
+      "bytes": 4580,
       "repositoryPath": "tasks/lottery-shop/scripts/counter_light_diagnostics/diagnostic_plan.json",
-      "sha256": "eef77a91969d9ddd697cf0c1e4b38b290820cc3750b9a056bd45a494754fecd0"
+      "sha256": "20ac8928373f1e99d759e3be8a073775f31d6a5497863128aeb60b8f1dc73bab"
     },
     {
       "bytes": 13566,
@@ -66,14 +66,14 @@
       "sha256": "6c0eafdaec2cac335ff3cec6bddd5663514ae941f0a2ab627f5216b84cb604ed"
     },
     {
-      "bytes": 48051,
+      "bytes": 48053,
       "repositoryPath": "tasks/lottery-shop/scripts/counter_light_diagnostics/pinned_dependencies/visual_candidate_ci.py",
-      "sha256": "a8d07dfab9a9da96833504417e829ce15f18828d9d12a1ac2e71f15a079be8e7"
+      "sha256": "c079c7ab2bdd88f40a67cd68e728323d30fa51c670c0a1266c269e36168d88b1"
     },
     {
       "bytes": 21289,
       "repositoryPath": "tasks/lottery-shop/scripts/counter_light_diagnostics/verify_and_measure.py",
-      "sha256": "725a3a99bd8727f4535aa8a05a8c3ced648f6850000e8a0f9f4367cd6f058ab8"
+      "sha256": "bc4668e4ce1b30e9d8ad50f1fa759c9059370daa11e13f8e9e3a56e53f9d39fa"
     },
     {
       "bytes": 18193,
@@ -101,14 +101,14 @@
       "sha256": "44b9299d7c1e78db08ad8215d7057aa5a1007a484df5efbb2bc71045b242a299"
     },
     {
-      "bytes": 48269,
+      "bytes": 48271,
       "repositoryPath": "tasks/lottery-shop/scripts/visual_candidate_ci.py",
-      "sha256": "d3f186bb1109b1513980f4fae77eebcc8c5c862776cd21916051444482bc6e81"
+      "sha256": "e5614ad7772fae8d1ffbc5878feee0de888282f58dfd44569fa4803e431021dc"
     },
     {
       "bytes": 49197,
       "repositoryPath": "tasks/lottery-shop/unity/Assets/G3/Tests/VisualCandidate/CounterLightDiagnosticCapture.cs",
-      "sha256": "cfa990736dec3a548dec2a44d9bdc27f0d4f929edfaf06edfcf9c172646d56b0"
+      "sha256": "a60ce60981c47306872f5c007acd4aae67401f9b568de64ee8d41f3104503945"
     },
     {
       "bytes": 60,
@@ -116,9 +116,9 @@
       "sha256": "69843d46f3228ef774a1c7d4b3e73b9db34a2640b2c6872e878fce861199d508"
     },
     {
-      "bytes": 81607,
+      "bytes": 81575,
       "repositoryPath": "tasks/lottery-shop/unity/Assets/G3/Tests/VisualCandidate/VisualCandidateCaptureTests.cs",
-      "sha256": "78a3b11433f92d2d25d46da476d8534f44d1cc7a44bc2cf9ca0e5f1181fb274e"
+      "sha256": "8f6333d8533f17992fd1ba72d547322f4df92138c30527a694efe52a76600b0c"
     }
   ],
   "schemaVersion": 1,

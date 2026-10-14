@@ -18,7 +18,7 @@ def fixture():
  # Do not reuse the candidate's fixture or material_expected implementation.
  ctrl={'lightNames':list(v.NAMES),'lightIntensities':[.6,1.15,1.6,.55,.06],'lightColors':[dict(r=1,g=1,b=1,a=1) for _ in range(5)],
  'lightPositions':[dict(x=0,y=0,z=0) for _ in range(5)],'lightRotations':[dict(x=0,y=0,z=0,w=1) for _ in range(5)],
- 'lightRanges':[10,4.8,4.2,4,2],'lightSpotAngles':[115]*5,'lightInnerSpotAngles':[70]*5,'lightShadows':['Soft','None','Soft','None','None'],
+ 'lightRanges':[10,4.8,4.2,4,2],'lightSpotAngles':[115]*5,'lightInnerSpotAngles':[70]*5,'lightShadows':['Soft','Soft','Soft','None','None'],
  'lightEnabled':[True]*5,'lightCullingMasks':[-1]*5,'probeIntensity':.85,'reflectionIntensity':1,'probeTextureId':'31','probeTextureName':'Day','ambientSH':[.2]*27,
  'ambientMode':'Trilight','ambientIntensity':1,'ambientSkyColor':dict(r=.68,g=.74,b=.80,a=1),'ambientEquatorColor':dict(r=.58,g=.57,b=.51,a=1),
  'ambientGroundColor':dict(r=.34,g=.31,b=.26,a=1),'ambientLight':dict(r=.68,g=.74,b=.80,a=1),
@@ -361,5 +361,49 @@ class MetaFlowDiagnosticTests(unittest.TestCase):
   self.assertEqual(str(caught.exception),'META_UNSUPPORTED_FLOW__MODEL_INTERIOR__MODEL_INTERNAL_ID_FIRST__INTEGER_PAIR_BOUNDED')
   policy.classify.assert_called_once_with(path);tree.read.assert_called_once_with(path,65536)
   tree.finish.assert_not_called()
+
+class Run33DiagnosticBindingTests(unittest.TestCase):
+ @classmethod
+ def setUpClass(cls):
+  import importlib.util
+  spec=importlib.util.spec_from_file_location('run33_meta_observer',S/'stage_a_inventory/g3_shop_inventory.py')
+  cls.inv=importlib.util.module_from_spec(spec);spec.loader.exec_module(cls.inv)
+ def meta(self,value='{instanceID: 0}',key='lastHumanDescriptionAvatarSource',root='ModelImporter',nested=False):
+  return ('fileFormatVersion: 2\nguid: '+'a'*32+'\n'+root+':\n'+('  humanDescription:\n  ' if nested else '')+'  '+key+': '+value+'\n').encode()
+ def test_exact_native_budgets_reject_old_core_and_other_values(self):
+  import compose_evidence as c
+  for stage,budget in [('capture',1800),('regression-edit',480),('regression-play-core',720),('regression-play-world',480)]:
+   c.verify_native_budget(stage,{'processBudgetSeconds':budget})
+   for bad in [budget-1,budget+1,str(budget),float(budget),True,None]:
+    with self.subTest(stage=stage,bad=bad),self.assertRaisesRegex(ValueError,'^ORIGINAL_NATIVE_BUDGET_CHANGED$'):
+     c.verify_native_budget(stage,{'processBudgetSeconds':bad})
+  for stage,budget in [('regression-play-core',480),('regression-play-world',720),('unknown',480)]:
+   self.assertRaises(ValueError,c.verify_native_budget,stage,{'processBudgetSeconds':budget})
+ def test_only_exact_model_null_avatar_slot_is_added(self):
+  for asset in ['MODEL_INTERIOR','MODEL_LAMP','MODEL_STAMP','MODEL_BOX']:
+   self.inv.screen_other_meta(self.meta(),asset)
+  for value in ['{instanceID: 1}','{instanceID: -1}','{instanceID: 00}','{instanceID: 0.0}',
+                '{instanceID: 0, instanceID: 0}','{instanceID: 0, token: PRIVATE_SENTINEL}',
+                '{unknown: 0}','{instanceID: {fileID: 0}}','{instanceID: &alias 0}']:
+   with self.subTest(value=value),self.assertRaises(self.inv.Rejected):
+    self.inv.screen_other_meta(self.meta(value),'MODEL_INTERIOR')
+  for raw,asset in [(self.meta(key='other'),'MODEL_INTERIOR'),(self.meta(root='OtherImporter'),'MODEL_INTERIOR'),
+                    (self.meta(nested=True),'MODEL_INTERIOR'),(self.meta(),'OTHER_META')]:
+   self.assertRaises(self.inv.Rejected,self.inv.screen_other_meta,raw,asset)
+ def test_avatar_marker_screen_requires_exact_model_importer_root(self):
+  import export_interior_meta as m
+  result=m.project(self.meta(),{'sourceCommit':'1'*40,'runId':'123','runAttempt':'1'})
+  for change in [{'key':'UNKNOWN_KEY'},{'indent':2},{'dash':True},{'tokens':['INTEGER']}]:
+   bad=copy.deepcopy(result);bad['rows'][2].update(change)
+   with self.subTest(change=change),self.assertRaises(m.Rejected):m.screen(bad)
+ def test_fixed_avatar_projection_is_slot_bound_and_never_reconstructs_input(self):
+  import export_interior_meta as m
+  ident={'sourceCommit':'1'*40,'runId':'123','runAttempt':'1'}
+  result=m.project(self.meta(),ident);self.assertEqual(result['rows'][-1]['tokens'],[m.AVATAR_ZERO]);m.encode(result)
+  for raw in [self.meta('{instanceID: 1}'),self.meta(key='other'),self.meta(nested=True)]:
+   row=m.project(raw,ident)['rows'][-1];self.assertNotIn(m.AVATAR_ZERO,row['tokens'])
+  for change in [{'key':'other'},{'indent':4},{'dash':True},{'tokens':[m.AVATAR_ZERO,'INTEGER']}]:
+   bad=copy.deepcopy(result);bad['rows'][-1].update(change);self.assertRaises(m.Rejected,m.screen,bad)
+  self.assertRaises(m.Rejected,m.project,self.meta('{token: PRIVATE_SENTINEL}'),ident)
 
 if __name__=='__main__':unittest.main()
