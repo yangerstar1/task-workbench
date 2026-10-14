@@ -4,6 +4,7 @@ import argparse
 import hashlib
 import os
 from pathlib import Path
+import time
 import visual_candidate_ci as visual
 import reflection_bake_ci as reflection
 import startup_progress_ci as startup
@@ -27,9 +28,17 @@ def read_fixed(path, limit):
 
 def eligible(ident, capture, session, progress, started, runtime_present):
     """All inputs are fixed receipts. Unknown/incomplete evidence never permits skipping."""
-    capture_fields = set(ident) | {'schemaVersion', 'phase', 'status', 'dockerExitCode', 'nativeExitCode', 'nativeExitMarkerCount', 'observations', 'compilerErrors', 'cleanup', 'image', 'mechanismSourcePin', 'nativeOutput', 'testVerdict', 'elapsedMs', 'recordedAtUtc'}
+    # Exact current capture writer schema: process_receipt() adds the diagnostic
+    # selectors, test() adds the native start/budget, and save() adds timing.
+    # Missing old-shape or future unknown fields must still fail closed.
+    capture_fields = set(ident) | {'schemaVersion', 'phase', 'status', 'dockerExitCode', 'nativeExitCode', 'nativeExitMarkerCount', 'observations', 'compilerErrors', 'cleanup', 'image', 'mechanismSourcePin', 'nativeOutput', 'testVerdict', 'elapsedMs', 'recordedAtUtc', 'counterLightDiagnostic', 'counterLightDiagnosticFault', 'nativeStartedAtNs', 'processBudgetSeconds'}
     require(set(capture) == capture_fields and set(session) == set(ident) | {'status', 'activationSucceeded', 'stagesStarted', 'cleanup'}, 'SAFE_FIELDS_REJECTED')
     require(type(capture['schemaVersion']) is int and capture['schemaVersion'] == 1 and capture['image'] == safe.private.IMAGE and capture['mechanismSourcePin'] == safe.private.PIN, 'SAFE_PIN_REJECTED')
+    require(type(capture['counterLightDiagnostic']) is bool and type(capture['counterLightDiagnosticFault']) is str and capture['counterLightDiagnosticFault'] == '', 'CAPTURE_DIAGNOSTIC_SELECTOR_REJECTED')
+    # Fault injection cannot authorize an early stop or substitute for a real
+    # prebuild failure. Opt-in alone changes none of the failure/runtime gates.
+    require(type(capture['nativeStartedAtNs']) is int and 0 < capture['nativeStartedAtNs'] <= time.time_ns(), 'CAPTURE_NATIVE_START_REJECTED')
+    require(type(capture['processBudgetSeconds']) is int and capture['processBudgetSeconds'] == 1800, 'CAPTURE_BUDGET_REJECTED')
     require(capture.get('phase') == 'capture' and capture.get('status') == 'NATIVE_FAILED', 'CAPTURE_FAILURE_REQUIRED')
     for value in (capture, session):
         for key in ('scope', 'sourceCommit', 'reviewedCandidateCommit', 'runId', 'runAttempt', 'requestId'):

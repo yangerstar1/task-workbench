@@ -18,6 +18,8 @@ jobs:
       github.event.repository.private == false && github.event.repository.fork == false && github.event.deleted == false
     runs-on: ubuntu-24.04
     timeout-minutes: 75
+    env:
+      PYTHONDONTWRITEBYTECODE: '1'
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
@@ -45,6 +47,8 @@ jobs:
           PYTHONDONTWRITEBYTECODE=1 python3 tasks/lottery-shop/scripts/test_material_initialization_ci.py -v
           PYTHONDONTWRITEBYTECODE=1 python3 tasks/lottery-shop/scripts/test_diagnostic_early_stop_ci.py -v
           PYTHONDONTWRITEBYTECODE=1 python3 tasks/lottery-shop/scripts/test_independent_g3_frames_ci.py -v
+          PYTHONDONTWRITEBYTECODE=1 python3 tasks/lottery-shop/scripts/test_diagnostic_extensions_ci.py -v
+          PYTHONDONTWRITEBYTECODE=1 python3 tasks/lottery-shop/scripts/test_stage_a_combined_receipt_ci.py -v
       - name: Prepare existing authorized disposable runner disk layout
         run: |
           python3 tasks/lottery-shop/scripts/visual_candidate_ci.py guard
@@ -70,6 +74,14 @@ jobs:
         run: |
           python3 tasks/lottery-shop/scripts/visual_candidate_ci.py restore-font
           python3 tasks/lottery-shop/scripts/visual_candidate_ci.py snapshot
+      - name: Bind counter-light diagnostic to the reviewed cold source before native preparation
+        id: counterlightprepare
+        timeout-minutes: 5
+        run: PYTHONDONTWRITEBYTECODE=1 python3 tasks/lottery-shop/scripts/counter_light_diagnostics/compose_evidence.py prepare --repo-root "$GITHUB_WORKSPACE"
+      - name: Capture protected cold Stage-A inventory before project preparation
+        id: inventorybefore
+        timeout-minutes: 5
+        run: PYTHONDONTWRITEBYTECODE=1 python3 tasks/lottery-shop/scripts/stage_a_inventory_ci.py before
       - name: Activate once in this attempt's private temporary container
         id: safestart
         timeout-minutes: 14
@@ -82,7 +94,7 @@ jobs:
         id: capture
         if: ${{ steps.safestart.outcome == 'success' }}
         timeout-minutes: 32
-        run: PYTHONDONTWRITEBYTECODE=1 python3 tasks/lottery-shop/scripts/safe_project_ci.py capture
+        run: PYTHONDONTWRITEBYTECODE=1 python3 tasks/lottery-shop/scripts/safe_project_ci.py capture --counter-light-diagnostic
       - name: Preserve fixed-schema bounded prebuild, lifecycle and runtime milestones
         if: ${{ always() && steps.guard.outcome == 'success' && steps.capture.outcome != 'skipped' }}
         run: python3 tasks/lottery-shop/scripts/visual_candidate_ci.py progress
@@ -319,3 +331,39 @@ jobs:
             tasks/lottery-shop/evidence/visual-candidate/regression-play-world/test-receipt.json
           if-no-files-found: error
           retention-days: 7
+      - name: Revalidate native and normal evidence before packaging counter-light diagnostic
+        id: counterlightfinalize
+        if: ${{ always() && steps.guard.outcome == 'success' && steps.counterlightprepare.outcome == 'success' && steps.capture.outcome == 'success' && steps.regressionedit.outcome == 'success' && steps.regressionplaycore.outcome == 'success' && steps.regressionplayworld.outcome == 'success' }}
+        timeout-minutes: 5
+        run: PYTHONDONTWRITEBYTECODE=1 python3 tasks/lottery-shop/scripts/counter_light_diagnostics/compose_evidence.py finalize --repo-root "$GITHUB_WORKSPACE" --diagnostic "$GITHUB_WORKSPACE/tasks/lottery-shop/artifacts/counter-light-diagnostic/run-$GITHUB_RUN_ID-attempt-$GITHUB_RUN_ATTEMPT" --output "$GITHUB_WORKSPACE/tasks/lottery-shop/artifacts/counter-light-package"
+      - name: Upload only the strictly composed counter-light diagnostic evidence bundle
+        if: ${{ always() && steps.counterlightfinalize.outcome == 'success' }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: lottery-counter-light-diagnostic-not-art-approval-not-g3-pass-${{ github.run_id }}-${{ github.run_attempt }}
+          path: tasks/lottery-shop/artifacts/counter-light-package
+          if-no-files-found: error
+          retention-days: 7
+      - name: Observe bounded inventory only after the existing native cleanup
+        id: inventoryafter
+        if: ${{ always() && steps.guard.outcome == 'success' && steps.inventorybefore.outcome == 'success' && steps.capture.outcome != 'skipped' }}
+        timeout-minutes: 5
+        run: PYTHONDONTWRITEBYTECODE=1 python3 "$RUNNER_TEMP/lottery-shop-inventory-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT/code/stage_a_inventory_ci.py" after
+      - name: Validate source-bound safe JSON without granting source waiver or G3 pass
+        id: inventorypublish
+        if: ${{ always() && steps.guard.outcome == 'success' && steps.inventoryafter.outcome == 'success' }}
+        timeout-minutes: 5
+        run: PYTHONDONTWRITEBYTECODE=1 python3 "$RUNNER_TEMP/lottery-shop-inventory-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT/code/stage_a_inventory_ci.py" publish
+      - name: Upload exactly one validated Stage-A observation JSON
+        if: ${{ always() && steps.guard.outcome == 'success' && steps.inventorypublish.outcome == 'success' && steps.inventorypublish.outputs.publishable == 'true' }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: lottery-shop-inventory-not-source-waiver-not-g3-pass-${{ github.run_id }}-${{ github.run_attempt }}
+          path: tasks/lottery-shop/evidence/visual-candidate/shop-inventory-not-source-waiver-not-g3-pass.json
+          if-no-files-found: error
+          retention-days: 7
+      - name: Preserve explicit inventory failure after all original evidence and cleanup
+        if: ${{ always() && steps.guard.outcome == 'success' && (steps.inventorybefore.outcome != 'success' || steps.inventoryafter.outcome != 'success' || steps.inventorypublish.outcome != 'success') }}
+        run: |
+          echo 'STAGE_A_INVENTORY_BLOCKED_NOT_SOURCE_WAIVER_NOT_G3_PASS'
+          exit 1

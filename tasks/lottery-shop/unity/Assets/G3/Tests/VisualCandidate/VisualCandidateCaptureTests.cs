@@ -744,6 +744,15 @@ namespace Lottery.G3.VisualCandidate.Tests
             Assert.That(pending.Revision, Is.EqualTo(before.Revision + 1));
             Assert.That(pending.Commands.Count, Is.EqualTo(before.Commands.Count + 1));
             Capture("phone-mom-pending", "PRODUCTION_WORLD_PHONE_PERSISTED_REQUEST_NOT_MONEY");
+            // Separate opt-in diagnostics: never add these images to the 23 normal frames.
+            if(CounterLightDiagnosticCapture.IsRequested())
+                CounterLightDiagnosticCapture.Run(P.View.Environment, app.SceneCamera, target, output,
+                    frames.Single(x => x.stage == "phone-mom-pending").sha256, storeDirectory,
+                    () => string.Join("|", StateCodec.ComputeHash(State), StateCodec.ComputeHash(store.Read()), store.ConfirmedHash,
+                        store.CanMutate, P.Panel, P.Mode, inputUpdates, actions.Count, frames.Count, Router.AwaitingRelease,
+                        phoneIdentity == P.View.Phone, P.View.Phone.GetInstanceID(), P.View.Phone.IsFocused,
+                        JsonUtility.ToJson(P.View.Walk.SavedPosition), JsonUtility.ToJson(P.View.Walk.SavedRotation),
+                        string.Join(",", P.View.VisibleControlIds), TicketContentHash(State.CurrentTicket)));
             var packetPoint = P.View.ButtonRect("packet-pending").center;
             MouseEvent(packetPoint, true); MouseEvent(packetPoint + Vector2.up * 24, true);
             MouseEvent(packetPoint, true); MouseEvent(packetPoint, false);

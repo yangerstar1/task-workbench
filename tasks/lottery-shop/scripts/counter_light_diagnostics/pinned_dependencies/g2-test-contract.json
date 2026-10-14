@@ -1,0 +1,70 @@
+{
+  "schemaVersion": 1,
+  "status": "FROZEN_FOR_CI",
+  "rulesSha256": "e959108cb2a4ef080862565de5b87814ccdfae14026204227e767d049bbdf668",
+  "profiles": {
+    "edit": {
+      "Lottery.Probe.Tests.dll": [
+        "Lottery.Probe.Tests.ProbeTests.ChineseFontContainsRequiredGlyphs",
+        "Lottery.Probe.Tests.ProbeTests.EditorPatchPinned",
+        "Lottery.Probe.Tests.ProbeTests.InputBackendAndLifecycle",
+        "Lottery.Probe.Tests.ProbeTests.RequiredPackagesResolved",
+        "Lottery.Probe.Tests.ProbeTests.SceneReferencesFontAndUrpMaterial",
+        "Lottery.Probe.Tests.ProbeTests.UrpAssetsSurviveReimport"
+      ],
+      "Lottery.G2.EditMode.Tests.dll": [
+        "Lottery.G2.EditMode.Tests.CoreTests.ExactWeightsAndAllSixteenBoundaries",
+        "Lottery.G2.EditMode.Tests.CoreTests.ExactG1SixteenFrozenFaceVectors",
+        "Lottery.G2.EditMode.Tests.CoreTests.N1HasExactlyOnePositiveMatchAndZeroZeroPrizeMatches",
+        "Lottery.G2.EditMode.Tests.CoreTests.DisplayConsumptionNeverChangesEconomicStream",
+        "Lottery.G2.EditMode.Tests.CoreTests.BuyLocksFullFaceAndDebitsOnceAcrossReloadAndStaleRetry",
+        "Lottery.G2.EditMode.Tests.CoreTests.CommandIdCannotBeReusedForDifferentRequest",
+        "Lottery.G2.EditMode.Tests.CoreTests.NewCommandHonorsExpectedRevision",
+        "Lottery.G2.EditMode.Tests.CoreTests.UnrevealedPrizeDoesNotEnterWalletAndCannotBeClaimed",
+        "Lottery.G2.EditMode.Tests.CoreTests.ClaimWritesUniqueSettlementAndSingleWalletCredit",
+        "Lottery.G2.EditMode.Tests.CoreTests.ZeroPrizeStillSettlesExactlyOnce",
+        "Lottery.G2.EditMode.Tests.CoreTests.TwelveTicketProbeLimitDoesNotAdvanceDay",
+        "Lottery.G2.EditMode.Tests.CoreTests.SnapshotMutationCannotChangeCommittedState",
+        "Lottery.G2.EditMode.Tests.CoreTests.DuplicateBrushCountsOnlyNewBitsAndInterpolatesContinuously",
+        "Lottery.G2.EditMode.Tests.CoreTests.BrushBoundsAndBatchValidationAreAtomic",
+        "Lottery.G2.EditMode.Tests.CoreTests.CellNinetyPercentCompletionUsesActualBitsOnly",
+        "Lottery.G2.EditMode.Tests.CoreTests.HalfScratchRestoresExactCommittedBitset",
+        "Lottery.G2.EditMode.Tests.CoreTests.BuySixFileFaultWindowsRecoverAuthoritativeLedger",
+        "Lottery.G2.EditMode.Tests.CoreTests.ScratchSixFileFaultWindowsRecoverAuthoritativeLedger",
+        "Lottery.G2.EditMode.Tests.CoreTests.ClaimSixFileFaultWindowsRecoverAuthoritativeLedger",
+        "Lottery.G2.EditMode.Tests.CoreTests.AdCommitSixFileFaultWindowsRecoverAuthoritativeLedger",
+        "Lottery.G2.EditMode.Tests.CoreTests.UnknownCommitBlocksNewCommandUntilSameIdRecovery",
+        "Lottery.G2.EditMode.Tests.CoreTests.UnknownUnpublishedCommitCanOnlyRetryAfterProof",
+        "Lottery.G2.EditMode.Tests.CoreTests.CorruptConfirmedStateNeverFallsBackToOlderBackup",
+        "Lottery.G2.EditMode.Tests.CoreTests.MalformedLengthPrefixesBlockStateCommitAndIntentWithoutChangingFiles",
+        "Lottery.G2.EditMode.Tests.CoreTests.UnknownSchemaIsRejectedAndOriginalBytesPreserved",
+        "Lottery.G2.EditMode.Tests.CoreTests.ExclusiveWriterRejectsSecondStoreWithoutDeletingSave",
+        "Lottery.G2.EditMode.Tests.CoreTests.NormalFirstDayUsesOrdinaryPurchaseWithoutAd",
+        "Lottery.G2.EditMode.Tests.CoreTests.SyntheticAdQualificationChecksSecondsCountDayAndCooldown",
+        "Lottery.G2.EditMode.Tests.CoreTests.CloseThenLateRewardKeepsReservationAndCommitsOnce",
+        "Lottery.G2.EditMode.Tests.CoreTests.RewardThenCloseAndDuplicateRewardCannotDoubleSpend",
+        "Lottery.G2.EditMode.Tests.CoreTests.WrongRequestAndWrongRunCallbacksNeverReward",
+        "Lottery.G2.EditMode.Tests.CoreTests.DefinitiveNoRewardThenRewardIsRecoveryConflict",
+        "Lottery.G2.EditMode.Tests.CoreTests.FakeReceiptSourceAndWaitingReservationSurviveStoreRebuild",
+        "Lottery.G2.EditMode.Tests.CoreTests.AdCreatedAndReservedResumeOriginalRequestAfterStoreRebuild",
+        "Lottery.G2.EditMode.Tests.CoreTests.RewardConfirmationAndCommitIntentSurviveStoreRebuild",
+        "Lottery.G2.EditMode.Tests.CoreTests.ValidRewardFromReservedPhaseIsDurablyConfirmed",
+        "Lottery.G2.EditMode.Tests.CoreTests.InsufficientCashAndReservedCashNeverGoNegative",
+        "Lottery.G2.EditMode.Tests.CoreTests.ChangedOriginalStockBecomesConflictWithoutReplacement",
+        "Lottery.G2.EditMode.Tests.CoreTests.AdUnknownCommitRetainsReservationUntilAuthoritativeRecovery"
+      ]
+    },
+    "play": {
+      "Lottery.G2.PlayMode.Tests.dll": [
+        "Lottery.G2.PlayMode.Tests.G2PlayTests.BuyHalfScratchPanelReturnRevealAndClaimCommitsOneTicket",
+        "Lottery.G2.PlayMode.Tests.G2PlayTests.UiHitConsumesGestureAndPanelPreservesTicket",
+        "Lottery.G2.PlayMode.Tests.G2PlayTests.SecondTouchCannotTakeOverAndTouchUsesSameUvProjection",
+        "Lottery.G2.PlayMode.Tests.G2PlayTests.PointerExitReentryAndFocusCancelDoNotBridge",
+        "Lottery.G2.PlayMode.Tests.G2PlayTests.BackCancelsCaptureAndReturnsToCommittedTicket",
+        "Lottery.G2.PlayMode.Tests.G2PlayTests.SaveFailureNeverShowsUncommittedScratch",
+        "Lottery.G2.PlayMode.Tests.G2PlayTests.UnknownBuyBlocksInputUntilOriginalCommitIsRecovered",
+        "Lottery.G2.PlayMode.Tests.G2PlayTests.ActualUrpFramesShowCommittedMaskAndSettlement"
+      ]
+    }
+  }
+}

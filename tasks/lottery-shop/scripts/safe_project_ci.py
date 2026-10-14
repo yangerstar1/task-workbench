@@ -19,6 +19,8 @@ PHASES = {
     'regression-play-core': ('playmode', split.FOLDERS['core'], 'Lottery.G2.PlayMode.Tests;Lottery.G3.PlayMode.Tests', 480),
     'regression-play-world': ('playmode', split.FOLDERS['world'], 'Lottery.G2.PlayMode.Tests;Lottery.G3.PlayMode.Tests', 480),
 }
+COUNTER_LIGHT_DIAGNOSTIC = False
+COUNTER_LIGHT_DIAGNOSTIC_FAULT = ''
 COVERAGE = 'generateAdditionalMetrics;generateHtmlReport;generateBadgeReport;dontClear'
 RETURN_COMMAND = 'unity-editor -logFile /dev/stdout -quit -returnlicense -username "$UNITY_EMAIL" -password "$UNITY_PASSWORD" -projectPath "/BlankProject"'
 MARKER = b'SAFE_PROJECT_NATIVE_EXIT_CODE='
@@ -115,6 +117,8 @@ def process_receipt(ident, phase):
                 nativeExitMarkerCount=0, observations={key: 0 for key in private.TOKENS}, compilerErrors=[], cleanup=None,
                 image=private.IMAGE, mechanismSourcePin=private.PIN, nativeOutput='BOUNDED_MEMORY_ONLY_NO_RAW_LOG',
                 testVerdict='SEPARATE_EXACT_NUNIT_VALIDATOR_REQUIRED')
+    if phase == 'capture':
+        record.update(counterLightDiagnostic=COUNTER_LIGHT_DIAGNOSTIC, counterLightDiagnosticFault=COUNTER_LIGHT_DIAGNOSTIC_FAULT)
     if phase in split.PHASES.values():
         shard = phase.removeprefix('regression-play-')
         record.update(shard=shard, plannedCaseCount=len(split.names(shard)), testSelectionSha256=split.selection_hash(shard),
@@ -160,6 +164,10 @@ def project_argv(phase, ident):
         argv += ['-g3RegressionProgress', '1', '-probeReviewedCommit', ident['reviewedCandidateCommit'],
                  '-g3RegressionShard', shard, '-testFilter', split.selection(shard)]
     if phase == 'performance-probe': argv += ['-g3PerformanceProbe', '1', '-probeReviewedCommit', ident['reviewedCandidateCommit']]
+    if phase == 'capture' and COUNTER_LIGHT_DIAGNOSTIC:
+        argv += ['-counterLightDiagnostic', '1']
+        if COUNTER_LIGHT_DIAGNOSTIC_FAULT:
+            argv += ['-counterLightDiagnosticFault', COUNTER_LIGHT_DIAGNOSTIC_FAULT]
     return argv
 
 
@@ -231,7 +239,8 @@ def test(root, phase):
             for receipt in (artifacts / 'performance-receipt.json', visual.outdir(root) / 'performance-receipt.json'):
                 if receipt.exists(): receipt.unlink()
         compiler_files = compiler_assets(root, ident)
-        if phase in split.PHASES.values(): record['nativeStartedAtNs'] = time.time_ns()
+        record['nativeStartedAtNs'] = time.time_ns()
+        record['processBudgetSeconds'] = seconds
         native(ident, shell(shlex.join(project_argv(phase, ident))), seconds, record, compiler_files)
         # Normal NUnit/test failure still permits the other exact suites to run.
         # Missing exits, native licensing failures or synchronous timeouts do not.
@@ -280,10 +289,26 @@ def configure_performance():
 
 
 def main():
+    global COUNTER_LIGHT_DIAGNOSTIC, COUNTER_LIGHT_DIAGNOSTIC_FAULT
     parser = argparse.ArgumentParser()
     parser.add_argument('phase', choices=('start', *PHASES, 'performance-probe', 'finish'))
     parser.add_argument('--performance-only', action='store_true')
+    parser.add_argument('--counter-light-diagnostic', action='store_true')
+    parser.add_argument('--counter-light-diagnostic-fault', default='')
     args = parser.parse_args()
+    if args.counter_light_diagnostic or args.counter_light_diagnostic_fault:
+        if args.phase != 'capture' or args.performance_only or not args.counter_light_diagnostic:
+            print('SAFE_PROJECT_DIAGNOSTIC_PROFILE_REJECTED'); return 1
+        allowed_cases = ('pendant-zero', 'boardwash-zero', 'counter-pair-zero', 'daylight-zero', 'reading-zero',
+                         'shelf-zero', 'all-direct-zero', 'probe-intensity-zero', 'global-reflection-zero',
+                         'reflection-controls-zero', 'ambient-sh-zero', 'counter-and-reflection-controls-zero',
+                         'oak-specular-highlights-off', 'oak-normal-flat', 'oak-roughness-one', 'oak-texture-only', 'oak-target-mask')
+        allowed_faults = {case + ':' + point for case in allowed_cases for point in ('after-mutation', 'before-capture', 'after-png', 'before-receipt')}
+        allowed_faults |= {'negative:camera-target', 'negative:material-slot', 'negative:probe-transform', 'negative:urp-camera'}
+        if args.counter_light_diagnostic_fault and args.counter_light_diagnostic_fault not in allowed_faults:
+            print('SAFE_PROJECT_DIAGNOSTIC_FAULT_REJECTED'); return 1
+        COUNTER_LIGHT_DIAGNOSTIC = True
+        COUNTER_LIGHT_DIAGNOSTIC_FAULT = args.counter_light_diagnostic_fault
     if args.performance_only:
         if args.phase not in ('start', 'performance-probe', 'finish'):
             print('SAFE_PROJECT_PROFILE_REJECTED'); return 1

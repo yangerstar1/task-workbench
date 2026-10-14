@@ -1,0 +1,28 @@
+{
+  "schemaVersion": 1,
+  "scope": "SOURCE_ONLY_COUNTER_LIGHT_DIAGNOSTIC_CANDIDATE_NOT_NATIVE_VALIDATION",
+  "frozenCommit": "02a6440209c26bcc94c50fdf73a87345b563b5ed",
+  "nativeCompile": "NOT_RUN",
+  "nativeCapture": "NOT_RUN",
+  "normalFrame": "phone-mom-pending",
+  "normalFrameSha256Run24": "da2a10a2039d590599871f76be907a60ddea0b09f18a7ed73839585f1d4e70d7",
+  "normalCameraRun24": {"position": [1.5700000524520874, 1.2020645141601562, -1.1998244524002075], "euler": [12, 180, 0], "fov": 28, "width": 1280, "height": 720},
+  "cases": ["pendant-zero", "boardwash-zero", "counter-pair-zero", "daylight-zero", "reading-zero", "shelf-zero", "all-direct-zero", "probe-intensity-zero", "global-reflection-zero", "reflection-controls-zero", "ambient-sh-zero", "counter-and-reflection-controls-zero", "oak-specular-highlights-off", "oak-normal-flat", "oak-roughness-one", "oak-texture-only", "oak-target-mask"],
+  "roiCoordinateSystem": "PNG top-left, half-open x0 y0 x1 y1, no crop or rescale of originals",
+  "rois": {
+    "fascia_lit": [840, 112, 1210, 192],
+    "fascia_lower": [840, 218, 1210, 248],
+    "counter_foreground": [875, 485, 1200, 665],
+    "ceramic_right": [990, 285, 1110, 420],
+    "ceramic_left": [268, 290, 351, 445],
+    "green_wall_control": [830, 285, 930, 373],
+    "phone_screen_control": [500, 65, 775, 640]
+  },
+  "materialTarget": {"rendererName": "Warm_Oak", "materialName": "Warm_Oak", "shader": "Universal Render Pipeline/Lit", "coverage": "ALL_MERGED_WARM_OAK_GEOMETRY_NOT_FASCIA_ONLY", "requireMaskCoverageForMaterialInterpretation": 0.95},
+  "normalFramesCountRequired": 23,
+  "diagnosticPngCount": 19,
+  "additionalRestoreOnlyRenderCount": 17,
+  "effectRankingThresholdCodeValue": 2,
+  "automaticArtApproval": false,
+  "launchOrPublicationAuthorizedByThisPackage": false
+}

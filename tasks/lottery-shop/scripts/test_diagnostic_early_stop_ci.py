@@ -20,7 +20,7 @@ def request(profile=v.EARLY_STOP):
 
 
 def evidence():
-    capture=s.process_receipt(IDENT,'capture');capture.update(status='NATIVE_FAILED',nativeExitCode=3,dockerExitCode=3,nativeExitMarkerCount=1,elapsedMs=250000,recordedAtUtc='2026-10-13T02:00:00Z')
+    capture=s.process_receipt(IDENT,'capture');capture.update(status='NATIVE_FAILED',nativeExitCode=3,dockerExitCode=3,nativeExitMarkerCount=1,elapsedMs=250000,recordedAtUtc='2026-10-13T02:00:00Z',nativeStartedAtNs=1791856550000000000,processBudgetSeconds=1800)
     session=dict(IDENT,status='READY',activationSucceeded=True,stagesStarted=['capture'],cleanup=None)
     events=[dict(stage=stage,utc='2026-10-13T02:00:00Z',elapsedMs=i,inputUpdates=0,frameCount=0,purchased=-1,settled=-1,dayPhase='UNAVAILABLE') for i,stage in enumerate(decision.FAILED_PREBUILD)]
     progress=dict(schemaVersion=1,scope=v.SCOPE,kind='prebuild',sourceCommit=IDENT['sourceCommit'],runId='123',runAttempt='1',status='MILESTONES_ONLY_NOT_TEST_PASS',events=events)
@@ -71,6 +71,56 @@ class RequestTests(unittest.TestCase):
 
 class ProofTests(unittest.TestCase):
     def test_exact_proven_failed_prebuild(self):self.assertTrue(decision.eligible(IDENT,*evidence(),False))
+
+    def test_current_capture_schema_requires_each_new_field(self):
+        for key in ('counterLightDiagnostic','counterLightDiagnosticFault','nativeStartedAtNs','processBudgetSeconds'):
+            inputs=evidence();inputs[0].pop(key)
+            with self.subTest(key=key),self.assertRaisesRegex(ValueError,'SAFE_FIELDS_REJECTED'):decision.eligible(IDENT,*inputs,False)
+        inputs=evidence()
+        for key in ('counterLightDiagnostic','counterLightDiagnosticFault','nativeStartedAtNs','processBudgetSeconds'):inputs[0].pop(key)
+        with self.assertRaisesRegex(ValueError,'SAFE_FIELDS_REJECTED'):decision.eligible(IDENT,*inputs,False)
+
+    def test_opt_in_is_exact_boolean_and_empty_fault_is_required(self):
+        for enabled in (False,True):
+            inputs=evidence();inputs[0]['counterLightDiagnostic']=enabled
+            self.assertTrue(decision.eligible(IDENT,*inputs,False))
+        for value in (None,0,1,'true','false',[],{}):
+            inputs=evidence();inputs[0]['counterLightDiagnostic']=value
+            with self.subTest(value=value),self.assertRaisesRegex(ValueError,'CAPTURE_DIAGNOSTIC_SELECTOR_REJECTED'):decision.eligible(IDENT,*inputs,False)
+
+    def test_fault_injection_or_wrong_fault_type_never_authorizes_skip(self):
+        for enabled in (False,True):
+            for fault in ('pendant-zero:before-capture','negative:camera-target','UNKNOWN',None,False,0,[],{}):
+                inputs=evidence();inputs[0].update(counterLightDiagnostic=enabled,counterLightDiagnosticFault=fault)
+                with self.subTest(enabled=enabled,fault=fault),self.assertRaisesRegex(ValueError,'CAPTURE_DIAGNOSTIC_SELECTOR_REJECTED'):decision.eligible(IDENT,*inputs,False)
+
+    def test_native_start_requires_positive_nonfuture_integer_not_boolean(self):
+        for value in (None,False,True,0,-1,1791856550000000000.0,'1791856550000000000',[],{},decision.time.time_ns()+10**12):
+            inputs=evidence();inputs[0]['nativeStartedAtNs']=value
+            with self.subTest(value=value),self.assertRaisesRegex(ValueError,'CAPTURE_NATIVE_START_REJECTED'):decision.eligible(IDENT,*inputs,False)
+
+    def test_capture_budget_requires_exact_original_integer(self):
+        for value in (None,False,True,0,480,1799,1801,1800.0,'1800',[],{}):
+            inputs=evidence();inputs[0]['processBudgetSeconds']=value
+            with self.subTest(value=value),self.assertRaisesRegex(ValueError,'CAPTURE_BUDGET_REJECTED'):decision.eligible(IDENT,*inputs,False)
+
+    def test_current_schema_rejects_unknown_and_non_capture_fields(self):
+        for key,value in [('unknown',True),('counterLightDiagnosticExtra',True),('nativeStartedAt','2026-10-13T02:00:00Z'),('shard','core'),('plannedCaseCount',32),('testSelectionSha256','f'*64)]:
+            inputs=evidence();inputs[0][key]=value
+            with self.subTest(key=key),self.assertRaisesRegex(ValueError,'SAFE_FIELDS_REJECTED'):decision.eligible(IDENT,*inputs,False)
+        inputs=evidence();inputs[1]['counterLightDiagnostic']=True
+        with self.assertRaisesRegex(ValueError,'SAFE_FIELDS_REJECTED'):decision.eligible(IDENT,*inputs,False)
+
+    def test_opt_in_still_requires_failed_prebuild_and_no_runtime(self):
+        mutations=[lambda e:e[0].update(status='NATIVE_SUCCEEDED',nativeExitCode=0,dockerExitCode=0),
+                   lambda e:e[2]['events'][5].update(stage='prebuild-prepare-passed'),
+                   lambda e:e[2]['events'][0].update(frameCount=1),
+                   lambda e:e[3]['events'][1].update(stage='ENTERED_PLAY_MODE')]
+        for mutate in mutations:
+            inputs=evidence();inputs[0]['counterLightDiagnostic']=True;mutate(inputs)
+            with self.assertRaises(ValueError):decision.eligible(IDENT,*inputs,False)
+        inputs=evidence();inputs[0]['counterLightDiagnostic']=True
+        with self.assertRaisesRegex(ValueError,'RUNTIME_EVIDENCE_PRESENT'):decision.eligible(IDENT,*inputs,True)
 
     def test_source_run_attempt_mismatch_in_every_proof(self):
         for index in range(4):
@@ -132,6 +182,28 @@ class DecisionTests(unittest.TestCase):
         result=self.decide();self.assertEqual(result['status'],'SKIP_REQUESTED');self.assertEqual(result['regressionEdit'],'SKIP_REQUESTED');self.assertEqual(result['regressionPlay'],'SKIP_REQUESTED');self.assertEqual(self.output.read_text(),'skip_regressions=true\n')
         self.assertEqual(set(result),{'schemaVersion','scope','status','reason','sourceCommit','reviewedCandidateCommit','runId','runAttempt','requestId','regressionEdit','regressionPlay','g3Gate','captureVerdict','evidenceSha256'})
         self.assertFalse(list(self.root.rglob('*regression*xml')));self.assertFalse((v.outdir(self.root)/'safe-regression-edit.json').exists());self.assertFalse((v.outdir(self.root)/'safe-regression-play.json').exists())
+
+    def test_current_safe_writer_capture_reaches_decision_without_native_launch(self):
+        def failed(*args):args[3].update(status='NATIVE_FAILED',nativeExitCode=3,dockerExitCode=3,nativeExitMarkerCount=1)
+        for enabled in (False,True):
+            v.write(s.file(self.root,'session'),dict(IDENT,status='READY',activationSucceeded=True,stagesStarted=[],cleanup=None))
+            with patch.object(s,'identity',return_value=IDENT),patch.object(s,'compiler_assets',return_value=frozenset()),patch.object(s,'native',side_effect=failed) as native,patch.object(s,'COUNTER_LIGHT_DIAGNOSTIC',enabled),patch.object(s,'COUNTER_LIGHT_DIAGNOSTIC_FAULT',''):
+                self.assertEqual(s.test(self.root,'capture'),1);native.assert_called_once()
+            capture_path=s.file(self.root,'capture');before=capture_path.read_bytes();capture=json.loads(before)
+            self.assertEqual(set(capture),set(evidence()[0]));self.assertIs(capture['counterLightDiagnostic'],enabled)
+            self.assertEqual(capture['processBudgetSeconds'],1800);self.assertIs(type(capture['nativeStartedAtNs']),int)
+            result=self.decide();self.assertEqual(result['status'],'SKIP_REQUESTED')
+            self.assertEqual(result['g3Gate'],'NOT_EVALUATED');self.assertEqual(result['captureVerdict'],'UNCHANGED_SEPARATE_RECEIPT')
+            self.assertEqual(capture_path.read_bytes(),before);self.assertEqual(capture['status'],'NATIVE_FAILED')
+
+    def test_malformed_current_fields_default_to_regressions_without_not_run_or_pass(self):
+        capture_path=s.file(self.root,'capture');original=json.loads(capture_path.read_bytes())
+        for key,value in [('counterLightDiagnostic',1),('counterLightDiagnosticFault','pendant-zero:before-capture'),('nativeStartedAtNs',True),('processBudgetSeconds',480),('unexpected',True)]:
+            capture=dict(original,counterLightDiagnostic=True);capture[key]=value;v.write(capture_path,capture);before=capture_path.read_bytes()
+            receipt=self.required();self.assertEqual(receipt['g3Gate'],'NOT_EVALUATED');self.assertEqual(receipt['captureVerdict'],'UNCHANGED_SEPARATE_RECEIPT')
+            self.assertEqual(capture_path.read_bytes(),before);self.assertFalse((v.outdir(self.root)/decision.FINAL_NAME).exists())
+            env=dict(DECISION_OUTCOME='success',DECISION_SKIP='true',REGRESSION_EDIT_OUTCOME='skipped',REGRESSION_PLAY_CORE_OUTCOME='skipped',REGRESSION_PLAY_WORLD_OUTCOME='skipped')
+            with patch.dict(os.environ,env),self.assertRaisesRegex(ValueError,'FINAL_DECISION_REJECTED'):decision.finalize_not_run(self.root)
 
     def test_not_run_requires_both_actual_skips_and_successful_decision(self):
         self.decide()

@@ -1,0 +1,726 @@
+{
+  "digestOnlyTrackedChanges": [
+    "ProjectSettings/GraphicsSettings.asset",
+    "ProjectSettings/ProjectSettings.asset",
+    "ProjectSettings/QualitySettings.asset",
+    "Assets/GeneratedProbe/Probe.unity",
+    "Assets/GeneratedProbe/ProbeSurface.mat"
+  ],
+  "gameSourceCommit": "02a6440209c26bcc94c50fdf73a87345b563b5ed",
+  "materials": [
+    {
+      "name": "Aged_Aluminium",
+      "roughnessTexture": null,
+      "textures": [],
+      "transparent": false
+    },
+    {
+      "name": "Bone_Laminate",
+      "roughnessTexture": null,
+      "textures": [],
+      "transparent": false
+    },
+    {
+      "name": "Brass_Worn",
+      "roughnessTexture": "textures/BrushedBrass_v24_Roughness.png",
+      "textures": [
+        "BrushedBrass_v24_BaseColor.png",
+        "BrushedBrass_v24_Normal.png",
+        "BrushedBrass_v24_Roughness.png"
+      ],
+      "transparent": false
+    },
+    {
+      "name": "Ceramic_Glazed",
+      "roughnessTexture": "textures/IvoryGlaze_v24_Roughness.png",
+      "textures": [
+        "IvoryGlaze_v24_BaseColor.png",
+        "IvoryGlaze_v24_Normal.png",
+        "IvoryGlaze_v24_Roughness.png"
+      ],
+      "transparent": false
+    },
+    {
+      "name": "Charcoal_Metal",
+      "roughnessTexture": null,
+      "textures": [],
+      "transparent": false
+    },
+    {
+      "name": "CounterToolTag_1",
+      "roughnessTexture": null,
+      "textures": [
+        "CounterToolTag_1_BaseColor.png"
+      ],
+      "transparent": false
+    },
+    {
+      "name": "CounterToolTag_2",
+      "roughnessTexture": null,
+      "textures": [
+        "CounterToolTag_2_BaseColor.png"
+      ],
+      "transparent": false
+    },
+    {
+      "name": "CounterToolTag_3",
+      "roughnessTexture": null,
+      "textures": [
+        "CounterToolTag_3_BaseColor.png"
+      ],
+      "transparent": false
+    },
+    {
+      "name": "Cream_Plaster",
+      "roughnessTexture": null,
+      "textures": [
+        "SoftPlaster_v13_BaseColor.png"
+      ],
+      "transparent": false
+    },
+    {
+      "name": "Dark_Green_Felt",
+      "roughnessTexture": "textures/Felt_v15_Roughness.png",
+      "textures": [
+        "Felt_v15_BaseColor.png",
+        "Felt_v15_Normal.png",
+        "Felt_v15_Roughness.png"
+      ],
+      "transparent": false
+    },
+    {
+      "name": "Decoration_Print_Atlas",
+      "roughnessTexture": null,
+      "textures": [
+        "DecorationAtlas_v15_BaseColor.png"
+      ],
+      "transparent": false
+    },
+    {
+      "name": "Display_Silver_Coating",
+      "roughnessTexture": null,
+      "textures": [],
+      "transparent": false
+    },
+    {
+      "name": "Glass_Blue_Water",
+      "roughnessTexture": null,
+      "textures": [],
+      "transparent": true
+    },
+    {
+      "name": "Glass_Clear",
+      "roughnessTexture": null,
+      "textures": [],
+      "transparent": true
+    },
+    {
+      "name": "Grout",
+      "roughnessTexture": null,
+      "textures": [],
+      "transparent": false
+    },
+    {
+      "name": "Heritage_Green_Paint",
+      "roughnessTexture": null,
+      "textures": [
+        "SmoothGreen_v13_BaseColor.png"
+      ],
+      "transparent": false
+    },
+    {
+      "name": "Ink",
+      "roughnessTexture": null,
+      "textures": [],
+      "transparent": false
+    },
+    {
+      "name": "Leaves_Green",
+      "roughnessTexture": "textures/Pothos_v26_Roughness.png",
+      "textures": [
+        "Pothos_v26_BaseColor.png",
+        "Pothos_v26_Normal.png",
+        "Pothos_v26_Roughness.png"
+      ],
+      "transparent": false
+    },
+    {
+      "name": "Newspaper",
+      "roughnessTexture": null,
+      "textures": [
+        "Newspaper_BaseColor.png"
+      ],
+      "transparent": false
+    },
+    {
+      "name": "Oxblood_Enamel",
+      "roughnessTexture": null,
+      "textures": [],
+      "transparent": false
+    },
+    {
+      "name": "Paper_Ivory",
+      "roughnessTexture": null,
+      "textures": [],
+      "transparent": false
+    },
+    {
+      "name": "Plastic_Cream",
+      "roughnessTexture": null,
+      "textures": [],
+      "transparent": false
+    },
+    {
+      "name": "Rubber",
+      "roughnessTexture": null,
+      "textures": [],
+      "transparent": false
+    },
+    {
+      "name": "Service_Monitor",
+      "roughnessTexture": null,
+      "textures": [
+        "ServiceMonitor_v15_BaseColor.png"
+      ],
+      "transparent": false
+    },
+    {
+      "name": "ShopSign",
+      "roughnessTexture": null,
+      "textures": [
+        "ShopSign_v15_BaseColor.png"
+      ],
+      "transparent": false
+    },
+    {
+      "name": "StreetBlur",
+      "roughnessTexture": null,
+      "textures": [
+        "StreetBlur_BaseColor.png"
+      ],
+      "transparent": false
+    },
+    {
+      "name": "Ticket_Swap_1",
+      "roughnessTexture": null,
+      "textures": [
+        "number-ticket-albedo.png"
+      ],
+      "transparent": false
+    },
+    {
+      "name": "Ticket_Swap_2",
+      "roughnessTexture": null,
+      "textures": [
+        "challenge-ticket-albedo.png"
+      ],
+      "transparent": false
+    },
+    {
+      "name": "Ticket_Type_Label",
+      "roughnessTexture": null,
+      "textures": [
+        "TicketTypeNames_v15_BaseColor.png"
+      ],
+      "transparent": false
+    },
+    {
+      "name": "Warm_Light",
+      "roughnessTexture": null,
+      "textures": [],
+      "transparent": false
+    },
+    {
+      "name": "Warm_Oak",
+      "roughnessTexture": "textures/OakGrain_v15_Roughness.png",
+      "textures": [
+        "OakGrain_v15_Normal.png",
+        "OakGrain_v15_Roughness.png",
+        "Walnut_v15_BaseColor.png"
+      ],
+      "transparent": false
+    },
+    {
+      "name": "Warm_Terrazzo",
+      "roughnessTexture": "textures/MineralFloor_v15_Roughness.png",
+      "textures": [
+        "MineralFloor_v15_BaseColor.png",
+        "MineralFloor_v15_Normal.png",
+        "MineralFloor_v15_Roughness.png"
+      ],
+      "transparent": false
+    },
+    {
+      "name": "Tool_Dock_Liner",
+      "roughnessTexture": null,
+      "textures": [
+        "Felt_v15_BaseColor.png",
+        "Felt_v15_Normal.png"
+      ],
+      "transparent": false
+    },
+    {
+      "name": "Nearfield_Tea",
+      "roughnessTexture": "textures/Tea_v24_Roughness.png",
+      "textures": [
+        "Tea_v24_BaseColor.png",
+        "Tea_v24_Normal.png",
+        "Tea_v24_Roughness.png"
+      ],
+      "transparent": false
+    },
+    {
+      "name": "Plant_Stem_Green",
+      "roughnessTexture": null,
+      "textures": [],
+      "transparent": false
+    }
+  ],
+  "pothos": [
+    "Assets/G3/Shop/Resources/G3/Shop/Textures/Pothos_v26_BaseColor.png.meta",
+    "Assets/G3/Shop/Resources/G3/Shop/Textures/Pothos_v26_Normal.png.meta",
+    "Assets/G3/Shop/Resources/G3/Shop/Textures/Pothos_v26_Roughness.png.meta"
+  ],
+  "recipeSources": [
+    "Assets/G3/Interaction/G3ShopEnvironment.cs",
+    "Assets/G3/Editor/G3ShopReflectionBaker.cs",
+    "Assets/G3/Editor/G3ShopArtImporter.cs",
+    "Assets/G3/Editor/G3Build.cs",
+    "Packages/manifest.json",
+    "Packages/packages-lock.json"
+  ],
+  "schemaVersion": 1,
+  "shop": "Assets/G3/Shop/Resources/G3/Shop",
+  "sourceFiles": [
+    {
+      "bytes": 9695,
+      "path": "Assets/G3/Editor/G3Build.cs",
+      "sha256": "95b9bc5885e8ffc3856faf3bdab63c943757d6be7f198696eb957a1b26348168"
+    },
+    {
+      "bytes": 44292,
+      "path": "Assets/G3/Editor/G3ShopArtImporter.cs",
+      "sha256": "8b6d4a49a7222a95764cc33e61cfcbcc218d465df0ac264fa464689e9480485c"
+    },
+    {
+      "bytes": 47274,
+      "path": "Assets/G3/Editor/G3ShopReflectionBaker.cs",
+      "sha256": "2d53a3fba817002d3778aaf3776319efd335813c511cb5c3722162bec1fb6a68"
+    },
+    {
+      "bytes": 25460,
+      "path": "Assets/G3/Interaction/G3ShopEnvironment.cs",
+      "sha256": "2448f1f8ae1ad07f67ca1a4413658a688f54066af7e27e98127c2faa05d1409c"
+    },
+    {
+      "bytes": 1560,
+      "path": "Assets/G3/Shop/Resources/G3/Shop/ContactShade.shader",
+      "sha256": "66b6dd704e0ba61b8d68795acc16c031ca00dfaa17d28bafcb98c7eb25c3a804"
+    },
+    {
+      "bytes": 60,
+      "path": "Assets/G3/Shop/Resources/G3/Shop/ContactShade.shader.meta",
+      "sha256": "c040afd19753ced930010398121ee4a397b923372077f5974c3e14eb8a4dcc6b"
+    },
+    {
+      "bytes": 172,
+      "path": "Assets/G3/Shop/Resources/G3/Shop/Exterior.meta",
+      "sha256": "edebc191f40dc56f6d72d759bc18f90c78c9105e4d149179181908a875a245c5"
+    },
+    {
+      "bytes": 1186,
+      "path": "Assets/G3/Shop/Resources/G3/Shop/Exterior/ExteriorBackdrop.shader",
+      "sha256": "ae98b53d52e18ba1c6bdfa36e65396716576e25abbb1b9e5e5877c2f50fad979"
+    },
+    {
+      "bytes": 204,
+      "path": "Assets/G3/Shop/Resources/G3/Shop/Exterior/ExteriorBackdrop.shader.meta",
+      "sha256": "2ae3eb92648247766b6f7ba24f175f8d228a6d793661ef6af794e8dfef49e791"
+    },
+    {
+      "bytes": 3090652,
+      "path": "Assets/G3/Shop/Resources/G3/Shop/Exterior/Street-day.png",
+      "sha256": "f7024fe54add3059448b44fd5d0acf7026771f0662abfdb1605ae9d96d9e6e56"
+    },
+    {
+      "bytes": 453,
+      "path": "Assets/G3/Shop/Resources/G3/Shop/Exterior/Street-day.png.meta",
+      "sha256": "e2b3af1e8627ffb789381ae7b8f427f8fcc002fed93da436f64317da22c206bc"
+    },
+    {
+      "bytes": 2641046,
+      "path": "Assets/G3/Shop/Resources/G3/Shop/Exterior/Street-night.png",
+      "sha256": "2393a5234fb3fbd142eea0ee31672db9685ec4dafb67abeedb0bf7a0d96fb852"
+    },
+    {
+      "bytes": 453,
+      "path": "Assets/G3/Shop/Resources/G3/Shop/Exterior/Street-night.png.meta",
+      "sha256": "f458405af3af9d143fac4b24cde50f1f4a6644514ef6215304ad74a66c5471ce"
+    },
+    {
+      "bytes": 7062700,
+      "path": "Assets/G3/Shop/Resources/G3/Shop/LotteryShop_Interior.fbx",
+      "sha256": "912658da9c7ca0bb8d917436040ad301bd6eef4944095da43a06f456054c2b47"
+    },
+    {
+      "bytes": 675,
+      "path": "Assets/G3/Shop/Resources/G3/Shop/READY.json",
+      "sha256": "b4a489b895165d9062e8e850d6e959315a4bed2e99a637481c6eb43793013435"
+    },
+    {
+      "bytes": 291373,
+      "path": "Assets/G3/Shop/Resources/G3/Shop/Textures/BrushedBrass_v24_BaseColor.png",
+      "sha256": "8aae14d147ad7baec41880cad0cb46f0840b0173d422bcf74a7606cb393ed5da"
+    },
+    {
+      "bytes": 876507,
+      "path": "Assets/G3/Shop/Resources/G3/Shop/Textures/BrushedBrass_v24_Normal.png",
+      "sha256": "87529521ff91022ef5b6b747ec31157c9e9d9b32da7fad91e4a7e045d62e9904"
+    },
+    {
+      "bytes": 164909,
+      "path": "Assets/G3/Shop/Resources/G3/Shop/Textures/BrushedBrass_v24_Roughness.png",
+      "sha256": "37623986d2a49befaa5acb9e8468698866d27d449210a304c8e4c7dcdbd09cc2"
+    },
+    {
+      "bytes": 10716,
+      "path": "Assets/G3/Shop/Resources/G3/Shop/Textures/CounterToolTag_1_BaseColor.png",
+      "sha256": "e98989f64c1a1187b49d093efbef1becde34d52c3260ce3a6f607a0cfd4a145c"
+    },
+    {
+      "bytes": 7095,
+      "path": "Assets/G3/Shop/Resources/G3/Shop/Textures/CounterToolTag_2_BaseColor.png",
+      "sha256": "f02077f25544901334dcf04d1298816a1bddfa84c5fff83373171e7b368a9901"
+    },
+    {
+      "bytes": 10710,
+      "path": "Assets/G3/Shop/Resources/G3/Shop/Textures/CounterToolTag_3_BaseColor.png",
+      "sha256": "82b42ebbac478fcf281e1e4dc16cfa3eb5406d58d4b87c447add7c2a9353d162"
+    },
+    {
+      "bytes": 2920634,
+      "path": "Assets/G3/Shop/Resources/G3/Shop/Textures/CreamPlaster_BaseColor.png",
+      "sha256": "55e392d09d3f54d0c064794858a0ac059c281b1157c90e0ad4d9f5238dfe85e7"
+    },
+    {
+      "bytes": 5747759,
+      "path": "Assets/G3/Shop/Resources/G3/Shop/Textures/CreamPlaster_Normal.png",
+      "sha256": "d14ca83e1184ad9a85219c229a84787457b51b492d49d68ecd100688e9188f1d"
+    },
+    {
+      "bytes": 1348201,
+      "path": "Assets/G3/Shop/Resources/G3/Shop/Textures/CreamPlaster_Roughness.png",
+      "sha256": "a8fa5daf30cc52dd2f9fccc1a5e7bcffc1473f421479de12134f4c2502ec95bb"
+    },
+    {
+      "bytes": 227637,
+      "path": "Assets/G3/Shop/Resources/G3/Shop/Textures/DecorationAtlas_v15_BaseColor.png",
+      "sha256": "16059f339c7a15cdd7c9bd91d9ab54937fe4692e354488d7dd6da669b60d50d7"
+    },
+    {
+      "bytes": 627939,
+      "path": "Assets/G3/Shop/Resources/G3/Shop/Textures/Felt_v15_BaseColor.png",
+      "sha256": "b153476d85f67a7921b6e94d316ea285eaf7524dc0870004c76cf006f277aa2f"
+    },
+    {
+      "bytes": 1943027,
+      "path": "Assets/G3/Shop/Resources/G3/Shop/Textures/Felt_v15_Normal.png",
+      "sha256": "2e73232b15faf1d4063a13b2bd528fbdc415e79aa9093e9885b4c17ccb1f748e"
+    },
+    {
+      "bytes": 562413,
+      "path": "Assets/G3/Shop/Resources/G3/Shop/Textures/Felt_v15_Roughness.png",
+      "sha256": "8f0222767b0faa415777d2af08c8d29b6459ed76ed96d71b0c218ea7147c1531"
+    },
+    {
+      "bytes": 2770585,
+      "path": "Assets/G3/Shop/Resources/G3/Shop/Textures/GreenPaint_BaseColor.png",
+      "sha256": "34cdc924c22cc1ddd2ebe375759a185ba844a982bcf2dadc779c2e671f34dd7f"
+    },
+    {
+      "bytes": 5522171,
+      "path": "Assets/G3/Shop/Resources/G3/Shop/Textures/GreenPaint_Normal.png",
+      "sha256": "4a8848a3c69b34f0667095896196aaa178cc6156def7c1845a3025a1d1ae5cd0"
+    },
+    {
+      "bytes": 1282924,
+      "path": "Assets/G3/Shop/Resources/G3/Shop/Textures/GreenPaint_Roughness.png",
+      "sha256": "d39be0cc480db05917c8b0c7abb70090eae592b25380281ef5206a3b7d9c89ef"
+    },
+    {
+      "bytes": 770217,
+      "path": "Assets/G3/Shop/Resources/G3/Shop/Textures/IvoryGlaze_v24_BaseColor.png",
+      "sha256": "736b860ff356f37ef1c8c840670d3905e376256e861df6c975ba3f76c70ff7b1"
+    },
+    {
+      "bytes": 900240,
+      "path": "Assets/G3/Shop/Resources/G3/Shop/Textures/IvoryGlaze_v24_Normal.png",
+      "sha256": "93bcca20716fdc1b3f62ec11d990cdd67bdedc1b9711ea9d0f7de1bbda3f2208"
+    },
+    {
+      "bytes": 505979,
+      "path": "Assets/G3/Shop/Resources/G3/Shop/Textures/IvoryGlaze_v24_Roughness.png",
+      "sha256": "5a85b63dc38640ba6cdfb589fd32385c37538a0962b44728d95bb593a44f9f33"
+    },
+    {
+      "bytes": 946335,
+      "path": "Assets/G3/Shop/Resources/G3/Shop/Textures/MineralFloor_v15_BaseColor.png",
+      "sha256": "0f4dd3d1b01e271ab644fda6d698706f9481737010b35472c9d3d170655697d2"
+    },
+    {
+      "bytes": 1606332,
+      "path": "Assets/G3/Shop/Resources/G3/Shop/Textures/MineralFloor_v15_Normal.png",
+      "sha256": "21831b9809eeef3b52b7215862157ae26dff5f26a27318dfd4ddebf2e8937d52"
+    },
+    {
+      "bytes": 475040,
+      "path": "Assets/G3/Shop/Resources/G3/Shop/Textures/MineralFloor_v15_Roughness.png",
+      "sha256": "f6bbcdeed23f82f05f0896fbb0ed7df33ecf5af6fb23862b98368ba3583eaa3f"
+    },
+    {
+      "bytes": 16968,
+      "path": "Assets/G3/Shop/Resources/G3/Shop/Textures/Newspaper_BaseColor.png",
+      "sha256": "efbc3d1c90952a463fa62d844f7fefb26ecacc1528fd77009c670e3f4690925d"
+    },
+    {
+      "bytes": 1311841,
+      "path": "Assets/G3/Shop/Resources/G3/Shop/Textures/OakGrain_v15_Normal.png",
+      "sha256": "1e43939d81d79567958d906f41855b7574f2c9865eda9003abc5bc25aad58266"
+    },
+    {
+      "bytes": 362019,
+      "path": "Assets/G3/Shop/Resources/G3/Shop/Textures/OakGrain_v15_Roughness.png",
+      "sha256": "c35b681c05459eeb4f64caf18c809950975f7e545f777db22e7d34b1d7387101"
+    },
+    {
+      "bytes": 58393,
+      "path": "Assets/G3/Shop/Resources/G3/Shop/Textures/Poster_Fortune_BaseColor.png",
+      "sha256": "8a2a4a93b460de38a81cfe2ef9afd5a9ee2b943c17f4bcde234f1962a8512619"
+    },
+    {
+      "bytes": 415532,
+      "path": "Assets/G3/Shop/Resources/G3/Shop/Textures/Pothos_v26_BaseColor.png",
+      "sha256": "86c81cb36d3b2ddaaf6f30329e7808d0b550b47ca3e942b4613659d3811a2bdd"
+    },
+    {
+      "bytes": 543,
+      "path": "Assets/G3/Shop/Resources/G3/Shop/Textures/Pothos_v26_BaseColor.png.meta",
+      "sha256": "bc420fb4c3270225b2043c8a36001e120e7f96d58613a9ddd7a2d1d83d01c3f8"
+    },
+    {
+      "bytes": 25886,
+      "path": "Assets/G3/Shop/Resources/G3/Shop/Textures/Pothos_v26_Normal.png",
+      "sha256": "bd7a2e202040c4459cb28825a8ff66c0ed9d4beec8d40c7835f75a8d481378de"
+    },
+    {
+      "bytes": 543,
+      "path": "Assets/G3/Shop/Resources/G3/Shop/Textures/Pothos_v26_Normal.png.meta",
+      "sha256": "e9acb7bcb2745eb18ce9b5d0fced8342a543ef28d7bf16d32fa456886433bd4b"
+    },
+    {
+      "bytes": 11234,
+      "path": "Assets/G3/Shop/Resources/G3/Shop/Textures/Pothos_v26_Roughness.png",
+      "sha256": "36dcfb92dd9ec1bffd86c1649178de4e601af5ceeeeebfbb5bac0bd884de51a1"
+    },
+    {
+      "bytes": 543,
+      "path": "Assets/G3/Shop/Resources/G3/Shop/Textures/Pothos_v26_Roughness.png.meta",
+      "sha256": "8f4d090cb76377000e7b94190250a7c2a1a1fa0ccf5434b59556e41e429da44f"
+    },
+    {
+      "bytes": 3249425,
+      "path": "Assets/G3/Shop/Resources/G3/Shop/Textures/QuietOak_v13_BaseColor.png",
+      "sha256": "931493fcc9885f7ff055e0932b944747874de457aaf11960c7dc1eae2b257388"
+    },
+    {
+      "bytes": 77839,
+      "path": "Assets/G3/Shop/Resources/G3/Shop/Textures/ResultsBoard_BaseColor.png",
+      "sha256": "1b9b2043337fe38e212552424c79fa53e4681b735db50896fb2438883a3eca0a"
+    },
+    {
+      "bytes": 14094,
+      "path": "Assets/G3/Shop/Resources/G3/Shop/Textures/ServiceMonitor_v15_BaseColor.png",
+      "sha256": "a989ead1468fcd9f59f2ccdf014e102e231818e81773857fb04c5b1209df1991"
+    },
+    {
+      "bytes": 61305,
+      "path": "Assets/G3/Shop/Resources/G3/Shop/Textures/ServiceNotice_BaseColor.png",
+      "sha256": "4720fd67fc58e50f5794d1823cedd7fc12e39da74c695f6cc010b492d317612d"
+    },
+    {
+      "bytes": 44160,
+      "path": "Assets/G3/Shop/Resources/G3/Shop/Textures/ShopSign_BaseColor.png",
+      "sha256": "bbdd48644b14820f7a2cc8747c656c082ee19f6b516e57e6e8bba4e5b939ff73"
+    },
+    {
+      "bytes": 32044,
+      "path": "Assets/G3/Shop/Resources/G3/Shop/Textures/ShopSign_v15_BaseColor.png",
+      "sha256": "7a9b0e69efd66d265cbce6399885c97fe285ba6a04c67eb8685fd21ecdc4aa15"
+    },
+    {
+      "bytes": 2179375,
+      "path": "Assets/G3/Shop/Resources/G3/Shop/Textures/SmoothGreen_v13_BaseColor.png",
+      "sha256": "63a14228f61b4b75f2c0d0e25193371168e4c0bc7760ecf8a9c1642bc2c81b41"
+    },
+    {
+      "bytes": 2950194,
+      "path": "Assets/G3/Shop/Resources/G3/Shop/Textures/SoftPlaster_v13_BaseColor.png",
+      "sha256": "0d0ff51fee5fb53f19c90dee0206ffd0f5cccd438ec50910a95a3f6d96eaa1f2"
+    },
+    {
+      "bytes": 279319,
+      "path": "Assets/G3/Shop/Resources/G3/Shop/Textures/StreetBlur_BaseColor.png",
+      "sha256": "e3a292653af1c7e3db3c554093593bd539aaf035b2df2cd1a5d9d22fba0901f8"
+    },
+    {
+      "bytes": 85782,
+      "path": "Assets/G3/Shop/Resources/G3/Shop/Textures/Tea_v24_BaseColor.png",
+      "sha256": "da0cb84d94925ed47e5e8fcfea12fd3fc36c014e668b3ad07f0fc1bbf6f9e755"
+    },
+    {
+      "bytes": 5334,
+      "path": "Assets/G3/Shop/Resources/G3/Shop/Textures/Tea_v24_Normal.png",
+      "sha256": "ea7e1e93c7c41fab9937d2cf274bdfe088b047d60597fa84a07f92b0bc7d22b1"
+    },
+    {
+      "bytes": 3158,
+      "path": "Assets/G3/Shop/Resources/G3/Shop/Textures/Tea_v24_Roughness.png",
+      "sha256": "9025ac7863e7457de92952c5fbdbf27ace7b6b84d585f052d03df5170eb0d6fe"
+    },
+    {
+      "bytes": 783961,
+      "path": "Assets/G3/Shop/Resources/G3/Shop/Textures/Terrazzo_BaseColor.png",
+      "sha256": "c5f70c0c9ba20c7ddc5de12e23429af580e815b3021c2d1a228a1bf1de5ab21e"
+    },
+    {
+      "bytes": 16912,
+      "path": "Assets/G3/Shop/Resources/G3/Shop/Textures/Terrazzo_Normal.png",
+      "sha256": "e8a7c51e5513cb6989ebc7494110b2f6b9a92cf28d24767ea6ee564916d2b568"
+    },
+    {
+      "bytes": 8534,
+      "path": "Assets/G3/Shop/Resources/G3/Shop/Textures/Terrazzo_Roughness.png",
+      "sha256": "959783c0f6a35143b2c30938b51d20c0d8bc125a895530661f4e9a37121d20bd"
+    },
+    {
+      "bytes": 24295,
+      "path": "Assets/G3/Shop/Resources/G3/Shop/Textures/TicketPlaceholder_1_BaseColor.png",
+      "sha256": "da40f6684330c1a35348fa3529a7ad4170f6897f6e845b8cc6be04ecd3f4f3c1"
+    },
+    {
+      "bytes": 23325,
+      "path": "Assets/G3/Shop/Resources/G3/Shop/Textures/TicketPlaceholder_2_BaseColor.png",
+      "sha256": "3560eb59be42a280876ca5cbac73b72f61d566c3f6f8922a74bcb73c607984de"
+    },
+    {
+      "bytes": 23655,
+      "path": "Assets/G3/Shop/Resources/G3/Shop/Textures/TicketPlaceholder_3_BaseColor.png",
+      "sha256": "ecae8251556feb51766db3ff2a6cc19d961b95c5091ed9de6767c11cb9f79f97"
+    },
+    {
+      "bytes": 21923,
+      "path": "Assets/G3/Shop/Resources/G3/Shop/Textures/TicketPlaceholder_4_BaseColor.png",
+      "sha256": "b707b3aecd41acfe2b8060210d94aa9f857bad8f0c3428a19a7f4fbd736002c2"
+    },
+    {
+      "bytes": 15794,
+      "path": "Assets/G3/Shop/Resources/G3/Shop/Textures/TicketTypeNames_v15_BaseColor.png",
+      "sha256": "f17c6a824feac92cbf79b1c665fb00283a658a4e4691a0754a95954b5b9de992"
+    },
+    {
+      "bytes": 2210418,
+      "path": "Assets/G3/Shop/Resources/G3/Shop/Textures/Walnut_v15_BaseColor.png",
+      "sha256": "00d54226c205327f6672693663c74343b5beb101666022ee82c20f6baa676053"
+    },
+    {
+      "bytes": 5146110,
+      "path": "Assets/G3/Shop/Resources/G3/Shop/Textures/WarmOak_Normal.png",
+      "sha256": "c4edbbf85fb920e400872ad5d642b788896cd40b12703d09342c1a47bc610c89"
+    },
+    {
+      "bytes": 1157043,
+      "path": "Assets/G3/Shop/Resources/G3/Shop/Textures/WarmOak_Roughness.png",
+      "sha256": "e47f78e7799a0efa00bbf504929788f3c665261fc696b9b0e822c46bd3776b6c"
+    },
+    {
+      "bytes": 2809613,
+      "path": "Assets/G3/Shop/Resources/G3/Shop/Textures/challenge-ticket-albedo.png",
+      "sha256": "4d1bc2a0999439014db391bd1754ef053f8729f699dbc02af05100ddc83a5384"
+    },
+    {
+      "bytes": 2813036,
+      "path": "Assets/G3/Shop/Resources/G3/Shop/Textures/counter-wood-basecolor.png",
+      "sha256": "5474d6c8b138e9b5b6d50f9d9d339590ea405342412489e7cc27794481943c1c"
+    },
+    {
+      "bytes": 3180106,
+      "path": "Assets/G3/Shop/Resources/G3/Shop/Textures/number-ticket-albedo.png",
+      "sha256": "aa9cd14c555cb2db4b402508ddee91e65a02b415e9226a0d99270b3d2e823e14"
+    },
+    {
+      "bytes": 616252,
+      "path": "Assets/G3/Shop/Resources/G3/Shop/Tool_inspection_lamp.fbx",
+      "sha256": "1b04130c8de713d707558f9955f22203bcfea6c59fa087f92a4c329205b1a016"
+    },
+    {
+      "bytes": 58620,
+      "path": "Assets/G3/Shop/Resources/G3/Shop/Tool_large_prize_stamp.fbx",
+      "sha256": "3164ddbfc9b26fcc3297d49f2cf595e41ded328ef297e2ba4ddc986dd74d48ef"
+    },
+    {
+      "bytes": 60956,
+      "path": "Assets/G3/Shop/Resources/G3/Shop/Tool_small_prize_box.fbx",
+      "sha256": "52223fb576e66ec4cb60e2f3a43622cbf4d2449c99054b884d12018c75d530d6"
+    },
+    {
+      "bytes": 14275,
+      "path": "Assets/G3/Shop/Resources/G3/Shop/anchors.json",
+      "sha256": "6f1cdd2c21d85ee2f7ced41c7108b39bba52f39a37b7c2a6ae017238a0913f39"
+    },
+    {
+      "bytes": 25267,
+      "path": "Assets/G3/Shop/Resources/G3/Shop/materials.json",
+      "sha256": "74d6d9d0cbdaabba35cb7733d5b50e953770f514e187eb503494586c454bb1bf"
+    },
+    {
+      "bytes": 13688,
+      "path": "Assets/GeneratedProbe/Probe.unity",
+      "sha256": "22edfea536d8714caceb7baec79a257da90cf7b259df748cafdd5b8bb4ce8e6a"
+    },
+    {
+      "bytes": 3792,
+      "path": "Assets/GeneratedProbe/ProbeSurface.mat",
+      "sha256": "a2b4e96c73d7696a2e4cdca75b70367eae148858135008be6b679ddd36e0bec3"
+    },
+    {
+      "bytes": 526,
+      "path": "Packages/manifest.json",
+      "sha256": "95bb5ada418c6d596d622ebd1a2e0f0b6d24422f3e525c622958cb492bae3eb2"
+    },
+    {
+      "bytes": 6015,
+      "path": "Packages/packages-lock.json",
+      "sha256": "950e703b31453d45443719e88b1a37025d40d388df07c9c3bed31b507fd2f132"
+    },
+    {
+      "bytes": 2615,
+      "path": "ProjectSettings/GraphicsSettings.asset",
+      "sha256": "fcd320222fb485b506ccb569d6d87e3621518b86de604d4a38f0a42628a36852"
+    },
+    {
+      "bytes": 22322,
+      "path": "ProjectSettings/ProjectSettings.asset",
+      "sha256": "62b8131ce0c634ba9d641cd7035de941607b874dccbd52f4d19dfefac7ccc993"
+    },
+    {
+      "bytes": 10138,
+      "path": "ProjectSettings/QualitySettings.asset",
+      "sha256": "f7a3e57ea74d0ab21722651776cef47dc45285dbc7df37818752b508e062040a"
+    }
+  ],
+  "toolModels": [
+    "Assets/G3/Shop/Resources/G3/Shop/Tool_inspection_lamp.fbx",
+    "Assets/G3/Shop/Resources/G3/Shop/Tool_large_prize_stamp.fbx",
+    "Assets/G3/Shop/Resources/G3/Shop/Tool_small_prize_box.fbx"
+  ]
+}

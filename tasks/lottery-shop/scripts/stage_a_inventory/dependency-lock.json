@@ -1,0 +1,45 @@
+{
+  "files": {
+    "activation_probe.py": {
+      "path": "tasks/lottery-shop/scripts/activation_probe.py",
+      "sha256": "2fc1e5b62878150b3b03bc22cbe33909acfa4087b0af08311464a06ab05077d4"
+    },
+    "g2_ci.py": {
+      "path": "tasks/lottery-shop/scripts/g2_ci.py",
+      "sha256": "6dda7a0ee084a95480b3171a49dcbfecb37173aed5d3ac7a3b9d0ff24d418e78"
+    },
+    "inventory/g3_shop_inventory.py": {
+      "path": "tasks/lottery-shop/scripts/stage_a_inventory/g3_shop_inventory.py",
+      "sha256": "df0e2fc7454ffb354b31cee0b3c5652ff28703ee2315017af7ac7dafdfb7b852"
+    },
+    "inventory/pinned/Textures/Pothos_v26_BaseColor.png.meta": {
+      "path": "tasks/lottery-shop/scripts/stage_a_inventory/pinned/Textures/Pothos_v26_BaseColor.png.meta",
+      "sha256": "bc420fb4c3270225b2043c8a36001e120e7f96d58613a9ddd7a2d1d83d01c3f8"
+    },
+    "inventory/pinned/Textures/Pothos_v26_Normal.png.meta": {
+      "path": "tasks/lottery-shop/scripts/stage_a_inventory/pinned/Textures/Pothos_v26_Normal.png.meta",
+      "sha256": "e9acb7bcb2745eb18ce9b5d0fced8342a543ef28d7bf16d32fa456886433bd4b"
+    },
+    "inventory/pinned/Textures/Pothos_v26_Roughness.png.meta": {
+      "path": "tasks/lottery-shop/scripts/stage_a_inventory/pinned/Textures/Pothos_v26_Roughness.png.meta",
+      "sha256": "8f4d090cb76377000e7b94190250a7c2a1a1fa0ccf5434b59556e41e429da44f"
+    },
+    "inventory/policy.json": {
+      "path": "tasks/lottery-shop/scripts/stage_a_inventory/policy.json",
+      "sha256": "1bfcd1f7fa100a4180f4c64ce9da74a02674fcc906ee3bdf4f7a036643106e5a"
+    },
+    "probe_ci.py": {
+      "path": "tasks/lottery-shop/scripts/probe_ci.py",
+      "sha256": "1fc573caa8c8c43fc4c7975ce4c4c2dfa7fc09f46cc56fbeac7af4b6bef7d2d4"
+    },
+    "stage_a_inventory_ci.py": {
+      "path": "tasks/lottery-shop/scripts/stage_a_inventory_ci.py",
+      "sha256": "1ed4899f2de2ea0c8971c0caad34ce06a48654cf84c3e82df488195f845b7c00"
+    },
+    "visual_candidate_ci.py": {
+      "path": "tasks/lottery-shop/scripts/visual_candidate_ci.py",
+      "sha256": "df0d7524ac2dc29ce3abf48a410c0fe191d9988493887de91e7b00eee29b4caa"
+    }
+  },
+  "schemaVersion": 1
+}
