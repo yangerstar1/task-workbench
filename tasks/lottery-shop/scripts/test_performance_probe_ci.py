@@ -115,7 +115,7 @@ class NativeBoundaryTests(unittest.TestCase):
     def tearDown(self):safe.visual=self.old_visual;safe.PHASES=self.old_phases
     def test_only_one_independent_phase_and_original_limits_unchanged(self):
         self.assertEqual(set(safe.PHASES),{'performance-probe'});self.assertEqual(safe.PHASES['performance-probe'][3],600)
-        self.assertEqual(self.old_phases['regression-play-core'][3],480);self.assertEqual(self.old_phases['regression-play-world'][3],480);self.assertEqual(self.old_phases['capture'][3],1800)
+        self.assertEqual(self.old_phases['regression-play-core'][3],720);self.assertEqual(self.old_phases['regression-play-world'][3],480);self.assertEqual(self.old_phases['capture'][3],1800)
         argv=safe.project_argv('performance-probe',IDENT)
         self.assertEqual(argv[argv.index('-assemblyNames')+1],'Lottery.G3.PerformanceDiagnostic.Tests')
         self.assertEqual(argv[argv.index('-probeReviewedCommit')+1],'2'*40);self.assertEqual(argv[argv.index('-probeRunAttempt')+1],'1')

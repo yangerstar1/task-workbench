@@ -23,7 +23,7 @@
     {
       "bytes": 652,
       "repositoryPath": "tasks/lottery-shop/scripts/counter_light_diagnostics/dependency-pins.json",
-      "sha256": "ea257c74c71392248db782f338aea93761651cb002303681c32f9ba3b87c1c83"
+      "sha256": "13dfbeacba3ff684b6447aa63d4e0d4afedb106e5ef7660cc1b0ef1b1086328f"
     },
     {
       "bytes": 4567,
@@ -51,9 +51,9 @@
       "sha256": "1395044323735afe604d75af9755f34b7404ca642cd91f1c07efaec21a0e6738"
     },
     {
-      "bytes": 17956,
+      "bytes": 18193,
       "repositoryPath": "tasks/lottery-shop/scripts/counter_light_diagnostics/pinned_dependencies/play_split_ci.py",
-      "sha256": "deeff31d4bb075ec4ecc6dfbbb630c6680d6a08087c1d96c3b99fb29d37ae141"
+      "sha256": "6ffbc1d0eae600dda704cfc8401f132379fe8e400fd1c800fda82c5d09c755b6"
     },
     {
       "bytes": 31709,
@@ -76,9 +76,9 @@
       "sha256": "725a3a99bd8727f4535aa8a05a8c3ced648f6850000e8a0f9f4367cd6f058ab8"
     },
     {
-      "bytes": 17956,
+      "bytes": 18193,
       "repositoryPath": "tasks/lottery-shop/scripts/play_split_ci.py",
-      "sha256": "deeff31d4bb075ec4ecc6dfbbb630c6680d6a08087c1d96c3b99fb29d37ae141"
+      "sha256": "6ffbc1d0eae600dda704cfc8401f132379fe8e400fd1c800fda82c5d09c755b6"
     },
     {
       "bytes": 16303,
@@ -96,9 +96,9 @@
       "sha256": "6c0eafdaec2cac335ff3cec6bddd5663514ae941f0a2ab627f5216b84cb604ed"
     },
     {
-      "bytes": 19353,
+      "bytes": 23423,
       "repositoryPath": "tasks/lottery-shop/scripts/safe_project_ci.py",
-      "sha256": "7a4477d05656c70944c95b8269af8d97e12aa405e644c5455c65ebdc067d1984"
+      "sha256": "44b9299d7c1e78db08ad8215d7057aa5a1007a484df5efbb2bc71045b242a299"
     },
     {
       "bytes": 48269,

@@ -14,7 +14,9 @@ require = visual.require
 SHARDS = ('core', 'world')
 PHASES = {s: 'regression-play-' + s for s in SHARDS}
 FOLDERS = {'core': 'visual-regression-play-core', 'world': 'visual-regression-world'}
-BUDGET_SECONDS = 480
+# Fixed per-process envelopes. Run31 completed 29 core cases before its old 480s deadline.
+# Exact test identities, assertions and WORLD route bounds are unchanged.
+BUDGET_SECONDS = {'core': 720, 'world': 480}
 FROZEN = {'Lottery.G2.PlayMode.Tests.dll': ['Lottery.G2.PlayMode.Tests.G2PlayTests.BuyHalfScratchPanelReturnRevealAndClaimCommitsOneTicket',
                                    'Lottery.G2.PlayMode.Tests.G2PlayTests.UiHitConsumesGestureAndPanelPreservesTicket',
                                    'Lottery.G2.PlayMode.Tests.G2PlayTests.SecondTouchCannotTakeOverAndTouchUsesSameUvProjection',
@@ -180,7 +182,7 @@ def native_receipt(root, shard, ident, failed, xml_path):
             and receipt.get('testVerdict') == 'SEPARATE_EXACT_NUNIT_VALIDATOR_REQUIRED', 'PLAY_NATIVE_PIN_REJECTED')
     require(receipt.get('shard') == shard and type(receipt.get('plannedCaseCount')) is int and receipt['plannedCaseCount'] == len(names(shard))
             and receipt.get('testSelectionSha256') == selection_hash(shard) and type(receipt.get('processBudgetSeconds')) is int
-            and receipt['processBudgetSeconds'] == BUDGET_SECONDS, 'PLAY_NATIVE_SELECTION_REJECTED')
+            and receipt['processBudgetSeconds'] == BUDGET_SECONDS[shard], 'PLAY_NATIVE_SELECTION_REJECTED')
     start = receipt.get('nativeStartedAtNs')
     require(type(start) is int and 0 < start <= time.time_ns() and xml_path.stat().st_mtime_ns >= start, 'PLAY_STALE_XML_REJECTED')
     code = 2 if failed else 0
@@ -217,7 +219,7 @@ def inspect(root, shard, preserve=True):
     value = dict(ident, schemaVersion=1, stage=PHASES[shard], shard=shard,
                  nativeResult=tree.get('result'), expectedCases=counts['total'], counts=counts,
                  allExpectedPassed=counts['failed'] == 0, rawXmlSha256=hashlib.sha256(raw).hexdigest(),
-                 nativeReceiptSha256=native_hash, processBudgetSeconds=BUDGET_SECONDS,
+                 nativeReceiptSha256=native_hash, processBudgetSeconds=BUDGET_SECONDS[shard],
                  cases=[dict(fullname=c.get('fullname'), result=c.get('result')) for c in cases])
     if preserve: visual.write(target_receipt, value)
     return value
@@ -243,10 +245,10 @@ def aggregate(root):
             rows.append(dict(shard=shard,status='REJECTED_OR_MISSING',expectedCases=len(names(shard))))
     union = len(cases) == 37 and len({c['fullname'] for c in cases}) == 37 and {c['fullname'] for c in cases} == set(names('core') + names('world'))
     passed = union and all(r['status'] == 'PASSED' for r in rows)
-    value = dict(ident,schemaVersion=1, status='PASSED' if passed else 'FAILED',
+    value = dict(ident,schemaVersion=2, status='PASSED' if passed else 'FAILED',
                  evidenceKind='TWO_NATIVE_NUNIT_REPORTS_NOT_ONE_37_CASE_NATIVE_RUN',
                  expectedCases=37, exactDisjointUnionVerified=union, allExpectedPassed=passed,
-                 processBudgetSecondsEach=BUDGET_SECONDS, totalPlayProcessEnvelopeSeconds=960,
+                 processBudgetSecondsByShard=dict(BUDGET_SECONDS), totalPlayProcessEnvelopeSeconds=sum(BUDGET_SECONDS.values()),
                  shards=rows, cases=cases)
     visual.write(visual.outdir(root) / 'regression-play-summary.json', value)
     require(passed, 'PLAY_SPLIT_AGGREGATE_FAILED')

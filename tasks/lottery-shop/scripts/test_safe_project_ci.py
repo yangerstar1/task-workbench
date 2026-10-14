@@ -79,6 +79,66 @@ class BoundaryTests(unittest.TestCase):
         self.assertNotIn('*.log',text);self.assertNotIn('cat ',text);self.assertNotIn('*.xml',text)
 
 
+
+class QuiescenceBoundaryTests(unittest.TestCase):
+    def expected(self, ident=IDENT):
+        return ('/lottery-visual-safe-'+ident['runId']+'-1|'+safe.private.IMAGE+'||false|true|true|'+'|'.join(ident[k] for k in safe.OWNER_FIELDS)+'\n').encode()
+    def test_exact_metadata_then_bounded_stopper_no_secret_reads(self):
+        calls=[]
+        def captured(command,seconds,scan):
+            calls.append((command,seconds))
+            data=self.expected() if len(calls)==1 else safe.QUIESCENT_MARKER
+            for byte in data:scan.feed(bytes([byte]))
+            return 0,scan
+        with patch.object(safe.private,'captured',side_effect=captured):self.assertTrue(safe.quiesce_owned(IDENT))
+        self.assertEqual(calls[0],(['docker','inspect','--format',safe.OWNER_FORMAT,'lottery-visual-safe-12345-1'],10))
+        self.assertEqual(calls[1],(['docker','exec','lottery-visual-safe-12345-1','/bin/bash','-c',safe.QUIESCE_COMMAND],15))
+        for forbidden in ('.Env','cmdline','environ','UNITY_PASSWORD','returnlicense','docker run'):
+            self.assertNotIn(forbidden,safe.OWNER_FORMAT+safe.QUIESCE_COMMAND)
+        self.assertIn('count <= 4096',safe.QUIESCE_COMMAND);self.assertIn('attempt<20',safe.QUIESCE_COMMAND)
+        self.assertIn('"$pid" == 1 || "$pid" == "$$"',safe.QUIESCE_COMMAND)
+    def test_foreign_identity_image_pid_namespace_privilege_or_missing_container_never_executes(self):
+        good=self.expected()
+        bad=[good.replace(b'12345',b'54321'),good.replace(b'2'*40,b'3'*40),good.replace(b'||false|',b'|host|false|'),good.replace(b'|false|',b'|true|'),good.replace(b'|true|true|',b'|false|true|'),good.replace(b'|true|true|',b'|true|false|'),good.replace(safe.private.IMAGE.encode(),b'unknown'),good+b'EXTRA',good[:-1],b'']
+        for data in bad:
+            with self.subTest(data=data):
+                def captured(command,seconds,scan):scan.feed(data);return 0,scan
+                with patch.object(safe.private,'captured',side_effect=captured) as run:
+                    self.assertFalse(safe.quiesce_owned(IDENT));run.assert_called_once()
+        with patch.object(safe.private,'captured',side_effect=TimeoutError('PRIVATE')) as run:
+            self.assertFalse(safe.quiesce_owned(IDENT));run.assert_called_once()
+    def test_stop_requires_exact_marker_zero_exit_and_no_duplicate_or_raw_output(self):
+        for data,code in [(b'',0),(safe.QUIESCENT_MARKER,1),(safe.QUIESCENT_MARKER*2,0),(safe.QUIESCENT_MARKER+b'PRIVATE',0)]:
+            calls=[]
+            def captured(command,seconds,scan):
+                calls.append(command);scan.feed(self.expected() if len(calls)==1 else data);return (0 if len(calls)==1 else code),scan
+            with patch.object(safe.private,'captured',side_effect=captured):self.assertFalse(safe.quiesce_owned(IDENT))
+        for ident in (dict(IDENT,runId='12345;false'),dict(IDENT,runAttempt='2'),dict(IDENT,sourceCommit='HEAD')):
+            with patch.object(safe.private,'captured') as run:self.assertFalse(safe.quiesce_owned(ident));run.assert_not_called()
+    def test_stopper_control_flow_on_fake_proc_only_with_non_signalling_kill_stub(self):
+        for mode in ('term','kill','stuck','malformed','foreign-init'):
+            with self.subTest(mode=mode),tempfile.TemporaryDirectory() as d:
+                root=Path(d);proc=root/'fakeproc';(proc/'1').mkdir(parents=True);(proc/'100').mkdir()
+                (proc/'1/comm').write_text('other\n' if mode=='foreign-init' else 'sleep\n')
+                (proc/'1/stat').write_text('1 (sleep) S 0 1\n')
+                (proc/'100/stat').write_text('MALFORMED\n' if mode=='malformed' else '100 (owned worker) S 1 100\n')
+                command=safe.QUIESCE_COMMAND.replace('/proc/',str(proc)+'/')
+                self.assertNotIn('/proc/',command)
+                # Every signal call is a function writing only fake stat data.
+                stub='kill() { printf "%s:%s\\n" "$2" "$3" >> "$FAKE/signals"; if [[ "$MODE" == term || ( "$MODE" == kill && "$2" == KILL ) ]]; then printf "100 (owned worker) Z 1 100\\n" > "$FAKE/fakeproc/100/stat"; fi; }; sleep() { :; };\n'
+                result=subprocess.run(['bash','--noprofile','--norc','-c',stub+command],stdout=subprocess.PIPE,stderr=subprocess.PIPE,timeout=5,env={'PATH':'/usr/bin:/bin','FAKE':d,'MODE':mode})
+                signals=(root/'signals').read_text() if (root/'signals').exists() else ''
+                if mode in ('term','kill'):
+                    self.assertEqual(result.returncode,0);self.assertEqual(result.stdout,safe.QUIESCENT_MARKER)
+                    self.assertIn('TERM:100',signals)
+                    if mode=='kill':self.assertIn('KILL:100',signals)
+                else:self.assertNotEqual(result.returncode,0);self.assertEqual(result.stdout,b'')
+                self.assertNotIn(':1\n',signals)
+
+    def test_stopper_shell_syntax_only_never_executes_on_host(self):
+        result=subprocess.run(['bash','-n'],input=safe.QUIESCE_COMMAND.encode(),stdout=subprocess.PIPE,stderr=subprocess.PIPE,timeout=5)
+        self.assertEqual(result.returncode,0);self.assertEqual(result.stdout,b'')
+
 class StartTests(unittest.TestCase):
     def test_one_private_container_and_one_activation_no_host_license_mount(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -101,6 +161,8 @@ class StartTests(unittest.TestCase):
                 with self.assertRaises(ValueError):safe.start(root)
                 self.assertEqual(run.call_count,1)
             self.assertEqual(len(calls),2);self.assertEqual(safe.session(root,IDENT)['status'],'READY')
+            for key, field in zip(safe.OWNER_LABELS,safe.OWNER_FIELDS):self.assertIn(key+'='+IDENT[field],calls[1])
+            self.assertNotIn('--pid',calls[1]);self.assertNotIn('--privileged',calls[1])
             self.assertNotIn('synthetic-private',safe.file(root,'start').read_text())
     def test_first_activation_failure_blocks_and_cleans_without_retry(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -119,7 +181,8 @@ class SessionTests(unittest.TestCase):
         safe.private.write(safe.file(self.root,'session'),self.value)
         self.ident=patch.object(safe,'identity',return_value=IDENT);self.ident.start()
         self.clean=patch.object(safe.private,'cleanup',return_value=dict(status='ABSENCE_VERIFIED',removalExitCode=0));self.cleanup=self.clean.start()
-    def tearDown(self):self.ident.stop();self.clean.stop();self.temp.cleanup()
+        self.stop=patch.object(safe,'quiesce_owned',return_value=True);self.quiesce=self.stop.start()
+    def tearDown(self):self.ident.stop();self.clean.stop();self.stop.stop();self.temp.cleanup()
     @staticmethod
     def successful(_ident,_command,_seconds,record,_compiler_files=()):record.update(status='NATIVE_SUCCEEDED',nativeExitCode=0,dockerExitCode=0,nativeExitMarkerCount=1)
     def test_failed_capture_keeps_regressions_runnable_but_capture_exit_is_failure(self):
@@ -128,10 +191,39 @@ class SessionTests(unittest.TestCase):
         self.assertEqual(safe.session(self.root,IDENT)['status'],'READY');self.cleanup.assert_not_called()
         with patch.object(safe,'native',side_effect=self.successful):self.assertEqual(safe.test(self.root,'regression-edit'),0)
         self.assertEqual(json.loads(safe.file(self.root,'capture').read_text())['nativeExitCode'],2)
-    def test_timeout_blocks_later_native_calls_and_cleans_owned_container(self):
+    def test_timeout_stops_owned_processes_keeps_blocked_then_returns_once_and_cleans(self):
+        with patch.object(safe,'native',side_effect=lambda *a:a[3].update(status='PROCESS_TIMEOUT')):self.assertEqual(safe.test(self.root,'capture'),1)
+        self.cleanup.assert_not_called();self.quiesce.assert_called_once_with(IDENT)
+        self.assertEqual(safe.session(self.root,IDENT)['status'],'BLOCKED')
+        with patch.object(safe,'native') as native:self.assertEqual(safe.test(self.root,'regression-edit'),1);native.assert_not_called()
+        def returned(*args):
+            self.assertEqual(args[1],safe.shell(safe.RETURN_COMMAND));self.assertEqual(args[2],180)
+            self.successful(*args)
+        with patch.object(safe,'native',side_effect=returned) as native:
+            self.assertEqual(safe.finish(self.root),0);native.assert_called_once()
+        self.cleanup.assert_called_once_with('lottery-visual-safe-12345-1')
+        self.assertEqual(safe.session(self.root,IDENT)['status'],'CLOSED')
+        self.assertEqual(json.loads(safe.file(self.root,'capture').read_text())['status'],'PROCESS_TIMEOUT')
+        with patch.object(safe,'native') as native:self.assertEqual(safe.finish(self.root),1);native.assert_not_called()
+
+    def test_timeout_unproven_stop_removes_container_and_never_returns(self):
+        self.quiesce.return_value=False
         with patch.object(safe,'native',side_effect=lambda *a:a[3].update(status='PROCESS_TIMEOUT')):self.assertEqual(safe.test(self.root,'capture'),1)
         self.cleanup.assert_called_once_with('lottery-visual-safe-12345-1')
-        with patch.object(safe,'native') as native:self.assertEqual(safe.test(self.root,'regression-edit'),1);native.assert_not_called()
+        with patch.object(safe,'native') as native:self.assertEqual(safe.finish(self.root),1);native.assert_not_called()
+        self.assertEqual(json.loads(safe.file(self.root,'finish').read_text())['returnStatus'],'RETURN_NOT_RUN_SESSION_BLOCKED')
+
+    def test_blocked_return_failure_keeps_original_timeout_and_always_cleans(self):
+        with patch.object(safe,'native',side_effect=lambda *a:a[3].update(status='PROCESS_TIMEOUT')):self.assertEqual(safe.test(self.root,'capture'),1)
+        with patch.object(safe,'native',side_effect=lambda *a:a[3].update(status='PROCESS_TIMEOUT')):self.assertEqual(safe.finish(self.root),1)
+        self.cleanup.assert_called_once();self.assertEqual(safe.session(self.root,IDENT)['status'],'CLOSED')
+        self.assertEqual(json.loads(safe.file(self.root,'finish').read_text())['returnStatus'],'PROCESS_TIMEOUT')
+        self.assertEqual(json.loads(safe.file(self.root,'capture').read_text())['status'],'PROCESS_TIMEOUT')
+
+    def test_blocked_without_recorded_activation_never_returns(self):
+        self.value.update(status='BLOCKED',activationSucceeded=False);safe.private.write(safe.file(self.root,'session'),self.value)
+        with patch.object(safe,'native') as native:self.assertEqual(safe.finish(self.root),1);native.assert_not_called()
+        self.cleanup.assert_called_once()
     def test_play_clears_only_fixed_old_progress_before_native_call(self):
         artifacts = self.root/safe.private.TASK/'artifacts/visual-regression-play-core'; artifacts.mkdir(parents=True)
         evidence = safe.visual.outdir(self.root); evidence.mkdir(parents=True, exist_ok=True)
@@ -140,7 +232,7 @@ class SessionTests(unittest.TestCase):
         sibling = artifacts/'unrelated.txt'; sibling.write_text('KEEP')
         def native(*args):
             self.assertTrue(all(not p.exists() for p in fixed)); self.assertEqual(sibling.read_text(), 'KEEP')
-            self.assertEqual(args[2], 480); self.assertIn('-g3RegressionProgress 1', args[1])
+            self.assertEqual(args[2], 720); self.assertIn('-g3RegressionProgress 1', args[1])
             self.successful(*args)
         with patch.object(safe, 'native', side_effect=native), patch.object(safe.split, 'contract'): self.assertEqual(safe.test(self.root, 'regression-play-core'), 0)
 
@@ -164,7 +256,8 @@ class SessionTests(unittest.TestCase):
             self.assertIn('-returnlicense',args[1]);args[3].update(status='NATIVE_FAILED',nativeExitCode=1,dockerExitCode=1,nativeExitMarkerCount=1)
         with patch.object(safe,'native',side_effect=returned):self.assertEqual(safe.finish(self.root),1)
         receipt=json.loads(safe.file(self.root,'finish').read_text());self.assertEqual(receipt['nativeExitCode'],1);self.assertEqual(receipt['returnStatus'],'NATIVE_FAILED');self.assertEqual(receipt['cleanup']['status'],'ABSENCE_VERIFIED')
-    def test_unverified_or_blocked_session_never_returns_other_license(self):
+    def test_unverified_blocked_session_never_returns_other_license(self):
+        self.quiesce.return_value=False
         self.value['status']='BLOCKED';safe.private.write(safe.file(self.root,'session'),self.value)
         with patch.object(safe,'native') as native:self.assertEqual(safe.finish(self.root),1);native.assert_not_called()
         self.cleanup.assert_called_once_with('lottery-visual-safe-12345-1')
@@ -208,7 +301,7 @@ class CompilerLocatorTests(unittest.TestCase):
                 value = dict(IDENT, status='READY', activationSucceeded=True, stagesStarted=[], cleanup=None)
                 safe.private.write(safe.file(root, 'session'), value)
                 with patch.object(safe, 'identity', return_value=IDENT), patch.object(safe.private, 'git', side_effect=error), \
-                     patch.object(safe, 'native') as native, \
+                     patch.object(safe, 'native') as native, patch.object(safe, 'quiesce_owned', return_value=False), \
                      patch.object(safe.private, 'cleanup', return_value=dict(status='ABSENCE_VERIFIED', removalExitCode=0)) as cleanup:
                     self.assertEqual(safe.test(root, 'capture'), 1)
                     native.assert_not_called(); cleanup.assert_called_once_with('lottery-visual-safe-12345-1')

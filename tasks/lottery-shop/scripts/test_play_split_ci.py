@@ -78,7 +78,9 @@ class SplitTests(unittest.TestCase):
     def test_success_two_raw_xmls_no_merged_native_xml(self):
         value=split.aggregate(self.root)
         self.assertTrue(value['allExpectedPassed']);self.assertTrue(value['exactDisjointUnionVerified'])
-        self.assertEqual(len(value['cases']),37);self.assertEqual(value['totalPlayProcessEnvelopeSeconds'],960)
+        self.assertEqual(len(value['cases']),37);self.assertEqual(value['totalPlayProcessEnvelopeSeconds'],1200)
+        self.assertEqual(value['schemaVersion'],2);self.assertEqual(value['processBudgetSecondsByShard'],{'core':720,'world':480})
+        self.assertNotIn('processBudgetSecondsEach',value)
         for shard in split.SHARDS:
             source,target=split.paths(self.root,shard)
             self.assertEqual((target/'raw-test-results.xml').read_bytes(),(source/'playmode-results.xml').read_bytes())
@@ -161,6 +163,17 @@ class SplitTests(unittest.TestCase):
         for key,value in [('sourceCommit','3'*40),('reviewedCandidateCommit','4'*40),('runId','999'),('runAttempt','2'),('phase','regression-play-core'),('shard','core'),('testSelectionSha256','f'*64),('plannedCaseCount',37),('processBudgetSeconds',960),('mechanismSourcePin','bad'),('image','bad')]:
             with self.subTest(key=key):split.visual.write(p,dict(original,**{key:value}));self.reject()
         split.visual.write(p,original)
+    def test_each_shard_rejects_old_swapped_and_non_integer_budgets(self):
+        for shard in split.SHARDS:
+            p=safe.file(self.root,split.PHASES[shard]);original=json.loads(p.read_text())
+            expected={'core':720,'world':480}[shard]
+            self.assertEqual(split.inspect(self.root,shard)['processBudgetSeconds'],expected)
+            for bad in (None,False,True,0,expected-1,expected+1,float(expected),str(expected),480 if shard=='core' else 720):
+                with self.subTest(shard=shard,budget=bad):
+                    split.visual.write(p,dict(original,processBudgetSeconds=bad))
+                    with self.assertRaisesRegex(ValueError,'PLAY_NATIVE_SELECTION_REJECTED'):split.inspect(self.root,shard)
+            split.visual.write(p,original)
+
     def test_native_timeout_missing_exit_wrong_exit_boolean_exit_rejected(self):
         p=safe.file(self.root,split.PHASES['core']);original=json.loads(p.read_text())
         for changed in [dict(status='PROCESS_TIMEOUT'),dict(nativeExitMarkerCount=0),dict(nativeExitMarkerCount=True),dict(nativeExitCode=None),dict(nativeExitCode=False),dict(dockerExitCode=2),dict(status='NATIVE_FAILED')]:
@@ -184,16 +197,17 @@ class SplitTests(unittest.TestCase):
             p.write_bytes(value);self.reject();self.assertFalse((split.paths(self.root,'world')[1]/'raw-test-results.xml').exists())
     def test_native_failure_stays_blocked_and_return_never_claimed(self):
         value=dict(IDENT,status='READY',activationSucceeded=True,stagesStarted=[],cleanup=None);safe.private.write(safe.file(self.root,'session'),value)
-        with patch.object(safe,'identity',return_value=IDENT),patch.object(safe,'compiler_assets',return_value=()),patch.object(safe.private,'cleanup',return_value=dict(status='ABSENCE_VERIFIED',removalExitCode=0)),patch.object(safe,'native',side_effect=lambda *args:args[3].update(status='PROCESS_TIMEOUT')):
+        with patch.object(safe,'quiesce_owned',return_value=False), patch.object(safe,'identity',return_value=IDENT),patch.object(safe,'compiler_assets',return_value=()),patch.object(safe.private,'cleanup',return_value=dict(status='ABSENCE_VERIFIED',removalExitCode=0)),patch.object(safe,'native',side_effect=lambda *args:args[3].update(status='PROCESS_TIMEOUT')):
             self.assertEqual(safe.test(self.root,'regression-play-core'),1)
         with patch.object(safe,'identity',return_value=IDENT),patch.object(safe.private,'cleanup',return_value=dict(status='ABSENCE_VERIFIED',removalExitCode=0)),patch.object(safe,'native') as native:
             self.assertEqual(safe.test(self.root,'regression-play-world'),1);native.assert_not_called()
             self.assertEqual(safe.finish(self.root),1);native.assert_not_called()
         self.assertEqual(json.loads(safe.file(self.root,'finish').read_text())['returnStatus'],'RETURN_NOT_RUN_SESSION_BLOCKED')
-    def test_both_arguments_keep_resolution_gpu_worker_and_each_480(self):
+    def test_both_arguments_keep_resolution_gpu_worker_and_exact_shard_budgets(self):
         for shard in split.SHARDS:
             phase=split.PHASES[shard];argv=safe.project_argv(phase,IDENT)
-            self.assertEqual(safe.PHASES[phase][3],480)
+            self.assertEqual(safe.PHASES[phase][3],{'core':720,'world':480}[shard])
+            self.assertEqual(safe.process_receipt(IDENT,phase)['processBudgetSeconds'],split.BUDGET_SECONDS[shard])
             for k,v in [('-screen-width','1280'),('-screen-height','720'),('-job-worker-count','2'),('-g3RegressionShard',shard),('-testFilter',split.selection(shard)),('-probeRunAttempt','1')]:self.assertEqual(argv[argv.index(k)+1],v)
             for item in ('-quit','-nographics','-runSynchronously','-testCategory','-repeat','-retry'):self.assertNotIn(item,argv)
             self.assertIn('-force-glcore',argv)
@@ -205,6 +219,9 @@ class SplitTests(unittest.TestCase):
             self.assertIn('visual_candidate_ci.py tests --stage '+split.PHASES[shard],text)
             self.assertIn('visual_candidate_ci.py regression-progress --shard '+shard,text)
         self.assertIn('visual_candidate_ci.py play-summary',text)
+        for shard,minutes in [('core',14),('world',10)]:
+            block=text.split('        id: regressionplay'+shard+'\n',1)[1].split('      - name:',1)[0]
+            self.assertIn('timeout-minutes: '+str(minutes),block)
         block=text.split('      - name: Preserve bounded WORLD route and ray sidecar even on timeout',1)[1].split('      - name:',1)[0]
         self.assertIn("always()",block);self.assertIn("steps.regressionplayworld.outcome != 'skipped'",block)
         self.assertIn('world_progress_ci.py',block);self.assertIn('/world-progress.json',text)

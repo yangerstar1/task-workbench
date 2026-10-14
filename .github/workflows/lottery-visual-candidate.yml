@@ -209,10 +209,10 @@ jobs:
         id: prepareoriginal
         if: ${{ always() && steps.guard.outcome == 'success' && steps.capture.outcome != 'skipped' && !(steps.regressiondecision.outcome == 'success' && steps.regressiondecision.outputs.skip_regressions == 'true') }}
         run: python3 tasks/lottery-shop/scripts/visual_candidate_ci.py prepare-original-g3-captures
-      - name: Run exact 34 non-WORLD PlayMode cases in their own 480-second native process
+      - name: Run exact 34 non-WORLD PlayMode cases in their own 720-second native process
         id: regressionplaycore
         if: ${{ always() && steps.guard.outcome == 'success' && steps.safestart.outcome == 'success' && steps.capture.outcome != 'skipped' && !(steps.regressiondecision.outcome == 'success' && steps.regressiondecision.outputs.skip_regressions == 'true') }}
-        timeout-minutes: 10
+        timeout-minutes: 14
         run: PYTHONDONTWRITEBYTECODE=1 python3 tasks/lottery-shop/scripts/safe_project_ci.py regression-play-core
       - name: Preserve core progress even on timeout
         if: ${{ always() && steps.guard.outcome == 'success' && steps.regressionplaycore.outcome != 'skipped' }}

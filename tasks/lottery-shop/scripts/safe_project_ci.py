@@ -16,7 +16,7 @@ import play_split_ci as split
 PHASES = {
     'capture': ('playmode', 'visual-candidate', 'Lottery.G3.VisualCandidate.Tests', 1800),
     'regression-edit': ('editmode', 'visual-regression-edit', 'Lottery.Probe.Tests;Lottery.G2.EditMode.Tests;Lottery.G3.EditMode.Tests', 480),
-    'regression-play-core': ('playmode', split.FOLDERS['core'], 'Lottery.G2.PlayMode.Tests;Lottery.G3.PlayMode.Tests', 480),
+    'regression-play-core': ('playmode', split.FOLDERS['core'], 'Lottery.G2.PlayMode.Tests;Lottery.G3.PlayMode.Tests', 720),
     'regression-play-world': ('playmode', split.FOLDERS['world'], 'Lottery.G2.PlayMode.Tests;Lottery.G3.PlayMode.Tests', 480),
 }
 COUNTER_LIGHT_DIAGNOSTIC = False
@@ -101,6 +101,96 @@ def name(ident):
     return 'lottery-visual-safe-' + ident['runId'] + '-' + ident['runAttempt']
 
 
+# Fixed metadata only: never inspect container Env, command lines or license files.
+OWNER_LABELS = ('lottery.visual.source', 'lottery.visual.reviewed', 'lottery.visual.run', 'lottery.visual.attempt')
+OWNER_FIELDS = ('sourceCommit', 'reviewedCandidateCommit', 'runId', 'runAttempt')
+OWNER_FORMAT = '{{.Name}}|{{.Config.Image}}|{{.HostConfig.PidMode}}|{{.HostConfig.Privileged}}|{{.HostConfig.AutoRemove}}|{{.State.Running}}|' + '|'.join('{{index .Config.Labels "' + key + '"}}' for key in OWNER_LABELS)
+QUIESCENT_MARKER = b'SAFE_PROJECT_QUIESCENT\n'
+# The entire container belongs exclusively to this attempt. Keep its original
+# PID 1 and this stopper alive; stop all other processes, including escaped
+# project process groups. /proc is read for PID/state only, never argv or Env.
+# Isolated PID namespace and exact original labels are checked before execution.
+QUIESCE_COMMAND = r"""set +x
+set +v
+IFS= read -r init_name < /proc/1/comm || exit 125
+[[ "$init_name" == sleep ]] || exit 125
+other_live() {
+  local path pid line tail state count=0
+  for path in /proc/[0-9]*/stat; do
+    ((count+=1)); ((count <= 4096)) || return 2
+    pid=${path#/proc/}; pid=${pid%/stat}
+    [[ "$pid" == 1 || "$pid" == "$$" ]] && continue
+    if ! IFS= read -r line 2>/dev/null < "$path"; then
+      [[ -d "${path%/stat}" ]] && return 2
+      continue
+    fi
+    tail=${line##*) }; state=${tail%% *}
+    [[ "$tail" != "$line" && "$state" =~ ^[RSDZTWtXxKPI]$ ]] || return 2
+    [[ "$state" == Z || "$state" == X || "$state" == x ]] && continue
+    if [[ "$1" == check ]]; then return 0; fi
+    kill -s "$1" "$pid" 2>/dev/null || true
+  done
+  return 1
+}
+for sig in TERM KILL; do
+  other_live "$sig"; status=$?; ((status != 2)) || exit 125
+  for ((attempt=0; attempt<20; attempt++)); do
+    other_live check; status=$?
+    ((status != 2)) || exit 125
+    if ((status == 1)); then
+      printf 'SAFE_PROJECT_QUIESCENT\n'; exit 0
+    fi
+    sleep 0.1
+  done
+done
+exit 125
+"""
+
+
+class ExactBytesScan:
+    """Compare a fixed response incrementally; retain no received output."""
+    def __init__(self, expected):
+        self.expected = expected; self.offset = 0; self.carry = b''
+
+    def feed(self, chunk):
+        private.require(self.expected[self.offset:self.offset + len(chunk)] == chunk, 'OWNED_STOP_NOT_PROVEN')
+        self.offset += len(chunk)
+
+    @property
+    def complete(self):
+        return self.offset == len(self.expected)
+
+
+def quiesce_owned(ident):
+    try:
+        private.require(re.fullmatch(r'[0-9a-f]{40}', ident['sourceCommit']) and
+                        re.fullmatch(r'[0-9a-f]{40}', ident['reviewedCandidateCommit']) and
+                        re.fullmatch(r'[1-9][0-9]{0,19}', ident['runId']) and ident['runAttempt'] == '1', 'STOP_IDENTITY_REJECTED')
+        expected = ('/' + name(ident) + '|' + private.IMAGE + '||false|true|true|' +
+                    '|'.join(ident[key] for key in OWNER_FIELDS) + '\n').encode('ascii')
+        scan = ExactBytesScan(expected)
+        code, scan = private.captured(['docker', 'inspect', '--format', OWNER_FORMAT, name(ident)], 10, scan=scan)
+        if code != 0 or not scan.complete: return False
+        scan = ExactBytesScan(QUIESCENT_MARKER)
+        code, scan = private.captured(['docker', 'exec', name(ident), '/bin/bash', '-c', QUIESCE_COMMAND], 15, scan=scan)
+        return code == 0 and scan.complete
+    except BaseException:
+        return False
+
+
+def block_session(root, ident, value, record):
+    value['status'] = 'BLOCKED'; retain_for_finish = False
+    # Persist the block before stopping: an interrupted stopper cannot leave
+    # a READY receipt. No other test or activation may use the retained container.
+    try:
+        private.write(file(root, 'session'), value)
+        retain_for_finish = value['activationSucceeded'] is True and value['cleanup'] is None and quiesce_owned(ident)
+    finally:
+        if not retain_for_finish:
+            value['cleanup'] = private.cleanup(name(ident))
+        record['cleanup'] = value['cleanup']
+
+
 def file(root, phase):
     private.require(phase in ('start', 'finish', 'session') or phase in PHASES, 'PHASE_REJECTED')
     return visual.outdir(root) / ('safe-' + phase + '.json')
@@ -122,7 +212,7 @@ def process_receipt(ident, phase):
     if phase in split.PHASES.values():
         shard = phase.removeprefix('regression-play-')
         record.update(shard=shard, plannedCaseCount=len(split.names(shard)), testSelectionSha256=split.selection_hash(shard),
-                      processBudgetSeconds=480, nativeStartedAtNs=None)
+                      processBudgetSeconds=PHASES[phase][3], nativeStartedAtNs=None)
     return record
 
 
@@ -196,6 +286,7 @@ def start(root):
         env = dict(os.environ); env['UNITY_SERIAL'] = private.derive_serial(env.pop('UNITY_LICENSE', ''))
         private.require(all(env.get(k) and len(env[k]) <= 4096 for k in ('UNITY_EMAIL', 'UNITY_PASSWORD')), 'INPUT_REJECTED')
         command = ['docker', 'run', '--detach', '--rm', '--log-driver=none', '--name', name(ident), '--cpus=2', '--memory=12g',
+                   *[item for key, field in zip(OWNER_LABELS, OWNER_FIELDS) for item in ('--label', key + '=' + ident[field])],
                    '--workdir', '/github/workspace', '--env', 'UNITY_SERIAL', '--env', 'UNITY_EMAIL', '--env', 'UNITY_PASSWORD',
                    '--volume', str(root) + ':/github/workspace',
                    '--volume', str(upstream / 'dist/BlankProject') + ':/activation-blank-src:ro',
@@ -247,13 +338,12 @@ def test(root, phase):
         healthy_exit = record['nativeExitMarkerCount'] == 1 and record['nativeExitCode'] == record['dockerExitCode']
         licensing_failure = record['observations']['invalidLicenseXml400'] or record['observations']['nativeActivationAborted']
         if not healthy_exit or licensing_failure:
-            value['status'] = 'BLOCKED'
-            value['cleanup'] = private.cleanup(name(ident)); record['cleanup'] = value['cleanup']
+            block_session(root, ident, value, record)
     except (KeyboardInterrupt, InterruptedError):
-        record['status'] = 'CANCELLED'; value['status'] = 'BLOCKED'; value['cleanup'] = private.cleanup(name(ident)); record['cleanup'] = value['cleanup']
+        record['status'] = 'CANCELLED'; block_session(root, ident, value, record)
     except Exception:
         record['status'] = 'SESSION_OR_TEST_ADAPTER_FAILED'
-        value['status'] = 'BLOCKED'; value['cleanup'] = private.cleanup(name(ident)); record['cleanup'] = value['cleanup']
+        block_session(root, ident, value, record)
     finally:
         private.write(file(root, 'session'), value); save(root, phase, record, started)
     return 0 if record['status'] == 'NATIVE_SUCCEEDED' else 1
@@ -263,7 +353,9 @@ def finish(root):
     ident = identity(root); record = process_receipt(ident, 'finish'); started = time.monotonic(); value = None
     try:
         value = session(root, ident)
-        if value['status'] == 'READY' and value['activationSucceeded']:
+        returnable = value['activationSucceeded'] is True and (value['status'] == 'READY' or
+                     (value['status'] == 'BLOCKED' and value['cleanup'] is None and quiesce_owned(ident)))
+        if returnable:
             # Ownership derives from this attempt's unique container and recorded
             # successful activation. No other machine/session is selected.
             native(ident, shell(RETURN_COMMAND), 180, record)

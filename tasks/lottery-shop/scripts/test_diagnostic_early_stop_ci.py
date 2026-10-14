@@ -290,7 +290,7 @@ class LifecycleWorkflowTests(unittest.TestCase):
             section=workflow.split('        id: '+step+'\n',1)[1].split('      - name:',1)[0];self.assertIn(condition,section);self.assertIn('always()',section)
         finish=workflow.split('      - name: Return only this temporary session',1)[1].split('      - name:',1)[0]
         self.assertIn("always() && steps.guard.outcome == 'success' && steps.safestart.outcome != 'skipped'",finish);self.assertNotIn('regressiondecision',finish);self.assertIn('safe_project_ci.py finish',finish)
-        self.assertNotIn('continue-on-error:',workflow);self.assertEqual(len(v.FRAMES),23);self.assertEqual(s.PHASES['regression-edit'][3],480);self.assertEqual(s.PHASES['regression-play-core'][3],480);self.assertEqual(s.PHASES['regression-play-world'][3],480);self.assertEqual(s.PHASES['capture'][3],1800)
+        self.assertNotIn('continue-on-error:',workflow);self.assertEqual(len(v.FRAMES),23);self.assertEqual(s.PHASES['regression-edit'][3],480);self.assertEqual(s.PHASES['regression-play-core'][3],720);self.assertEqual(s.PHASES['regression-play-world'][3],480);self.assertEqual(s.PHASES['capture'][3],1800)
 
 
 if __name__=='__main__':unittest.main()

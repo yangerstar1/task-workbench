@@ -62,9 +62,9 @@ class CombinedDiagnosticTests(unittest.TestCase):
                 got=safe.project_argv(phase,ident)
                 self.assertEqual(got,baseline[phase]+(['-counterLightDiagnostic','1'] if phase=='capture' else []))
 
-    def test_original_budgets_and_workflow_limits_remain(self):
+    def test_exact_phase_budgets_and_workflow_limits_remain(self):
         self.assertEqual(safe.PHASES['capture'][3],1800)
-        self.assertEqual({safe.PHASES[k][3] for k in ('regression-edit','regression-play-core','regression-play-world')},{480})
+        self.assertEqual({k:safe.PHASES[k][3] for k in ('regression-edit','regression-play-core','regression-play-world')},{'regression-edit':480,'regression-play-core':720,'regression-play-world':480})
         text=WORKFLOW.read_text();self.assertIn('timeout-minutes: 75',text)
         fixture=(TASK/'unity/Assets/G3/Tests/VisualCandidate/VisualCandidateCaptureTests.cs').read_text()
         self.assertIn('900',fixture)
@@ -191,13 +191,13 @@ class CaptureTimeoutBudgetTests(unittest.TestCase):
         s=DIAGNOSTIC.read_text();self.assertIn('PER_CASE_RESTORED_PIXEL_MISMATCH',s)
         self.assertIn('FINAL_RESTORED_PIXEL_MISMATCH',s);self.assertIn('public int schemaVersion = 3;',s)
 
-    def test_capture_process_remains1800_other_process_budgets480(self):
+    def test_capture_process_remains1800_core720_edit_and_world480(self):
         tree=ast.parse((TASK/'scripts/safe_project_ci.py').read_text())
         node=next(n.value for n in tree.body if isinstance(n,ast.Assign) and any(isinstance(t,ast.Name) and t.id=='PHASES' for t in n.targets))
         # Other tuple members include imported assembly selectors; inspect only fixed budgets.
         budgets={ast.literal_eval(k):ast.literal_eval(v.elts[3]) for k,v in zip(node.keys,node.values)}
         self.assertEqual(budgets['capture'],1800)
-        for p in ('regression-edit','regression-play-core','regression-play-world'):self.assertEqual(budgets[p],480)
+        for p,seconds in [('regression-edit',480),('regression-play-core',720),('regression-play-world',480)]:self.assertEqual(budgets[p],seconds)
         self.assertLess(capture_budget(FIXTURE.read_text()),budgets['capture']*1000)
 
     def test_workflow_capture_and_job_budgets_unchanged(self):
