@@ -1,22 +1,22 @@
 {
   "schemaVersion": 3,
-  "requestId": "lottery-visual-20261014-30",
-  "sourceCommit": "bffb8241aeea21d469778e0cf1a46a8b5e811206",
+  "requestId": "lottery-visual-20261014-31",
+  "sourceCommit": "4d2f0e5efcd4f53f86c56555a2085ce21f4cb433",
   "purpose": "DIAGNOSTIC_VISUAL_CANDIDATE_NOT_G3_PASS",
   "sourceReview": {
-    "sourceCommit": "bffb8241aeea21d469778e0cf1a46a8b5e811206",
+    "sourceCommit": "4d2f0e5efcd4f53f86c56555a2085ce21f4cb433",
     "status": "APPROVED_FOR_DIAGNOSTIC_CAPTURE_ONLY",
-    "reviewId": "visual-source-20261014-40",
+    "reviewId": "visual-source-20261014-41",
     "reviewer": "independent-source-review",
-    "reviewedAtUtc": "2026-10-14T13:19:50Z"
+    "reviewedAtUtc": "2026-10-14T13:46:34Z"
   },
   "executionProfile": "EARLY_STOP_ON_PREBUILD_FAILURE",
   "androidBuild": "DEVELOPMENT_CANDIDATE_APK",
   "androidReview": {
-    "sourceCommit": "bffb8241aeea21d469778e0cf1a46a8b5e811206",
+    "sourceCommit": "4d2f0e5efcd4f53f86c56555a2085ce21f4cb433",
     "status": "APPROVED_FOR_DIAGNOSTIC_ANDROID_ONLY",
-    "reviewId": "android-source-20261014-40",
+    "reviewId": "android-source-20261014-41",
     "reviewer": "independent-source-review",
-    "reviewedAtUtc": "2026-10-14T13:19:50Z"
+    "reviewedAtUtc": "2026-10-14T13:46:34Z"
   }
 }
