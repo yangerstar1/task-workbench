@@ -1,14 +1,14 @@
 {
   "schemaVersion": 2,
-  "requestId": "lottery-visual-20261014-22",
-  "sourceCommit": "b2abda4abea65ed81fe6256520f29ca074572f02",
+  "requestId": "lottery-visual-20261014-23",
+  "sourceCommit": "7b4bf934de956f494db105ee6f3849481536f1da",
   "purpose": "DIAGNOSTIC_VISUAL_CANDIDATE_NOT_G3_PASS",
   "sourceReview": {
-    "sourceCommit": "b2abda4abea65ed81fe6256520f29ca074572f02",
+    "sourceCommit": "7b4bf934de956f494db105ee6f3849481536f1da",
     "status": "APPROVED_FOR_DIAGNOSTIC_CAPTURE_ONLY",
-    "reviewId": "visual-source-20261014-22",
+    "reviewId": "visual-source-20261014-23",
     "reviewer": "independent-source-review",
-    "reviewedAtUtc": "2026-10-14T00:04:43Z"
+    "reviewedAtUtc": "2026-10-14T00:50:28Z"
   },
   "executionProfile": "EARLY_STOP_ON_PREBUILD_FAILURE"
 }
