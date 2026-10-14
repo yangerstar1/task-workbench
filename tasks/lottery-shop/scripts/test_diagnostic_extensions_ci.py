@@ -28,8 +28,13 @@ def with_id(text, name):
 class CombinedDiagnosticTests(unittest.TestCase):
     def test_job_disables_bytecode_before_any_python_guard(self):
         text=WORKFLOW.read_text()
-        self.assertEqual(text.count("    env:\n      PYTHONDONTWRITEBYTECODE: '1'\n    steps:\n"),1)
-        self.assertLess(text.index("      PYTHONDONTWRITEBYTECODE: '1'"),text.index('id: guard'))
+        env_block="    env:\n      PYTHONDONTWRITEBYTECODE: '1'\n    steps:\n"
+        self.assertEqual(text.count('\n  android-diagnostic-candidate:'),1)
+        visual_job,android_job=text.split('\n  android-diagnostic-candidate:',1)
+        self.assertEqual(text.count(env_block),2)
+        for job,guard in ((visual_job,'id: guard'),(android_job,'id: androidguard')):
+            self.assertEqual(job.count(env_block),1)
+            self.assertLess(job.index(env_block),job.index(guard))
 
     def test_cold_prepare_order_before_native(self):
         text=WORKFLOW.read_text()

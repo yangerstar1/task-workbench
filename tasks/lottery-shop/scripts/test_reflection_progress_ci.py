@@ -140,7 +140,15 @@ class ReflectionProgressTests(unittest.TestCase):
         self.assertEqual(workflow.count('scripts/reflection_progress_ci.py'),1);self.assertEqual(workflow.count('/evidence/visual-candidate/reflection-progress.json'),1)
         self.assertIn('scripts/test_reflection_progress_ci.py -v',workflow)
         self.assertIn('scripts/reflection_bake_ci.py',workflow);self.assertIn('scripts/visual_candidate_ci.py captures',workflow)
-        self.assertNotIn('*.json',workflow);self.assertEqual(workflow.count('secrets.'),3)
+        self.assertNotIn('*.json',workflow)
+        # One unchanged set per isolated job; no extra credential names/references.
+        self.assertEqual(workflow.count('\n  android-diagnostic-candidate:'),1)
+        visual_job,android_job=workflow.split('\n  android-diagnostic-candidate:',1)
+        self.assertEqual(workflow.count('secrets.'),6)
+        for job in (visual_job,android_job):
+            self.assertEqual(job.count('secrets.'),3)
+            self.assertCountEqual(re.findall(r'\$\{\{ secrets\.([A-Z_]+) \}\}',job),
+                                  ['UNITY_LICENSE','UNITY_EMAIL','UNITY_PASSWORD'])
         self.assertEqual(len(progress.visual.FRAMES),23)
     def test_producer_enum_fields_gate_and_best_effort_match(self):
         root=Path(__file__).resolve().parents[3];source=(root/progress.visual.TASK/'unity/Assets/G3/Editor/G3ShopReflectionBaker.cs').read_text()
