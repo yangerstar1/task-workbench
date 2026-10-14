@@ -950,6 +950,12 @@ namespace Lottery.G3.VisualCandidate.Tests
         void Capture(string stage, string cameraOrigin, ExteriorReceipt exterior = null, string fixtureStateBefore = null)
         {
             CheckRuntimeBudget(); Milestone("capture-begin:" + stage);
+            // Single-angle daylight experiment; the native frame must use the declared light state.
+            bool lightingNight=State.Phase==DayPhase.NIGHT_BILL||State.Phase==DayPhase.DAY_COMPLETE||State.Phase==DayPhase.RUN_FAILED;
+            var directional=P.View.Environment.GetComponentsInChildren<Light>().Where(light=>light.type==LightType.Directional).ToArray();
+            Assert.That(directional,Has.Length.EqualTo(1),"Exactly one owned directional source is required");
+            Assert.That(Quaternion.Angle(directional[0].transform.rotation,lightingNight?Quaternion.Euler(25,190,0):Quaternion.Euler(10,185,0)),Is.LessThan(.01f),"Actual day/night direction must match the source-owned A/B angle");
+            Assert.That(directional[0].intensity,Is.EqualTo(lightingNight?.16f:.8f).Within(.00001f),"Single-angle A/B must not change source energy");
             P.View.RefreshGlyphGeometry();
             Assert.That(P.View.AllHudLabelsFit, Is.True, string.Join(" | ", P.View.OverflowingHudLabels));
             var hud = app.SceneCamera.transform.Find("Same-camera readable HUD");

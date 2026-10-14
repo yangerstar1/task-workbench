@@ -9,6 +9,9 @@ namespace Lottery.G3.Interaction
         public Vector3 SavedPosition=>transform.position;
         public Quaternion SavedRotation=>Quaternion.Euler(pitch,yaw,0);
         public bool CameraWriteEnabled=>cameraWriteEnabled;
+        // Only the exact controller created by Initialize belongs to this player.
+        // Other controllers and child colliders must still occlude interaction rays.
+        public bool OwnsBodyCollider(Collider candidate)=>candidate!=null&&candidate==body;
         // SceneView owns focus changes. A physical phone view must not race a
         // held walk input or resize-triggered attempt to apply the walking pose.
         public void SetCameraWriteEnabled(bool value){cameraWriteEnabled=value;}

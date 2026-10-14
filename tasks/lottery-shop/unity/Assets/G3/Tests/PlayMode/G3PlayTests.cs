@@ -370,9 +370,16 @@ namespace Lottery.G3.PlayMode.Tests
         [UnityTest]
         public IEnumerator SafeAreasAndTwentyByNineViewportKeepPaperAspectAndActionHitRegions()
         {
-            Buy("number");foreach(var size in new[]{new Vector2Int(1280,720),new Vector2Int(1600,720)})
+            // Extra fixture rows strengthen this existing test identity. The exact
+            // native case count/contract is unchanged; these are Editor fixtures.
+            Buy("number");foreach(var size in new[]{new Vector2Int(1280,720),new Vector2Int(1600,720),new Vector2Int(640,360)})
+            foreach(bool insetSafeArea in new[]{false,true})
             {
-                BindPresentationTarget(size.x,size.y);P.View.SimulatedSafeArea=new Rect(54,18,size.x-98,size.y-36);P.View.Layout();
+                P.View.SimulatedSafeArea=null;BindPresentationTarget(size.x,size.y);
+                float reference=size.y/720f;
+                var safe=insetSafeArea?new Rect(54*reference,18*reference,size.x-98*reference,size.y-36*reference):new Rect(0,0,size.x,size.y);
+                P.View.SimulatedSafeArea=safe;P.View.Layout();
+                AssertDiagnosticHudGeometry(safe,size,insetSafeArea);
                 Physics.SyncTransforms();
                 Assert.That(app.SceneCamera.orthographic,Is.False);
                 var surface=P.View.Surface;
@@ -403,10 +410,32 @@ namespace Lottery.G3.PlayMode.Tests
                     Assert.That(actual.V,Is.EqualTo(expected.V).Within(.001));
                     Assert.That(Vector3.Distance(surface.PaperUvToWorld(actual),world),Is.LessThan(.001f),"World/presentation-pixel/UV roundtrip must preserve the hit position");
                 }
-                foreach(var id in new[]{"open-settings","stand","quick"}){var rect=P.View.ButtonRect(id);Assert.That(rect.xMin,Is.GreaterThanOrEqualTo(54));Assert.That(rect.xMax,Is.LessThanOrEqualTo(size.x-44));Assert.That(rect.yMin,Is.GreaterThanOrEqualTo(18));Assert.That(P.View.ConsumeUi(rect.center,out var action),Is.True);Assert.That(action.Kind,Is.Not.EqualTo(G3ActionKind.None));}
+                foreach(var id in new[]{"open-settings","stand","quick"}){var rect=P.View.ButtonRect(id);Assert.That(rect.xMin,Is.GreaterThanOrEqualTo(safe.xMin));Assert.That(rect.xMax,Is.LessThanOrEqualTo(safe.xMax));Assert.That(rect.yMin,Is.GreaterThanOrEqualTo(safe.yMin));Assert.That(rect.yMax,Is.LessThanOrEqualTo(safe.yMax));Assert.That(P.View.ConsumeUi(rect.center,out var action),Is.True);Assert.That(action.Kind,Is.Not.EqualTo(G3ActionKind.None));}
                 SetupLocalPanel(G3Panel.Shop);Assert.That(P.Panel,Is.EqualTo(G3Panel.Shop));Close();
             }
             P.View.SimulatedSafeArea=null;yield return null;
+        }
+        void AssertDiagnosticHudGeometry(Rect safe,Vector2Int size,bool insetSafeArea)
+        {
+            var view=P.View;var badge=view.DiagnosticBadgeRect;var settings=view.ButtonRect("open-settings");var day=view.DayProgressRect;var joystick=view.JoystickRect;float d=view.TouchPixelsPerDp;
+            Assert.That(view.HasMeasuredAndroidDensity,Is.False,"Declared Editor fallback density; not physical Android evidence");
+            Assert.That(view.DiagnosticBadgeVisible,Is.True,"Diagnostic fixtures retain their explicit QA marker");
+            foreach(var rect in new[]{badge,settings,day,joystick})
+            {
+                Assert.That(rect.xMin,Is.GreaterThanOrEqualTo(safe.xMin));Assert.That(rect.xMax,Is.LessThanOrEqualTo(safe.xMax));
+                Assert.That(rect.yMin,Is.GreaterThanOrEqualTo(safe.yMin));Assert.That(rect.yMax,Is.LessThanOrEqualTo(safe.yMax));
+            }
+            Assert.That(badge.Overlaps(settings),Is.False,"QA must never paint inside the full settings touch target");
+            Assert.That(badge.Overlaps(day),Is.False,"Diagnostic slot is separate from day progress text");
+            Assert.That(badge.Overlaps(joystick),Is.False);Assert.That(day.Overlaps(settings),Is.False);
+            Assert.That(settings.width/d,Is.GreaterThanOrEqualTo(48));Assert.That(settings.height/d,Is.GreaterThanOrEqualTo(48));
+            Assert.That(joystick.width/d,Is.EqualTo(112).Within(.0001f));Assert.That(joystick.height/d,Is.EqualTo(112).Within(.0001f));
+            Assert.That(view.UiControlId(badge.center),Is.Empty,"QA is an observation label, never a control");
+            Assert.That(view.ConsumeUi(badge.center,out _),Is.False,"The separated QA marker has no input ownership");
+            Assert.That(view.ConsumeUi(settings.center,out var action),Is.True);Assert.That(action.Kind,Is.EqualTo(G3ActionKind.Open));Assert.That(action.Slot,Is.EqualTo((int)G3Panel.Settings));
+            Assert.That(view.IsSafePointer(new Vector2(safe.xMin-.1f,safe.center.y)),Is.False);
+            view.RefreshGlyphGeometry();Assert.That(view.AllHudLabelsFit,Is.True,string.Join("; ",view.OverflowingHudLabels));
+            TestContext.Out.WriteLine("HUD_DIAGNOSTIC_DOCK_V1 "+size.x+"x"+size.y+" inset="+insetSafeArea+" EDITOR_FALLBACK_NOT_ANDROID badge="+badge+" settings="+settings+" joystick="+joystick);
         }
         [UnityTest]
         public IEnumerator MaximumAmountGlyphsStayInsideReviewedTextSafeBounds()

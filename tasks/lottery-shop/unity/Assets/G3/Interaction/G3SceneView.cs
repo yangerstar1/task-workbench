@@ -77,6 +77,10 @@ namespace Lottery.G3.Interaction
         public Rect? SimulatedSafeArea {get;set;}
         public Rect PresentationSafeArea=>Safe;
         public Rect EvidenceBodyRect=>evidenceBodyRect;
+        public Rect DiagnosticBadgeRect=>qaRect;
+        public Rect DayProgressRect=>dayRect;
+        public bool DiagnosticBadgeVisible=>qaTag!=null&&qaTag.gameObject.activeInHierarchy;
+        Rect SettingsTouchRect=>new Rect(Safe.xMax-56*TouchPixelsPerDp,Safe.yMax-88*TouchPixelsPerDp,48*TouchPixelsPerDp,48*TouchPixelsPerDp);
         Rect Safe=>SimulatedSafeArea??(SceneCamera!=null&&SceneCamera.targetTexture!=null?new Rect(0,0,PresentationWidth,PresentationHeight):(Screen.safeArea.width>0?Screen.safeArea:new Rect(0,0,PresentationWidth,PresentationHeight)));
         public bool LayoutChanged=>lastWidth!=PresentationWidth||lastHeight!=PresentationHeight||lastSafe!=Safe;
         public void Initialize(Font chinese,Shader flatShader,Shader glyph,Shader lit,Shader paper,Shader silver,Shader maskedFont,ApprovedArtworkBinding numberArt,ApprovedArtworkBinding challengeArt)
@@ -231,7 +235,7 @@ namespace Lottery.G3.Interaction
                 // Navigation belongs to physical world targets, never global shortcuts.
                 float d=TouchPixelsPerDp,w=56*d,h=56*d,x=lastSafe.x+16*d,y=lastSafe.y+12*d;
                 if(!walking)AddButton("stand","起身",new G3Action(G3ActionKind.Stand),new Rect(x,y,w,h));
-                AddButton("open-settings","设置",new G3Action(G3ActionKind.Open,slot:(int)G3Panel.Settings),new Rect(lastSafe.xMax-56*d,lastSafe.yMax-88*d,48*d,48*d));
+                AddButton("open-settings","设置",new G3Action(G3ActionKind.Open,slot:(int)G3Panel.Settings),SettingsTouchRect);
                 x=lastSafe.xMax-244*s;y=lastSafe.y+12*s;w=232*s;h=96*s;
                 if(presenter.IsCommitting)AddButton("retry","确认交易",new G3Action(G3ActionKind.Retry),new Rect(x,y,w,h));
                 else if(!walking&&t!=null&&t.Phase!=TicketPhase.SETTLED)
@@ -281,7 +285,15 @@ namespace Lottery.G3.Interaction
             string cash=state.RecoveryRequired?"待确认":G3Text.Money(state.CashMinor),due=state.RecoveryRequired?"待确认":G3Text.Money(bill.TotalDueMinor);
             string progress=state.RecoveryRequired?"存档待恢复":"第 "+state.DayNumber+" 天 · 已购 "+state.TicketsPurchasedToday+"/12 · 已结 "+state.SettledTicketCount+"/12";
             dayText.SetText(progress);float dw=Mathf.Min(lastSafe.width*.46f,TextWidth(progress,32*s)+32*s);
-            dayRect=new Rect(lastSafe.xMax-16*s-dw,lastSafe.yMax-80*s,dw,64*s);PlacePlate(dayHeader,dayRect,.55f);PlaceLabel(dayText,Inset(dayRect,16*s,15*s),32*s,.47f,false);
+            // The diagnostic badge owns a non-interactive slot in the top row.
+            // Keep the full 48 dp settings hit target clear, including measured
+            // densities whose target reaches higher than the fallback reference.
+            var topRow=new Rect(lastSafe.x,lastSafe.yMax-80*s,lastSafe.width,64*s);
+            float right=lastSafe.xMax-16*s;
+            if(topRow.Overlaps(SettingsTouchRect))right=Mathf.Min(right,SettingsTouchRect.xMin-12*s);
+            qaRect=new Rect(right-68*s,topRow.y+12*s,68*s,40*s);
+            if(!string.IsNullOrEmpty(state.FixtureLabel))right=qaRect.xMin-12*s;
+            dayRect=new Rect(right-dw,topRow.y,dw,64*s);PlacePlate(dayHeader,dayRect,.55f);PlaceLabel(dayText,Inset(dayRect,16*s,15*s),32*s,.47f,false);
             float cashWidth=TextWidth(cash,40*s),dueWidth=TextWidth(due,32*s),first=152*s+cashWidth,total=first+214*s+dueWidth;
             float available=dayRect.x-lastSafe.x-32*s;headerFallback=total>available;
             headerRect=new Rect(lastSafe.x+16*s,lastSafe.yMax-80*s,Mathf.Min(total,available),64*s);
@@ -299,7 +311,7 @@ namespace Lottery.G3.Interaction
                 PlaceLabel(nightCaption,new Rect(headerRect.x+first+58*s,headerRect.y+16*s,128*s,34*s),32*s,.47f,false);
                 PlaceLabel(nightValue,new Rect(headerRect.x+first+198*s,headerRect.y+16*s,dueWidth+2*s,34*s),32*s,.47f,false);
             }
-            PlacePlate(header,headerRect,.55f);qaText.SetText("QA");qaRect=new Rect(lastSafe.xMax-84*s,dayRect.y-52*s,68*s,40*s);PlacePlate(qaTag,qaRect,.55f);PlaceLabel(qaText,Inset(qaRect,10*s,4*s),32*s,.47f,false);
+            PlacePlate(header,headerRect,.55f);qaText.SetText("QA");PlacePlate(qaTag,qaRect,.55f);PlaceLabel(qaText,Inset(qaRect,10*s,4*s),32*s,.47f,false);
         }
         static bool CatalogCard(G3Action action)=>action.Kind==G3ActionKind.InspectStock||action.Kind==G3ActionKind.InspectTool;
         G3HudSymbol CatalogSymbol(G3Action action)
@@ -510,12 +522,35 @@ namespace Lottery.G3.Interaction
             for(int i=used-1;i>=0;i--){var b=pool[i];if(b.Root.activeInHierarchy&&b.Enabled&&b.Rect.Contains(pixel))return b.Id;}
             return !PanelVisible&&!moreVisible&&footerHitRect.Contains(pixel)&&current.Snapshot.CurrentTicket!=null?"ticket-detail":"";
         }
+        // Reused for ordinary picks. A full buffer is not a complete/ordered result;
+        // query all hits on saturation rather than risk dropping a nearer blocker.
+        readonly RaycastHit[] worldPickHits=new RaycastHit[16];
+        bool TryNearestForeignWorldHit(Ray ray,out RaycastHit hit)
+        {
+            int count=Physics.RaycastNonAlloc(ray,worldPickHits,5,Physics.DefaultRaycastLayers,QueryTriggerInteraction.Collide);
+            var hits=worldPickHits;
+            if(count==worldPickHits.Length)
+            {hits=Physics.RaycastAll(ray,5,Physics.DefaultRaycastLayers,QueryTriggerInteraction.Collide);count=hits.Length;}
+            hit=default;bool found=false,ambiguous=false;
+            for(int i=0;i<count;i++)
+            {
+                var candidate=hits[i];
+                if(candidate.collider==null||Walk.OwnsBodyCollider(candidate.collider))continue;
+                if(!found||candidate.distance<hit.distance)
+                {hit=candidate;found=true;ambiguous=false;}
+                // Unordered equal-nearest hits must not select an arbitrary target
+                // or bypass an opaque blocker. A genuinely closer hit resets this.
+                else if(candidate.distance==hit.distance&&candidate.collider!=hit.collider)ambiguous=true;
+            }
+            return found&&!ambiguous;
+        }
         public G3WorldTarget WorldTarget(Vector2 pixel)
         {
             if(!IsSafePointer(pixel))return null;
             var ray=SceneCamera.ViewportPointToRay(new Vector3(pixel.x/PresentationWidth,pixel.y/PresentationHeight,0));
-            // Nearest collider wins: an opaque counter/wall blocks the target.
-            if(!Physics.Raycast(ray,out RaycastHit hit,5,Physics.DefaultRaycastLayers,QueryTriggerInteraction.Collide))return null;
+            // Skip only our owned body. The nearest remaining collider wins even
+            // when it is another CharacterController or an untargeted child collider.
+            if(!TryNearestForeignWorldHit(ray,out RaycastHit hit))return null;
             var target=hit.collider.GetComponentInParent<G3WorldTarget>();if(target==null)return null;
             var body=Walk.SavedPosition;var delta=new Vector2(hit.point.x-body.x,hit.point.z-body.z);
             return delta.sqrMagnitude<=target.ReachMeters*target.ReachMeters?target:null;

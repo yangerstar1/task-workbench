@@ -52,28 +52,79 @@ namespace Lottery.G3.PlayMode.Tests
             }
             Assert.Fail("Real LOOK touch did not face the declared world target");
         }
-        IEnumerator TouchWalkTo(Vector3 destination,bool proveConcurrentLook=false)
+        // Source-owned fixed labels and numeric samples only, at most 10 output rows
+        // per segment (begin, eight checkpoints, finish). No frame-by-frame log flood.
+        static string WorldNumber(float value)=>value.ToString("F4",System.Globalization.CultureInfo.InvariantCulture);
+        static string WorldVector(Vector3 value)=>"("+WorldNumber(value.x)+","+WorldNumber(value.y)+","+WorldNumber(value.z)+")";
+        static float WorldDistance(Vector3 a,Vector3 b)=>new Vector2(a.x-b.x,a.z-b.z).magnitude;
+        sealed class WorldWalkObservation
+        {
+            public string Segment;public Vector3 Origin,Destination,Previous;
+            public float Started,PreviousAt,LastStep,PathMeters,MaxFrameWall,MaxFrameDelta,MinRemaining;
+            public int Frames,StationaryFrames;public Vector2 LastCommand;
+            public void Observe(Vector3 body)
+            {
+                float now=Time.realtimeSinceStartup;
+                LastStep=WorldDistance(body,Previous);PathMeters+=LastStep;
+                MaxFrameWall=Mathf.Max(MaxFrameWall,now-PreviousAt);MaxFrameDelta=Mathf.Max(MaxFrameDelta,Time.unscaledDeltaTime);
+                MinRemaining=Mathf.Min(MinRemaining,WorldDistance(body,Destination));
+                Frames++;if(LastStep<.0001f)StationaryFrames++;
+                Previous=body;PreviousAt=now;
+            }
+        }
+        string WorldWalkDiagnostic(WorldWalkObservation sample,string phase)
+        {
+            var body=P.View.Walk.SavedPosition;
+            return "WORLD_ROUTE_V1 segment="+sample.Segment+" phase="+phase+" elapsed="+WorldNumber(Time.realtimeSinceStartup-sample.Started)+
+                " limit=45 frames="+sample.Frames+" stationaryFrames="+sample.StationaryFrames+" body="+WorldVector(body)+
+                " origin="+WorldVector(sample.Origin)+" destination="+WorldVector(sample.Destination)+" remaining="+WorldNumber(WorldDistance(body,sample.Destination))+
+                " minRemaining="+WorldNumber(sample.MinRemaining)+" lastStep="+WorldNumber(sample.LastStep)+" pathMeters="+WorldNumber(sample.PathMeters)+
+                " maxFrameWall="+WorldNumber(sample.MaxFrameWall)+" maxUnscaledDelta="+WorldNumber(sample.MaxFrameDelta)+
+                " command="+WorldVector(new Vector3(sample.LastCommand.x,0,sample.LastCommand.y))+" camera="+WorldVector(app.SceneCamera.transform.position)+
+                " cameraEuler="+WorldVector(app.SceneCamera.transform.eulerAngles)+" moveId="+Router.MoveTouchId+" lookId="+Router.LookTouchId+
+                " mode="+(int)Router.Mode+" focused="+Router.IsFocused+" awaitingRelease="+Router.AwaitingRelease+" cameraWrite="+P.View.Walk.CameraWriteEnabled;
+        }
+        void AssertWorldRouteBudget(WorldWalkObservation sample,string phase)
+        {
+            float elapsed=Time.realtimeSinceStartup-sample.Started;
+            // Build the detailed string only on failure, not on every movement frame.
+            if(!(elapsed<45))Assert.That(elapsed,Is.LessThan(45),"Real joystick route stalled; never teleport or extend the native budget. "+WorldWalkDiagnostic(sample,phase));
+        }
+        IEnumerator TouchWalkTo(string segment,Vector3 destination,bool proveConcurrentLook=false)
         {
             yield return WorldNeutral();Vector3 origin=P.View.Walk.SavedPosition;float started=Time.realtimeSinceStartup;
+            var sample=new WorldWalkObservation{Segment=segment,Origin=origin,Previous=origin,Destination=destination,Started=started,PreviousAt=started,MinRemaining=WorldDistance(origin,destination)};
+            TestContext.Out.WriteLine(WorldWalkDiagnostic(sample,"BEGIN"));int checkpoints=0;bool reached=false;
             Vector2 move=P.View.JoystickRect.center,look=LookOrigin;
             WorldTouches(Finger(901,IPhase.Began,move));
             if(proveConcurrentLook)WorldTouches(Finger(902,IPhase.Began,look));
             bool movedLook=false;Quaternion initialLook=app.SceneCamera.transform.rotation;
-            while(Vector2.Distance(new Vector2(P.View.Walk.SavedPosition.x,P.View.Walk.SavedPosition.z),new Vector2(destination.x,destination.z))>.09f)
+            try
             {
-                Assert.That(Time.realtimeSinceStartup-started,Is.LessThan(45),"Real joystick route stalled; never teleport or extend the native budget");
-                Vector3 world=destination-P.View.Walk.SavedPosition;world.y=0;
-                Vector3 local=Quaternion.Inverse(Quaternion.Euler(0,app.SceneCamera.transform.eulerAngles.y,0))*world.normalized;
-                Vector2 point=move+new Vector2(local.x,local.z)*P.View.JoystickRect.width*.3f;
-                yield return null;
-                if(proveConcurrentLook&&!movedLook)
+                while(WorldDistance(P.View.Walk.SavedPosition,destination)>.09f)
                 {
-                    look+=Vector2.right*12*P.View.TouchPixelsPerDp;
-                    WorldTouches(Finger(901,IPhase.Moved,point),Finger(902,IPhase.Moved,look));
-                    Assert.That(Router.MoveTouchId,Is.EqualTo(901));Assert.That(Router.LookTouchId,Is.EqualTo(902));Assert.That(Quaternion.Angle(initialLook,app.SceneCamera.transform.rotation),Is.GreaterThan(1));movedLook=true;
+                    AssertWorldRouteBudget(sample,"STALL");
+                    Vector3 world=destination-P.View.Walk.SavedPosition;world.y=0;
+                    Vector3 local=Quaternion.Inverse(Quaternion.Euler(0,app.SceneCamera.transform.eulerAngles.y,0))*world.normalized;
+                    sample.LastCommand=new Vector2(local.x,local.z);
+                    Vector2 point=move+sample.LastCommand*P.View.JoystickRect.width*.3f;
+                    yield return null;
+                    if(proveConcurrentLook&&!movedLook)
+                    {
+                        look+=Vector2.right*12*P.View.TouchPixelsPerDp;
+                        WorldTouches(Finger(901,IPhase.Moved,point),Finger(902,IPhase.Moved,look));
+                        Assert.That(Router.MoveTouchId,Is.EqualTo(901));Assert.That(Router.LookTouchId,Is.EqualTo(902));Assert.That(Quaternion.Angle(initialLook,app.SceneCamera.transform.rotation),Is.GreaterThan(1));movedLook=true;
+                    }
+                    else WorldTouches(Finger(901,IPhase.Moved,point));
+                    sample.Observe(P.View.Walk.SavedPosition);
+                    if(checkpoints<8&&Time.realtimeSinceStartup-started>=(checkpoints+1)*5)
+                    {checkpoints++;TestContext.Out.WriteLine(WorldWalkDiagnostic(sample,"SAMPLE"));}
                 }
-                else WorldTouches(Finger(901,IPhase.Moved,point));
+                // Arrival on a slow frame does not silently bypass the same 45 s bound.
+                AssertWorldRouteBudget(sample,"ARRIVAL");
+                reached=true;
             }
+            finally{TestContext.Out.WriteLine(WorldWalkDiagnostic(sample,reached?"REACHED":"ABORTED"));}
             WorldTouches(Finger(901,IPhase.Ended,move));if(proveConcurrentLook)WorldTouches(Finger(902,IPhase.Ended,look));
             yield return WorldNeutral();Assert.That(Vector3.Distance(P.View.Walk.SavedPosition,origin),Is.GreaterThan(.05f));
         }
@@ -101,20 +152,26 @@ namespace Lottery.G3.PlayMode.Tests
             string kind=!hitAny?"NONE":hit.collider is CharacterController?"CHARACTER_CONTROLLER":physical!=null?"WORLD_TARGET":"UNTARGETED_COLLIDER";
             var body=P.View.Walk.SavedPosition;
             float reach=hitAny?new Vector2(hit.point.x-body.x,hit.point.z-body.z).magnitude:-1;
-            return "WORLD_RAY_V1 kind="+kind+" trigger="+(hitAny&&hit.collider.isTrigger)+" ownBody="+(hitAny&&hit.collider.transform.IsChildOf(P.View.Walk.transform))+
-                " environment="+(hitAny&&hit.collider.transform.IsChildOf(P.View.Environment.transform))+" hitDistance="+(hitAny?hit.distance:-1).ToString("F4",System.Globalization.CultureInfo.InvariantCulture)+
-                " horizontalReach="+reach.ToString("F4",System.Globalization.CultureInfo.InvariantCulture)+" body="+body.ToString("F4")+" camera="+app.SceneCamera.transform.position.ToString("F4")+
-                " target="+target.ToString("F4")+" pixel="+pixel.ToString("F4")+" rayOrigin="+ray.origin.ToString("F4")+" rayDirection="+ray.direction.ToString("F4");
+            var foreign=Physics.RaycastAll(ray,5,Physics.DefaultRaycastLayers,QueryTriggerInteraction.Collide)
+                .Where(x=>!P.View.Walk.OwnsBodyCollider(x.collider)).OrderBy(x=>x.distance).ThenBy(x=>x.collider.GetComponentInParent<G3WorldTarget>()!=null?1:0).ToArray();
+            var selected=foreign.Length>0?foreign[0]:default;
+            return "WORLD_RAY_V2 kind="+kind+" trigger="+(hitAny&&hit.collider.isTrigger)+" ownBody="+(hitAny&&P.View.Walk.OwnsBodyCollider(hit.collider))+
+                " environment="+(hitAny&&hit.collider.transform.IsChildOf(P.View.Environment.transform))+" hitDistance="+WorldNumber(hitAny?hit.distance:-1)+
+                " horizontalReach="+WorldNumber(reach)+" body="+WorldVector(body)+" camera="+WorldVector(app.SceneCamera.transform.position)+
+                " target="+WorldVector(target)+" pixel="+WorldVector(new Vector3(pixel.x,pixel.y,0))+" rayOrigin="+WorldVector(ray.origin)+" rayDirection="+WorldVector(ray.direction)+
+                " foreignHits="+foreign.Length+" foreignDistance="+WorldNumber(foreign.Length>0?selected.distance:-1)+
+                " foreignController="+(foreign.Length>0&&selected.collider is CharacterController)+" foreignTarget="+(foreign.Length>0&&selected.collider.GetComponentInParent<G3WorldTarget>()!=null)+
+                " foreignNearestTies="+(foreign.Length>0?foreign.Count(x=>x.distance==selected.distance):0);
         }
         [UnityTest,Timeout(180000)]
         public IEnumerator WorldInputEntryToTicketRackAndTableUsesConcurrentMoveLookAndRelease()
         {
             PrepareWorldInputViewport();
             DeclareWorldSpawn(P.View.Environment.EntryPosition,P.View.Environment.EntryYaw);
-            yield return TouchWalkTo(new Vector3(.65f,0,.25f),true);
+            yield return TouchWalkTo("ENTRY_TO_TICKET_RACK",new Vector3(.65f,0,.25f),true);
             yield return TouchWorldOpen(new Vector3(1.64f,.91f,-.32f),G3Panel.Tickets);
             Click("buy-number");Confirm();Assert.That(State.CurrentTicket.TicketType,Is.EqualTo("number"));string hash=StateCodec.ComputeHash(State);Close();
-            yield return TouchWalkTo(new Vector3(-.65f,0,.90f));
+            yield return TouchWalkTo("TICKET_RACK_TO_TABLE",new Vector3(-.65f,0,.90f));
             yield return TouchWorldOpen(new Vector3(-1.35f,.85f,.45f),G3Panel.None,true);
             Assert.That(StateCodec.ComputeHash(State),Is.EqualTo(hash));ScratchCell(3,.3f);Assert.That(State.CurrentTicket.Scratch.CellCoverage(3),Is.GreaterThan(0));
         }
@@ -125,13 +182,13 @@ namespace Lottery.G3.PlayMode.Tests
             // Explicit local transaction setup precedes the real spatial route.
             Buy("number");ScratchCell(3,.3f);string hash=StateCodec.ComputeHash(State);
             yield return TouchUiRelease("stand");
-            yield return TouchWalkTo(new Vector3(.15f,0,.30f));yield return TouchWalkTo(new Vector3(1.20f,0,-.85f),true);
+            yield return TouchWalkTo("TABLE_TO_PHONE_AISLE",new Vector3(.15f,0,.30f));yield return TouchWalkTo("AISLE_TO_PHONE",new Vector3(1.20f,0,-.85f),true);
             var phone=P.View.Phone.ScreenWorldCorners;Vector3 phoneCenter=phone.Aggregate(Vector3.zero,(a,b)=>a+b)/phone.Length;
             yield return TouchFace(phoneCenter);Vector3 pos=app.SceneCamera.transform.position;Quaternion rot=app.SceneCamera.transform.rotation;
             yield return TouchWorldOpen(phoneCenter,G3Panel.Phone);Assert.That(P.View.Phone.IsFocused,Is.True);
             yield return TouchUiRelease("close-phone");Assert.That(P.View.Phone.IsFocused,Is.False);Assert.That(app.SceneCamera.transform.position,Is.EqualTo(pos));Assert.That(app.SceneCamera.transform.rotation,Is.EqualTo(rot));
             Assert.That(StateCodec.ComputeHash(State),Is.EqualTo(hash));
-            yield return TouchWalkTo(new Vector3(.15f,0,.30f));yield return TouchWalkTo(new Vector3(-.65f,0,.90f));
+            yield return TouchWalkTo("PHONE_TO_RETURN_AISLE",new Vector3(.15f,0,.30f));yield return TouchWalkTo("RETURN_AISLE_TO_TABLE",new Vector3(-.65f,0,.90f));
             yield return TouchWorldOpen(new Vector3(-1.35f,.85f,.45f),G3Panel.None,true);Assert.That(StateCodec.ComputeHash(State),Is.EqualTo(hash));
         }
         [UnityTest,Timeout(180000)]
@@ -141,21 +198,82 @@ namespace Lottery.G3.PlayMode.Tests
             // Declared local projection reference only, before the spatial route begins.
             SetupLocalPanel(G3Panel.Shop);string localStock=P.BuildPanel().Body;Close();
             string hash=StateCodec.ComputeHash(State);DeclareWorldSpawn(P.View.Environment.EntryPosition,P.View.Environment.EntryYaw);
-            yield return TouchWalkTo(new Vector3(1.35f,0,1.40f),true);
+            yield return TouchWalkTo("ENTRY_TO_INVENTORY",new Vector3(1.35f,0,1.40f),true);
             yield return TouchWorldOpen(new Vector3(2.345f,.75f,2.02f),G3Panel.Inventory);Close();
-            yield return TouchWalkTo(new Vector3(.25f,0,.8f));yield return TouchWalkTo(new Vector3(-.08f,0,-1.20f));
+            yield return TouchWalkTo("INVENTORY_TO_SHELF_AISLE",new Vector3(.25f,0,.8f));yield return TouchWalkTo("AISLE_TO_TOOL_SHELF",new Vector3(-.08f,0,-1.20f));
             yield return TouchWorldOpen(P.View.Environment.ShelfTargetPosition,G3Panel.Shop);
             Assert.That(P.BuildPanel().Cards.Any(x=>x.Id.StartsWith("stock-")),Is.True);string physicalStock=P.BuildPanel().Body;Close();
             // Compare the public service projection without changing navigation state.
             Assert.That(State.Stock.Count,Is.GreaterThan(0));Assert.That(physicalStock,Is.EqualTo(localStock),"Physical entry and declared local projection show the identical stock");
-            yield return TouchWalkTo(new Vector3(-.24f,0,-.08f));
+            yield return TouchWalkTo("TOOL_SHELF_TO_DRAWER",new Vector3(-.24f,0,-.08f));
             yield return TouchWorldOpen(new Vector3(-1.17f,.65f,0),G3Panel.Drawer);Close();
             Assert.That(StateCodec.ComputeHash(State),Is.EqualTo(hash));
             yield return WorldPointerRejectionChecks(new Vector3(-1.17f,.65f,0));
         }
+        void AssertWorldPickExcludesOnlyOwnedBody(Vector2 pixel)
+        {
+            var walk=P.View.Walk;var own=walk.GetComponent<CharacterController>();
+            Assert.That(own,Is.Not.Null);Assert.That(walk.OwnsBodyCollider(own),Is.True);Assert.That(walk.OwnsBodyCollider(null),Is.False);
+            Assert.That(own.enabled,Is.True);int originalLayer=own.gameObject.layer;Vector3 originalCenter=own.center;
+            var ray=app.SceneCamera.ViewportPointToRay(new Vector3(pixel.x/P.View.PresentationWidth,pixel.y/P.View.PresentationHeight,0));
+            var expected=P.View.WorldTarget(pixel);Assert.That(expected,Is.Not.Null);
+            var temporary=new System.Collections.Generic.List<GameObject>();
+            try
+            {
+                // Deliberate collider-only regression fixture, after the real route.
+                // Keep the player's transform/reach/camera fixed. Force its exact
+                // controller onto the ray and prove it remains enabled yet ignored.
+                own.center=walk.transform.InverseTransformPoint(ray.GetPoint(.4f));Physics.SyncTransforms();
+                Assert.That(Physics.Raycast(ray,out var ownedHit,5,Physics.DefaultRaycastLayers,QueryTriggerInteraction.Collide),Is.True);
+                Assert.That(ownedHit.collider,Is.SameAs(own),"Counterexample must actually hit the owned controller first");
+                Assert.That(P.View.WorldTarget(pixel),Is.SameAs(expected));Assert.That(own.enabled,Is.True);Assert.That(own.gameObject.layer,Is.EqualTo(originalLayer));
+                own.center=originalCenter;Physics.SyncTransforms();
+                // Another controller remains opaque, even inside our transform tree.
+                var foreign=new GameObject("Declared foreign controller picking fixture");temporary.Add(foreign);foreign.transform.SetParent(walk.transform,true);foreign.transform.position=ray.GetPoint(.5f);
+                var other=foreign.AddComponent<CharacterController>();other.radius=.07f;other.height=.2f;other.center=Vector3.zero;
+                Physics.SyncTransforms();Assert.That(walk.OwnsBodyCollider(other),Is.False);
+                Assert.That(Physics.RaycastAll(ray,5,Physics.DefaultRaycastLayers,QueryTriggerInteraction.Collide).Any(x=>x.collider==other),Is.True,"Foreign controller must intersect the ray");
+                Assert.That(P.View.WorldTarget(pixel),Is.Null,"Foreign CharacterController must block a target behind it");
+                foreign.SetActive(false);Physics.SyncTransforms();Assert.That(P.View.WorldTarget(pixel),Is.SameAs(expected));
+                // An ordinary child collider is not owned merely because of ancestry.
+                var child=new GameObject("Declared foreign child box picking fixture");temporary.Add(child);child.transform.SetParent(walk.transform,true);child.transform.position=ray.GetPoint(.5f);child.transform.rotation=Quaternion.LookRotation(ray.direction);
+                var childBox=child.AddComponent<BoxCollider>();childBox.size=new Vector3(.2f,.2f,.03f);Physics.SyncTransforms();
+                Assert.That(walk.OwnsBodyCollider(childBox),Is.False);Assert.That(P.View.WorldTarget(pixel),Is.Null);
+                child.SetActive(false);Physics.SyncTransforms();Assert.That(P.View.WorldTarget(pixel),Is.SameAs(expected));
+                // Force more than 16 hits, beyond the non-allocating query capacity.
+                // Every extra collider is behind the original nearest target.
+                var targetHit=Physics.RaycastAll(ray,5,Physics.DefaultRaycastLayers,QueryTriggerInteraction.Collide)
+                    .Where(x=>x.collider.GetComponentInParent<G3WorldTarget>()==expected).OrderBy(x=>x.distance).First();
+                Assert.That(targetHit.distance+1.05f,Is.LessThan(5));
+                for(int i=0;i<20;i++)
+                {
+                    var extra=new GameObject("Declared dense picking fixture");temporary.Add(extra);extra.transform.position=ray.GetPoint(targetHit.distance+.1f+i*.04f);extra.transform.rotation=Quaternion.LookRotation(ray.direction);
+                    extra.AddComponent<BoxCollider>().size=new Vector3(.08f,.08f,.01f);
+                }
+                Physics.SyncTransforms();Assert.That(Physics.RaycastAll(ray,5,Physics.DefaultRaycastLayers,QueryTriggerInteraction.Collide).Length,Is.GreaterThan(16));
+                Assert.That(P.View.WorldTarget(pixel),Is.SameAs(expected),"Saturated hit buffers must not lose the nearest target");
+                child.SetActive(true);Physics.SyncTransforms();Assert.That(P.View.WorldTarget(pixel),Is.Null,"Saturated hit buffers must not lose a nearer opaque blocker");
+                // Equal-nearest distinct targets are ambiguous, independent of the
+                // order returned by PhysX. Fail closed instead of selecting either.
+                child.AddComponent<G3WorldTarget>().Panel=G3Panel.Inventory;
+                var twin=new GameObject("Declared tied picking fixture");temporary.Add(twin);twin.transform.position=child.transform.position;twin.transform.rotation=child.transform.rotation;
+                var twinBox=twin.AddComponent<BoxCollider>();twinBox.size=childBox.size;twin.AddComponent<G3WorldTarget>().Panel=G3Panel.Shop;
+                Physics.SyncTransforms();var tied=Physics.RaycastAll(ray,5,Physics.DefaultRaycastLayers,QueryTriggerInteraction.Collide).Where(x=>x.collider==childBox||x.collider==twinBox).ToArray();
+                Assert.That(tied.Length,Is.EqualTo(2));Assert.That(tied[0].distance,Is.EqualTo(tied[1].distance));
+                Assert.That(P.View.WorldTarget(pixel),Is.Null,"Equal-nearest distinct targets must fail closed");
+                Assert.That(P.View.WorldTarget(new Vector2(float.NaN,pixel.y)),Is.Null);Assert.That(P.View.WorldTarget(new Vector2(pixel.x,float.PositiveInfinity)),Is.Null);
+            }
+            finally
+            {
+                own.center=originalCenter;
+                foreach(var item in temporary){item.SetActive(false);Object.Destroy(item);}Physics.SyncTransforms();
+            }
+            Assert.That(own.enabled,Is.True);Assert.That(own.gameObject.layer,Is.EqualTo(originalLayer));Assert.That(P.View.WorldTarget(pixel),Is.SameAs(expected));
+        }
         IEnumerator WorldPointerRejectionChecks(Vector3 target)
         {
             yield return TouchFace(target);var pixel=P.View.WorldToPresentationPoint(target);Assert.That(P.View.WorldTarget(pixel),Is.Not.Null);
+            AssertWorldPickExcludesOnlyOwnedBody(pixel);
             WorldTouches(Finger(903,IPhase.Began,pixel));WorldTouches(Finger(903,IPhase.Canceled,pixel));Assert.That(P.Panel,Is.EqualTo(G3Panel.None));yield return WorldNeutral();
             WorldTouches(Finger(903,IPhase.Began,pixel));WorldTouches(Finger(903,IPhase.Ended,pixel+Vector2.right*9*P.View.TouchPixelsPerDp));Assert.That(P.Panel,Is.EqualTo(G3Panel.None));yield return WorldNeutral();
             WorldTouches(Finger(903,IPhase.Began,pixel));WorldTouches(Finger(903,IPhase.Ended,new Vector2(-1,pixel.y)));Assert.That(P.Panel,Is.EqualTo(G3Panel.None));yield return WorldNeutral();
