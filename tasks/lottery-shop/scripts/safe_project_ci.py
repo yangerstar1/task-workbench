@@ -11,11 +11,13 @@ import signal
 import time
 import activation_probe as private
 import visual_candidate_ci as visual
+import play_split_ci as split
 
 PHASES = {
     'capture': ('playmode', 'visual-candidate', 'Lottery.G3.VisualCandidate.Tests', 1800),
     'regression-edit': ('editmode', 'visual-regression-edit', 'Lottery.Probe.Tests;Lottery.G2.EditMode.Tests;Lottery.G3.EditMode.Tests', 480),
-    'regression-play': ('playmode', 'visual-regression-play', 'Lottery.G2.PlayMode.Tests;Lottery.G3.PlayMode.Tests', 480),
+    'regression-play-core': ('playmode', split.FOLDERS['core'], 'Lottery.G2.PlayMode.Tests;Lottery.G3.PlayMode.Tests', 480),
+    'regression-play-world': ('playmode', split.FOLDERS['world'], 'Lottery.G2.PlayMode.Tests;Lottery.G3.PlayMode.Tests', 480),
 }
 COVERAGE = 'generateAdditionalMetrics;generateHtmlReport;generateBadgeReport;dontClear'
 RETURN_COMMAND = 'unity-editor -logFile /dev/stdout -quit -returnlicense -username "$UNITY_EMAIL" -password "$UNITY_PASSWORD" -projectPath "/BlankProject"'
@@ -109,10 +111,15 @@ def session(root, ident):
 
 
 def process_receipt(ident, phase):
-    return dict(ident, schemaVersion=1, phase=phase, status='NOT_STARTED', dockerExitCode=None, nativeExitCode=None,
+    record = dict(ident, schemaVersion=1, phase=phase, status='NOT_STARTED', dockerExitCode=None, nativeExitCode=None,
                 nativeExitMarkerCount=0, observations={key: 0 for key in private.TOKENS}, compilerErrors=[], cleanup=None,
                 image=private.IMAGE, mechanismSourcePin=private.PIN, nativeOutput='BOUNDED_MEMORY_ONLY_NO_RAW_LOG',
                 testVerdict='SEPARATE_EXACT_NUNIT_VALIDATOR_REQUIRED')
+    if phase in split.PHASES.values():
+        shard = phase.removeprefix('regression-play-')
+        record.update(shard=shard, plannedCaseCount=len(split.names(shard)), testSelectionSha256=split.selection_hash(shard),
+                      processBudgetSeconds=480, nativeStartedAtNs=None)
+    return record
 
 
 def shell(command):
@@ -147,8 +154,11 @@ def project_argv(phase, ident):
             '-enableCodeCoverage', '-debugCodeOptimization', '-coverageOptions', COVERAGE, '-assemblyNames', assemblies]
     if phase != 'regression-edit': argv += ['-force-glcore', '-screen-width', '1280', '-screen-height', '720']
     argv += ['-job-worker-count', '2', '-probeCommit', ident['sourceCommit'], '-probeRunId', ident['runId']]
-    if phase in ('capture', 'regression-play', 'performance-probe'): argv += ['-probeRunAttempt', ident['runAttempt']]
-    if phase == 'regression-play': argv += ['-g3RegressionProgress', '1', '-probeReviewedCommit', ident['reviewedCandidateCommit']]
+    if phase in ('capture', 'performance-probe') or phase in split.PHASES.values(): argv += ['-probeRunAttempt', ident['runAttempt']]
+    if phase in split.PHASES.values():
+        shard = phase.removeprefix('regression-play-')
+        argv += ['-g3RegressionProgress', '1', '-probeReviewedCommit', ident['reviewedCandidateCommit'],
+                 '-g3RegressionShard', shard, '-testFilter', split.selection(shard)]
     if phase == 'performance-probe': argv += ['-g3PerformanceProbe', '1', '-probeReviewedCommit', ident['reviewedCandidateCommit']]
     return argv
 
@@ -209,14 +219,20 @@ def test(root, phase):
         # Fixed native destination only; never reuse a prior stage's XML.
         xml = artifacts / (platform + '-results.xml')
         if xml.exists(): xml.unlink()
-        if phase == 'regression-play':
-            # Only the two fixed progress destinations; no prior attempt can survive.
-            for progress in (artifacts / 'test-progress.json', visual.outdir(root) / 'regression-play-progress.json'):
+        if phase in split.PHASES.values():
+            split.contract(root)
+            # Only fixed outputs for this shard; never erase the sibling's proof.
+            outputs = [artifacts / 'test-progress.json', visual.outdir(root) / (phase + '-progress.json')]
+            if phase == split.PHASES['world']:
+                outputs += [artifacts / 'world-progress.jsonl', visual.outdir(root) / 'world-progress.json']
+            for progress in outputs:
                 if progress.exists(): progress.unlink()
         if phase == 'performance-probe':
             for receipt in (artifacts / 'performance-receipt.json', visual.outdir(root) / 'performance-receipt.json'):
                 if receipt.exists(): receipt.unlink()
-        native(ident, shell(shlex.join(project_argv(phase, ident))), seconds, record, compiler_assets(root, ident))
+        compiler_files = compiler_assets(root, ident)
+        if phase in split.PHASES.values(): record['nativeStartedAtNs'] = time.time_ns()
+        native(ident, shell(shlex.join(project_argv(phase, ident))), seconds, record, compiler_files)
         # Normal NUnit/test failure still permits the other exact suites to run.
         # Missing exits, native licensing failures or synchronous timeouts do not.
         healthy_exit = record['nativeExitMarkerCount'] == 1 and record['nativeExitCode'] == record['dockerExitCode']

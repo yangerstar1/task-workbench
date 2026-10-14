@@ -115,7 +115,7 @@ class NativeBoundaryTests(unittest.TestCase):
     def tearDown(self):safe.visual=self.old_visual;safe.PHASES=self.old_phases
     def test_only_one_independent_phase_and_original_limits_unchanged(self):
         self.assertEqual(set(safe.PHASES),{'performance-probe'});self.assertEqual(safe.PHASES['performance-probe'][3],600)
-        self.assertEqual(self.old_phases['regression-play'][3],480);self.assertEqual(self.old_phases['capture'][3],1800)
+        self.assertEqual(self.old_phases['regression-play-core'][3],480);self.assertEqual(self.old_phases['regression-play-world'][3],480);self.assertEqual(self.old_phases['capture'][3],1800)
         argv=safe.project_argv('performance-probe',IDENT)
         self.assertEqual(argv[argv.index('-assemblyNames')+1],'Lottery.G3.PerformanceDiagnostic.Tests')
         self.assertEqual(argv[argv.index('-probeReviewedCommit')+1],'2'*40);self.assertEqual(argv[argv.index('-probeRunAttempt')+1],'1')
@@ -124,7 +124,7 @@ class NativeBoundaryTests(unittest.TestCase):
         self.assertIn('/github/workspace/tasks/lottery-shop/artifacts/performance-probe/playmode-results.xml',argv)
     def test_wrong_profile_cannot_start_other_project_or_bypass_performance_flag(self):
         script=str(Path(__file__).with_name('safe_project_ci.py'))
-        for args in [('capture','--performance-only'),('regression-play','--performance-only'),('performance-probe',)]:
+        for args in [('capture','--performance-only'),('regression-play-core','--performance-only'),('regression-play-world','--performance-only'),('performance-probe',)]:
             p=subprocess.run([sys.executable,script,*args],capture_output=True,text=True,env=dict(os.environ,PYTHONDONTWRITEBYTECODE='1'))
             self.assertEqual(p.returncode,1);self.assertEqual(p.stdout.strip(),'SAFE_PROJECT_PROFILE_REJECTED');self.assertEqual(p.stderr,'')
     def test_new_workflow_one_native_case_same_pins_secret_scope_and_exact_exports(self):

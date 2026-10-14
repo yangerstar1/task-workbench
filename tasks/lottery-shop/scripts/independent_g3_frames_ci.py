@@ -10,6 +10,7 @@ import xml.etree.ElementTree as ET
 import g3_ci
 import visual_candidate_ci as visual
 import reflection_bake_ci as baked
+import play_split_ci as split
 
 require = visual.require
 SCOPE = 'EXACT_PASSED_G3_CASE_14_FRAMES_NOT_23_FRAME_OR_SUITE_PASS'
@@ -58,45 +59,22 @@ def preparation(root, ident):
 
 
 def exact_case(root, ident, prepared_ns):
-    path = root / visual.TASK / 'artifacts/visual-regression-play/playmode-results.xml'
-    raw = regular(path, 10*1024*1024)
+    path = split.paths(root, 'core')[0] / 'playmode-results.xml'
     require(path.stat().st_mtime_ns >= prepared_ns, 'INDEPENDENT_FRAME_STALE_XML')
-    # Require native UTF-8 before XML auto-detection can bypass byte DTD checks.
-    text = raw.decode('utf-8-sig')
-    require('\x00' not in text and '<!DOCTYPE' not in text and '<!ENTITY' not in text, 'INDEPENDENT_FRAME_XML_ENCODING_OR_DTD_REJECTED')
-    visual.bounded.require_safe_xml(raw)
-    tree = ET.fromstring(raw)
-    expected = {}
-    for contract in ('g2','g3'):
-        profile = visual.read_json(root / visual.TASK / ('ci/'+contract+'-test-contract.json'))['profiles']['play']
-        require(not set(expected).intersection(profile), 'INDEPENDENT_FRAME_CONTRACT_REJECTED'); expected.update(profile)
-    assemblies = [s for s in tree.iter('test-suite') if s.get('type') == 'Assembly']
-    cases = list(tree.iter('test-case')); all_names = [name for names in expected.values() for name in names]
-    require(tree.tag == 'test-run' and len(all_names) == len(set(all_names)) == 37 and len(cases) == 37 and {c.get('fullname') for c in cases} == set(all_names), 'INDEPENDENT_FRAME_EXACT_CASES_REJECTED')
-    require(len(assemblies) == len(expected) and {a.get('name') for a in assemblies} == set(expected), 'INDEPENDENT_FRAME_ASSEMBLY_REJECTED')
-    owned = []
-    for assembly in assemblies:
-        children = list(assembly.iter('test-case')); names = expected[assembly.get('name')]
-        require(len(children) == len(names) and {c.get('fullname') for c in children} == set(names), 'INDEPENDENT_FRAME_OWNERSHIP_REJECTED'); owned.extend(children)
-    require(len(owned) == len(cases) and set(owned) == set(cases), 'INDEPENDENT_FRAME_OWNERSHIP_REJECTED')
-    require(all(c.get('result') in ('Passed','Failed') for c in cases), 'INDEPENDENT_FRAME_SKIPPED_OR_INCOMPLETE')
-    passed = sum(c.get('result') == 'Passed' for c in cases); failed = 37-passed
-    require(all(tree.get(k) == str(v) for k,v in {'total':37,'passed':passed,'failed':failed,'skipped':0,'inconclusive':0}.items()), 'INDEPENDENT_FRAME_COUNTS_REJECTED')
-    require(tree.get('result') in (('Passed',) if failed == 0 else ('Failed','Failed(Child)')), 'INDEPENDENT_FRAME_ROOT_RESULT_REJECTED')
-    target = [c for c in cases if c.get('fullname') == visual.ORIGINAL_G3_CASE]
-    require(len(target) == 1 and target[0].get('result') == 'Passed' and target[0].find('failure') is None, 'INDEPENDENT_FRAME_TARGET_NOT_PASSED')
-    native_path = visual.outdir(root) / 'safe-regression-play.json'
-    native = baked.load_receipt(regular(native_path,16384))
-    require(native_path.stat().st_mtime_ns >= prepared_ns and all(native[k] == ident[k] for k in ('sourceCommit','reviewedCandidateCommit','runId','runAttempt')) and native['scope'] == visual.SCOPE and native['phase'] == 'regression-play', 'INDEPENDENT_FRAME_NATIVE_IDENTITY_REJECTED')
-    code = 2 if failed else 0
-    require(type(native['nativeExitMarkerCount']) is int and native['nativeExitMarkerCount'] == 1 and type(native['nativeExitCode']) is int and type(native['dockerExitCode']) is int and native['nativeExitCode'] == native['dockerExitCode'] == code and native['status'] == ('NATIVE_FAILED' if failed else 'NATIVE_SUCCEEDED'), 'INDEPENDENT_FRAME_NATIVE_RESULT_REJECTED')
-    require(native['observations']['invalidLicenseXml400'] == 0 and native['observations']['nativeActivationAborted'] == 0, 'INDEPENDENT_FRAME_NATIVE_LICENSE_REJECTED')
-    return dict(total=37,passed=passed,failed=failed,skipped=0), hashlib.sha256(raw).hexdigest()
+    checked = split.inspect(root, 'core', preserve=False)
+    target = [c for c in checked['cases'] if c['fullname'] == visual.ORIGINAL_G3_CASE]
+    require(len(target) == 1 and target[0]['result'] == 'Passed', 'INDEPENDENT_FRAME_TARGET_NOT_PASSED')
+    tree = ET.fromstring(regular(path, 10*1024*1024))
+    case = next(c for c in tree.iter('test-case') if c.get('fullname') == visual.ORIGINAL_G3_CASE)
+    require(case.find('failure') is None, 'INDEPENDENT_FRAME_TARGET_NOT_PASSED')
+    native_path = visual.outdir(root) / 'safe-regression-play-core.json'
+    require(native_path.stat().st_mtime_ns >= prepared_ns, 'INDEPENDENT_FRAME_STALE_NATIVE')
+    return checked['counts'], checked['rawXmlSha256'], checked['nativeReceiptSha256']
 
 
 def export(root):
     clear(root); ident = identity(root); ns, prep_hash = preparation(root,ident)
-    counts, xml_hash = exact_case(root,ident,ns)
+    counts, xml_hash, native_hash = exact_case(root,ident,ns)
     source = root / visual.TASK / 'artifacts/g3-play/captures'
     originals = {}
     for name in FILES:
@@ -110,7 +88,7 @@ def export(root):
     require(checked == receipt, 'INDEPENDENT_FRAME_RECEIPT_CHANGED')
     for frame in receipt['frames']:
         require(hashlib.sha256(originals[frame['file']]).hexdigest() == frame['sha256'] and len(originals[frame['file']]) == frame['bytes'], 'INDEPENDENT_FRAME_ORIGINAL_CHANGED')
-    proof = dict(schemaVersion=1,scope=SCOPE,sourceCommit=ident['sourceCommit'],reviewedCandidateCommit=ident['reviewedCandidateCommit'],runId=ident['runId'],runAttempt=ident['runAttempt'],originalCase=visual.ORIGINAL_G3_CASE,originalCaseResult='Passed',suiteCounts=counts,suiteAllPassed=counts['failed']==0,rawXmlSha256=xml_hash,preparationReceiptSha256=prep_hash,legacyReceiptSha256=hashlib.sha256(originals['render-receipt.json']).hexdigest(),legacyReceiptRunAttempt='NOT_PRESENT_IN_LEGACY_SCHEMA',attemptBinding='FIXED_OUTPUTS_CLEARED_BEFORE_ATTEMPT_AND_RECREATED_AFTER_PREPARATION',mainDayFrames=list(visual.ORIGINAL_G3_FRAMES[:-1]),separateProtectedFixtureFrame='challenge-protected',visual23FrameGate='NOT_EVALUATED_BY_THIS_EXPORT',g3Gate='NOT_EVALUATED',visualReview='PENDING',deviceQa='NOT_RUN')
+    proof = dict(schemaVersion=2,scope=SCOPE,sourceCommit=ident['sourceCommit'],reviewedCandidateCommit=ident['reviewedCandidateCommit'],runId=ident['runId'],runAttempt=ident['runAttempt'],originalCase=visual.ORIGINAL_G3_CASE,originalCaseResult='Passed',frameOwningShard='core',owningShardCounts=counts,owningShardAllPassed=counts['failed']==0,completePlayRegression='NOT_EVALUATED_BY_THIS_EXPORT',rawXmlSha256=xml_hash,nativeReceiptSha256=native_hash,preparationReceiptSha256=prep_hash,legacyReceiptSha256=hashlib.sha256(originals['render-receipt.json']).hexdigest(),legacyReceiptRunAttempt='NOT_PRESENT_IN_LEGACY_SCHEMA',attemptBinding='FIXED_OUTPUTS_CLEARED_BEFORE_ATTEMPT_AND_RECREATED_AFTER_PREPARATION',mainDayFrames=list(visual.ORIGINAL_G3_FRAMES[:-1]),separateProtectedFixtureFrame='challenge-protected',visual23FrameGate='NOT_EVALUATED_BY_THIS_EXPORT',g3Gate='NOT_EVALUATED',visualReview='PENDING',deviceQa='NOT_RUN')
     folder = destination(root); folder.mkdir(parents=True,exist_ok=True)
     try:
         for name in FILES:(folder/name).write_bytes(originals[name])

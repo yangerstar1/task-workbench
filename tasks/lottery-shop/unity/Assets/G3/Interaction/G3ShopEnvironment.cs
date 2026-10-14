@@ -39,7 +39,7 @@ namespace Lottery.G3.Interaction
         // Run08 clipped walnut/printed stock under the additive direct sources.
         // Keep authored texture factors and ambient bounce; reduce source energy
         // in this Gamma/LDR room instead of baking a compensating dark tint.
-        const float DaylightStrength=.8f;
+        const float DaylightStrength=.6f;
         static readonly float[] PracticalStrengths={1.15f,1.25f,.55f,.06f};
         UniversalRenderPipelineAsset priorPipeline,runtimePipeline;
         public float TicketWidth=>layout!=null&&layout.ticketWidth>0?layout.ticketWidth:.4f;
@@ -231,7 +231,7 @@ namespace Lottery.G3.Interaction
             var bounce=new SphericalHarmonicsL2();bounce.AddAmbientLight(value?new Color(.20f,.21f,.24f):new Color(.336f,.368f,.344f));
             bounce.AddDirectionalLight(Vector3.up,value?new Color(.16f,.13f,.10f):new Color(.20f,.22f,.25f),.7f);
             RenderSettings.ambientProbe=bounce;RenderSettings.reflectionIntensity=value ? .7f : 1;
-            for(int i=0;i<practicals.Count;i++)practicals[i].intensity=PracticalStrengths[i]*(value?1.04f:1);
+            for(int i=0;i<practicals.Count;i++)practicals[i].intensity=(!value&&i==1?1.6f:PracticalStrengths[i])*(value?1.04f:1);
             roomReflection.backgroundColor=value?new Color(.08f,.10f,.15f):new Color(.40f,.45f,.49f);
             if(!bakingReflection)roomReflection.customBakedTexture=value?nightReflection:dayReflection;
             if(exteriorMaterial!=null){exteriorMaterial.SetTexture("_BaseMap",value?exteriorNight:exteriorDay);exteriorMaterial.SetFloat("_Exposure",value?.72f:1f);}

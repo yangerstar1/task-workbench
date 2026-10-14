@@ -104,7 +104,7 @@ def finalize_not_run(root):
     ident = visual.identity(root)
     for key, env in (('sourceCommit', 'GITHUB_SHA'), ('runId', 'GITHUB_RUN_ID'), ('runAttempt', 'GITHUB_RUN_ATTEMPT')):
         require(ident.get(key) == os.environ.get(env), 'FINAL_DECISION_RUN_REJECTED')
-    require(os.environ.get('DECISION_OUTCOME') == 'success' and os.environ.get('DECISION_SKIP') == 'true' and os.environ.get('REGRESSION_EDIT_OUTCOME') == 'skipped' and os.environ.get('REGRESSION_PLAY_OUTCOME') == 'skipped', 'ACTUAL_REGRESSION_SKIP_REQUIRED')
+    require(os.environ.get('DECISION_OUTCOME') == 'success' and os.environ.get('DECISION_SKIP') == 'true' and os.environ.get('REGRESSION_EDIT_OUTCOME') == 'skipped' and os.environ.get('REGRESSION_PLAY_CORE_OUTCOME') == 'skipped' and os.environ.get('REGRESSION_PLAY_WORLD_OUTCOME') == 'skipped', 'ACTUAL_REGRESSION_SKIP_REQUIRED')
     value, digest = read_fixed(visual.outdir(root) / NAME, 8192)
     fields = {'schemaVersion', 'scope', 'status', 'reason', 'sourceCommit', 'reviewedCandidateCommit', 'runId', 'runAttempt', 'requestId', 'regressionEdit', 'regressionPlay', 'g3Gate', 'captureVerdict', 'evidenceSha256'}
     require(set(value) == fields and type(value['schemaVersion']) is int and value['schemaVersion'] == 1 and value['scope'] == SCOPE and value['status'] == 'SKIP_REQUESTED' and value['reason'] == 'PREBUILD_FAILURE_CONFIRMED', 'FINAL_DECISION_REJECTED')

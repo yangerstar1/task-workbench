@@ -15,6 +15,8 @@ import zlib
 from unittest.mock import patch
 import xml.etree.ElementTree as ET
 import visual_candidate_ci as candidate
+import play_split_ci as split
+import test_play_split_ci as split_fixtures
 
 
 def receipt():
@@ -641,21 +643,13 @@ class OriginalG3FrameExportTests(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory(); self.addCleanup(self.temp.cleanup); self.root = Path(self.temp.name)
         self.env = patch.dict(os.environ, GITHUB_SHA="1" * 40, GITHUB_RUN_ID="12345", GITHUB_RUN_ATTEMPT="1"); self.env.start(); self.addCleanup(self.env.stop)
-        candidate.write(candidate.outdir(self.root) / "source-receipt.json", dict(scope=candidate.SCOPE, sourceCommit="1" * 40, runId="12345", runAttempt="1"))
+        candidate.write(candidate.outdir(self.root) / "source-receipt.json", dict(scope=candidate.SCOPE, sourceCommit="1" * 40, reviewedCandidateCommit="2" * 40, runId="12345", runAttempt="1"))
         original = Path(__file__).resolve().parents[3] / candidate.TASK / "ci"
         for name in ("g2-test-contract.json", "g3-test-contract.json"):
             target = self.root / candidate.TASK / "ci" / name; target.parent.mkdir(parents=True, exist_ok=True); shutil.copyfile(original / name, target)
         candidate.prepare_original_g3_captures(self.root)
-        profiles = {}
-        for name in ("g2-test-contract.json", "g3-test-contract.json"):
-            profiles.update(candidate.read_json(original / name)["profiles"]["play"])
-        count = sum(len(names) for names in profiles.values())
-        self.xml = ET.Element("test-run", result="Passed", total=str(count), passed=str(count), failed="0", skipped="0", inconclusive="0")
-        for assembly, names in profiles.items():
-            suite = ET.SubElement(self.xml, "test-suite", type="Assembly", name=assembly, result="Passed")
-            for name in names: ET.SubElement(suite, "test-case", fullname=name, result="Passed")
-        self.xmlpath = self.root / candidate.TASK / "artifacts/visual-regression-play/results.xml"
-        self.xmlpath.parent.mkdir(parents=True); self.xmlpath.write_bytes(ET.tostring(self.xml))
+        self.xml = split_fixtures.seed(self.root)['core']
+        self.xmlpath = split.paths(self.root, 'core')[0] / 'playmode-results.xml'
         self.source = candidate.original_g3_source(self.root); self.source.mkdir(parents=True)
         frames = []
         for index, name in enumerate(candidate.ORIGINAL_G3_FRAMES):
@@ -792,7 +786,7 @@ class RegressionProgressTests(unittest.TestCase):
     def setUp(self):
         self.root = Path(__file__).resolve().parents[3]
         self.ident = dict(sourceCommit="1"*40, reviewedCandidateCommit="2"*40, runId="123", runAttempt="1")
-        self.allowed = candidate.regression_case_keys(self.root)
+        self.allowed = candidate.regression_case_keys(self.root, "core")
         self.case = sorted(self.allowed)[0]
 
     def value(self, finish=False):
@@ -801,15 +795,23 @@ class RegressionProgressTests(unittest.TestCase):
         if finish:
             events += [dict(sequence=3, stage="case-end", caseKey=self.case, result="FAILED", utc="2026-10-13T00:00:02Z", elapsedMs=2000),
                        dict(sequence=4, stage="run-end", caseKey="", result="UNAVAILABLE", utc="2026-10-13T00:00:03Z", elapsedMs=3000)]
-        return dict(schemaVersion=1, scope=candidate.SCOPE, status="MILESTONES_ONLY_NOT_TEST_PASS", events=events, **self.ident)
+        return dict(schemaVersion=2, shard="core", scope=candidate.SCOPE, status="MILESTONES_ONLY_NOT_TEST_PASS", events=events, **self.ident)
 
     def check(self, value):
-        return candidate.validate_regression_progress(value, self.ident, self.allowed)
+        return candidate.validate_regression_progress(value, self.ident, self.allowed, "core")
 
     def test_partial_and_failed_case_trails_are_diagnostic_only(self):
         for finish in (False, True):
             value = self.value(finish); self.assertEqual(self.check(value), value)
             self.assertNotIn("allExpectedPassed", value)
+
+    def test_shard_and_sibling_case_cannot_be_mixed(self):
+        value=self.value();value['shard']='world'
+        with self.assertRaises(ValueError):self.check(value)
+        value=self.value();value['events'][1]['caseKey']=next(iter(candidate.regression_case_keys(self.root,'world')))
+        with self.assertRaises(ValueError):self.check(value)
+        value=self.value();value['schemaVersion']=1;del value['shard']
+        with self.assertRaises(ValueError):self.check(value)
 
     def test_trigger_reviewed_source_run_and_attempt_must_all_match(self):
         for key in self.ident:
@@ -850,19 +852,19 @@ class RegressionProgressTests(unittest.TestCase):
 
     def test_only_fixed_file_exports_and_oversize_never_leaks(self):
         with tempfile.TemporaryDirectory() as d:
-            root = Path(d); source = root/candidate.TASK/"artifacts/visual-regression-play/test-progress.json"
-            source.parent.mkdir(parents=True); destination = candidate.outdir(root)/"regression-play-progress.json"
+            root = Path(d); source = root/candidate.TASK/"artifacts/visual-regression-play-core/test-progress.json"
+            source.parent.mkdir(parents=True); destination = candidate.outdir(root)/"regression-play-core-progress.json"
             source.write_text(json.dumps(self.value()))
             with patch.object(candidate, "identity", return_value=self.ident), patch.object(candidate, "regression_case_keys", return_value=self.allowed):
-                candidate.export_regression_progress(root); self.assertEqual(json.loads(destination.read_text()), self.value())
+                candidate.export_regression_progress(root, "core"); self.assertEqual(json.loads(destination.read_text()), self.value())
                 source.write_text("x"*65537)
-                with self.assertRaises(Exception): candidate.export_regression_progress(root)
+                with self.assertRaises(Exception): candidate.export_regression_progress(root, "core")
                 self.assertFalse(destination.exists())
-                source.unlink(); candidate.export_regression_progress(root); self.assertFalse(destination.exists())
+                source.unlink(); candidate.export_regression_progress(root, "core"); self.assertFalse(destination.exists())
 
     def test_callback_whitelist_matches_exact_current_contract_and_is_explicitly_gated(self):
         text = (self.root/candidate.TASK/"unity/Assets/G3/Tests/PlayMode/G3RegressionProgress.cs").read_text()
-        keys = set(re.findall(r'"([0-9a-f]{64})"', text)); self.assertEqual(keys, self.allowed); self.assertEqual(len(keys), 37)
+        keys = set(re.findall(r'"([0-9a-f]{64})"', text)); self.assertEqual(keys, candidate.regression_case_keys(self.root)); self.assertEqual(len(keys), 37)
         for required in ('[assembly: TestRunCallback(', 'ITestRunCallback', 'Arg("-g3RegressionProgress")=="1"', 'Arg("-assemblyNames")==Assemblies', 'Arg("-testPlatform")=="playmode"', 'Arg("-probeReviewedCommit")', 'MaximumBytes=65536, MaximumEvents=128'):
             self.assertIn(required, text)
         for forbidden in ('.Message', '.StackTrace', '.Output', 'ToXml', 'GetEnvironmentVariable', 'test.Name'):
@@ -871,13 +873,13 @@ class RegressionProgressTests(unittest.TestCase):
 
     def test_workflow_exports_only_named_validated_progress_after_real_play_attempt(self):
         text = (self.root/candidate.WORKFLOW).read_text()
-        begin = text.index('      - name: Preserve exact-contract bounded PlayMode progress even on timeout')
-        end = text.index('      - name: Verify existing exact PlayMode', begin)
-        block = text[begin:end]
-        self.assertIn("steps.regressionplay.outcome != 'skipped'", block)
-        self.assertIn("steps.guard.outcome == 'success'", block)
-        self.assertIn('visual_candidate_ci.py regression-progress', block)
-        self.assertEqual(text.count('            tasks/lottery-shop/evidence/visual-candidate/regression-play-progress.json'), 1)
+        for shard, label in (("core", "core"), ("world", "WORLD")):
+            begin = text.index('      - name: Preserve ' + label + ' progress even on timeout')
+            block = text[begin:].split('      - name:', 2)[1]
+            self.assertIn("steps.regressionplay" + shard + ".outcome != 'skipped'", block)
+            self.assertIn("steps.guard.outcome == 'success'", block)
+            self.assertIn('visual_candidate_ci.py regression-progress --shard ' + shard, block)
+            self.assertEqual(text.count('            tasks/lottery-shop/evidence/visual-candidate/regression-play-' + shard + '-progress.json'), 1)
 
 
 

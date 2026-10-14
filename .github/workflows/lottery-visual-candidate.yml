@@ -37,6 +37,8 @@ jobs:
           PYTHONDONTWRITEBYTECODE=1 python3 tasks/lottery-shop/scripts/test_visual_candidate_ci.py -v
           PYTHONDONTWRITEBYTECODE=1 python3 tasks/lottery-shop/scripts/test_activation_probe.py -v
           PYTHONDONTWRITEBYTECODE=1 python3 tasks/lottery-shop/scripts/test_safe_project_ci.py -v
+          PYTHONDONTWRITEBYTECODE=1 python3 tasks/lottery-shop/scripts/test_play_split_ci.py -v
+          PYTHONDONTWRITEBYTECODE=1 python3 tasks/lottery-shop/scripts/test_world_progress_ci.py -v
           PYTHONDONTWRITEBYTECODE=1 python3 tasks/lottery-shop/scripts/test_reflection_bake_ci.py -v
           PYTHONDONTWRITEBYTECODE=1 python3 tasks/lottery-shop/scripts/test_reflection_progress_ci.py -v
           PYTHONDONTWRITEBYTECODE=1 python3 tasks/lottery-shop/scripts/test_startup_progress_ci.py -v
@@ -174,58 +176,20 @@ jobs:
         id: prepareoriginal
         if: ${{ always() && steps.guard.outcome == 'success' && steps.capture.outcome != 'skipped' && !(steps.regressiondecision.outcome == 'success' && steps.regressiondecision.outputs.skip_regressions == 'true') }}
         run: python3 tasks/lottery-shop/scripts/visual_candidate_ci.py prepare-original-g3-captures
-      - name: Existing G2 and G3 PlayMode suites including original 75-step flow and captures
-        id: regressionplay
+      - name: Run exact 34 non-WORLD PlayMode cases in their own 480-second native process
+        id: regressionplaycore
         if: ${{ always() && steps.guard.outcome == 'success' && steps.safestart.outcome == 'success' && steps.capture.outcome != 'skipped' && !(steps.regressiondecision.outcome == 'success' && steps.regressiondecision.outputs.skip_regressions == 'true') }}
         timeout-minutes: 10
-        run: PYTHONDONTWRITEBYTECODE=1 python3 tasks/lottery-shop/scripts/safe_project_ci.py regression-play
-      - name: Record NOT_RUN only after both regression stages were actually skipped
-        if: ${{ always() && steps.guard.outcome == 'success' && steps.regressiondecision.outcome == 'success' && steps.regressiondecision.outputs.skip_regressions == 'true' && steps.regressionedit.outcome == 'skipped' && steps.regressionplay.outcome == 'skipped' }}
-        env:
-          DECISION_OUTCOME: ${{ steps.regressiondecision.outcome }}
-          DECISION_SKIP: ${{ steps.regressiondecision.outputs.skip_regressions }}
-          REGRESSION_EDIT_OUTCOME: ${{ steps.regressionedit.outcome }}
-          REGRESSION_PLAY_OUTCOME: ${{ steps.regressionplay.outcome }}
-        run: PYTHONDONTWRITEBYTECODE=1 python3 tasks/lottery-shop/scripts/diagnostic_early_stop_ci.py finalize
-      - name: Preserve exact-contract bounded PlayMode progress even on timeout
-        if: ${{ always() && steps.guard.outcome == 'success' && steps.regressionplay.outcome != 'skipped' }}
-        run: python3 tasks/lottery-shop/scripts/visual_candidate_ci.py regression-progress
-      - name: Verify existing exact PlayMode identities and preserve bounded original XML
-        if: ${{ always() && steps.guard.outcome == 'success' && steps.regressionplay.outcome != 'skipped' }}
-        run: python3 tasks/lottery-shop/scripts/visual_candidate_ci.py tests --stage regression-play
-      - name: Preserve separate existing 14-frame originals only after exact native PlayMode passes
-        id: originalcaptures
-        if: ${{ always() && steps.guard.outcome == 'success' && steps.prepareoriginal.outcome == 'success' && steps.regressionplay.outcome != 'skipped' }}
-        run: python3 tasks/lottery-shop/scripts/visual_candidate_ci.py original-g3-captures
-      - name: Upload separately verified existing 14 original G3 frames
-        if: ${{ always() && steps.guard.outcome == 'success' && steps.originalcaptures.outcome == 'success' }}
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        with:
-          name: lottery-visual-candidate-not-g3-pass-existing-g3-frames-${{ github.run_id }}-${{ github.run_attempt }}
-          path: |
-            tasks/lottery-shop/evidence/visual-candidate/source-receipt.json
-            tasks/lottery-shop/evidence/visual-candidate/original-g3-preparation.json
-            tasks/lottery-shop/evidence/visual-candidate/original-g3-captures/render-receipt.json
-            tasks/lottery-shop/evidence/visual-candidate/original-g3-captures/export-receipt.json
-            tasks/lottery-shop/evidence/visual-candidate/original-g3-captures/empty.png
-            tasks/lottery-shop/evidence/visual-candidate/original-g3-captures/number-half.png
-            tasks/lottery-shop/evidence/visual-candidate/original-g3-captures/number-revealed.png
-            tasks/lottery-shop/evidence/visual-candidate/original-g3-captures/number-copy.png
-            tasks/lottery-shop/evidence/visual-candidate/original-g3-captures/number-settled.png
-            tasks/lottery-shop/evidence/visual-candidate/original-g3-captures/configuration.png
-            tasks/lottery-shop/evidence/visual-candidate/original-g3-captures/phone.png
-            tasks/lottery-shop/evidence/visual-candidate/original-g3-captures/challenge-two-safe.png
-            tasks/lottery-shop/evidence/visual-candidate/original-g3-captures/challenge-selected.png
-            tasks/lottery-shop/evidence/visual-candidate/original-g3-captures/shop-shortcut.png
-            tasks/lottery-shop/evidence/visual-candidate/original-g3-captures/shop-physical.png
-            tasks/lottery-shop/evidence/visual-candidate/original-g3-captures/night.png
-            tasks/lottery-shop/evidence/visual-candidate/original-g3-captures/day-end.png
-            tasks/lottery-shop/evidence/visual-candidate/original-g3-captures/challenge-protected.png
-          if-no-files-found: error
-          retention-days: 7
+        run: PYTHONDONTWRITEBYTECODE=1 python3 tasks/lottery-shop/scripts/safe_project_ci.py regression-play-core
+      - name: Preserve core progress even on timeout
+        if: ${{ always() && steps.guard.outcome == 'success' && steps.regressionplaycore.outcome != 'skipped' }}
+        run: python3 tasks/lottery-shop/scripts/visual_candidate_ci.py regression-progress --shard core
+      - name: Verify exact 34 core identities and preserve their native XML
+        if: ${{ always() && steps.guard.outcome == 'success' && steps.regressionplaycore.outcome != 'skipped' }}
+        run: python3 tasks/lottery-shop/scripts/visual_candidate_ci.py tests --stage regression-play-core
       - name: Preserve 14 originals from exact passed G3 case independently of sibling failures
         id: independentg3caseframes
-        if: ${{ always() && steps.guard.outcome == 'success' && steps.prepareoriginal.outcome == 'success' && steps.regressionplay.outcome != 'skipped' }}
+        if: ${{ always() && steps.guard.outcome == 'success' && steps.prepareoriginal.outcome == 'success' && steps.regressionplaycore.outcome != 'skipped' }}
         run: PYTHONDONTWRITEBYTECODE=1 python3 tasks/lottery-shop/scripts/independent_g3_frames_ci.py
       - name: Upload independently verified G3 case originals without granting 23-frame or suite pass
         if: ${{ always() && steps.guard.outcome == 'success' && steps.independentg3caseframes.outcome == 'success' }}
@@ -251,6 +215,68 @@ jobs:
             tasks/lottery-shop/evidence/visual-candidate/independent-g3-case-captures/challenge-protected.png
             tasks/lottery-shop/evidence/visual-candidate/independent-g3-case-captures/render-receipt.json
             tasks/lottery-shop/evidence/visual-candidate/independent-g3-case-captures/export-receipt.json
+            tasks/lottery-shop/evidence/visual-candidate/regression-play-core/raw-test-results.xml
+            tasks/lottery-shop/evidence/visual-candidate/regression-play-core/test-receipt.json
+            tasks/lottery-shop/evidence/visual-candidate/safe-regression-play-core.json
+          if-no-files-found: error
+          retention-days: 7
+      - name: Run exact 3 WORLD PlayMode cases in their own 480-second native process
+        id: regressionplayworld
+        if: ${{ always() && steps.guard.outcome == 'success' && steps.safestart.outcome == 'success' && steps.capture.outcome != 'skipped' && !(steps.regressiondecision.outcome == 'success' && steps.regressiondecision.outputs.skip_regressions == 'true') }}
+        timeout-minutes: 10
+        run: PYTHONDONTWRITEBYTECODE=1 python3 tasks/lottery-shop/scripts/safe_project_ci.py regression-play-world
+      - name: Record NOT_RUN only after Edit and both Play processes were actually skipped
+        if: ${{ always() && steps.guard.outcome == 'success' && steps.regressiondecision.outcome == 'success' && steps.regressiondecision.outputs.skip_regressions == 'true' && steps.regressionedit.outcome == 'skipped' && steps.regressionplaycore.outcome == 'skipped' && steps.regressionplayworld.outcome == 'skipped' }}
+        env:
+          DECISION_OUTCOME: ${{ steps.regressiondecision.outcome }}
+          DECISION_SKIP: ${{ steps.regressiondecision.outputs.skip_regressions }}
+          REGRESSION_EDIT_OUTCOME: ${{ steps.regressionedit.outcome }}
+          REGRESSION_PLAY_CORE_OUTCOME: ${{ steps.regressionplaycore.outcome }}
+          REGRESSION_PLAY_WORLD_OUTCOME: ${{ steps.regressionplayworld.outcome }}
+        run: PYTHONDONTWRITEBYTECODE=1 python3 tasks/lottery-shop/scripts/diagnostic_early_stop_ci.py finalize
+      - name: Preserve WORLD progress even on timeout
+        if: ${{ always() && steps.guard.outcome == 'success' && steps.regressionplayworld.outcome != 'skipped' }}
+        run: python3 tasks/lottery-shop/scripts/visual_candidate_ci.py regression-progress --shard world
+      - name: Preserve bounded WORLD route and ray sidecar even on timeout
+        if: ${{ always() && steps.guard.outcome == 'success' && steps.regressionplayworld.outcome != 'skipped' }}
+        run: PYTHONDONTWRITEBYTECODE=1 python3 tasks/lottery-shop/scripts/world_progress_ci.py
+      - name: Verify exact 3 WORLD identities and preserve their native XML
+        if: ${{ always() && steps.guard.outcome == 'success' && steps.regressionplayworld.outcome != 'skipped' }}
+        run: python3 tasks/lottery-shop/scripts/visual_candidate_ci.py tests --stage regression-play-world
+      - name: Require disjoint exact 37 identities and both native exits without merging XML
+        if: ${{ always() && steps.guard.outcome == 'success' && (steps.regressionplaycore.outcome != 'skipped' || steps.regressionplayworld.outcome != 'skipped') }}
+        run: python3 tasks/lottery-shop/scripts/visual_candidate_ci.py play-summary
+      - name: Preserve separate existing 14-frame originals only after exact native PlayMode passes
+        id: originalcaptures
+        if: ${{ always() && steps.guard.outcome == 'success' && steps.prepareoriginal.outcome == 'success' && steps.regressionplaycore.outcome != 'skipped' }}
+        run: python3 tasks/lottery-shop/scripts/visual_candidate_ci.py original-g3-captures
+      - name: Upload separately verified existing 14 original G3 frames
+        if: ${{ always() && steps.guard.outcome == 'success' && steps.originalcaptures.outcome == 'success' }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: lottery-visual-candidate-not-g3-pass-existing-g3-frames-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            tasks/lottery-shop/evidence/visual-candidate/source-receipt.json
+            tasks/lottery-shop/evidence/visual-candidate/original-g3-preparation.json
+            tasks/lottery-shop/evidence/visual-candidate/original-g3-captures/render-receipt.json
+            tasks/lottery-shop/evidence/visual-candidate/original-g3-captures/export-receipt.json
+            tasks/lottery-shop/evidence/visual-candidate/regression-play-core/raw-test-results.xml
+            tasks/lottery-shop/evidence/visual-candidate/regression-play-core/test-receipt.json
+            tasks/lottery-shop/evidence/visual-candidate/safe-regression-play-core.json
+            tasks/lottery-shop/evidence/visual-candidate/original-g3-captures/empty.png
+            tasks/lottery-shop/evidence/visual-candidate/original-g3-captures/number-half.png
+            tasks/lottery-shop/evidence/visual-candidate/original-g3-captures/number-revealed.png
+            tasks/lottery-shop/evidence/visual-candidate/original-g3-captures/number-copy.png
+            tasks/lottery-shop/evidence/visual-candidate/original-g3-captures/number-settled.png
+            tasks/lottery-shop/evidence/visual-candidate/original-g3-captures/configuration.png
+            tasks/lottery-shop/evidence/visual-candidate/original-g3-captures/phone.png
+            tasks/lottery-shop/evidence/visual-candidate/original-g3-captures/challenge-two-safe.png
+            tasks/lottery-shop/evidence/visual-candidate/original-g3-captures/challenge-selected.png
+            tasks/lottery-shop/evidence/visual-candidate/original-g3-captures/shop-shortcut.png
+            tasks/lottery-shop/evidence/visual-candidate/original-g3-captures/shop-physical.png
+            tasks/lottery-shop/evidence/visual-candidate/original-g3-captures/night.png
+            tasks/lottery-shop/evidence/visual-candidate/original-g3-captures/day-end.png
+            tasks/lottery-shop/evidence/visual-candidate/original-g3-captures/challenge-protected.png
           if-no-files-found: error
           retention-days: 7
       - name: Return only this temporary session and verify its container is gone
@@ -272,8 +298,12 @@ jobs:
             tasks/lottery-shop/evidence/visual-candidate/safe-start.json
             tasks/lottery-shop/evidence/visual-candidate/safe-capture.json
             tasks/lottery-shop/evidence/visual-candidate/safe-regression-edit.json
-            tasks/lottery-shop/evidence/visual-candidate/safe-regression-play.json
-            tasks/lottery-shop/evidence/visual-candidate/regression-play-progress.json
+            tasks/lottery-shop/evidence/visual-candidate/safe-regression-play-core.json
+            tasks/lottery-shop/evidence/visual-candidate/safe-regression-play-world.json
+            tasks/lottery-shop/evidence/visual-candidate/regression-play-core-progress.json
+            tasks/lottery-shop/evidence/visual-candidate/regression-play-world-progress.json
+            tasks/lottery-shop/evidence/visual-candidate/world-progress.json
+            tasks/lottery-shop/evidence/visual-candidate/regression-play-summary.json
             tasks/lottery-shop/evidence/visual-candidate/safe-finish.json
             tasks/lottery-shop/evidence/visual-candidate/safe-session.json
             tasks/lottery-shop/evidence/visual-candidate/diagnostic-regression-decision.json
@@ -281,8 +311,11 @@ jobs:
             tasks/lottery-shop/evidence/visual-candidate/regression-edit/raw-test-results.xml
             tasks/lottery-shop/evidence/visual-candidate/regression-edit/raw-test-report-receipt.json
             tasks/lottery-shop/evidence/visual-candidate/regression-edit/test-receipt.json
-            tasks/lottery-shop/evidence/visual-candidate/regression-play/raw-test-results.xml
-            tasks/lottery-shop/evidence/visual-candidate/regression-play/raw-test-report-receipt.json
-            tasks/lottery-shop/evidence/visual-candidate/regression-play/test-receipt.json
+            tasks/lottery-shop/evidence/visual-candidate/regression-play-core/raw-test-results.xml
+            tasks/lottery-shop/evidence/visual-candidate/regression-play-world/raw-test-results.xml
+            tasks/lottery-shop/evidence/visual-candidate/regression-play-core/raw-test-report-receipt.json
+            tasks/lottery-shop/evidence/visual-candidate/regression-play-world/raw-test-report-receipt.json
+            tasks/lottery-shop/evidence/visual-candidate/regression-play-core/test-receipt.json
+            tasks/lottery-shop/evidence/visual-candidate/regression-play-world/test-receipt.json
           if-no-files-found: error
           retention-days: 7

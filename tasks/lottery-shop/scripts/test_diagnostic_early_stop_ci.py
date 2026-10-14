@@ -135,7 +135,7 @@ class DecisionTests(unittest.TestCase):
 
     def test_not_run_requires_both_actual_skips_and_successful_decision(self):
         self.decide()
-        env=dict(DECISION_OUTCOME='success',DECISION_SKIP='true',REGRESSION_EDIT_OUTCOME='skipped',REGRESSION_PLAY_OUTCOME='skipped')
+        env=dict(DECISION_OUTCOME='success',DECISION_SKIP='true',REGRESSION_EDIT_OUTCOME='skipped',REGRESSION_PLAY_CORE_OUTCOME='skipped',REGRESSION_PLAY_WORLD_OUTCOME='skipped')
         with patch.dict(os.environ,env):
             final=decision.finalize_not_run(self.root)
             self.assertEqual(final['status'],'REGRESSIONS_NOT_RUN');self.assertEqual(final['regressionEdit'],'NOT_RUN');self.assertEqual(final['regressionPlay'],'NOT_RUN')
@@ -145,7 +145,7 @@ class DecisionTests(unittest.TestCase):
         self.assertNotIn('expectedCases',final)
 
     def test_not_run_cannot_use_full_profile_or_wrong_run_decision(self):
-        env=dict(DECISION_OUTCOME='success',DECISION_SKIP='true',REGRESSION_EDIT_OUTCOME='skipped',REGRESSION_PLAY_OUTCOME='skipped')
+        env=dict(DECISION_OUTCOME='success',DECISION_SKIP='true',REGRESSION_EDIT_OUTCOME='skipped',REGRESSION_PLAY_CORE_OUTCOME='skipped',REGRESSION_PLAY_WORLD_OUTCOME='skipped')
         with patch.dict(os.environ,env):
             self.req['executionProfile']=v.FULL_DIAGNOSTIC;v.write(self.root/v.REQUEST,self.req);self.decide()
             with self.assertRaises(ValueError):decision.finalize_not_run(self.root)
@@ -213,12 +213,12 @@ class LifecycleWorkflowTests(unittest.TestCase):
     def test_workflow_keeps_finish_independent_and_original_timeouts(self):
         root=Path(__file__).resolve().parents[3];workflow=(root/v.WORKFLOW).read_text()
         condition="&& !(steps.regressiondecision.outcome == 'success' && steps.regressiondecision.outputs.skip_regressions == 'true')"
-        self.assertEqual(workflow.count(condition),3)
-        for step in ('regressionedit','prepareoriginal','regressionplay'):
+        self.assertEqual(workflow.count(condition),4)
+        for step in ('regressionedit','prepareoriginal','regressionplaycore','regressionplayworld'):
             section=workflow.split('        id: '+step+'\n',1)[1].split('      - name:',1)[0];self.assertIn(condition,section);self.assertIn('always()',section)
         finish=workflow.split('      - name: Return only this temporary session',1)[1].split('      - name:',1)[0]
         self.assertIn("always() && steps.guard.outcome == 'success' && steps.safestart.outcome != 'skipped'",finish);self.assertNotIn('regressiondecision',finish);self.assertIn('safe_project_ci.py finish',finish)
-        self.assertNotIn('continue-on-error:',workflow);self.assertEqual(len(v.FRAMES),23);self.assertEqual(s.PHASES['regression-edit'][3],480);self.assertEqual(s.PHASES['regression-play'][3],480);self.assertEqual(s.PHASES['capture'][3],1800)
+        self.assertNotIn('continue-on-error:',workflow);self.assertEqual(len(v.FRAMES),23);self.assertEqual(s.PHASES['regression-edit'][3],480);self.assertEqual(s.PHASES['regression-play-core'][3],480);self.assertEqual(s.PHASES['regression-play-world'][3],480);self.assertEqual(s.PHASES['capture'][3],1800)
 
 
 if __name__=='__main__':unittest.main()

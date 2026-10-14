@@ -84,6 +84,8 @@ namespace Lottery.G3.PlayMode.Tests
                 " cameraEuler="+WorldVector(app.SceneCamera.transform.eulerAngles)+" moveId="+Router.MoveTouchId+" lookId="+Router.LookTouchId+
                 " mode="+(int)Router.Mode+" focused="+Router.IsFocused+" awaitingRelease="+Router.AwaitingRelease+" cameraWrite="+P.View.Walk.CameraWriteEnabled;
         }
+        static void WriteWorldDiagnostic(string sample)
+        {G3WorldProgress.Record(sample);TestContext.Out.WriteLine(sample);}
         void AssertWorldRouteBudget(WorldWalkObservation sample,string phase)
         {
             float elapsed=Time.realtimeSinceStartup-sample.Started;
@@ -94,7 +96,7 @@ namespace Lottery.G3.PlayMode.Tests
         {
             yield return WorldNeutral();Vector3 origin=P.View.Walk.SavedPosition;float started=Time.realtimeSinceStartup;
             var sample=new WorldWalkObservation{Segment=segment,Origin=origin,Previous=origin,Destination=destination,Started=started,PreviousAt=started,MinRemaining=WorldDistance(origin,destination)};
-            TestContext.Out.WriteLine(WorldWalkDiagnostic(sample,"BEGIN"));int checkpoints=0;bool reached=false;
+            WriteWorldDiagnostic(WorldWalkDiagnostic(sample,"BEGIN"));int checkpoints=0;bool reached=false;
             Vector2 move=P.View.JoystickRect.center,look=LookOrigin;
             WorldTouches(Finger(901,IPhase.Began,move));
             if(proveConcurrentLook)WorldTouches(Finger(902,IPhase.Began,look));
@@ -118,13 +120,13 @@ namespace Lottery.G3.PlayMode.Tests
                     else WorldTouches(Finger(901,IPhase.Moved,point));
                     sample.Observe(P.View.Walk.SavedPosition);
                     if(checkpoints<8&&Time.realtimeSinceStartup-started>=(checkpoints+1)*5)
-                    {checkpoints++;TestContext.Out.WriteLine(WorldWalkDiagnostic(sample,"SAMPLE"));}
+                    {checkpoints++;WriteWorldDiagnostic(WorldWalkDiagnostic(sample,"SAMPLE"));}
                 }
                 // Arrival on a slow frame does not silently bypass the same 45 s bound.
                 AssertWorldRouteBudget(sample,"ARRIVAL");
                 reached=true;
             }
-            finally{TestContext.Out.WriteLine(WorldWalkDiagnostic(sample,reached?"REACHED":"ABORTED"));}
+            finally{WriteWorldDiagnostic(WorldWalkDiagnostic(sample,reached?"REACHED":"ABORTED"));}
             WorldTouches(Finger(901,IPhase.Ended,move));if(proveConcurrentLook)WorldTouches(Finger(902,IPhase.Ended,look));
             yield return WorldNeutral();Assert.That(Vector3.Distance(P.View.Walk.SavedPosition,origin),Is.GreaterThan(.05f));
         }
@@ -137,7 +139,7 @@ namespace Lottery.G3.PlayMode.Tests
         IEnumerator TouchWorldOpen(Vector3 target,G3Panel panel,bool table=false)
         {
             yield return TouchFace(target);Physics.SyncTransforms();var pixel=P.View.WorldToPresentationPoint(target);
-            Assert.That(P.View.IsSafePointer(pixel),Is.True);var physical=P.View.WorldTarget(pixel);Assert.That(physical,Is.Not.Null,"Nearest unobstructed collider must be a reachable physical target. "+WorldRayDiagnostic(target,pixel));
+            Assert.That(P.View.IsSafePointer(pixel),Is.True);var physical=P.View.WorldTarget(pixel);var diagnostic=WorldRayDiagnostic(target,pixel);WriteWorldDiagnostic(diagnostic);Assert.That(physical,Is.Not.Null,"Nearest unobstructed collider must be a reachable physical target. "+diagnostic);
             Assert.That(physical.IsTable,Is.EqualTo(table));if(!table)Assert.That(physical.Panel,Is.EqualTo(panel));
             var before=P.Panel;WorldTouches(Finger(903,IPhase.Began,pixel));Assert.That(P.Panel,Is.EqualTo(before),"Press is not activation");
             WorldTouches(Finger(903,IPhase.Ended,pixel));Assert.That(P.Panel,Is.EqualTo(panel));

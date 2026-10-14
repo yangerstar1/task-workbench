@@ -60,9 +60,15 @@ namespace Lottery.G3.PlayMode.Tests
             "ef3058f328d787cd4600f411326ce0a55af07700f456d44a06b3960f1208af57",
             "159863c79e23387097d03394a700065bae8959f64c867293c6740b6d64a97e5e",
         };
+        static readonly HashSet<string> WorldKeys=new HashSet<string> {
+            "fe443afcbe561b898231f2330bc6d1840c843fd0415f94eeafc03d68ffae8d80",
+            "a81f4076bd1a31b90e812478de29a90c4cfbbc52d2abb118b9a77f73984f8b32",
+            "3fb46e6d77cead8492b8b2b3f87b20cda9d74ce0fc1be6a62c65b9822f6296f1",
+        };
+        static string Shard=>Arg("-g3RegressionShard");
         static string Arg(string name){var args=Environment.GetCommandLineArgs();int i=Array.IndexOf(args,name);return i>=0&&i+1<args.Length?args[i+1]:"";}
-        static bool Enabled=>Arg("-g3RegressionProgress")=="1"&&Arg("-assemblyNames")==Assemblies&&Arg("-testPlatform")=="playmode";
-        static string PathName=>Path.GetFullPath(Path.Combine(Application.dataPath,"../../artifacts/visual-regression-play/test-progress.json"));
+        static bool Enabled=>Arg("-g3RegressionProgress")=="1"&&Arg("-assemblyNames")==Assemblies&&Arg("-testPlatform")=="playmode"&&(Shard=="core"||Shard=="world");
+        static string PathName=>Path.GetFullPath(Path.Combine(Application.dataPath,"../../artifacts/"+(Shard=="world"?"visual-regression-world":"visual-regression-play-core")+"/test-progress.json"));
         public void RunStarted(ITest testsToRun){if(Enabled)Mark("run-start","","UNAVAILABLE");}
         public void RunFinished(ITestResult testResults){if(Enabled)Mark("run-end","","UNAVAILABLE");}
         public void TestStarted(ITest test){if(Enabled&&!test.IsSuite)Mark("case-start",Key(test.FullName),"UNAVAILABLE");}
@@ -80,18 +86,18 @@ namespace Lottery.G3.PlayMode.Tests
             {
                 var source=Arg("-probeCommit");var reviewed=Arg("-probeReviewedCommit");var run=Arg("-probeRunId");var attempt=Arg("-probeRunAttempt");
                 if(!Regex.IsMatch(source,"^[0-9a-f]{40}$")||!Regex.IsMatch(reviewed,"^[0-9a-f]{40}$")||source==reviewed||!Regex.IsMatch(run,"^[1-9][0-9]*$")||!Regex.IsMatch(attempt,"^[1-9][0-9]*$"))throw new InvalidOperationException();
-                if(stage.StartsWith("case-",StringComparison.Ordinal)&&!CaseKeys.Contains(key))throw new InvalidOperationException();
+                if(stage.StartsWith("case-",StringComparison.Ordinal)&&(!CaseKeys.Contains(key)||(WorldKeys.Contains(key)!=(Shard=="world"))))throw new InvalidOperationException();
                 Receipt receipt;
                 if(File.Exists(PathName))
                 {
                     if(new FileInfo(PathName).Length>MaximumBytes)throw new InvalidOperationException();
                     receipt=JsonUtility.FromJson<Receipt>(File.ReadAllText(PathName));
-                    if(receipt==null||receipt.schemaVersion!=1||receipt.scope!=Scope||receipt.status!="MILESTONES_ONLY_NOT_TEST_PASS"||receipt.sourceCommit!=source||receipt.reviewedCandidateCommit!=reviewed||receipt.runId!=run||receipt.runAttempt!=attempt||receipt.events==null||receipt.events.Length==0||receipt.events[0].stage!="run-start")throw new InvalidOperationException();
+                    if(receipt==null||receipt.schemaVersion!=2||receipt.shard!=Shard||receipt.scope!=Scope||receipt.status!="MILESTONES_ONLY_NOT_TEST_PASS"||receipt.sourceCommit!=source||receipt.reviewedCandidateCommit!=reviewed||receipt.runId!=run||receipt.runAttempt!=attempt||receipt.events==null||receipt.events.Length==0||receipt.events[0].stage!="run-start")throw new InvalidOperationException();
                 }
                 else
                 {
                     if(stage!="run-start")throw new InvalidOperationException();
-                    receipt=new Receipt{sourceCommit=source,reviewedCandidateCommit=reviewed,runId=run,runAttempt=attempt,events=new Event[0]};
+                    receipt=new Receipt{shard=Shard,sourceCommit=source,reviewedCandidateCommit=reviewed,runId=run,runAttempt=attempt,events=new Event[0]};
                 }
                 var events=new List<Event>(receipt.events);
                 // Framework suite callbacks never add a second run-start record.
@@ -114,7 +120,7 @@ namespace Lottery.G3.PlayMode.Tests
         [Serializable] sealed class Event{public int sequence;public string stage,caseKey,result,utc;public long elapsedMs;}
         [Serializable] sealed class Receipt
         {
-            public int schemaVersion=1;public string scope=Scope,status="MILESTONES_ONLY_NOT_TEST_PASS",sourceCommit,reviewedCandidateCommit,runId,runAttempt;public Event[] events;
+            public int schemaVersion=2;public string shard,scope=Scope,status="MILESTONES_ONLY_NOT_TEST_PASS",sourceCommit,reviewedCandidateCommit,runId,runAttempt;public Event[] events;
         }
     }
 }

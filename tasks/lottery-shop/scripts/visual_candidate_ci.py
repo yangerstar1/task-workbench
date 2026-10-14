@@ -50,7 +50,7 @@ ORIGINAL_G3_CASE = "Lottery.G3.PlayMode.Tests.G3PlayTests.ActualUrpFramesShowOne
 ORIGINAL_G3_FILES = [name + ".png" for name in ORIGINAL_G3_FRAMES] + ["render-receipt.json"]
 HEX40 = re.compile(r"[0-9a-f]{40}\Z")
 HEX64 = re.compile(r"[0-9a-f]{64}\Z")
-STAGES = ("capture", "regression-edit", "regression-play")
+STAGES = ("capture", "regression-edit", "regression-play-core", "regression-play-world")
 
 
 def require(value, message):
@@ -150,7 +150,7 @@ def snapshot(root, after=False):
     # Hash committed project inputs only. No file contents or ProjectSettings
     # content is copied to evidence, and no runtime Library/Logs tree is scanned.
     names = git(root, "ls-files", "--", TASK + "/unity/Assets", TASK + "/unity/Packages",
-                TASK + "/unity/ProjectSettings", TASK + "/scripts", WORKFLOW, REQUEST).splitlines()
+                TASK + "/unity/ProjectSettings", TASK + "/scripts", TASK + "/ci", WORKFLOW).splitlines()
     records = []
     for name in sorted(names):
         path = root / name
@@ -167,6 +167,10 @@ def snapshot(root, after=False):
 
 
 def export_tests(root, stage):
+    if stage in ("regression-play-core", "regression-play-world"):
+        import play_split_ci
+        return play_split_ci.export(root, stage.removeprefix("regression-play-"))
+    require(stage in ("capture", "regression-edit"), "Unknown or legacy unsplit Play stage")
     source = root / TASK / "artifacts" / ("visual-candidate" if stage == "capture" else "visual-" + stage)
     target = outdir(root) / stage
     target.mkdir(parents=True, exist_ok=True)
@@ -369,15 +373,16 @@ def export_original_g3_captures(root):
     require(isinstance(prepared["preparedAtUtc"], str) and len(prepared["preparedAtUtc"]) <= 40, "Invalid original frame preparation timestamp")
     stamp = datetime.fromisoformat(prepared["preparedAtUtc"].replace("Z", "+00:00"))
     require(stamp.tzinfo is not None and stamp.utcoffset().total_seconds() == 0 and abs(stamp.timestamp() - prepared["preparedAtNs"] / 1e9) < 1, "Original frame preparation timestamp mismatch")
-    xml_path, unused = bounded.load_test_report(root / TASK / "artifacts/visual-regression-play")
+    import play_split_ci as split
+    xml_path = split.paths(root, "core")[0] / "playmode-results.xml"
     require(xml_path.stat().st_mtime_ns >= prepared["preparedAtNs"], "Stale original NUnit XML from an earlier attempt")
     # Re-read and screen the actual original NUnit XML using the unchanged exact
     # identities. A prior JSON saying Passed cannot substitute for native XML.
-    export_tests(root, "regression-play")
-    tests = read_json(outdir(root) / "regression-play/test-receipt.json")
-    expected_play_count = sum(len(cases) for contract in ("g2", "g3")
-                              for cases in read_json(root / TASK / ("ci/" + contract + "-test-contract.json"))["profiles"]["play"].values())
-    require(tests["allExpectedPassed"] is True and tests["expectedCases"] == expected_play_count, "Expanded exact PlayMode suite did not pass")
+    # The complete 37-case verdict is a two-process JSON aggregate. Frame
+    # acquisition is specifically bound to the 34-case core process XML.
+    summary = split.aggregate(root)
+    tests = split.inspect(root, "core")
+    require(summary["allExpectedPassed"] is True and tests["allExpectedPassed"] is True, "Exact split Play regression did not pass")
     case = [c for c in tests["cases"] if c["fullname"] == ORIGINAL_G3_CASE]
     require(len(case) == 1 and case[0]["result"] == "Passed", "Original G3 frame test did not pass")
     source = original_g3_source(root)
@@ -395,7 +400,8 @@ def export_original_g3_captures(root):
     write(destination / "export-receipt.json", dict(schemaVersion=1, scope=SCOPE,
           sourceCommit=ident["sourceCommit"], runId=ident["runId"], runAttempt=ident["runAttempt"],
           evidenceGroup="EXISTING_G3_14_FRAMES_SEPARATE_FROM_V19_23_FRAME_FIXTURE", originalCase=ORIGINAL_G3_CASE,
-          originalCaseResult="Passed", exactPlayModeCases=tests["expectedCases"], rawXmlSha256=tests["rawXmlSha256"],
+          originalCaseResult="Passed", exactPlayModeCases=summary["expectedCases"], frameOwningShard="core", frameOwningNativeCases=tests["expectedCases"],
+          splitSummarySha256=sha(outdir(root) / "regression-play-summary.json"), rawXmlSha256=tests["rawXmlSha256"],
           legacyReceiptSha256=sha(source / "render-receipt.json"), preparationReceiptSha256=sha(outdir(root) / "original-g3-preparation.json"),
           legacyReceiptRunAttempt="NOT_PRESENT_IN_LEGACY_SCHEMA", attemptBinding="FIXED_OUTPUTS_CLEARED_BEFORE_THIS_ATTEMPT_AND_RECREATED_AFTER_PREPARATION",
           mainDayFrames=ORIGINAL_G3_FRAMES[:-1], separateProtectedFixtureFrame="challenge-protected",
@@ -508,17 +514,21 @@ def export_progress(root):
         write(outdir(root) / "preparation-scenes.json", value)
 
 
-def regression_case_keys(root):
+def regression_case_keys(root, shard=None):
+    if shard is not None:
+        import play_split_ci as split
+        split.contract(root)
+        return {hashlib.sha256(name.encode("utf-8")).hexdigest() for name in split.names(shard)}
     contract = read_json(root / TASK / "ci/g3-test-contract.json")
     names = [name for profile in ("regression-play", "play") for cases in contract["profiles"][profile].values() for name in cases]
     require(len(names) == len(set(names)), "Duplicate regression progress contract identity")
     return {hashlib.sha256(name.encode("utf-8")).hexdigest() for name in names}
 
 
-def validate_regression_progress(value, ident, allowed_keys):
-    keys = {"schemaVersion", "scope", "sourceCommit", "reviewedCandidateCommit", "runId", "runAttempt", "status", "events"}
+def validate_regression_progress(value, ident, allowed_keys, shard):
+    keys = {"schemaVersion", "scope", "sourceCommit", "reviewedCandidateCommit", "runId", "runAttempt", "status", "events", "shard"}
     require(isinstance(value, dict) and set(value) == keys, "Unexpected regression progress fields")
-    require(type(value["schemaVersion"]) is int and value["schemaVersion"] == 1 and value["scope"] == SCOPE and value["status"] == "MILESTONES_ONLY_NOT_TEST_PASS", "Invalid regression progress schema/scope/status")
+    require(type(value["schemaVersion"]) is int and value["schemaVersion"] == 2 and value["scope"] == SCOPE and value["status"] == "MILESTONES_ONLY_NOT_TEST_PASS" and shard in ("core", "world") and value["shard"] == shard, "Invalid regression progress schema/scope/status")
     require(all(value[k] == ident[k] for k in ("sourceCommit", "reviewedCandidateCommit", "runId", "runAttempt")), "Regression progress identity mismatch")
     events = value["events"]
     require(isinstance(events, list) and 1 <= len(events) <= 128, "Regression progress event count exceeds bound")
@@ -555,22 +565,24 @@ def validate_regression_progress(value, ident, allowed_keys):
     return value
 
 
-def export_regression_progress(root):
+def export_regression_progress(root, shard):
+    import play_split_ci as split
     ident = identity(root)
-    source = root / TASK / "artifacts/visual-regression-play/test-progress.json"
-    destination = outdir(root) / "regression-play-progress.json"
+    source = split.paths(root, shard)[0] / "test-progress.json"
+    destination = outdir(root) / (split.PHASES[shard] + "-progress.json")
     if destination.exists(): destination.unlink()
     if not source.exists():
         return
-    value = validate_regression_progress(read_json(source, 65536), ident, regression_case_keys(root))
+    value = validate_regression_progress(read_json(source, 65536), ident, regression_case_keys(root, shard), shard)
     write(destination, value)
 
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("command", choices=("guard", "restore-font", "snapshot", "snapshot-after", "tests", "captures", "partial-captures", "progress", "regression-progress", "prepare-original-g3-captures", "original-g3-captures"))
+    parser.add_argument("command", choices=("guard", "restore-font", "snapshot", "snapshot-after", "tests", "captures", "partial-captures", "progress", "regression-progress", "play-summary", "prepare-original-g3-captures", "original-g3-captures"))
     parser.add_argument("--root", type=Path, default=Path(__file__).resolve().parents[3])
     parser.add_argument("--stage", choices=STAGES, default="capture")
+    parser.add_argument("--shard", choices=("core", "world"))
     args = parser.parse_args(); root = args.root.resolve()
     if args.command == "guard": guard(root)
     elif args.command == "restore-font":
@@ -580,7 +592,10 @@ def main():
     elif args.command == "prepare-original-g3-captures": prepare_original_g3_captures(root)
     elif args.command == "original-g3-captures": export_original_g3_captures(root)
     elif args.command == "progress": export_progress(root)
-    elif args.command == "regression-progress": export_regression_progress(root)
+    elif args.command == "regression-progress": export_regression_progress(root, args.shard)
+    elif args.command == "play-summary":
+        import play_split_ci
+        play_split_ci.aggregate(root)
     elif args.command == "tests": export_tests(root, args.stage)
     else: export_captures(root, require_complete=args.command == "captures")
 

@@ -20,7 +20,8 @@ class BoundaryTests(unittest.TestCase):
     def test_three_exact_pinned_project_argument_sets(self):
         sets = [('capture','playmode','visual-candidate','Lottery.G3.VisualCandidate.Tests'),
                 ('regression-edit','editmode','visual-regression-edit','Lottery.Probe.Tests;Lottery.G2.EditMode.Tests;Lottery.G3.EditMode.Tests'),
-                ('regression-play','playmode','visual-regression-play','Lottery.G2.PlayMode.Tests;Lottery.G3.PlayMode.Tests')]
+                ('regression-play-core','playmode','visual-regression-play-core','Lottery.G2.PlayMode.Tests;Lottery.G3.PlayMode.Tests'),
+                ('regression-play-world','playmode','visual-regression-world','Lottery.G2.PlayMode.Tests;Lottery.G3.PlayMode.Tests')]
         for phase,platform,folder,assemblies in sets:
             expected=['unity-editor','-batchmode','-logFile','/dev/stdout','-projectPath','/github/workspace/tasks/lottery-shop/unity',
                 '-coverageResultsPath','/github/workspace/CodeCoverage','-runTests','-testPlatform',platform,'-testResults',
@@ -28,8 +29,10 @@ class BoundaryTests(unittest.TestCase):
                 '-coverageOptions','generateAdditionalMetrics;generateHtmlReport;generateBadgeReport;dontClear','-assemblyNames',assemblies]
             if phase!='regression-edit':expected+=['-force-glcore','-screen-width','1280','-screen-height','720']
             expected+=['-job-worker-count','2','-probeCommit','1'*40,'-probeRunId','12345']
-            if phase in ('capture','regression-play'):expected+=['-probeRunAttempt','1']
-            if phase=='regression-play':expected+=['-g3RegressionProgress','1','-probeReviewedCommit','2'*40]
+            if phase == 'capture' or phase in safe.split.PHASES.values():expected+=['-probeRunAttempt','1']
+            if phase in safe.split.PHASES.values():
+                shard=phase.removeprefix('regression-play-')
+                expected+=['-g3RegressionProgress','1','-probeReviewedCommit','2'*40,'-g3RegressionShard',shard,'-testFilter',safe.split.selection(shard)]
             self.assertEqual(safe.project_argv(phase,IDENT),expected)
             for forbidden in ('-quit','-nographics','-executeMethod'):self.assertNotIn(forbidden,expected)
 
@@ -68,7 +71,7 @@ class BoundaryTests(unittest.TestCase):
         self.assertIn('group: unity-personal-proof',text);self.assertIn('timeout-minutes: 75',text)
         self.assertIn('safe_project_ci.py finish',text);self.assertIn('safe_project_ci.py capture',text)
         self.assertNotIn('continue-on-error',text)
-        self.assertIn('visual_candidate_ci.py tests --stage regression-edit',text);self.assertIn('visual_candidate_ci.py tests --stage regression-play',text)
+        self.assertIn('visual_candidate_ci.py tests --stage regression-edit',text);self.assertIn('visual_candidate_ci.py tests --stage regression-play-core',text);self.assertIn('visual_candidate_ci.py tests --stage regression-play-world',text)
         self.assertIn('visual_candidate_ci.py captures',text);self.assertIn('visual_candidate_ci.py snapshot-after',text)
         self.assertNotIn('*.log',text);self.assertNotIn('cat ',text);self.assertNotIn('*.xml',text)
 
@@ -127,16 +130,28 @@ class SessionTests(unittest.TestCase):
         self.cleanup.assert_called_once_with('lottery-visual-safe-12345-1')
         with patch.object(safe,'native') as native:self.assertEqual(safe.test(self.root,'regression-edit'),1);native.assert_not_called()
     def test_play_clears_only_fixed_old_progress_before_native_call(self):
-        artifacts = self.root/safe.private.TASK/'artifacts/visual-regression-play'; artifacts.mkdir(parents=True)
+        artifacts = self.root/safe.private.TASK/'artifacts/visual-regression-play-core'; artifacts.mkdir(parents=True)
         evidence = safe.visual.outdir(self.root); evidence.mkdir(parents=True, exist_ok=True)
-        fixed = [artifacts/'test-progress.json', evidence/'regression-play-progress.json']
+        fixed = [artifacts/'test-progress.json', evidence/'regression-play-core-progress.json']
         for p in fixed: p.write_text('SYNTHETIC_OLD_ATTEMPT')
         sibling = artifacts/'unrelated.txt'; sibling.write_text('KEEP')
         def native(*args):
             self.assertTrue(all(not p.exists() for p in fixed)); self.assertEqual(sibling.read_text(), 'KEEP')
             self.assertEqual(args[2], 480); self.assertIn('-g3RegressionProgress 1', args[1])
             self.successful(*args)
-        with patch.object(safe, 'native', side_effect=native): self.assertEqual(safe.test(self.root, 'regression-play'), 0)
+        with patch.object(safe, 'native', side_effect=native), patch.object(safe.split, 'contract'): self.assertEqual(safe.test(self.root, 'regression-play-core'), 0)
+
+    def test_world_clears_its_sidecar_but_preserves_core_evidence(self):
+        artifacts=self.root/safe.private.TASK/'artifacts/visual-regression-world';artifacts.mkdir(parents=True)
+        evidence=safe.visual.outdir(self.root);evidence.mkdir(parents=True,exist_ok=True)
+        fixed=[artifacts/'world-progress.jsonl',evidence/'world-progress.json',artifacts/'test-progress.json',evidence/'regression-play-world-progress.json']
+        for path in fixed:path.write_text('STALE')
+        keep=evidence/'regression-play-core-progress.json';keep.write_text('CORE')
+        def native(*args):
+            self.assertTrue(all(not p.exists() for p in fixed));self.assertEqual(keep.read_text(),'CORE')
+            self.assertIn('-g3RegressionShard world',args[1]);self.assertEqual(args[2],480);self.successful(*args)
+        with patch.object(safe,'native',side_effect=native),patch.object(safe.split,'contract'):
+            self.assertEqual(safe.test(self.root,'regression-play-world'),0)
 
     def test_phase_cannot_repeat_or_reactivate(self):
         with patch.object(safe,'native',side_effect=self.successful):self.assertEqual(safe.test(self.root,'capture'),0)
