@@ -108,6 +108,15 @@ namespace Lottery.G3.PlayMode.Tests
             }
             Snapshot before,worst;long pumpCalls,pumpTicks,diagnosticCalls,diagnosticTicks,started,resumed,worstWall,worstYield,worstResume;
             int pendingFrame,worstFrame,intervals;bool open,overflow,worstIncomplete;
+            long cpuBefore,cpuAfter,worstCpuTicks;bool worstCpuAvailable;
+            // Process CPU across the same yield: CPU work versus off-CPU waiting.
+            // TimeSpan ticks (10,000,000/s), NOT Stopwatch ticks. No process identity,
+            // paths, exception text, profiler stream or child-process data is exported.
+            static long ReadProcessCpuTicks()
+            {
+                try{using(var process=System.Diagnostics.Process.GetCurrentProcess())return process.TotalProcessorTime.Ticks;}
+                catch{return -1;}
+            }
             readonly int gcMax=System.Math.Min(2,System.GC.MaxGeneration);
             public WorldPhaseObservation(){G3SceneView.BeginPhaseCostObservation();}
             void Add(ref long target,long value)
@@ -124,14 +133,16 @@ namespace Lottery.G3.PlayMode.Tests
                     Overflow=overflow||glyph[4]!=0||input[6]!=0||scene.Overflow};
             }
             public void BeforeYield(int frame)
-            {before=Read();pendingFrame=frame;resumed=0;started=System.Diagnostics.Stopwatch.GetTimestamp();open=true;}
-            public void AfterYield(){if(open)resumed=System.Diagnostics.Stopwatch.GetTimestamp();}
+            {before=Read();pendingFrame=frame;resumed=0;cpuAfter=-1;cpuBefore=ReadProcessCpuTicks();started=System.Diagnostics.Stopwatch.GetTimestamp();open=true;}
+            public void AfterYield(){if(open){resumed=System.Diagnostics.Stopwatch.GetTimestamp();cpuAfter=ReadProcessCpuTicks();}}
             public void EndFrame(bool incomplete=false)
             {
                 if(!open)return;long ended=System.Diagnostics.Stopwatch.GetTimestamp();open=false;var after=Read();
                 long wall=Bound(ended-started);intervals++;
                 if(worstFrame!=0&&wall<=worstWall)return;
                 worstFrame=pendingFrame;worstWall=wall;worstIncomplete=incomplete||resumed==0;
+                worstCpuAvailable=resumed!=0&&cpuBefore>=0&&cpuAfter>=cpuBefore&&cpuAfter-cpuBefore<=Limit;
+                worstCpuTicks=worstCpuAvailable?cpuAfter-cpuBefore:0;
                 worstYield=Bound((resumed==0?ended:resumed)-started);worstResume=resumed==0?0:Bound(ended-resumed);
                 worst=new Snapshot{PumpCalls=Bound(after.PumpCalls-before.PumpCalls),PumpTicks=Bound(after.PumpTicks-before.PumpTicks),
                     DiagnosticCalls=Bound(after.DiagnosticCalls-before.DiagnosticCalls),DiagnosticTicks=Bound(after.DiagnosticTicks-before.DiagnosticTicks),
@@ -149,7 +160,7 @@ namespace Lottery.G3.PlayMode.Tests
                 " glyphCalls="+N(worst.GlyphCalls)+" glyphTicks="+N(worst.GlyphTicks)+" atlasNotifications="+N(worst.Atlas)+
                 " updateCalls="+N(worst.UpdateCalls)+" updateTicks="+N(worst.UpdateTicks)+" showCalls="+N(worst.ShowCalls)+" showTicks="+N(worst.ShowTicks)+
                 " gcMax="+N(gcMax)+" gc0="+N(worst.Gc0)+" gc1="+N(worst.Gc1)+" gc2="+N(worst.Gc2)+
-                " incomplete="+(worstIncomplete?"1":"0")+" overflow="+(overflow||worst.Overflow?"1":"0");
+                " incomplete="+(worstIncomplete?"1":"0")+" overflow="+(overflow||worst.Overflow?"1":"0")+" cpuAvailable="+(worstCpuAvailable?"1":"0")+" processCpuTicks="+N(worstCpuTicks);
             public void End(){G3SceneView.EndPhaseCostObservation();}
         }
         sealed class WorldWalkObservation
@@ -427,3 +438,4 @@ namespace Lottery.G3.PlayMode.Tests
         }
     }
 }
+

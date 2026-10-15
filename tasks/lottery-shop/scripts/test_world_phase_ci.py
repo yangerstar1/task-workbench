@@ -7,7 +7,7 @@ import world_progress_ci as world
 from test_world_progress_ci import record, route, ray, encode, IDENT, KEY, SEGMENT
 
 FIELDS = ('frequency intervals frame wallTicks yieldTicks resumeTicks pumpCalls pumpTicks diagnosticCalls diagnosticTicks pollCalls pollTicks '
-          'glyphCalls glyphTicks atlasNotifications updateCalls updateTicks showCalls showTicks gcMax gc0 gc1 gc2 incomplete overflow').split()
+          'glyphCalls glyphTicks atlasNotifications updateCalls updateTicks showCalls showTicks gcMax gc0 gc1 gc2 incomplete overflow cpuAvailable processCpuTicks').split()
 
 def phase(segment=SEGMENT, **updates):
     v = dict.fromkeys(FIELDS, 0)
@@ -23,6 +23,12 @@ def rows(sample=None, end='ABORTED', frames=1):
 
 class WorldPhaseTests(unittest.TestCase):
     def check(self, values):return world.decode_records(encode(values), IDENT)
+    def test_cpu_extension_and_legacy_records(self):
+        self.check(rows(phase(cpuAvailable=1,processCpuTicks=1200000000)))
+        self.check(rows(phase(cpuAvailable=1,processCpuTicks=0)))
+        self.check(rows(phase().replace(" cpuAvailable=0 processCpuTicks=0", "")))
+        for sample in (phase(cpuAvailable=0,processCpuTicks=1),phase(cpuAvailable=2),phase(processCpuTicks=-1),phase(processCpuTicks=1000000000000001),phase()+" processCpuTicks=0"):
+            with self.subTest(sample=sample),self.assertRaises(ValueError):self.check(rows(sample))
     def test_positive_native_shaped_record(self):
         data=rows();got=self.check(data)
         self.assertEqual(got['observations'],data)
@@ -93,3 +99,4 @@ class WorldPhaseTests(unittest.TestCase):
         self.assertEqual(actual,FIELDS)
 
 if __name__=='__main__':unittest.main(verbosity=2)
+
