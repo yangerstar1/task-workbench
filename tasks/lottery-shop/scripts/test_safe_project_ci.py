@@ -163,6 +163,11 @@ class StartTests(unittest.TestCase):
             self.assertEqual(len(calls),2);self.assertEqual(safe.session(root,IDENT)['status'],'READY')
             for key, field in zip(safe.OWNER_LABELS,safe.OWNER_FIELDS):self.assertIn(key+'='+IDENT[field],calls[1])
             self.assertNotIn('--pid',calls[1]);self.assertNotIn('--privileged',calls[1])
+            # Public ubuntu-24.04 has four vCPUs; keep a fixed bounded
+            # quota while retaining the existing memory/worker limits.
+            self.assertEqual([x for x in calls[1] if x.startswith('--cpus')],['--cpus=4'])
+            self.assertEqual([x for x in calls[1] if x.startswith('--memory')],['--memory=12g'])
+            self.assertFalse(any(x.startswith(('--gpus','--device')) for x in calls[1]))
             self.assertNotIn('synthetic-private',safe.file(root,'start').read_text())
     def test_first_activation_failure_blocks_and_cleans_without_retry(self):
         with tempfile.TemporaryDirectory() as directory:

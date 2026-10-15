@@ -285,7 +285,7 @@ def start(root):
         private.require(code == 0, 'IMAGE_PULL_FAILED')
         env = dict(os.environ); env['UNITY_SERIAL'] = private.derive_serial(env.pop('UNITY_LICENSE', ''))
         private.require(all(env.get(k) and len(env[k]) <= 4096 for k in ('UNITY_EMAIL', 'UNITY_PASSWORD')), 'INPUT_REJECTED')
-        command = ['docker', 'run', '--detach', '--rm', '--log-driver=none', '--name', name(ident), '--cpus=2', '--memory=12g',
+        command = ['docker', 'run', '--detach', '--rm', '--log-driver=none', '--name', name(ident), '--cpus=4', '--memory=12g',
                    *[item for key, field in zip(OWNER_LABELS, OWNER_FIELDS) for item in ('--label', key + '=' + ident[field])],
                    '--workdir', '/github/workspace', '--env', 'UNITY_SERIAL', '--env', 'UNITY_EMAIL', '--env', 'UNITY_PASSWORD',
                    '--volume', str(root) + ':/github/workspace',

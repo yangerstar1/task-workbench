@@ -16,7 +16,7 @@ namespace Lottery.G3.Interaction
         [Serializable] public sealed class LayoutData { public Anchor[] anchors; public CollisionBox[] colliders;public float ticketWidth=.4f;public bool requiresUnityXReflection; }
         readonly List<Light> practicals=new List<Light>();readonly HashSet<Material> instantiatedMaterials=new HashSet<Material>();readonly Dictionary<Material,Color> authoredWindowColors=new Dictionary<Material,Color>();
         Light daylight; LayoutData layout; bool? night; GameObject art;
-        Material exteriorMaterial;Texture2D exteriorDay,exteriorNight;Mesh exteriorNearMesh,tableContactMesh;
+        Material exteriorMaterial;Texture2D exteriorDay,exteriorNight;Mesh exteriorNearMesh,tableContactMesh,furnitureContactMesh;
         ReflectionProbe roomReflection;bool capturedLighting,bakingReflection;
         Cubemap dayReflection,nightReflection;
         public const string ReflectionRecipe="G3_SHOP_STATIC_REFLECTION_V2";
@@ -128,7 +128,7 @@ namespace Lottery.G3.Interaction
             roomReflection.boxProjection=true;roomReflection.shadowDistance=12;roomReflection.nearClipPlane=.08f;roomReflection.farClipPlane=12;roomReflection.intensity=.85f;
             // Only authored room geometry enters reflections, never camera-attached HUD.
             roomReflection.cullingMask=1<<(bakingReflection?ReflectionBakeLayer:ReflectionGeometryLayer);roomReflection.clearFlags=ReflectionProbeClearFlags.SolidColor;
-            BuildExteriorDepth();BuildTableContactShades();SetNight(false);Physics.SyncTransforms();
+            BuildExteriorDepth();BuildTableContactShades();BuildFurnitureContactShades();SetNight(false);Physics.SyncTransforms();
         }
         void BuildTableContactShades()
         {
@@ -148,6 +148,67 @@ namespace Lottery.G3.Interaction
             var go=new GameObject("Subtle contact beneath authored tool pads");go.transform.SetParent(transform,false);go.layer=bakingReflection?ReflectionBakeLayer:ReflectionGeometryLayer;
             go.AddComponent<MeshFilter>().sharedMesh=tableContactMesh;var renderer=go.AddComponent<MeshRenderer>();renderer.sharedMaterial=material;
             renderer.shadowCastingMode=ShadowCastingMode.Off;renderer.receiveShadows=false;
+        }
+        void BuildFurnitureContactShades()
+        {
+            // The visible terrazzo is above the y=0 collision substrate. Read its
+            // imported mesh bounds, in environment space, rather than the collider.
+            // Fixed FBX 8c37ca30: all 90 Warm_Terrazzo meshes are floor tiles;
+            // their measured top is .02250005 m. No extra floor renderer is made.
+            var floor=art.GetComponentsInChildren<MeshFilter>().FirstOrDefault(f=>f.name=="Warm_Terrazzo"&&f.sharedMesh!=null);
+            if(floor==null){Debug.LogWarning("Furniture contact skipped: imported terrazzo mesh missing");return;}
+            var bounds=floor.sharedMesh.bounds;var matrix=transform.worldToLocalMatrix*floor.transform.localToWorldMatrix;
+            float top=float.NegativeInfinity;
+            for(int i=0;i<8;i++)
+            {
+                var corner=bounds.center+Vector3.Scale(bounds.extents,new Vector3((i&1)==0?-1:1,(i&2)==0?-1:1,(i&4)==0?-1:1));
+                top=Mathf.Max(top,matrix.MultiplyPoint3x4(corner).y);
+            }
+            // A changed material grouping must be reviewed, never shade a guessed plane.
+            if(float.IsNaN(top)||float.IsInfinity(top)||Mathf.Abs(top-.0225f)>.001f)
+            {Debug.LogWarning("Furniture contact skipped: imported terrazzo height changed");return;}
+            float y=top+.0015f;
+            var shader=Resources.Load<Shader>("G3/Shop/ContactShade");
+            if(shader==null)throw new InvalidOperationException("Missing local contact presentation shader");
+            var vertices=new List<Vector3>();var uv=new List<Vector2>();var indices=new List<int>();
+            // XZ footprints are measured at the actual tile top in the fixed FBX,
+            // not the full-height decorative bounding boxes or interaction proxies.
+            // Hollow rims leave no second dark slab under a cabinet; each corner
+            // belongs to just one surface. Rim reaches 4.5 cm outside the footprint.
+            AddFurnitureContactRim(vertices,uv,indices,new Vector3(.7f,y,-1.86f),new Vector2(2.5996f,.6796f));
+            // Showcase rounded corners need >=3.515 mm inset at this height;
+            // 5 mm hides the full-alpha inner edge with 1.485 mm clearance.
+            AddFurnitureContactRim(vertices,uv,indices,new Vector3(2.13f,y,-.32f),new Vector2(.98f,2.05f),.005f);
+            AddFurnitureContactRim(vertices,uv,indices,new Vector3(-2.19f,y,-2.25f),new Vector2(1.20202f,.56202f));
+            // Four authored Desk_Tapered_Leg sections are .080127 m square here.
+            // .134 m quads with _Inner=.6 place the fade at that section: ~2.7 cm rim.
+            foreach(float x in new[]{-1.2338815f,-2.8161185f})foreach(float z in new[]{.55f,-.69f})
+            {
+                var p=new Vector3(x,y,z);int n=vertices.Count;const float h=.067f;
+                vertices.AddRange(new[]{p+new Vector3(-h,0,-h),p+new Vector3(h,0,-h),p+new Vector3(h,0,h),p+new Vector3(-h,0,h)});
+                uv.AddRange(new[]{Vector2.zero,Vector2.right,Vector2.one,Vector2.up});indices.AddRange(new[]{n,n+2,n+1,n,n+3,n+2});
+            }
+            furnitureContactMesh=new Mesh{name="Three cabinet rims and four leg contacts"};
+            furnitureContactMesh.SetVertices(vertices);furnitureContactMesh.SetUVs(0,uv);furnitureContactMesh.SetTriangles(indices,0);
+            furnitureContactMesh.RecalculateBounds();furnitureContactMesh.RecalculateNormals();
+            // Separate owned material keeps the existing table-pad material/shader
+            // settings intact. Low alpha complements existing real light shadows.
+            var material=new Material(shader){name="Subtle furniture floor contact"};
+            material.SetColor("_Color",new Color(.035f,.04f,.032f,.14f));material.SetVector("_Inner",new Vector4(.6f,.6f,0,0));instantiatedMaterials.Add(material);
+            var go=new GameObject("Subtle contact beneath authored furniture");go.transform.SetParent(transform,false);go.layer=bakingReflection?ReflectionBakeLayer:ReflectionGeometryLayer;
+            go.AddComponent<MeshFilter>().sharedMesh=furnitureContactMesh;var renderer=go.AddComponent<MeshRenderer>();renderer.sharedMaterial=material;
+            renderer.shadowCastingMode=ShadowCastingMode.Off;renderer.receiveShadows=false;
+            renderer.lightProbeUsage=LightProbeUsage.Off;renderer.reflectionProbeUsage=ReflectionProbeUsage.Off;
+        }
+        static void AddFurnitureContactRim(List<Vector3> vertices,List<Vector2> uv,List<int> indices,Vector3 center,Vector2 footprint,float innerInset=.002f)
+        {
+            int n=vertices.Count;var outer=footprint*.5f+Vector2.one*.045f;var inner=footprint*.5f-Vector2.one*innerInset;
+            // Outer then inner loop; inner UV .2/.8 corresponds to _Inner=.6.
+            // Four disjoint trapezoids share edges, so their alpha never stacks.
+            foreach(var half in new[]{outer,inner})
+                vertices.AddRange(new[]{center+new Vector3(-half.x,0,-half.y),center+new Vector3(half.x,0,-half.y),center+new Vector3(half.x,0,half.y),center+new Vector3(-half.x,0,half.y)});
+            uv.AddRange(new[]{Vector2.zero,Vector2.right,Vector2.one,Vector2.up,new Vector2(.2f,.2f),new Vector2(.8f,.2f),new Vector2(.8f,.8f),new Vector2(.2f,.8f)});
+            for(int i=0;i<4;i++){int j=(i+1)%4;indices.AddRange(new[]{n+i,n+4+j,n+j,n+i,n+4+i,n+4+j});}
         }
         // V19 presentation-only depth; no colliders, interaction targets or Update loop.
         void BuildExteriorDepth()
@@ -285,6 +346,7 @@ namespace Lottery.G3.Interaction
             foreach(var material in instantiatedMaterials)if(material!=null)ReleaseOwned(material);
             if(exteriorNearMesh!=null)ReleaseOwned(exteriorNearMesh);
             if(tableContactMesh!=null)ReleaseOwned(tableContactMesh);
+            if(furnitureContactMesh!=null)ReleaseOwned(furnitureContactMesh);
             if(runtimePipeline!=null){if(QualitySettings.renderPipeline==runtimePipeline)QualitySettings.renderPipeline=priorPipeline;ReleaseOwned(runtimePipeline);}
             // A disabled menu can outlive the newer gameplay environment. It must
             // never restore its old snapshot over another environment's lighting.
