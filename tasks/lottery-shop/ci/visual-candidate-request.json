@@ -1,14 +1,22 @@
 {
-  "schemaVersion": 2,
-  "requestId": "lottery-visual-20261015-43",
-  "sourceCommit": "b8bbfb0f851a98459d68c4d83fe8ff17d515e9f0",
+  "schemaVersion": 3,
+  "requestId": "lottery-visual-20261015-44",
+  "sourceCommit": "0890cc0c7e3ab65c981f64dd8fa5e0dd1d744abe",
   "purpose": "DIAGNOSTIC_VISUAL_CANDIDATE_NOT_G3_PASS",
   "sourceReview": {
-    "sourceCommit": "b8bbfb0f851a98459d68c4d83fe8ff17d515e9f0",
+    "sourceCommit": "0890cc0c7e3ab65c981f64dd8fa5e0dd1d744abe",
     "status": "APPROVED_FOR_DIAGNOSTIC_CAPTURE_ONLY",
-    "reviewId": "visual-source-20261015-55",
+    "reviewId": "visual-source-20261015-56",
     "reviewer": "independent-source-review",
-    "reviewedAtUtc": "2026-10-15T13:10:05Z"
+    "reviewedAtUtc": "2026-10-15T13:39:24Z"
   },
-  "executionProfile": "ART_ONLY_DIAGNOSTIC"
+  "executionProfile": "FULL_DIAGNOSTIC",
+  "androidBuild": "DEVELOPMENT_CANDIDATE_APK",
+  "androidReview": {
+    "sourceCommit": "0890cc0c7e3ab65c981f64dd8fa5e0dd1d744abe",
+    "status": "APPROVED_FOR_DIAGNOSTIC_ANDROID_ONLY",
+    "reviewId": "android-source-20261015-56",
+    "reviewer": "independent-source-review",
+    "reviewedAtUtc": "2026-10-15T13:39:24Z"
+  }
 }
