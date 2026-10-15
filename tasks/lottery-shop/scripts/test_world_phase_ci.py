@@ -7,7 +7,7 @@ import world_progress_ci as world
 from test_world_progress_ci import record, route, ray, encode, IDENT, KEY, SEGMENT
 
 FIELDS = ('frequency intervals frame wallTicks yieldTicks resumeTicks pumpCalls pumpTicks diagnosticCalls diagnosticTicks pollCalls pollTicks '
-          'glyphCalls glyphTicks atlasNotifications updateCalls updateTicks showCalls showTicks gcMax gc0 gc1 gc2 incomplete overflow cpuAvailable processCpuTicks').split()
+          'glyphCalls glyphTicks atlasNotifications updateCalls updateTicks showCalls showTicks gcMax gc0 gc1 gc2 incomplete overflow cpuAvailable processCpuTicks shaderAvailable shaderNs shaderCalls shaderSaturated').split()
 
 def phase(segment=SEGMENT, **updates):
     v = dict.fromkeys(FIELDS, 0)
@@ -29,6 +29,30 @@ class WorldPhaseTests(unittest.TestCase):
         self.check(rows(phase().replace(" cpuAvailable=0 processCpuTicks=0", "")))
         for sample in (phase(cpuAvailable=0,processCpuTicks=1),phase(cpuAvailable=2),phase(processCpuTicks=-1),phase(processCpuTicks=1000000000000001),phase()+" processCpuTicks=0"):
             with self.subTest(sample=sample),self.assertRaises(ValueError):self.check(rows(sample))
+    def test_shader_extension_unknown_complete_saturated_and_legacy(self):
+        self.check(rows(phase(shaderAvailable=1,shaderNs=62000000000,shaderCalls=1)))
+        self.check(rows(phase(shaderAvailable=1)))
+        self.check(rows(phase(shaderAvailable=1,shaderNs=1000000000000000,shaderCalls=64,shaderSaturated=1)))
+        self.check(rows(phase().replace(" shaderAvailable=0 shaderNs=0 shaderCalls=0 shaderSaturated=0", "")))
+        for sample in (phase(shaderNs=1),phase(shaderCalls=1),phase(shaderSaturated=1),phase(shaderAvailable=2),
+                       phase(shaderAvailable=1,shaderNs=1),phase(shaderAvailable=1,shaderCalls=65,shaderSaturated=1),
+                       phase(shaderAvailable=1,shaderCalls=64),phase(shaderAvailable=1,shaderNs=-1,shaderCalls=1),
+                       phase(shaderAvailable=1,shaderNs=1000000000000001,shaderCalls=1),phase(incomplete=1,shaderAvailable=1),
+                       phase()+" shaderNs=0",phase().replace("shaderNs=0", "shaderNs=SECRET")):
+            with self.subTest(sample=sample),self.assertRaises(ValueError):self.check(rows(sample))
+    def test_shader_recorder_is_single_bounded_and_same_worst_interval(self):
+        source=(Path(__file__).resolve().parents[3]/'tasks/lottery-shop/unity/Assets/G3/Tests/PlayMode/G3WorldInteractionTests.cs').read_text()
+        self.assertEqual(source.count('"Shader.CreateGPUProgram"'),1)
+        self.assertIn('const int ShaderCapacity=64;',source)
+        self.assertIn('Unity.Profiling.ProfilerRecorderOptions.None',source)
+        self.assertIn('Unity.Profiling.ProfilerMarkerDataUnit.TimeNanoseconds',source)
+        self.assertIn('shaderRecorder.Reset();shaderRecorder.Start();',source)
+        self.assertIn('shaderRecorder.Stop();',source)
+        self.assertIn('shaderRecorder.Dispose();',source)
+        self.assertIn('worstShader=worstIncomplete?default:currentShader;',source)
+        self.assertLess(source.index('if(worstFrame!=0&&wall<=worstWall)return;'),source.index('worstShader=worstIncomplete?default:currentShader;'))
+        self.assertNotIn('GetAvailable(',source)
+        self.assertNotIn('Shader.Warmup',source)
     def test_positive_native_shaped_record(self):
         data=rows();got=self.check(data)
         self.assertEqual(got['observations'],data)
@@ -95,7 +119,7 @@ class WorldPhaseTests(unittest.TestCase):
         body=source[begin:source.index('// Arrival on a slow frame',begin)]
         self.assertLess(body.index('sample.Observe('),body.index('WriteWorldDiagnostic(WorldWalkDiagnostic(sample,"SAMPLE"))'))
         self.assertLess(body.index('WriteWorldDiagnostic(WorldWalkDiagnostic(sample,"SAMPLE"))'),body.index('activeWorldPhase?.EndFrame()'))
-        actual=re.findall(r'" ([A-Za-z0-9]+)="',source[source.index('public string Summary(string segment)'):source.index('public void End(){G3SceneView')])
+        actual=re.findall(r'" ([A-Za-z0-9]+)="',source[source.index('public string Summary(string segment)'):source.index('public void End(){try{EndShaderObservation();}')])
         self.assertEqual(actual,FIELDS)
 
 if __name__=='__main__':unittest.main(verbosity=2)

@@ -117,8 +117,59 @@ namespace Lottery.G3.PlayMode.Tests
                 try{using(var process=System.Diagnostics.Process.GetCurrentProcess())return process.TotalProcessorTime.Ticks;}
                 catch{return -1;}
             }
+            // A single fixed native marker, all threads, individual completed samples.
+            // No frame aggregation, ring overwrite, GPU timer, stream or marker metadata.
+            const int ShaderCapacity=64;
+            Unity.Profiling.ProfilerRecorder shaderRecorder;
+            bool shaderReady;
+            struct ShaderSample {public bool Available,Saturated;public long Ns,Calls;}
+            ShaderSample currentShader,worstShader;
+            void InitializeShaderObservation()
+            {
+                try
+                {
+                    shaderRecorder=new Unity.Profiling.ProfilerRecorder("Shader.CreateGPUProgram",ShaderCapacity,Unity.Profiling.ProfilerRecorderOptions.None);
+                    shaderReady=shaderRecorder.Valid&&shaderRecorder.UnitType==Unity.Profiling.ProfilerMarkerDataUnit.TimeNanoseconds;
+                }
+                catch{shaderReady=false;}
+            }
+            void BeforeShaderYield()
+            {
+                currentShader=default;
+                if(!shaderReady)return;
+                try{shaderRecorder.Reset();shaderRecorder.Start();shaderReady=shaderRecorder.IsRunning;}
+                catch{shaderReady=false;}
+            }
+            void AfterShaderYield()
+            {
+                if(!shaderReady)return;
+                try
+                {
+                    shaderRecorder.Stop();
+                    if(!shaderRecorder.Valid||shaderRecorder.UnitType!=Unity.Profiling.ProfilerMarkerDataUnit.TimeNanoseconds)return;
+                    int count=shaderRecorder.Count;
+                    if(count<0||count>ShaderCapacity)return;
+                    var sample=new ShaderSample{Available=true,Saturated=count==ShaderCapacity||shaderRecorder.WrappedAround};
+                    for(int i=0;i<count;i++)
+                    {
+                        var value=shaderRecorder.GetSample(i);
+                        // None collects individual marker invocations, not frame aggregates.
+                        // Unexpected sample shape is UNKNOWN, never a negative finding.
+                        if(value.Value<0||value.Count!=1)return;
+                        if(value.Value>Limit||sample.Ns>Limit-value.Value){sample.Ns=Limit;sample.Saturated=true;}
+                        else sample.Ns+=value.Value;
+                        sample.Calls++;
+                    }
+                    currentShader=sample;
+                }
+                catch{shaderReady=false;currentShader=default;}
+            }
+            void EndShaderObservation()
+            {
+                try{shaderRecorder.Dispose();}catch{shaderReady=false;}
+            }
             readonly int gcMax=System.Math.Min(2,System.GC.MaxGeneration);
-            public WorldPhaseObservation(){G3SceneView.BeginPhaseCostObservation();}
+            public WorldPhaseObservation(){G3SceneView.BeginPhaseCostObservation();InitializeShaderObservation();}
             void Add(ref long target,long value)
             {if(value<0||value>Limit||target>Limit-value){target=Limit;overflow=true;}else target+=value;}
             long Bound(long value){if(value<0||value>Limit){overflow=true;return System.Math.Max(0,System.Math.Min(Limit,value));}return value;}
@@ -133,8 +184,8 @@ namespace Lottery.G3.PlayMode.Tests
                     Overflow=overflow||glyph[4]!=0||input[6]!=0||scene.Overflow};
             }
             public void BeforeYield(int frame)
-            {before=Read();pendingFrame=frame;resumed=0;cpuAfter=-1;cpuBefore=ReadProcessCpuTicks();started=System.Diagnostics.Stopwatch.GetTimestamp();open=true;}
-            public void AfterYield(){if(open){resumed=System.Diagnostics.Stopwatch.GetTimestamp();cpuAfter=ReadProcessCpuTicks();}}
+            {before=Read();pendingFrame=frame;resumed=0;cpuAfter=-1;cpuBefore=ReadProcessCpuTicks();BeforeShaderYield();started=System.Diagnostics.Stopwatch.GetTimestamp();open=true;}
+            public void AfterYield(){if(open){resumed=System.Diagnostics.Stopwatch.GetTimestamp();AfterShaderYield();cpuAfter=ReadProcessCpuTicks();}}
             public void EndFrame(bool incomplete=false)
             {
                 if(!open)return;long ended=System.Diagnostics.Stopwatch.GetTimestamp();open=false;var after=Read();
@@ -143,6 +194,7 @@ namespace Lottery.G3.PlayMode.Tests
                 worstFrame=pendingFrame;worstWall=wall;worstIncomplete=incomplete||resumed==0;
                 worstCpuAvailable=resumed!=0&&cpuBefore>=0&&cpuAfter>=cpuBefore&&cpuAfter-cpuBefore<=Limit;
                 worstCpuTicks=worstCpuAvailable?cpuAfter-cpuBefore:0;
+                worstShader=worstIncomplete?default:currentShader;
                 worstYield=Bound((resumed==0?ended:resumed)-started);worstResume=resumed==0?0:Bound(ended-resumed);
                 worst=new Snapshot{PumpCalls=Bound(after.PumpCalls-before.PumpCalls),PumpTicks=Bound(after.PumpTicks-before.PumpTicks),
                     DiagnosticCalls=Bound(after.DiagnosticCalls-before.DiagnosticCalls),DiagnosticTicks=Bound(after.DiagnosticTicks-before.DiagnosticTicks),
@@ -160,8 +212,9 @@ namespace Lottery.G3.PlayMode.Tests
                 " glyphCalls="+N(worst.GlyphCalls)+" glyphTicks="+N(worst.GlyphTicks)+" atlasNotifications="+N(worst.Atlas)+
                 " updateCalls="+N(worst.UpdateCalls)+" updateTicks="+N(worst.UpdateTicks)+" showCalls="+N(worst.ShowCalls)+" showTicks="+N(worst.ShowTicks)+
                 " gcMax="+N(gcMax)+" gc0="+N(worst.Gc0)+" gc1="+N(worst.Gc1)+" gc2="+N(worst.Gc2)+
-                " incomplete="+(worstIncomplete?"1":"0")+" overflow="+(overflow||worst.Overflow?"1":"0")+" cpuAvailable="+(worstCpuAvailable?"1":"0")+" processCpuTicks="+N(worstCpuTicks);
-            public void End(){G3SceneView.EndPhaseCostObservation();}
+                " incomplete="+(worstIncomplete?"1":"0")+" overflow="+(overflow||worst.Overflow?"1":"0")+" cpuAvailable="+(worstCpuAvailable?"1":"0")+" processCpuTicks="+N(worstCpuTicks)+
+                " shaderAvailable="+(worstShader.Available?"1":"0")+" shaderNs="+N(worstShader.Ns)+" shaderCalls="+N(worstShader.Calls)+" shaderSaturated="+(worstShader.Saturated?"1":"0");
+            public void End(){try{EndShaderObservation();}finally{G3SceneView.EndPhaseCostObservation();}}
         }
         sealed class WorldWalkObservation
         {
