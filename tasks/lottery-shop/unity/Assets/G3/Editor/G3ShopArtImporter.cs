@@ -332,6 +332,7 @@ namespace Lottery.G3.Editor
             if(anchors.requiresUnityXReflection)throw new InvalidOperationException("Shop manifest still requests the superseded X reflection");
             var instance=UnityEngine.Object.Instantiate(source);
             var mirroredMeshes=new Dictionary<Mesh,Mesh>();var backwallMeshes=new List<Mesh>();var farLeafMeshes=new List<Mesh>();
+            var displayGlassGroups=new HashSet<string>(StringComparer.Ordinal);
             var root=new GameObject(outputName);var groups=new Dictionary<string,List<CombineInstance>>();var materials=new Dictionary<string,Material>();int transparent=0;
             try
             {
@@ -356,6 +357,14 @@ namespace Lottery.G3.Editor
                             material=AssetDatabase.LoadAssetAtPath<Material>(Root+"/Materials/Tool_Dock_Liner.mat")??throw new InvalidOperationException("Missing dock liner material");
                         RequireRendererMaterial(material,owned,trace,38);
                         string key=material.name+(material.renderQueue>=(int)RenderQueue.Transparent?"_glass_"+(transparent++):"");
+                        // Preserve generated mesh keys/paths. Only the four display panes
+                        // get a prefab object marker; entrance/window glazing is untouched.
+                        if(validateRoom&&IsDisplayCaseGlass(filter.name))
+                        {
+                            if(material.name!="Glass_Clear"||material.renderQueue!=(int)RenderQueue.Transparent)
+                                throw new InvalidOperationException("Display-case pane requires authored clear glass");
+                            displayGlassGroups.Add(key);
+                        }
                         if(!groups.ContainsKey(key)){groups[key]=new List<CombineInstance>();materials[key]=material;}
                         var matrix=filter.transform.localToWorldMatrix;var mesh=filter.sharedMesh;
                         if(matrix.determinant<0)
@@ -375,12 +384,14 @@ namespace Lottery.G3.Editor
                         groups[key].Add(new CombineInstance{mesh=mesh,subMeshIndex=sub,transform=matrix});
                     }
                 }
+                if(validateRoom&&displayGlassGroups.Count!=4)
+                    throw new InvalidOperationException("Expected exactly four authored display-case panes");
                 if(validateRoom)AddBackwallDisplay(groups,backwallMeshes);
                 foreach(var pair in groups)
                 {
                     string path=generated+"/"+outputName+"_"+pair.Key+".asset";var mesh=AssetDatabase.LoadAssetAtPath<Mesh>(path);if(mesh==null){mesh=new Mesh();AssetDatabase.CreateAsset(mesh,path);}else mesh.Clear();
                     mesh.name="Static shop "+pair.Key;mesh.indexFormat=IndexFormat.UInt32;mesh.CombineMeshes(pair.Value.ToArray(),true,true);AlignWindingWithAuthoredNormals(mesh);mesh.RecalculateBounds();mesh.RecalculateTangents();EditorUtility.SetDirty(mesh);
-                    var go=new GameObject(pair.Key);go.transform.SetParent(root.transform,false);go.AddComponent<MeshFilter>().sharedMesh=mesh;var renderer=go.AddComponent<MeshRenderer>();renderer.sharedMaterial=materials[pair.Key];renderer.receiveShadows=true;renderer.shadowCastingMode=materials[pair.Key].renderQueue>=(int)RenderQueue.Transparent?ShadowCastingMode.Off:ShadowCastingMode.On;
+                    var go=new GameObject(displayGlassGroups.Contains(pair.Key)?"DisplayCase_"+pair.Key:pair.Key);go.transform.SetParent(root.transform,false);go.AddComponent<MeshFilter>().sharedMesh=mesh;var renderer=go.AddComponent<MeshRenderer>();renderer.sharedMaterial=materials[pair.Key];renderer.receiveShadows=true;renderer.shadowCastingMode=materials[pair.Key].renderQueue>=(int)RenderQueue.Transparent?ShadowCastingMode.Off:ShadowCastingMode.On;
                 }
                 string prefabPath=Root+"/"+outputName+".prefab";
                 PrefabUtility.SaveAsPrefabAsset(root,prefabPath);AssetDatabase.SaveAssets();
@@ -390,6 +401,7 @@ namespace Lottery.G3.Editor
             }
             finally{foreach(var mesh in farLeafMeshes)UnityEngine.Object.DestroyImmediate(mesh);foreach(var mesh in backwallMeshes)UnityEngine.Object.DestroyImmediate(mesh);foreach(var mesh in mirroredMeshes.Values)UnityEngine.Object.DestroyImmediate(mesh);UnityEngine.Object.DestroyImmediate(instance);UnityEngine.Object.DestroyImmediate(root);}
         }
+        static bool IsDisplayCaseGlass(string name)=>name=="Slanted_Display_Glass"||name=="Display_Front_Glass"||name=="Display_End_Glass"||name=="Display_End_Glass.001";
         // Presentation geometry, independent of camera/state. Exact authored names only.
         // These 90 far leaves are still four-triangle meshes; Counter_Pothos is excluded.
         sealed class FarLeafShape

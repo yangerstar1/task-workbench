@@ -90,6 +90,7 @@ namespace Lottery.G3.Interaction
             foreach(var child in art.GetComponentsInChildren<Transform>())child.gameObject.layer=bakingReflection?ReflectionBakeLayer:ReflectionGeometryLayer;
             foreach(var r in art.GetComponentsInChildren<Renderer>())
             {r.shadowCastingMode=r.sharedMaterials.Any(m=>m.renderQueue>=(int)RenderQueue.Transparent)?ShadowCastingMode.Off:ShadowCastingMode.On;r.receiveShadows=true;r.reflectionProbeUsage=ReflectionProbeUsage.BlendProbes;}
+            ConfigureDisplayCaseGlass();
             foreach(var box in layout.colliders)
             {
                 // The permanent physical phone owns its nearest-hit body/glass
@@ -304,6 +305,23 @@ namespace Lottery.G3.Interaction
             if(!bakingReflection)roomReflection.customBakedTexture=value?nightReflection:dayReflection;
             if(exteriorMaterial!=null){exteriorMaterial.SetTexture("_BaseMap",value?exteriorNight:exteriorDay);exteriorMaterial.SetFloat("_Exposure",value?.72f:1f);}
             SetWindowColors(value);
+        }
+        // Presentation-only clarity for the four authored cabinet panes. The
+        // importer marks objects without changing mesh keys or window materials.
+        // Shared owned copy keeps source assets immutable and is released by OnDestroy.
+        void ConfigureDisplayCaseGlass()
+        {
+            var panes=art.GetComponentsInChildren<Renderer>().Where(r=>r.name.StartsWith("DisplayCase_Glass_Clear_glass_",StringComparison.Ordinal)).ToArray();
+            if(panes.Length!=4)throw new InvalidOperationException("Expected four marked display-case glass renderers");
+            var source=panes[0].sharedMaterial;
+            if(source==null||source.name!="Glass_Clear"||!source.HasProperty("_BaseColor")||panes.Any(r=>r.sharedMaterials.Length!=1||r.sharedMaterial!=source))
+                throw new InvalidOperationException("Display-case glass must share its authored clear material");
+            var material=new Material(source){name="Glass_Clear (Display Case)"};
+            instantiatedMaterials.Add(material);
+            var color=source.GetColor("_BaseColor");color.a=.10f;
+            material.SetColor("_BaseColor",color);
+            if(material.HasProperty("_Color"))material.SetColor("_Color",color);
+            foreach(var pane in panes)pane.sharedMaterial=material;
         }
         void SetWindowColors(bool value)
         {
