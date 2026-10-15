@@ -330,7 +330,7 @@ namespace Lottery.G3.Editor
             // positions now use that same basis; no reflected prefab parent exists.
             if(anchors.requiresUnityXReflection)throw new InvalidOperationException("Shop manifest still requests the superseded X reflection");
             var instance=UnityEngine.Object.Instantiate(source);
-            var mirroredMeshes=new Dictionary<Mesh,Mesh>();
+            var mirroredMeshes=new Dictionary<Mesh,Mesh>();var backwallMeshes=new List<Mesh>();
             var root=new GameObject(outputName);var groups=new Dictionary<string,List<CombineInstance>>();var materials=new Dictionary<string,Material>();int transparent=0;
             try
             {
@@ -373,6 +373,7 @@ namespace Lottery.G3.Editor
                         groups[key].Add(new CombineInstance{mesh=mesh,subMeshIndex=sub,transform=matrix});
                     }
                 }
+                if(validateRoom)AddBackwallDisplay(groups,backwallMeshes);
                 foreach(var pair in groups)
                 {
                     string path=generated+"/"+outputName+"_"+pair.Key+".asset";var mesh=AssetDatabase.LoadAssetAtPath<Mesh>(path);if(mesh==null){mesh=new Mesh();AssetDatabase.CreateAsset(mesh,path);}else mesh.Clear();
@@ -385,7 +386,116 @@ namespace Lottery.G3.Editor
                 RequireRendererBindings(AssetDatabase.LoadAssetAtPath<GameObject>(prefabPath),owned,trace,38);
                 Debug.Log("G3_SHOP_STATIC_BATCH opaque-by-material plus separate glass renderers="+groups.Count+"; performance on device remains NOT_RUN");
             }
-            finally{foreach(var mesh in mirroredMeshes.Values)UnityEngine.Object.DestroyImmediate(mesh);UnityEngine.Object.DestroyImmediate(instance);UnityEngine.Object.DestroyImmediate(root);}
+            finally{foreach(var mesh in backwallMeshes)UnityEngine.Object.DestroyImmediate(mesh);foreach(var mesh in mirroredMeshes.Values)UnityEngine.Object.DestroyImmediate(mesh);UnityEngine.Object.DestroyImmediate(instance);UnityEngine.Object.DestroyImmediate(root);}
+        }
+        // Editor-only, presentation-only addition in the measured +X rear-wall slot.
+        // Reuse four existing opaque material groups, so the runtime prefab gains
+        // no renderer or material. These temporary meshes die after CombineMeshes.
+        // Dimensions/placement are metres in the already measured Unity basis.
+        static void AddBackwallDisplay(Dictionary<string,List<CombineInstance>> groups,List<Mesh> temporary)
+        {
+            var wood=new BackwallMesh();var paper=new BackwallMesh();var print=new BackwallMesh();var metal=new BackwallMesh();
+            wood.Box(new Vector3(2.25f,1.72f,-2.59f),new Vector3(.45f,.65f,.016f));
+            wood.Box(new Vector3(2.25f,1.411f,-2.571f),new Vector3(.402f,.016f,.022f));
+            // Screen-right is -X on a back wall seen from inside the room.
+            // Atlas tile edges are inset 4 px at 2048 to avoid neighbour bleeding.
+            // Existing text only: receipt, everyday shop memo, and shop services.
+            // Blank backing: one paper, two slightly curled printed corners total.
+            AddBackwallPaper(paper,null,new Vector3(2.361f,1.812f,-2.579f),new Vector2(.153f,.298f),-3.5f,0,Rect.zero);
+            AddBackwallPaper(paper,print,new Vector3(2.161f,1.807f,-2.576f),new Vector2(.185f,.37f),1.5f,.0035f,new Rect(.251953125f,.001953125f,.24609375f,.49609375f));
+            AddBackwallPaper(paper,print,new Vector3(2.356f,1.812f,-2.573f),new Vector2(.145f,.29f),-2f,0,new Rect(.001953125f,.001953125f,.24609375f,.49609375f));
+            AddBackwallPaper(paper,print,new Vector3(2.288f,1.564f,-2.566f),new Vector2(.14f,.28f),2.5f,.005f,new Rect(.751953125f,.001953125f,.24609375f,.49609375f));
+            AddBackwallClip(metal,new Vector3(2.161f,1.985f,-2.570f),1.5f);
+            AddBackwallClip(metal,new Vector3(2.356f,1.949f,-2.567f),-2f);
+            AddBackwallClip(metal,new Vector3(2.288f,1.696f,-2.560f),2.5f);
+            foreach(float x in new[]{2.055f,2.445f})metal.Box(new Vector3(x,2.018f,-2.580f),new Vector3(.009f,.009f,.004f));
+            var names=new[]{"Warm_Oak","Paper_Ivory","Decoration_Print_Atlas","Charcoal_Metal"};
+            var builders=new[]{wood,paper,print,metal};
+            int triangles=0;
+            for(int i=0;i<builders.Length;i++)
+            {
+                // Fail if the original material grouping changed; never create a
+                // fallback material/renderer or alter the owned material state.
+                if(!groups.TryGetValue(names[i],out var group))throw new InvalidOperationException("Backwall requires existing opaque group "+names[i]);
+                var mesh=builders[i].Finish("Backwall display "+names[i]);temporary.Add(mesh);triangles+=mesh.triangles.Length/3;
+                group.Add(new CombineInstance{mesh=mesh,subMeshIndex=0,transform=Matrix4x4.identity});
+            }
+            if(triangles>3000)throw new InvalidOperationException("Backwall geometry budget exceeded");
+            Debug.Log("G3_BACKWALL_DISPLAY triangles="+triangles+" added_renderers=0 added_materials=0 DEVICE_QA_NOT_RUN");
+        }
+        static Vector3 BackwallPoint(Vector3 center,float x,float y,float z,float roll)
+        {return center+Quaternion.Euler(0,0,roll)*new Vector3(-x,y,z);}
+        static void AddBackwallPaper(BackwallMesh paper,BackwallMesh print,Vector3 center,Vector2 size,float roll,float curl,Rect tile)
+        {
+            const int columns=4,rows=6;const float thickness=.00045f;
+            var points=new Vector3[(columns+1)*(rows+1)];var tex=new Vector2[points.Length];
+            for(int y=0;y<=rows;y++)for(int x=0;x<=columns;x++)
+            {
+                float u=(float)x/columns,v=(float)y/rows;
+                // Only the lower screen-right corner rises, not a whole floating sheet.
+                float bend=curl*Mathf.Pow(u,3)*Mathf.Pow(1-v,3);
+                int n=y*(columns+1)+x;points[n]=BackwallPoint(center,(u-.5f)*size.x,(v-.5f)*size.y,bend,roll);
+                tex[n]=print==null?new Vector2(u,v):new Vector2(tile.x+u*tile.width,tile.y+v*tile.height);
+            }
+            var face=print??paper;face.Grid(points,tex,columns,rows,false);
+            var back=points.Select(p=>p-new Vector3(0,0,thickness)).ToArray();
+            paper.Grid(back,tex,columns,rows,true);
+            // Separate boundary faces keep the fine paper edge crisp.
+            for(int y=0;y<rows;y++)
+            {int a=y*(columns+1),b=(y+1)*(columns+1);paper.Quad(points[a],back[a],back[b],points[b]);a+=columns;b+=columns;paper.Quad(points[b],back[b],back[a],points[a]);}
+            for(int x=0;x<columns;x++)
+            {int a=x,b=x+1;paper.Quad(points[b],back[b],back[a],points[a]);a=rows*(columns+1)+x;b=a+1;paper.Quad(points[a],back[a],back[b],points[b]);}
+        }
+        static void AddBackwallClip(BackwallMesh metal,Vector3 center,float roll)
+        {
+            // A small folded steel jaw with a U handle. No new physics or motion.
+            metal.Box(center,new Vector3(.031f,.013f,.004f),roll);
+            metal.Box(center+new Vector3(0,-.005f,-.003f),new Vector3(.028f,.004f,.006f),roll);
+            const float wire=.0016f;
+            var local=new[]{new Vector3(-.009f,.005f,.003f),new Vector3(-.009f,.022f,.006f),new Vector3(.009f,.022f,.006f),new Vector3(.009f,.005f,.003f)};
+            var q=Quaternion.Euler(0,0,roll);
+            for(int i=0;i<3;i++)metal.Rod(center+q*local[i],center+q*local[i+1],wire,6);
+        }
+        sealed class BackwallMesh
+        {
+            readonly List<Vector3> vertices=new List<Vector3>();readonly List<Vector2> uv=new List<Vector2>();readonly List<int> indices=new List<int>();
+            public void Quad(Vector3 a,Vector3 b,Vector3 c,Vector3 d)
+            {
+                int n=vertices.Count;vertices.AddRange(new[]{a,b,c,d});uv.AddRange(new[]{Vector2.zero,Vector2.right,Vector2.one,Vector2.up});indices.AddRange(new[]{n,n+1,n+2,n,n+2,n+3});
+            }
+            public void Box(Vector3 center,Vector3 size,float roll=0)
+            {
+                var p=new[]{new Vector3(-1,-1,-1),new Vector3(1,-1,-1),new Vector3(1,1,-1),new Vector3(-1,1,-1),new Vector3(-1,-1,1),new Vector3(1,-1,1),new Vector3(1,1,1),new Vector3(-1,1,1)};
+                var faces=new[]{0,3,2,1,4,5,6,7,0,4,7,3,1,2,6,5,0,1,5,4,3,7,6,2};var q=Quaternion.Euler(0,0,roll);
+                var local=p.Select(point=>Vector3.Scale(point,size*.5f)).ToArray();
+                for(int i=0;i<p.Length;i++)p[i]=center+q*local[i];
+                for(int face=0;face<6;face++)
+                {
+                    int first=vertices.Count;Quad(p[faces[face*4]],p[faces[face*4+1]],p[faces[face*4+2]],p[faces[face*4+3]]);
+                    // Wood grain has the same 1.4 m authoring repeat as the original
+                    // cabinetry; keep the long direction vertical on the back board.
+                    for(int j=0;j<4;j++)
+                    {var point=local[faces[face*4+j]];uv[first+j]=(face<2?new Vector2(point.x,point.y):face<4?new Vector2(point.z,point.y):new Vector2(point.x,point.z))/1.4f;}
+                }
+            }
+            public void Grid(Vector3[] points,Vector2[] tex,int columns,int rows,bool reverse)
+            {
+                int n=vertices.Count;vertices.AddRange(points);uv.AddRange(tex);
+                for(int y=0;y<rows;y++)for(int x=0;x<columns;x++)
+                {int a=n+y*(columns+1)+x,b=a+1,d=a+columns+1,c=d+1;indices.AddRange(reverse?new[]{a,b,c,a,c,d}:new[]{a,c,b,a,d,c});}
+            }
+            public void Rod(Vector3 a,Vector3 b,float radius,int sides)
+            {
+                var axis=(b-a).normalized;var right=Vector3.Cross(axis,Vector3.forward).normalized;var up=Vector3.Cross(axis,right).normalized;
+                for(int i=0;i<sides;i++)
+                {
+                    float angle=2*Mathf.PI*i/sides,next=2*Mathf.PI*(i+1)/sides;
+                    var u=radius*(Mathf.Cos(angle)*right+Mathf.Sin(angle)*up);var v=radius*(Mathf.Cos(next)*right+Mathf.Sin(next)*up);
+                    Quad(a+u,a+v,b+v,b+u);
+                }
+            }
+            public Mesh Finish(string name)
+            {var mesh=new Mesh{name=name};mesh.SetVertices(vertices);mesh.SetUVs(0,uv);mesh.SetTriangles(indices,0);mesh.RecalculateNormals();mesh.RecalculateBounds();return mesh;}
         }
         static Color SourceLinearBaseColor(float[] values)
         {

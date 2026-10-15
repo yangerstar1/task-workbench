@@ -293,7 +293,7 @@ namespace Lottery.G3.Interaction
             RenderSettings.ambientGroundColor=value?new Color(.20f,.18f,.17f):new Color(.34f,.31f,.26f);
             // Setting only Trilight colours does not establish a new runtime scene's
             // ambient probe. Set its actual SH coefficients synchronously as well.
-            var bounce=new SphericalHarmonicsL2();bounce.AddAmbientLight(value?new Color(.20f,.21f,.24f):new Color(.336f,.368f,.344f));
+            var bounce=new SphericalHarmonicsL2();bounce.AddAmbientLight(value?new Color(.20f,.21f,.24f):new Color(.252f,.276f,.258f));
             bounce.AddDirectionalLight(Vector3.up,value?new Color(.16f,.13f,.10f):new Color(.20f,.22f,.25f),.7f);
             RenderSettings.ambientProbe=bounce;RenderSettings.reflectionIntensity=value ? .7f : 1;
             // The reading pendant is the baseline, independent of purchased tools.

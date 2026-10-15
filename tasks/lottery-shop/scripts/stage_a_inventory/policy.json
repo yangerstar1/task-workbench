@@ -298,9 +298,9 @@
       "sha256": "7b1b8b78532814cda88b72efa3e9b1769ba1d8e4a1e3ed6fa49bdedadc993fd8"
     },
     {
-      "bytes": 44879,
+      "bytes": 53374,
       "path": "Assets/G3/Editor/G3ShopArtImporter.cs",
-      "sha256": "bdc3c31b76e7764bc873573c639f32b8dfada5275067e07da8828b66849790fc"
+      "sha256": "2b652d7149b771f4694e6136b9bb6a4170f5b87d7bc89b225ebe803c8d58a582"
     },
     {
       "bytes": 47274,
@@ -310,7 +310,7 @@
     {
       "bytes": 31461,
       "path": "Assets/G3/Interaction/G3ShopEnvironment.cs",
-      "sha256": "bf3712303c12c5dd75394260d62ff5a2e8491c5c80388a40e350a0f262c985dd"
+      "sha256": "6beea507cb364a7d003dec67ad76edabe1fca3a631fa3c4d6ce234edfa0c3cd9"
     },
     {
       "bytes": 1560,
