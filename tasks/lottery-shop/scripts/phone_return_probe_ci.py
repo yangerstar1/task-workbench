@@ -9,6 +9,7 @@ import os
 from pathlib import Path
 import re
 import shutil
+import subprocess
 import sys
 import xml.etree.ElementTree as ET
 import probe_ci as bounded
@@ -67,6 +68,208 @@ def identity(root):
     value = read_json(outdir(root) / "source-receipt.json", 8192)
     require(value.get("scope") == SCOPE and value.get("sourceCommit") == os.environ.get("GITHUB_SHA"), "Source receipt mismatch")
     return value
+
+
+# Observability only: identical disposable-runner paths, command order and 30 GiB
+# gate. The unchanged workflow two-minute cap is the only execution envelope.
+DISK_PATHS = ('/usr/share/dotnet', '/opt/ghc', '/usr/local/.ghcup',
+              '/usr/local/lib/android', '/opt/hostedtoolcache/CodeQL')
+DISK_REQUIRED_BYTES = 30 * 1024**3
+DISK_IDENTITY_KEYS = ('sourceCommit', 'reviewedCandidateCommit', 'runId', 'runAttempt', 'requestId')
+DISK_FIELDS = {'schemaVersion', 'scope', 'phase', 'status', 'stage', 'cleanupPaths', 'requiredFreeBytes',
+               'freeBeforeBytes', 'freeAfterBytes', 'guardExitCode', 'cleanupExitCode', 'thresholdExitCode',
+               'helperReturnCode', 'helperReturnMarkerCount', *DISK_IDENTITY_KEYS}
+DISK_STAGES = {'GUARD', 'MEASURE_BEFORE', 'CLEANUP', 'MEASURE_AFTER', 'THRESHOLD', 'COMPLETE'}
+DISK_FAILURES = {'GUARD_OR_IDENTITY_REJECTED', 'BEFORE_MEASUREMENT_FAILED', 'CLEANUP_LAUNCH_OR_EXIT_REJECTED',
+                 'AFTER_MEASUREMENT_FAILED', 'CLEANUP_FAILED', 'INSUFFICIENT_IMAGE_DISK_SPACE', 'INTERRUPTED'}
+
+
+def disk_identity(root):
+    ident = identity(root)
+    require(all(type(ident.get(k)) is str and HEX40.fullmatch(ident[k])
+                for k in DISK_IDENTITY_KEYS[:2]), 'DISK_SOURCE_REJECTED')
+    require(type(ident.get('runId')) is str and re.fullmatch(r'[1-9][0-9]{0,19}', ident['runId'])
+            and ident.get('runAttempt') == '1', 'DISK_RUN_REJECTED')
+    require(ident['runId'] == os.environ.get('GITHUB_RUN_ID')
+            and ident['runAttempt'] == os.environ.get('GITHUB_RUN_ATTEMPT'), 'DISK_RUN_MISMATCH')
+    require(type(ident.get('requestId')) is str and
+            re.fullmatch(r'lottery-phone-return-[0-9]{8}-[0-9]{2,3}', ident['requestId']), 'DISK_REQUEST_REJECTED')
+    return {key: ident[key] for key in DISK_IDENTITY_KEYS}
+
+
+def write_disk_receipt(root, value):
+    # Atomic replacement retains the last complete fixed-schema snapshot if the
+    # runner interrupts this step. This private state is never upload-allowlisted.
+    path = outdir(root) / 'runner-disk-preparation-state.json'
+    data = json.dumps(value, sort_keys=True, separators=(',', ':')) + '\n'
+    require(len(data.encode('utf-8')) <= 4096, 'DISK_RECEIPT_LIMIT')
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_suffix('.tmp')
+    temporary.write_text(data, encoding='utf-8')
+    temporary.replace(path)
+
+
+def prepare_runner_disk(root):
+    # No exception strings, subprocess output, environment dump or directory
+    # enumeration is ever copied into this receipt or sent to the job log.
+    receipt = dict(schemaVersion=1, scope=SCOPE, phase='RUNNER_DISK_PREPARATION',
+                   status='IN_PROGRESS', stage='GUARD', cleanupPaths=list(DISK_PATHS),
+                   requiredFreeBytes=DISK_REQUIRED_BYTES, freeBeforeBytes=-1, freeAfterBytes=-1,
+                   guardExitCode=None, cleanupExitCode=None, thresholdExitCode=None,
+                   helperReturnCode=None, helperReturnMarkerCount=0,
+                   **{key: 'UNAVAILABLE' for key in DISK_IDENTITY_KEYS})
+    try:
+        receipt.update(disk_identity(root))
+    except Exception:
+        pass
+    write_disk_receipt(root, receipt)
+
+    def stage(name):
+        receipt['stage'] = name
+        write_disk_receipt(root, receipt)
+
+    def finish(status, code):
+        receipt.update(status=status, helperReturnCode=code, helperReturnMarkerCount=1)
+        write_disk_receipt(root, receipt)
+        # A successful preparation cannot permit activation before export validation.
+        read_disk_receipt(root)
+        return code
+
+    def free_bytes():
+        value = shutil.disk_usage(root).free
+        require(type(value) is int and 0 <= value <= 2**63-1, 'DISK_MEASUREMENT_REJECTED')
+        return value
+
+    class PhaseRejected(Exception):
+        pass
+
+    def observed_phase(name, action, failure):
+        stage(name)  # A receipt-write error must not be mislabeled as an action error.
+        try:
+            return action()
+        except KeyboardInterrupt:
+            raise PhaseRejected('INTERRUPTED') from None
+        except Exception:
+            raise PhaseRejected(failure) from None
+
+    def guarded_identity():
+        guard(root)  # Same full independent-request guard, still before cleanup.
+        return disk_identity(root)
+
+    def cleanup():
+        result = subprocess.run(['sudo', 'rm', '-rf', *DISK_PATHS], cwd=root,
+                                stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+                                stderr=subprocess.DEVNULL, check=False)
+        require(type(result.returncode) is int and -255 <= result.returncode <= 255,
+                'DISK_CLEANUP_EXIT_REJECTED')
+        return result.returncode
+
+    try:
+        receipt.update(observed_phase('GUARD', guarded_identity, 'GUARD_OR_IDENTITY_REJECTED'))
+        receipt['guardExitCode'] = 0
+        receipt['freeBeforeBytes'] = observed_phase('MEASURE_BEFORE', free_bytes, 'BEFORE_MEASUREMENT_FAILED')
+        receipt['cleanupExitCode'] = observed_phase('CLEANUP', cleanup, 'CLEANUP_LAUNCH_OR_EXIT_REJECTED')
+        receipt['freeAfterBytes'] = observed_phase('MEASURE_AFTER', free_bytes, 'AFTER_MEASUREMENT_FAILED')
+        if receipt['cleanupExitCode'] != 0:
+            return finish('CLEANUP_FAILED', 1)
+        stage('THRESHOLD')
+        receipt['thresholdExitCode'] = int(receipt['freeAfterBytes'] < DISK_REQUIRED_BYTES)
+        if receipt['thresholdExitCode']:
+            return finish('INSUFFICIENT_IMAGE_DISK_SPACE', 1)
+        stage('COMPLETE')
+        return finish('DISK_PREPARATION_SUCCEEDED', 0)
+    except PhaseRejected as rejected:
+        if receipt['stage'] == 'GUARD' and rejected.args[0] != 'INTERRUPTED':
+            receipt['guardExitCode'] = 1
+        return finish(rejected.args[0], 1)
+
+
+def validate_disk_receipt(value, ident):
+    require(type(value) is dict and set(value) == DISK_FIELDS, 'DISK_FIELDS_REJECTED')
+    require(type(value['schemaVersion']) is int and value['schemaVersion'] == 1
+            and value['scope'] == SCOPE and value['phase'] == 'RUNNER_DISK_PREPARATION', 'DISK_SCHEMA_REJECTED')
+    require(all(type(value[key]) is str and value[key] == ident[key] for key in DISK_IDENTITY_KEYS),
+            'DISK_BINDING_REJECTED')
+    require(type(value['cleanupPaths']) is list and value['cleanupPaths'] == list(DISK_PATHS)
+            and type(value['requiredFreeBytes']) is int and value['requiredFreeBytes'] == DISK_REQUIRED_BYTES,
+            'DISK_SCOPE_REJECTED')
+    require(type(value['stage']) is str and value['stage'] in DISK_STAGES
+            and type(value['status']) is str and value['status'] in DISK_FAILURES | {'IN_PROGRESS', 'DISK_PREPARATION_SUCCEEDED'},
+            'DISK_ENUM_REJECTED')
+    for key in ('freeBeforeBytes', 'freeAfterBytes'):
+        require(type(value[key]) is int and -1 <= value[key] <= 2**63-1, 'DISK_BYTES_REJECTED')
+    for key in ('guardExitCode', 'thresholdExitCode', 'helperReturnCode'):
+        require(value[key] is None or type(value[key]) is int and value[key] in (0, 1), 'DISK_EXIT_REJECTED')
+    require(value['cleanupExitCode'] is None or type(value['cleanupExitCode']) is int
+            and -255 <= value['cleanupExitCode'] <= 255, 'DISK_CLEANUP_EXIT_REJECTED')
+    require(type(value['helperReturnMarkerCount']) is int and value['helperReturnMarkerCount'] in (0, 1),
+            'DISK_MARKER_REJECTED')
+    stage, status = value['stage'], value['status']
+    before, after = value['freeBeforeBytes'], value['freeAfterBytes']
+    guard_code, cleanup_code, threshold_code = (value[k] for k in ('guardExitCode', 'cleanupExitCode', 'thresholdExitCode'))
+    # Closed snapshot state machine. An interrupted/unfinished stage is never a
+    # successful cleanup, threshold check or completed preparation.
+    if stage == 'GUARD':
+        require(guard_code in (None, 1) and cleanup_code is threshold_code is None and before == after == -1,
+                'DISK_STAGE_REJECTED')
+    else:
+        require(guard_code == 0, 'DISK_GUARD_REQUIRED')
+        if stage == 'MEASURE_BEFORE':
+            require(before == after == -1 and cleanup_code is threshold_code is None, 'DISK_STAGE_REJECTED')
+        elif stage == 'CLEANUP':
+            require(before >= 0 and after == -1 and cleanup_code is threshold_code is None, 'DISK_STAGE_REJECTED')
+        elif stage == 'MEASURE_AFTER':
+            require(before >= 0 and cleanup_code is not None and threshold_code is None
+                    and (after >= 0 if status == 'CLEANUP_FAILED' else after == -1), 'DISK_STAGE_REJECTED')
+        else:
+            require(before >= 0 and after >= 0 and cleanup_code == 0, 'DISK_STAGE_REJECTED')
+            if stage == 'COMPLETE':
+                require(threshold_code == 0 and after >= DISK_REQUIRED_BYTES, 'DISK_THRESHOLD_REQUIRED')
+            else:
+                require(threshold_code == (1 if status == 'INSUFFICIENT_IMAGE_DISK_SPACE' else None),
+                        'DISK_STAGE_REJECTED')
+    if status == 'IN_PROGRESS':
+        require(value['helperReturnMarkerCount'] == 0 and value['helperReturnCode'] is None
+                and guard_code != 1, 'DISK_UNFINISHED_REJECTED')
+    else:
+        success = status == 'DISK_PREPARATION_SUCCEEDED'
+        require(value['helperReturnMarkerCount'] == 1 and value['helperReturnCode'] == (0 if success else 1),
+                'DISK_TERMINAL_REJECTED')
+        expected = {'GUARD_OR_IDENTITY_REJECTED': 'GUARD', 'BEFORE_MEASUREMENT_FAILED': 'MEASURE_BEFORE',
+                    'CLEANUP_LAUNCH_OR_EXIT_REJECTED': 'CLEANUP', 'AFTER_MEASUREMENT_FAILED': 'MEASURE_AFTER',
+                    'CLEANUP_FAILED': 'MEASURE_AFTER', 'INSUFFICIENT_IMAGE_DISK_SPACE': 'THRESHOLD',
+                    'DISK_PREPARATION_SUCCEEDED': 'COMPLETE'}
+        require(stage == expected[status] if status != 'INTERRUPTED' else stage in DISK_STAGES - {'THRESHOLD', 'COMPLETE'},
+                'DISK_STATUS_STAGE_REJECTED')
+        if status == 'GUARD_OR_IDENTITY_REJECTED':require(guard_code == 1, 'DISK_GUARD_EXIT_REQUIRED')
+        if status == 'CLEANUP_FAILED':require(cleanup_code != 0, 'DISK_CLEANUP_FAILURE_REQUIRED')
+        if status == 'INSUFFICIENT_IMAGE_DISK_SPACE':require(after < DISK_REQUIRED_BYTES, 'DISK_THRESHOLD_FAILURE_REQUIRED')
+    return value
+
+
+def read_disk_receipt(root):
+    raw = read_regular(outdir(root) / 'runner-disk-preparation-state.json', 4096)
+    value = json.loads(raw, object_pairs_hook=unique_pairs)
+    return validate_disk_receipt(value, disk_identity(root))
+
+
+def export_disk_receipt(root, step_outcome):
+    target = outdir(root) / 'runner-disk-preparation.json'
+    target.unlink(missing_ok=True)
+    value = read_disk_receipt(root)
+    require(step_outcome in ('success', 'failure', 'cancelled'), 'DISK_STEP_OUTCOME_REJECTED')
+    require((step_outcome == 'success') == (value['status'] == 'DISK_PREPARATION_SUCCEEDED'),
+            'DISK_STEP_RESULT_MISMATCH')
+    write(target, value)
+    return value
+
+
+def export_diagnostics(root):
+    export_disk_receipt(root, os.environ.get('RUNNER_DISK_STEP_OUTCOME'))
+    outcome = os.environ.get('PHONE_RETURN_STEP_OUTCOME')
+    require(outcome in ('success', 'failure', 'cancelled', 'skipped'), 'PHONE_STEP_OUTCOME_REJECTED')
+    if outcome != 'skipped':
+        export(root)  # Retains the previous exact phone-step outcome condition.
 
 
 FLAGS = {'setupComplete','routeComplete','cleanupComplete','deadlineExceeded','phoneOpened','cameraRestored','finalSeated','phoneFocused'}
@@ -197,9 +400,11 @@ def export(root):
     require(result['status']=='FUNCTIONAL_ROUTE_AND_STATE_OBSERVED','PHONE_OBSERVATION_INCOMPLETE')
 
 def main():
-    parser=argparse.ArgumentParser();parser.add_argument('command',choices=('guard','prepare','export'));args=parser.parse_args();root=Path(__file__).resolve().parents[3]
+    parser=argparse.ArgumentParser();parser.add_argument('command',choices=('guard','disk-prepare','prepare','export','export-diagnostics'));args=parser.parse_args();root=Path(__file__).resolve().parents[3]
     if args.command=='guard': guard(root)
+    elif args.command=='disk-prepare': require(prepare_runner_disk(root)==0,'RUNNER_DISK_PREPARATION_REJECTED')
     elif args.command=='prepare': identity(root);bounded.restore(root)
+    elif args.command=='export-diagnostics': export_diagnostics(root)
     else: export(root)
 
 if __name__=='__main__':

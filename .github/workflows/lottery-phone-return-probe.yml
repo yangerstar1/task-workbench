@@ -38,15 +38,9 @@ jobs:
         timeout-minutes: 1
         run: PYTHONDONTWRITEBYTECODE=1 python3 tasks/lottery-shop/scripts/test_phone_return_probe_ci.py -v
       - name: Prepare same authorized disposable runner disk layout
+        id: runner_disk_prepare
         timeout-minutes: 2
-        run: |
-          PYTHONDONTWRITEBYTECODE=1 python3 tasks/lottery-shop/scripts/phone_return_probe_ci.py guard
-          sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/.ghcup /usr/local/lib/android /opt/hostedtoolcache/CodeQL
-          python3 - <<'PY'
-          import shutil
-          if shutil.disk_usage('.').free < 30*1024**3:
-              raise SystemExit('INSUFFICIENT_IMAGE_DISK_SPACE')
-          PY
+        run: PYTHONDONTWRITEBYTECODE=1 python3 tasks/lottery-shop/scripts/phone_return_probe_ci.py disk-prepare
       - name: Read same pinned public activation and return mechanism
         timeout-minutes: 3
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
@@ -83,8 +77,11 @@ jobs:
         run: PYTHONDONTWRITEBYTECODE=1 python3 tasks/lottery-shop/scripts/safe_project_ci.py phone-return-probe --phone-return-only
       - name: Export only fixed safe fields and exact one-case verdict, never raw NUnit/logs
         timeout-minutes: 1
-        if: ${{ always() && steps.guard.outcome == 'success' && steps.phone_return.outcome != 'skipped' }}
-        run: PYTHONDONTWRITEBYTECODE=1 python3 tasks/lottery-shop/scripts/phone_return_probe_ci.py export
+        if: ${{ always() && steps.guard.outcome == 'success' }}
+        env:
+          RUNNER_DISK_STEP_OUTCOME: ${{ steps.runner_disk_prepare.outcome }}
+          PHONE_RETURN_STEP_OUTCOME: ${{ steps.phone_return.outcome }}
+        run: PYTHONDONTWRITEBYTECODE=1 python3 tasks/lottery-shop/scripts/phone_return_probe_ci.py export-diagnostics
       - name: Return only this owned activation and verify container absence
         if: ${{ always() && steps.guard.outcome == 'success' && steps.safestart.outcome != 'skipped' }}
         timeout-minutes: 5
@@ -97,6 +94,7 @@ jobs:
           name: lottery-phone-return-diagnostic-not-g3-pass-${{ github.run_id }}-${{ github.run_attempt }}
           path: |
             tasks/lottery-shop/evidence/phone-return-probe/source-receipt.json
+            tasks/lottery-shop/evidence/phone-return-probe/runner-disk-preparation.json
             tasks/lottery-shop/evidence/phone-return-probe/safe-start.json
             tasks/lottery-shop/evidence/phone-return-probe/safe-phone-return-prepare.json
             tasks/lottery-shop/evidence/phone-return-probe/preparation-observation.json

@@ -801,6 +801,7 @@
         1
       ],
       "baseColorTexture": "textures/ServiceMonitor_v15_BaseColor.png",
+      "emissionTexture": "textures/ServiceMonitor_v15_BaseColor.png",
       "printedSurface": true,
       "uvContract": "Per-object isolated rectangle; Unity localUmin+localUmax-U if orientation repair needed. Do not swap atlas tiles."
     },
