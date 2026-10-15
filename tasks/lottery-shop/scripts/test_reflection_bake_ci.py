@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """Synthetic reflection evidence negatives, no Unity/Docker or pixel decoding."""
+import ast
 import copy
+import re
 import json
 import os
 from pathlib import Path
@@ -47,6 +49,87 @@ class ReflectionEvidenceTests(unittest.TestCase):
         (self.root/bake.SOURCE/'reflection-receipt.json').write_text(json.dumps(self.receipt))
     def export(self):
         bake.export_reflections(self.root)
+    def test_recipe_sources_exactly_match_native_policy_and_pinned_verifier(self):
+        expected = {
+            'Assets/G3/Interaction/G3ShopEnvironment.cs',
+            'Assets/G3/Editor/G3ShopReflectionBaker.cs',
+            'Assets/G3/Interaction/G3ContactOcclusionFeature.cs',
+            'Assets/G3/Interaction/G3ContactOcclusionFeature.cs.meta',
+            'Assets/G3/Editor/G3ShopArtImporter.cs',
+            'Assets/G3/Editor/G3Build.cs',
+            'Packages/manifest.json', 'Packages/packages-lock.json',
+        }
+        self.assertEqual(len(bake.RECIPE_SOURCES), 8)
+        self.assertEqual(set(bake.RECIPE_SOURCES), expected)
+        repository = Path(__file__).resolve().parents[3]
+        source = (repository / bake.TASK / 'unity/Assets/G3/Editor/G3ShopReflectionBaker.cs').read_text()
+        block = source.split('static readonly string[] RecipeSources={', 1)[1].split('};', 1)[0]
+        native = re.findall(r'"([^"]+)"', block)
+        self.assertEqual(len(native), 8)
+        self.assertEqual(set(native), expected)
+        policy = json.loads((repository / bake.TASK / 'scripts/stage_a_inventory/policy.json').read_text())
+        self.assertEqual(len(policy['recipeSources']), 8)
+        self.assertEqual(set(policy['recipeSources']), expected)
+        pinned = repository / bake.TASK / 'scripts/counter_light_diagnostics/pinned_dependencies/reflection_bake_ci.py'
+        constants = [node for node in ast.parse(pinned.read_text()).body
+                     if isinstance(node, ast.Assign) and any(isinstance(t, ast.Name) and t.id == 'RECIPE_SOURCES' for t in node.targets)]
+        self.assertEqual(len(constants), 1)
+        self.assertEqual(ast.literal_eval(constants[0].value), bake.RECIPE_SOURCES)
+
+    def test_each_contact_feature_source_and_meta_mutation_rejects_export(self):
+        for name in ('Assets/G3/Interaction/G3ContactOcclusionFeature.cs',
+                     'Assets/G3/Interaction/G3ContactOcclusionFeature.cs.meta'):
+            with self.subTest(name=name):
+                path = self.root / bake.TASK / 'unity' / name
+                before = path.read_bytes()
+                try:
+                    path.write_bytes(before + b'CHANGED')
+                    with self.assertRaisesRegex(ValueError, 'REFLECTION_SOURCE_INPUT_CHANGED'):
+                        self.export()
+                finally:
+                    path.write_bytes(before)
+                self.assertFalse((bake.visual.outdir(self.root)/'reflections/reflection-receipt.json').exists())
+
+    def test_each_contact_feature_source_and_meta_missing_rejects_export(self):
+        for name in ('Assets/G3/Interaction/G3ContactOcclusionFeature.cs',
+                     'Assets/G3/Interaction/G3ContactOcclusionFeature.cs.meta'):
+            with self.subTest(name=name):
+                path = self.root / bake.TASK / 'unity' / name
+                before = path.read_bytes()
+                try:
+                    path.unlink()
+                    with self.assertRaises(ValueError):
+                        self.export()
+                finally:
+                    path.write_bytes(before)
+                self.assertFalse((bake.visual.outdir(self.root)/'reflections/reflection-receipt.json').exists())
+
+    def test_legacy_six_source_digest_cannot_pass_current_eight_source_contract(self):
+        legacy = tuple(name for name in bake.RECIPE_SOURCES if 'G3ContactOcclusionFeature' not in name)
+        self.assertEqual(len(legacy), 6)
+        with patch.object(bake, 'RECIPE_SOURCES', legacy):
+            legacy_digest = bake.source_digest(self.root, self.receipt)
+        self.assertNotEqual(legacy_digest, self.receipt['sourceDigest'])
+        self.receipt['sourceDigest'] = legacy_digest
+        self.save()
+        with self.assertRaisesRegex(ValueError, 'REFLECTION_SOURCE_INPUT_CHANGED'):
+            self.export()
+
+    def test_contact_feature_symlink_cannot_replace_bound_source(self):
+        for name in ('Assets/G3/Interaction/G3ContactOcclusionFeature.cs',
+                     'Assets/G3/Interaction/G3ContactOcclusionFeature.cs.meta'):
+            with self.subTest(name=name):
+                path = self.root / bake.TASK / 'unity' / name
+                before = path.read_bytes()
+                target = self.root / 'outside-bound-source'
+                target.write_bytes(before)
+                try:
+                    path.unlink(); path.symlink_to(target)
+                    with self.assertRaisesRegex(ValueError, 'REFLECTION_INPUT_PATH_REJECTED'):
+                        self.export()
+                finally:
+                    path.unlink(); path.write_bytes(before); target.unlink()
+
     def test_valid_five_originals_preserved_byte_exact(self):
         self.export();out=bake.visual.outdir(self.root)/'reflections'
         self.assertEqual({p.name for p in out.iterdir()},set(bake.FILES))

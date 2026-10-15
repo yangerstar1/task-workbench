@@ -161,6 +161,8 @@ SHOP = 'Assets/G3/Shop/Resources/G3/Shop'
 RECIPE = 'G3_SHOP_STATIC_REFLECTION_V2'
 GUIDS = {'day': 'b90a2a9e9f0d4c1bab2f613e26d9c771', 'night': 'a54ec87d23ac49ea83e7cf7bad94381a'}
 RECIPE_SOURCES = ('Assets/G3/Interaction/G3ShopEnvironment.cs', 'Assets/G3/Editor/G3ShopReflectionBaker.cs',
+                  'Assets/G3/Interaction/G3ContactOcclusionFeature.cs',
+                  'Assets/G3/Interaction/G3ContactOcclusionFeature.cs.meta',
                   'Assets/G3/Editor/G3ShopArtImporter.cs', 'Assets/G3/Editor/G3Build.cs',
                   'Packages/manifest.json', 'Packages/packages-lock.json')
 DEPENDENCIES = (SHOP + '/LotteryShop_Runtime.prefab', SHOP + '/G3VisualPipeline.asset')

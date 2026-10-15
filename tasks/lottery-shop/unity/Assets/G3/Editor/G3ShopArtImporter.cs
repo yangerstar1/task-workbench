@@ -573,6 +573,9 @@ namespace Lottery.G3.Editor
             if(existing.Length==0)AssetDatabase.AddObjectToAsset(feature,renderer);
             EditorUtility.CopySerialized(source,renderer);
             renderer.name="G3 bounded contact occlusion";
+            // SSAO declares its depth prepass; do not force a full-color blit merely
+            // because this renderer has a feature. Auto retains required intermediates.
+            renderer.intermediateTextureMode=IntermediateTextureMode.Auto;
             feature.name="G3 small radius contact occlusion";feature.SetActive(true);
             var settings=new SerializedObject(feature);
             ContactEnum(settings,"AOMethod","InterleavedGradient");

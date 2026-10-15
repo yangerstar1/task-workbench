@@ -28,7 +28,7 @@
     {
       "bytes": 652,
       "repositoryPath": "tasks/lottery-shop/scripts/counter_light_diagnostics/dependency-pins.json",
-      "sha256": "5c78781648fa629d9a614357cfa3cb240b280dc3edfb6d75d1917b5d464980b1"
+      "sha256": "9a56e8249eb2ddf644687f4b22c2c0f3f4eb8c0d965df881b28069155eafd151"
     },
     {
       "bytes": 4580,
@@ -66,9 +66,9 @@
       "sha256": "1fc573caa8c8c43fc4c7975ce4c4c2dfa7fc09f46cc56fbeac7af4b6bef7d2d4"
     },
     {
-      "bytes": 22365,
+      "bytes": 22514,
       "repositoryPath": "tasks/lottery-shop/scripts/counter_light_diagnostics/pinned_dependencies/reflection_bake_ci.py",
-      "sha256": "6c0eafdaec2cac335ff3cec6bddd5663514ae941f0a2ab627f5216b84cb604ed"
+      "sha256": "16b3b7b6c8caaf7c85bc1392531cedf42be0d787243ca13c398e89dc97fb3d50"
     },
     {
       "bytes": 48053,
@@ -96,9 +96,9 @@
       "sha256": "1fc573caa8c8c43fc4c7975ce4c4c2dfa7fc09f46cc56fbeac7af4b6bef7d2d4"
     },
     {
-      "bytes": 22365,
+      "bytes": 22514,
       "repositoryPath": "tasks/lottery-shop/scripts/reflection_bake_ci.py",
-      "sha256": "6c0eafdaec2cac335ff3cec6bddd5663514ae941f0a2ab627f5216b84cb604ed"
+      "sha256": "16b3b7b6c8caaf7c85bc1392531cedf42be0d787243ca13c398e89dc97fb3d50"
     },
     {
       "bytes": 23664,
