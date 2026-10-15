@@ -123,7 +123,7 @@ namespace Lottery.G3.Interaction
                 m.Title=name+" · 借还记录";
                 m.Body="累计已借\n"+G3Text.Money(s.Contacts.First(x=>x.ContactId==selectedContact).BorrowedLifetimeMinor)+" / "+G3Text.Money(DayRules.ContactLimit(selectedContact))+" 元\n还款不恢复额度";
                 foreach(var e in records.Skip(phoneRecordPage).Take(1))
-                {var loan=s.Loans.FirstOrDefault(x=>x.LoanId==e.LoanId);m.Messages.Add(new G3PhoneMessage(e.EventId,"第 "+e.Day+" 天 "+(e.Kind=="REPAID"?"已归还":"已收款")+"\n"+G3Text.Money(e.AmountMinor)+" 元\n第 "+e.DueNight+" 晚到期\n"+(loan?.RemainingMinor==0?"已结清":"尚欠 "+G3Text.Money(loan?.RemainingMinor??0)),e.Kind=="REPAID"));}
+                {var loan=s.Loans.FirstOrDefault(x=>x.LoanId==e.LoanId);m.Messages.Add(new G3PhoneMessage(e.EventId,"第 "+e.Day+" 天 "+(e.Kind=="REPAID"?"已归还":"已收款")+"\n"+G3Text.Money(e.AmountMinor)+" 元\n"+G3Text.LoanDue(loan,s.DayNumber)+(loan!=null&&loan.RemainingMinor>0?"\n尚欠 "+G3Text.Money(loan.RemainingMinor):""),e.Kind=="REPAID"));}
                 if(records.Length==0)m.Messages.Add(new G3PhoneMessage("empty-records","暂时没有借还记录。"));
                 m.Add("phone-prev","上一页",new G3Action(G3ActionKind.PhonePage,slot:-1),phoneRecordPage>0);m.Add("phone-next","下一页",new G3Action(G3ActionKind.PhonePage,slot:1),phoneRecordPage+1<pages);return m;
             }
@@ -151,7 +151,7 @@ namespace Lottery.G3.Interaction
                 {
                     m.Messages.Add(new G3PhoneMessage("request-"+e.EventId,"借我周转一下\n"+G3Text.Money(e.AmountMinor)+" 元",true));
                     m.Messages.Add(new G3PhoneMessage("reply-"+e.EventId,(e.DueNight-e.Day)+"天后还我。"));
-                    m.Messages.Add(new G3PhoneMessage(e.EventId,"转账\n"+G3Text.Money(e.AmountMinor)+" 元",false,true,"已收款 · 第 "+e.DueNight+" 晚到期",new G3Action(G3ActionKind.PhoneRecords),true));
+                    m.Messages.Add(new G3PhoneMessage(e.EventId,"转账\n"+G3Text.Money(e.AmountMinor)+" 元",false,true,"已收款 · "+G3Text.LoanDue(s.Loans.FirstOrDefault(x=>x.LoanId==e.LoanId),s.DayNumber),new G3Action(G3ActionKind.PhoneRecords),true));
                 }
                 m.Messages.Add(new G3PhoneMessage("receipt-"+e.EventId,(e.Kind=="REPAID"?"归还":"到账")+G3Text.Money(e.AmountMinor)+"元",true));
                 if(e.Kind=="REPAID")m.Messages.Add(new G3PhoneMessage("thanks-"+e.EventId,selectedContact=="mother"?"收到了，踏实经营。":"收到了，量力而行。"));

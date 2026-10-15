@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using Lottery.G3.Core;
 
 namespace Lottery.G3.Interaction
@@ -39,6 +40,23 @@ namespace Lottery.G3.Interaction
         public static string Tool(string id)=>string.IsNullOrEmpty(id)?"空位":DayRules.Tool(id).Name;
         public static string Money(long amount)=>DayRules.Money(amount);
         public static string Signed(long amount)=>(amount>0?"+":"")+Money(amount);
+        // Current debt labels use saved loan deadlines, never a prospective borrow date.
+        public static string LoanDue(LoanRecord loan,int day,bool compact=false)
+        {
+            if(loan==null||loan.RemainingMinor<=0)return loan==null?"无欠款":"已还清";
+            return "第 "+loan.DueNight+" 晚"+(day>loan.DueNight?" · 已逾期":compact?"":"到期");
+        }
+        public static string ContactDebt(RunState state,string contactId)
+        {
+            var unpaid=state.Loans.Where(x=>x.ContactId==contactId&&x.RemainingMinor>0).OrderBy(x=>x.DueNight).ToArray();
+            if(unpaid.Length==0)
+            {
+                var contact=state.Contacts.FirstOrDefault(x=>x.ContactId==contactId);
+                return contact==null?"无欠款":contact.BorrowedLifetimeMinor>0?"已还清":"未借款";
+            }
+            string due=LoanDue(unpaid[0],state.DayNumber,true);
+            return Money(unpaid.Sum(x=>x.RemainingMinor))+"（"+(unpaid.Select(x=>x.DueNight).Distinct().Count()>1?"最早":"")+due+"）";
+        }
         public static string ConsumableHint(string id,string q)
         {
             int n=q=="precious"?2:q=="rare"?1:0;
