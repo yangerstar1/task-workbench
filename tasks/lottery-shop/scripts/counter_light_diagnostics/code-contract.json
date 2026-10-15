@@ -101,9 +101,9 @@
       "sha256": "16b3b7b6c8caaf7c85bc1392531cedf42be0d787243ca13c398e89dc97fb3d50"
     },
     {
-      "bytes": 23664,
+      "bytes": 25031,
       "repositoryPath": "tasks/lottery-shop/scripts/safe_project_ci.py",
-      "sha256": "717d977eb3cdfc1723920619daaa15f1980ffb1dcc91b577ec25ccda3d75c527"
+      "sha256": "b2e5924451c0651c239ccfc4ab77cfc4d02acaa85b9ce8bb148a920ffb441b4a"
     },
     {
       "bytes": 50794,

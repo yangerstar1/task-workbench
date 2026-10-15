@@ -1,0 +1,94 @@
+name: Lottery bounded phone return functional diagnostic only
+on:
+  push:
+    branches: [lottery-shop-g0-20261011]
+    paths: [tasks/lottery-shop/ci/phone-return-probe-request.json]
+permissions:
+  contents: read
+concurrency:
+  group: unity-personal-proof
+  cancel-in-progress: false
+jobs:
+  phone-return-only:
+    if: >-
+      github.event_name == 'push' && github.repository == 'yangerstar1/task-workbench' &&
+      github.repository_owner == 'yangerstar1' && github.actor == 'yangerstar1' &&
+      github.triggering_actor == 'yangerstar1' && github.ref == 'refs/heads/lottery-shop-g0-20261011' &&
+      github.event.repository.private == false && github.event.repository.fork == false && github.event.deleted == false
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+          lfs: false
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /tasks/lottery-shop/
+            /.github/workflows/lottery-phone-return-probe.yml
+            /.github/workflows/lottery-visual-candidate.yml
+            /.github/workflows/lottery-activation-probe.yml
+      - name: Require fresh independent phone-return request and exact source
+        id: guard
+        run: PYTHONDONTWRITEBYTECODE=1 python3 tasks/lottery-shop/scripts/phone_return_probe_ci.py guard
+      - name: Focused closed-selector and evidence rejection tests without secrets
+        run: PYTHONDONTWRITEBYTECODE=1 python3 tasks/lottery-shop/scripts/test_phone_return_probe_ci.py -v
+      - name: Prepare same authorized disposable runner disk layout
+        run: |
+          PYTHONDONTWRITEBYTECODE=1 python3 tasks/lottery-shop/scripts/phone_return_probe_ci.py guard
+          sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/.ghcup /usr/local/lib/android /opt/hostedtoolcache/CodeQL
+          python3 - <<'PY'
+          import shutil
+          if shutil.disk_usage('.').free < 30*1024**3:
+              raise SystemExit('INSUFFICIENT_IMAGE_DISK_SPACE')
+          PY
+      - name: Read same pinned public activation and return mechanism
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          repository: game-ci/unity-test-runner
+          ref: 0ff419b913a3630032cbe0de48a0099b5a9f0ed9
+          path: .visual-safe-upstream
+          persist-credentials: false
+          lfs: false
+          sparse-checkout: |
+            dist/BlankProject
+            dist/unity-config
+            dist/platforms/ubuntu
+      - name: Verify licensed font and hash exact source metadata
+        run: PYTHONDONTWRITEBYTECODE=1 python3 tasks/lottery-shop/scripts/phone_return_probe_ci.py prepare
+      - name: Activate once in this attempt's private container
+        id: safestart
+        timeout-minutes: 14
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+        run: PYTHONDONTWRITEBYTECODE=1 python3 tasks/lottery-shop/scripts/safe_project_ci.py start --phone-return-only
+      - name: "One exact phone return case: 180 seconds including fixture setup and cleanup, 480-second native cap"
+        id: phone_return
+        if: ${{ steps.safestart.outcome == 'success' }}
+        timeout-minutes: 10
+        run: PYTHONDONTWRITEBYTECODE=1 python3 tasks/lottery-shop/scripts/safe_project_ci.py phone-return-probe --phone-return-only
+      - name: Export only fixed safe fields and exact one-case verdict, never raw NUnit/logs
+        if: ${{ always() && steps.guard.outcome == 'success' && steps.phone_return.outcome != 'skipped' }}
+        run: PYTHONDONTWRITEBYTECODE=1 python3 tasks/lottery-shop/scripts/phone_return_probe_ci.py export
+      - name: Return only this owned activation and verify container absence
+        if: ${{ always() && steps.guard.outcome == 'success' && steps.safestart.outcome != 'skipped' }}
+        timeout-minutes: 5
+        run: PYTHONDONTWRITEBYTECODE=1 python3 tasks/lottery-shop/scripts/safe_project_ci.py finish --phone-return-only
+      - name: Upload only independent phone-return diagnostic evidence
+        if: ${{ always() && steps.guard.outcome == 'success' }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: lottery-phone-return-diagnostic-not-g3-pass-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            tasks/lottery-shop/evidence/phone-return-probe/source-receipt.json
+            tasks/lottery-shop/evidence/phone-return-probe/safe-start.json
+            tasks/lottery-shop/evidence/phone-return-probe/safe-phone-return-probe.json
+            tasks/lottery-shop/evidence/phone-return-probe/safe-finish.json
+            tasks/lottery-shop/evidence/phone-return-probe/safe-session.json
+            tasks/lottery-shop/evidence/phone-return-probe/phone-return-observation.json
+          if-no-files-found: error
+          retention-days: 7
+

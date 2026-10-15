@@ -253,6 +253,10 @@ def project_argv(phase, ident):
         shard = phase.removeprefix('regression-play-')
         argv += ['-g3RegressionProgress', '1', '-probeReviewedCommit', ident['reviewedCandidateCommit'],
                  '-g3RegressionShard', shard, '-testFilter', split.selection(shard)]
+    if phase == 'phone-return-probe':
+        import phone_return_probe_ci as phone
+        argv += ['-g3PhoneReturnDiagnostic', '1', '-probeReviewedCommit', ident['reviewedCandidateCommit'],
+                 '-probeRunAttempt', ident['runAttempt'], '-testFilter', phone.FILTER]
     if phase == 'performance-probe': argv += ['-g3PerformanceProbe', '1', '-probeReviewedCommit', ident['reviewedCandidateCommit']]
     if phase == 'capture' and COUNTER_LIGHT_DIAGNOSTIC:
         argv += ['-counterLightDiagnostic', '1']
@@ -330,6 +334,10 @@ def test(root, phase):
                 outputs += [artifacts / 'world-progress.jsonl', visual.outdir(root) / 'world-progress.json']
             for progress in outputs:
                 if progress.exists(): progress.unlink()
+        if phase == 'phone-return-probe':
+            for receipt in (artifacts / 'phone-return.json', artifacts / 'phone-return.json.tmp'):
+                private.require(not receipt.is_symlink(), 'PHONE_RECEIPT_LINK_REJECTED')
+                if receipt.exists(): receipt.unlink()
         if phase == 'performance-probe':
             for receipt in (artifacts / 'performance-receipt.json', visual.outdir(root) / 'performance-receipt.json'):
                 if receipt.exists(): receipt.unlink()
@@ -384,14 +392,29 @@ def configure_performance():
     PHASES = {'performance-probe': ('playmode', 'performance-probe', 'Lottery.G3.PerformanceDiagnostic.Tests', 600)}
 
 
+def configure_phone_return():
+    # Fixed independent one-case capability; all native security machinery is shared.
+    global visual, PHASES
+    import phone_return_probe_ci
+    visual = phone_return_probe_ci
+    PHASES = {"phone-return-probe": ("playmode", "phone-return-probe", "Lottery.G3.PlayMode.Tests", 480)}
+
+
 def main():
     global COUNTER_LIGHT_DIAGNOSTIC, COUNTER_LIGHT_DIAGNOSTIC_FAULT
     parser = argparse.ArgumentParser()
-    parser.add_argument('phase', choices=('start', *PHASES, 'performance-probe', 'finish'))
+    parser.add_argument('phase', choices=('start', *PHASES, 'performance-probe', 'phone-return-probe', 'finish'))
     parser.add_argument('--performance-only', action='store_true')
+    parser.add_argument('--phone-return-only', action='store_true')
     parser.add_argument('--counter-light-diagnostic', action='store_true')
     parser.add_argument('--counter-light-diagnostic-fault', default='')
     args = parser.parse_args()
+    if args.phone_return_only:
+        if args.performance_only or args.counter_light_diagnostic or args.counter_light_diagnostic_fault or args.phase not in ('start', 'phone-return-probe', 'finish'):
+            print('SAFE_PROJECT_PROFILE_REJECTED'); return 1
+        configure_phone_return()
+    elif args.phase == 'phone-return-probe':
+        print('SAFE_PROJECT_PROFILE_REJECTED'); return 1
     if args.counter_light_diagnostic or args.counter_light_diagnostic_fault:
         if args.phase != 'capture' or args.performance_only or not args.counter_light_diagnostic:
             print('SAFE_PROJECT_DIAGNOSTIC_PROFILE_REJECTED'); return 1

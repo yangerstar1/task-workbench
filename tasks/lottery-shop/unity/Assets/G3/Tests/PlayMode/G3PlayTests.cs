@@ -61,6 +61,7 @@ namespace Lottery.G3.PlayMode.Tests
         [UnitySetUp]
         public IEnumerator SetUp()
         {
+            BeginPhoneDiagnostic();
             bool setupComplete=false;
             try
             {
@@ -86,6 +87,7 @@ namespace Lottery.G3.PlayMode.Tests
                 BindPresentationTarget();
                 Physics.SyncTransforms();
                 yield return null;
+                CheckPhoneDeadline();
                 Assert.That(app.SceneCamera.orthographic,Is.False,"The real shop and tabletop must use the perspective scene camera");
                 TestContext.Out.WriteLine("SIMULATED_INPUT_SYSTEM startup: "+InputDiagnostic);
                 // Headless Editor focus is not device focus evidence. Establish the
@@ -107,6 +109,7 @@ namespace Lottery.G3.PlayMode.Tests
                 AssertRemovedGlobalNavigation();
                 Assert.That(P.View.HasButton("open-settings"),Is.True,"Settings remains the explicit persistent safety control");
                 TestContext.Out.WriteLine("SIMULATED_INPUT_SYSTEM ready, mouse/Escape edges primed: "+InputDiagnostic);
+                CheckPhoneDeadline();
                 setupComplete=true;
             }
             finally
@@ -123,6 +126,7 @@ namespace Lottery.G3.PlayMode.Tests
         [UnityTearDown]
         public IEnumerator TearDown()
         {
+            bool phoneCleanupComplete=false;
             try
             {
                 try
@@ -145,13 +149,15 @@ namespace Lottery.G3.PlayMode.Tests
                     var unloading=SceneManager.UnloadSceneAsync(scene);
                     Assert.That(unloading,Is.Not.Null,"G3 test scene unload must start");
                     var timeout=System.Diagnostics.Stopwatch.StartNew();
-                    while(!unloading.isDone && timeout.Elapsed.TotalSeconds<10) yield return null;
+                    while(!unloading.isDone && timeout.Elapsed.TotalSeconds<10) { CheckPhoneDeadline();yield return null; }
                     Assert.That(unloading.isDone,Is.True,"G3 test scene unload exceeded its 10-second diagnostic bound");
                 }
                 if(directory!=null && Directory.Exists(directory)) Directory.Delete(directory,true);
+                CheckPhoneDeadline();
                 yield return null;
+                phoneCleanupComplete=true;
             }
-            finally{RestoreLoadedPresentations();}
+            finally{try{RestoreLoadedPresentations();}finally{EndPhoneDiagnostic(phoneCleanupComplete);}}
         }
         void HidePresentation(GameObject owner)
         {
