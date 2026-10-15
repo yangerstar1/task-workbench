@@ -386,7 +386,7 @@ namespace Lottery.G3.Editor
                 }
                 if(validateRoom&&displayGlassGroups.Count!=4)
                     throw new InvalidOperationException("Expected exactly four authored display-case panes");
-                if(validateRoom)AddBackwallDisplay(groups,backwallMeshes);
+                if(validateRoom){AddBackwallDisplay(groups,backwallMeshes);AddCabinetRestockTray(groups,backwallMeshes);}
                 foreach(var pair in groups)
                 {
                     string path=generated+"/"+outputName+"_"+pair.Key+".asset";var mesh=AssetDatabase.LoadAssetAtPath<Mesh>(path);if(mesh==null){mesh=new Mesh();AssetDatabase.CreateAsset(mesh,path);}else mesh.Clear();
@@ -508,6 +508,45 @@ namespace Lottery.G3.Editor
             }
             if(triangles>3000)throw new InvalidOperationException("Backwall geometry budget exceeded");
             Debug.Log("G3_BACKWALL_DISPLAY triangles="+triangles+" added_renderers=0 added_materials=0 DEVICE_QA_NOT_RUN");
+        }
+        static void AddCabinetRestockTray(Dictionary<string,List<CombineInstance>> groups,List<Mesh> temporary)
+        {
+            // Fixed empty bay on the existing redemption-cabinet top. Unity basis
+            // is (-BlenderX, BlenderZ, -BlenderY); no furniture/physics changes.
+            // Envelope: x [-2.01,-1.64], y [1.465,1.693], z [-2.40,-2.02].
+            // Two upright refill packs and one working stack in a low oak organizer.
+            var wood=new BackwallMesh();var paper=new BackwallMesh();
+            var green=new BackwallMesh();var red=new BackwallMesh();
+            wood.Box(new Vector3(-1.825f,1.474f,-2.21f),new Vector3(.37f,.018f,.38f));
+            wood.Box(new Vector3(-1.647f,1.506f,-2.21f),new Vector3(.014f,.046f,.38f));
+            wood.Box(new Vector3(-2.003f,1.506f,-2.21f),new Vector3(.014f,.046f,.38f));
+            wood.Box(new Vector3(-1.825f,1.506f,-2.027f),new Vector3(.342f,.046f,.014f));
+            wood.Box(new Vector3(-1.825f,1.581f,-2.393f),new Vector3(.342f,.196f,.014f));
+            // Front pack rests on the tray floor; rear pack sits on a 30 mm oak
+            // riser against the rear stop. All covers preserve the approved 3:2 aspect.
+            wood.Box(new Vector3(-1.80f,1.498f,-2.356f),new Vector3(.27f,.03f,.06f));
+            paper.Box(new Vector3(-1.80f,1.603f,-2.356f),new Vector3(.27f,.18f,.06f));
+            paper.Box(new Vector3(-1.85f,1.573f,-2.288f),new Vector3(.27f,.18f,.06f));
+            // Full approved UV rectangles only; no replacement art or invented labels.
+            AddBackwallPaper(paper,red,new Vector3(-1.80f,1.603f,-2.3255f),new Vector2(.27f,.18f),0,0,new Rect(0,0,1,1));
+            AddBackwallPaper(paper,green,new Vector3(-1.85f,1.573f,-2.2575f),new Vector2(.27f,.18f),0,0,new Rect(0,0,1,1));
+            paper.Box(new Vector3(-1.82f,1.501f,-2.151f),new Vector3(.27f,.036f,.18f));
+            // Top cover of the lower refill stack; U points toward room screen-right,
+            // V toward the rear. Winding is upward, independent of two-sided printing.
+            green.Grid(new[]{new Vector3(-1.685f,1.5195f,-2.061f),new Vector3(-1.955f,1.5195f,-2.061f),new Vector3(-1.685f,1.5195f,-2.241f),new Vector3(-1.955f,1.5195f,-2.241f)},new[]{Vector2.zero,Vector2.right,Vector2.up,Vector2.one},1,1,false);
+            var names=new[]{"Warm_Oak","Paper_Ivory","Ticket_Swap_1","Ticket_Swap_2"};
+            var builders=new[]{wood,paper,green,red};int triangles=0;
+            for(int i=0;i<builders.Length;i++)
+            {
+                if(!groups.TryGetValue(names[i],out var group))throw new InvalidOperationException("Cabinet restock requires existing opaque group "+names[i]);
+                var mesh=builders[i].Finish("Cabinet restock "+names[i]);temporary.Add(mesh);triangles+=mesh.triangles.Length/3;
+                var bounds=mesh.bounds;var min=bounds.min;var max=bounds.max;
+                if(min.x< -2.011f||max.x> -1.639f||min.y<1.464f||max.y>1.694f||min.z< -2.401f||max.z> -2.019f)
+                    throw new InvalidOperationException("Cabinet restock escaped its empty countertop bay");
+                group.Add(new CombineInstance{mesh=mesh,subMeshIndex=0,transform=Matrix4x4.identity});
+            }
+            if(triangles>400)throw new InvalidOperationException("Cabinet restock geometry budget exceeded");
+            Debug.Log("G3_CABINET_RESTOCK triangles="+triangles+" added_renderers=0 added_materials=0 DEVICE_QA_NOT_RUN");
         }
         static Vector3 BackwallPoint(Vector3 center,float x,float y,float z,float roll)
         {return center+Quaternion.Euler(0,0,roll)*new Vector3(-x,y,z);}
