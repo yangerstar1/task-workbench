@@ -71,7 +71,12 @@ namespace Lottery.G3.Interaction
             go.transform.position=emitter.bounds.center+direction*.018f;go.transform.LookAt(target);
             var light=go.AddComponent<Light>();light.type=LightType.Spot;
             light.color=new Color(1f,.94f,.82f);light.intensity=.12f;light.range=.85f;
-            light.spotAngle=110f;light.innerSpotAngle=75f;
+            // Keep the source at the LED ring and feather its beam onto the paper.
+            // The tray lip is ~43 degrees off-axis in the authored left-hand slot;
+            // a 35-degree half-cone rejects it without dimming the on-axis ticket.
+            // The small core also rolls off the nearer paper instead of applying
+            // full intensity across the steep inverse-square near-field gradient.
+            light.spotAngle=70f;light.innerSpotAngle=20f;
             // A small local source with no extra shadow atlas slot. The ceiling
             // reading source already supplies the tabletop's soft cast shadows.
             light.shadows=LightShadows.None;light.renderMode=LightRenderMode.ForcePixel;
