@@ -20,8 +20,8 @@ def fixture():
  'lightPositions':[dict(x=0,y=0,z=0) for _ in range(5)],'lightRotations':[dict(x=0,y=0,z=0,w=1) for _ in range(5)],
  'lightRanges':[10,4.8,4.2,4,2],'lightSpotAngles':[115]*5,'lightInnerSpotAngles':[70]*5,'lightShadows':['Soft','Soft','Soft','None','None'],
  'lightEnabled':[True]*5,'lightCullingMasks':[-1]*5,'probeIntensity':.85,'reflectionIntensity':1,'probeTextureId':'31','probeTextureName':'Day','ambientSH':[.2]*27,
- 'ambientMode':'Trilight','ambientIntensity':1,'ambientSkyColor':dict(r=.68,g=.74,b=.80,a=1),'ambientEquatorColor':dict(r=.58,g=.57,b=.51,a=1),
- 'ambientGroundColor':dict(r=.34,g=.31,b=.26,a=1),'ambientLight':dict(r=.68,g=.74,b=.80,a=1),
+ 'ambientMode':'Trilight','ambientIntensity':1,'ambientSkyColor':dict(r=.51,g=.555,b=.60,a=1),'ambientEquatorColor':dict(r=.435,g=.4275,b=.3825,a=1),
+ 'ambientGroundColor':dict(r=.255,g=.2325,b=.195,a=1),'ambientLight':dict(r=.51,g=.555,b=.60,a=1),
  'oakShader':'Universal Render Pipeline/Lit','oakMaterialId':10,'oakKeywords':['_METALLICSPECGLOSSMAP','_NORMALMAP'],
  'oakSmoothness':1,'oakNormalStrength':.28,'oakSpecularHighlights':1,'oakBaseMapId':'21','oakBaseMapName':'Walnut_v15_BaseColor',
  'oakBaseColor':dict(r=1,g=1,b=1,a=1),'oakBaseScale':dict(x=1,y=1),'oakBaseOffset':dict(x=0,y=0),
@@ -74,6 +74,18 @@ class SafetyTests(unittest.TestCase):
  def setUp(self):
   self.tmp=tempfile.TemporaryDirectory();self.addCleanup(self.tmp.cleanup);self.root=pathlib.Path(self.tmp.name);safe.ACTIVE.clear()
   self.env=mock.patch.dict(os.environ,{'GITHUB_WORKSPACE':str(self.root),'GITHUB_SHA':'b'*40,'GITHUB_RUN_ID':'123','GITHUB_RUN_ATTEMPT':'1'});self.env.start();self.addCleanup(self.env.stop);self.addCleanup(safe.ACTIVE.clear)
+ def test_current_day_trilight_float32_receipt_passes_semantics_and_safety(self):
+  d=full_receipt()
+  for controls in [d['initialControls']]+[row['controls'] for row in d['cases']]:
+   for key in ('ambientSkyColor','ambientEquatorColor','ambientGroundColor','ambientLight'):
+    controls[key]={k:struct.unpack('f',struct.pack('f',value))[0] for k,value in controls[key].items()}
+  seal(d);self.assertEqual(e.receipt(encode(d),IDENT),d);v.validate_receipt(d,'a'*64,'b'*40)
+ def test_previous_day_trilight_receipt_is_safe_but_semantically_rejected(self):
+  d=full_receipt()
+  old={'ambientSkyColor':dict(r=.68,g=.74,b=.80,a=1),'ambientEquatorColor':dict(r=.58,g=.57,b=.51,a=1),'ambientGroundColor':dict(r=.34,g=.31,b=.26,a=1),'ambientLight':dict(r=.68,g=.74,b=.80,a=1)}
+  for controls in [d['initialControls']]+[row['controls'] for row in d['cases'] if row['id']!='ambient-sh-zero']:controls.update(copy.deepcopy(old))
+  seal(d);self.assertEqual(e.receipt(encode(d),IDENT),d)
+  with self.assertRaisesRegex(ValueError,'Initial Trilight color baseline drift'):v.validate_receipt(d,'a'*64,'b'*40)
  def test_complete_raw_receipt_is_safe_but_not_semantic_pass(self):
   d=full_receipt();self.assertEqual(e.receipt(encode(d),IDENT),d)
   d['cases'][10]['controls']['ambientSH']=[.5]*27;seal(d);e.receipt(encode(d),IDENT)

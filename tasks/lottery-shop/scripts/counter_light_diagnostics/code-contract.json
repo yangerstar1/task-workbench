@@ -16,6 +16,11 @@
       "sha256": "2fc1e5b62878150b3b03bc22cbe33909acfa4087b0af08311464a06ab05077d4"
     },
     {
+      "bytes": 9561,
+      "repositoryPath": "tasks/lottery-shop/scripts/art_only_capture_ci.py",
+      "sha256": "31a4cabe8effb7f3a4be7fb602e1408013fb1cc17058f2809a7969927ca2234a"
+    },
+    {
       "bytes": 20759,
       "repositoryPath": "tasks/lottery-shop/scripts/counter_light_diagnostics/compose_evidence.py",
       "sha256": "958e766eeef8be0caba4e3bcf8f848933eb4bd606a0eaf0cd69f5f0557c5ca79"
@@ -71,9 +76,9 @@
       "sha256": "c079c7ab2bdd88f40a67cd68e728323d30fa51c670c0a1266c269e36168d88b1"
     },
     {
-      "bytes": 21289,
+      "bytes": 21299,
       "repositoryPath": "tasks/lottery-shop/scripts/counter_light_diagnostics/verify_and_measure.py",
-      "sha256": "bc4668e4ce1b30e9d8ad50f1fa759c9059370daa11e13f8e9e3a56e53f9d39fa"
+      "sha256": "1c93a2dd21a9810b3103b28d4876fca12ed0c207eaae2b251e99eed76e52f571"
     },
     {
       "bytes": 18193,
@@ -96,19 +101,19 @@
       "sha256": "6c0eafdaec2cac335ff3cec6bddd5663514ae941f0a2ab627f5216b84cb604ed"
     },
     {
-      "bytes": 23423,
+      "bytes": 23664,
       "repositoryPath": "tasks/lottery-shop/scripts/safe_project_ci.py",
-      "sha256": "0190adc40061fe6c8c1225bd6d9542757e24622ee000e6a4262af52fe32d5b44"
+      "sha256": "717d977eb3cdfc1723920619daaa15f1980ffb1dcc91b577ec25ccda3d75c527"
     },
     {
-      "bytes": 48271,
+      "bytes": 50794,
       "repositoryPath": "tasks/lottery-shop/scripts/visual_candidate_ci.py",
-      "sha256": "e5614ad7772fae8d1ffbc5878feee0de888282f58dfd44569fa4803e431021dc"
+      "sha256": "90e2583073c3e15e802960dfeae7cdab84391f9c4bf1cd69207b725d39f8e1c0"
     },
     {
-      "bytes": 49197,
+      "bytes": 49207,
       "repositoryPath": "tasks/lottery-shop/unity/Assets/G3/Tests/VisualCandidate/CounterLightDiagnosticCapture.cs",
-      "sha256": "a60ce60981c47306872f5c007acd4aae67401f9b568de64ee8d41f3104503945"
+      "sha256": "ed3fd4b0ce6abc937432c550f64a9727fe57751bdfd64f170fe1a9fa470c1d73"
     },
     {
       "bytes": 60,

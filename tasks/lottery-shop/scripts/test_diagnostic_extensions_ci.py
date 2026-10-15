@@ -134,7 +134,8 @@ class CombinedDiagnosticTests(unittest.TestCase):
         for row in data['files']:
             names.append(row['repositoryPath']);raw=(ROOT/row['repositoryPath']).read_bytes()
             self.assertEqual(len(raw),row['bytes']);self.assertEqual(hashlib.sha256(raw).hexdigest(),row['sha256'])
-        self.assertEqual(len(names),len(set(names)));self.assertEqual(len(names),24)
+        self.assertEqual(len(names),len(set(names)));self.assertEqual(len(names),25)
+        self.assertIn('tasks/lottery-shop/scripts/art_only_capture_ci.py',names)
         for new in ('tasks/lottery-shop/scripts/post_capture_safety.py','tasks/lottery-shop/scripts/counter_light_diagnostics/export_observation.py'):self.assertIn(new,names)
         pins=json.loads((folder/'dependency-pins.json').read_bytes())
         for name,digest in pins.items():self.assertEqual(hashlib.sha256((folder/'pinned_dependencies'/name).read_bytes()).hexdigest(),digest)

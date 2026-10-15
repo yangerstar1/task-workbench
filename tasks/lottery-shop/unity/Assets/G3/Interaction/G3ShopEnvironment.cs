@@ -115,7 +115,7 @@ namespace Lottery.G3.Interaction
             daylight.shadowBias=.015f;daylight.shadowNormalBias=.06f;
             daylight.GetUniversalAdditionalLightData().usePipelineSettings=false;RenderSettings.sun=daylight;
             // Real ceiling/pendant sources supply local shape and contact shadows.
-            // Explicit ambient SH below supplies the bounce that an unbaked room lacks.
+            // Trilight colours below supply the effective ambient bounce.
             Practical("Warm counter pendant",AnchorPosition("light_counter",new Vector3(1.12f,2.30f,-.9f)),new Color(1,.89f,.72f),PracticalStrengths[0],4.8f,new Vector3(.4f,.9f,-1.7f),true);
             Practical("Table reading pendant",AnchorPosition("light_table",new Vector3(-1.71f,2.30f,-.24f)),new Color(1,.95f,.86f),PracticalStrengths[1],4.2f,TicketPosition,true);
             Practical("Shelf ambient fill",AnchorPosition("light_shelf",new Vector3(2.2f,2.2f,-.4f)),new Color(.83f,.91f,1),PracticalStrengths[2],4,new Vector3(2.1f,1.1f,-.4f),false);
@@ -288,11 +288,12 @@ namespace Lottery.G3.Interaction
             daylight.shadowStrength=value?.55f:.65f;
             daylight.intensity=value ? .16f : DaylightStrength;daylight.color=value?new Color(.49f,.62f,.91f):new Color(1,.94f,.84f);
             RenderSettings.ambientMode=AmbientMode.Trilight;
-            RenderSettings.ambientSkyColor=value?new Color(.30f,.34f,.43f):new Color(.68f,.74f,.80f);
-            RenderSettings.ambientEquatorColor=value?new Color(.35f,.31f,.27f):new Color(.58f,.57f,.51f);
-            RenderSettings.ambientGroundColor=value?new Color(.20f,.18f,.17f):new Color(.34f,.31f,.26f);
-            // Setting only Trilight colours does not establish a new runtime scene's
-            // ambient probe. Set its actual SH coefficients synchronously as well.
+            RenderSettings.ambientSkyColor=value?new Color(.30f,.34f,.43f):new Color(.51f,.555f,.60f);
+            RenderSettings.ambientEquatorColor=value?new Color(.35f,.31f,.27f):new Color(.435f,.4275f,.3825f);
+            RenderSettings.ambientGroundColor=value?new Color(.20f,.18f,.17f):new Color(.255f,.2325f,.195f);
+            // Trilight derives the effective ambient probe from the three colours above.
+            // Run37's manual SH-only reduction produced no visible frame improvement.
+            // Retain the manual assignment unchanged; tune Trilight through its colours.
             var bounce=new SphericalHarmonicsL2();bounce.AddAmbientLight(value?new Color(.20f,.21f,.24f):new Color(.252f,.276f,.258f));
             bounce.AddDirectionalLight(Vector3.up,value?new Color(.16f,.13f,.10f):new Color(.20f,.22f,.25f),.7f);
             RenderSettings.ambientProbe=bounce;RenderSettings.reflectionIntensity=value ? .7f : 1;

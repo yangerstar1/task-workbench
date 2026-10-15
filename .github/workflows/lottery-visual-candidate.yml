@@ -39,6 +39,7 @@ jobs:
         id: guard
         run: python3 tasks/lottery-shop/scripts/visual_candidate_ci.py guard
       - name: Run diagnostic evidence validator synthetic tests
+        if: ${{ steps.guard.outputs.execution_profile != 'ART_ONLY_DIAGNOSTIC' }}
         run: |
           PYTHONDONTWRITEBYTECODE=1 python3 tasks/lottery-shop/scripts/test_visual_candidate_ci.py -v
           PYTHONDONTWRITEBYTECODE=1 python3 tasks/lottery-shop/scripts/test_android_candidate_ci.py -v
@@ -56,6 +57,9 @@ jobs:
           PYTHONDONTWRITEBYTECODE=1 python3 -S tasks/lottery-shop/scripts/test_counter_light_prepare_ci.py -v
           PYTHONDONTWRITEBYTECODE=1 python3 tasks/lottery-shop/scripts/test_stage_a_combined_receipt_ci.py -v
           PYTHONDONTWRITEBYTECODE=1 python3 tasks/lottery-shop/scripts/export_interior_meta.py --self-test
+      - name: Check the closed art-only selector, NOT_RUN semantics and cleanup scheduling
+        if: ${{ steps.guard.outputs.execution_profile == 'ART_ONLY_DIAGNOSTIC' }}
+        run: PYTHONDONTWRITEBYTECODE=1 python3 tasks/lottery-shop/scripts/test_art_only_capture_ci.py -v
       - name: Prepare existing authorized disposable runner disk layout
         run: |
           python3 tasks/lottery-shop/scripts/visual_candidate_ci.py guard
@@ -81,12 +85,19 @@ jobs:
         run: |
           python3 tasks/lottery-shop/scripts/visual_candidate_ci.py restore-font
           python3 tasks/lottery-shop/scripts/visual_candidate_ci.py snapshot
+      - name: Bind art-only capture to the exact reviewed source contract before activation
+        id: artprepare
+        if: ${{ steps.guard.outputs.execution_profile == 'ART_ONLY_DIAGNOSTIC' }}
+        timeout-minutes: 1
+        run: PYTHONDONTWRITEBYTECODE=1 python3 tasks/lottery-shop/scripts/art_only_capture_ci.py prepare
       - name: Bind counter-light diagnostic to the reviewed cold source before native preparation
         id: counterlightprepare
+        if: ${{ steps.guard.outputs.execution_profile != 'ART_ONLY_DIAGNOSTIC' }}
         timeout-minutes: 5
         run: PYTHONDONTWRITEBYTECODE=1 python3 tasks/lottery-shop/scripts/counter_light_diagnostics/compose_evidence.py prepare --repo-root "$GITHUB_WORKSPACE"
       - name: Verify pinned image measurement dependencies before any native activation
         id: counterlightdeps
+        if: ${{ steps.guard.outputs.execution_profile != 'ART_ONLY_DIAGNOSTIC' }}
         timeout-minutes: 5
         shell: bash
         run: |
@@ -115,7 +126,12 @@ jobs:
         id: capture
         if: ${{ steps.safestart.outcome == 'success' }}
         timeout-minutes: 32
-        run: PYTHONDONTWRITEBYTECODE=1 python3 tasks/lottery-shop/scripts/safe_project_ci.py capture --counter-light-diagnostic
+        run: |
+          if [ "${{ steps.guard.outputs.execution_profile }}" = "ART_ONLY_DIAGNOSTIC" ]; then
+            PYTHONDONTWRITEBYTECODE=1 python3 tasks/lottery-shop/scripts/safe_project_ci.py capture
+          else
+            PYTHONDONTWRITEBYTECODE=1 python3 tasks/lottery-shop/scripts/safe_project_ci.py capture --counter-light-diagnostic
+          fi
       - name: Preserve fixed-schema bounded prebuild, lifecycle and runtime milestones
         if: ${{ always() && steps.guard.outcome == 'success' && steps.capture.outcome != 'skipped' }}
         run: python3 tasks/lottery-shop/scripts/visual_candidate_ci.py progress
@@ -148,6 +164,7 @@ jobs:
           path: |
             tasks/lottery-shop/evidence/visual-candidate/source-receipt.json
             tasks/lottery-shop/evidence/visual-candidate/source-before.json
+            tasks/lottery-shop/evidence/visual-candidate/art-only-preparation.json
             tasks/lottery-shop/evidence/visual-candidate/font-receipt.json
             tasks/lottery-shop/evidence/visual-candidate/reflections/Day.exr
             tasks/lottery-shop/evidence/visual-candidate/reflections/Day.exr.meta
@@ -195,11 +212,11 @@ jobs:
           retention-days: 7
       - name: Decide explicitly requested diagnostic prebuild-failure short-circuit
         id: regressiondecision
-        if: ${{ always() && steps.guard.outcome == 'success' && steps.safestart.outcome == 'success' && steps.capture.outcome == 'failure' }}
+        if: ${{ always() && steps.guard.outcome == 'success' && steps.guard.outputs.execution_profile != 'ART_ONLY_DIAGNOSTIC' && steps.safestart.outcome == 'success' && steps.capture.outcome == 'failure' }}
         run: PYTHONDONTWRITEBYTECODE=1 python3 tasks/lottery-shop/scripts/diagnostic_early_stop_ci.py decide
       - name: Existing Probe, G2, and G3 EditMode suites without skipped cases
         id: regressionedit
-        if: ${{ always() && steps.guard.outcome == 'success' && steps.safestart.outcome == 'success' && steps.capture.outcome != 'skipped' && !(steps.regressiondecision.outcome == 'success' && steps.regressiondecision.outputs.skip_regressions == 'true') }}
+        if: ${{ always() && steps.guard.outcome == 'success' && steps.guard.outputs.execution_profile != 'ART_ONLY_DIAGNOSTIC' && steps.safestart.outcome == 'success' && steps.capture.outcome != 'skipped' && !(steps.regressiondecision.outcome == 'success' && steps.regressiondecision.outputs.skip_regressions == 'true') }}
         timeout-minutes: 10
         run: PYTHONDONTWRITEBYTECODE=1 python3 tasks/lottery-shop/scripts/safe_project_ci.py regression-edit
       - name: Verify existing exact EditMode identities and preserve bounded original XML
@@ -207,11 +224,11 @@ jobs:
         run: python3 tasks/lottery-shop/scripts/visual_candidate_ci.py tests --stage regression-edit
       - name: Clear only fixed old G3 frame outputs before this attempt
         id: prepareoriginal
-        if: ${{ always() && steps.guard.outcome == 'success' && steps.capture.outcome != 'skipped' && !(steps.regressiondecision.outcome == 'success' && steps.regressiondecision.outputs.skip_regressions == 'true') }}
+        if: ${{ always() && steps.guard.outcome == 'success' && steps.guard.outputs.execution_profile != 'ART_ONLY_DIAGNOSTIC' && steps.capture.outcome != 'skipped' && !(steps.regressiondecision.outcome == 'success' && steps.regressiondecision.outputs.skip_regressions == 'true') }}
         run: python3 tasks/lottery-shop/scripts/visual_candidate_ci.py prepare-original-g3-captures
       - name: Run exact 34 non-WORLD PlayMode cases in their own 720-second native process
         id: regressionplaycore
-        if: ${{ always() && steps.guard.outcome == 'success' && steps.safestart.outcome == 'success' && steps.capture.outcome != 'skipped' && !(steps.regressiondecision.outcome == 'success' && steps.regressiondecision.outputs.skip_regressions == 'true') }}
+        if: ${{ always() && steps.guard.outcome == 'success' && steps.guard.outputs.execution_profile != 'ART_ONLY_DIAGNOSTIC' && steps.safestart.outcome == 'success' && steps.capture.outcome != 'skipped' && !(steps.regressiondecision.outcome == 'success' && steps.regressiondecision.outputs.skip_regressions == 'true') }}
         timeout-minutes: 14
         run: PYTHONDONTWRITEBYTECODE=1 python3 tasks/lottery-shop/scripts/safe_project_ci.py regression-play-core
       - name: Preserve core progress even on timeout
@@ -255,7 +272,7 @@ jobs:
           retention-days: 7
       - name: Run exact 3 WORLD PlayMode cases in their own 480-second native process
         id: regressionplayworld
-        if: ${{ always() && steps.guard.outcome == 'success' && steps.safestart.outcome == 'success' && steps.capture.outcome != 'skipped' && !(steps.regressiondecision.outcome == 'success' && steps.regressiondecision.outputs.skip_regressions == 'true') }}
+        if: ${{ always() && steps.guard.outcome == 'success' && steps.guard.outputs.execution_profile != 'ART_ONLY_DIAGNOSTIC' && steps.safestart.outcome == 'success' && steps.capture.outcome != 'skipped' && !(steps.regressiondecision.outcome == 'success' && steps.regressiondecision.outputs.skip_regressions == 'true') }}
         timeout-minutes: 10
         run: PYTHONDONTWRITEBYTECODE=1 python3 tasks/lottery-shop/scripts/safe_project_ci.py regression-play-world
       - name: Record NOT_RUN only after Edit and both Play processes were actually skipped
@@ -337,6 +354,29 @@ jobs:
           path: ${{ runner.temp }}/lottery-interior-meta-structure-${{ github.run_id }}-${{ github.run_attempt }}/interior-meta-structure.json
           if-no-files-found: error
           retention-days: 7
+      - name: Record art-only NOT_RUN from actual skipped regressions without replacing failures
+        id: artreceipt
+        if: ${{ always() && steps.guard.outcome == 'success' && steps.guard.outputs.execution_profile == 'ART_ONLY_DIAGNOSTIC' }}
+        env:
+          ART_GUARD_OUTCOME: ${{ steps.guard.outcome }}
+          ART_EXECUTION_PROFILE: ${{ steps.guard.outputs.execution_profile }}
+          ART_PREPARE_OUTCOME: ${{ steps.artprepare.outcome }}
+          ART_START_OUTCOME: ${{ steps.safestart.outcome }}
+          ART_CAPTURE_OUTCOME: ${{ steps.capture.outcome }}
+          ART_FINISH_OUTCOME: ${{ steps.nativefinish.outcome }}
+          ART_PREPARE_ORIGINAL_OUTCOME: ${{ steps.prepareoriginal.outcome }}
+          REGRESSION_EDIT_OUTCOME: ${{ steps.regressionedit.outcome }}
+          REGRESSION_PLAY_CORE_OUTCOME: ${{ steps.regressionplaycore.outcome }}
+          REGRESSION_PLAY_WORLD_OUTCOME: ${{ steps.regressionplayworld.outcome }}
+        run: PYTHONDONTWRITEBYTECODE=1 python3 tasks/lottery-shop/scripts/art_only_capture_ci.py finalize
+      - name: Publish the explicit art-only profile receipt with no regression or G3 claim
+        if: ${{ always() && steps.artreceipt.outcome == 'success' }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: lottery-art-only-diagnostic-regressions-not-run-${{ github.run_id }}-${{ github.run_attempt }}
+          path: tasks/lottery-shop/evidence/visual-candidate/art-only-execution.json
+          if-no-files-found: error
+          retention-days: 7
       - name: Capture source mutation metadata without exporting project settings or logs
         if: ${{ always() && steps.guard.outcome == 'success' && steps.capture.outcome != 'skipped' }}
         run: python3 tasks/lottery-shop/scripts/visual_candidate_ci.py snapshot-after
@@ -362,6 +402,8 @@ jobs:
             tasks/lottery-shop/evidence/visual-candidate/safe-session.json
             tasks/lottery-shop/evidence/visual-candidate/diagnostic-regression-decision.json
             tasks/lottery-shop/evidence/visual-candidate/diagnostic-regression-not-run.json
+            tasks/lottery-shop/evidence/visual-candidate/art-only-execution.json
+            tasks/lottery-shop/evidence/visual-candidate/art-only-preparation.json
             tasks/lottery-shop/evidence/visual-candidate/regression-edit/raw-test-results.xml
             tasks/lottery-shop/evidence/visual-candidate/regression-edit/raw-test-report-receipt.json
             tasks/lottery-shop/evidence/visual-candidate/regression-edit/test-receipt.json

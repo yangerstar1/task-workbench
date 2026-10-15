@@ -309,7 +309,11 @@ def start(root):
 
 
 def test(root, phase):
-    ident = identity(root); value = session(root, ident); record = process_receipt(ident, phase); started = time.monotonic()
+    ident = identity(root)
+    if ident.get('executionProfile') == 'ART_ONLY_DIAGNOSTIC':
+        private.require(phase == 'capture' and not COUNTER_LIGHT_DIAGNOSTIC and not COUNTER_LIGHT_DIAGNOSTIC_FAULT,
+                        'ART_ONLY_FIXED_CAPTURE_REQUIRED')
+    value = session(root, ident); record = process_receipt(ident, phase); started = time.monotonic()
     try:
         private.require(value['status'] == 'READY' and value['activationSucceeded'] and phase not in value['stagesStarted'], 'SESSION_NOT_READY_OR_PHASE_REPEATED')
         value['stagesStarted'].append(phase); private.write(file(root, 'session'), value)

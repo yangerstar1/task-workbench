@@ -175,7 +175,7 @@ def validate_receipt(d, normal_sha, commit):
     validate_controls_shape(initial)
     require(initial['lightNames'] == NAMES and len(initial['lightIntensities']) == 5 and all(near(a,b) for a,b in zip(initial['lightIntensities'],EXPECTED)), 'Initial light values drift')
     require(near(initial['probeIntensity'],.85) and initial['reflectionIntensity'] == 1 and len(initial['ambientSH']) == 27, 'Initial indirect values drift')
-    for key, rgb in [('ambientSkyColor',(.68,.74,.80)),('ambientEquatorColor',(.58,.57,.51)),('ambientGroundColor',(.34,.31,.26))]:
+    for key, rgb in [('ambientSkyColor',(.51,.555,.60)),('ambientEquatorColor',(.435,.4275,.3825)),('ambientGroundColor',(.255,.2325,.195))]:
         require(all(near(initial[key][c],n) for c,n in zip('rgb',rgb)) and initial[key]['a']==1, 'Initial Trilight color baseline drift')
     require(initial['oakShader'] == 'Universal Render Pipeline/Lit' and initial['oakKeywords'] == sorted(initial['oakKeywords']), 'Initial Lit shader/keywords invalid')
     require(d.get('oakMaterialCoverage') == 'ALL_MERGED_WARM_OAK_GEOMETRY_NOT_FASCIA_ONLY', 'Target coverage not disclosed')

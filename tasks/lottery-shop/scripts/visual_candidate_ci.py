@@ -84,6 +84,7 @@ def read_json(path, maximum=2 * 1024 * 1024):
 
 FULL_DIAGNOSTIC = "FULL_DIAGNOSTIC"
 EARLY_STOP = "EARLY_STOP_ON_PREBUILD_FAILURE"
+ART_ONLY = "ART_ONLY_DIAGNOSTIC"
 
 
 def read_diagnostic_request(path):
@@ -117,6 +118,21 @@ def request_profile(request):
     return request["executionProfile"]
 
 
+def request_execution_profile(request):
+    """Separate art-only capability; the pinned legacy parser stays unchanged."""
+    if type(request) is dict and request.get("executionProfile") == ART_ONLY:
+        keys = {"schemaVersion", "requestId", "sourceCommit", "purpose", "sourceReview", "executionProfile"}
+        require(type(request.get("schemaVersion")) is int and request["schemaVersion"] == 2 and
+                set(request) == keys, "Art-only requires exact schema 2 without Android capability")
+        require(all(type(request[key]) is str for key in ("requestId", "sourceCommit", "purpose", "executionProfile")),
+                "Art-only request field types rejected")
+        review = request["sourceReview"]
+        require(type(review) is dict and set(review) == {"sourceCommit", "status", "reviewedAtUtc", "reviewId", "reviewer"} and
+                all(type(value) is str for value in review.values()), "Art-only source review field types rejected")
+        return ART_ONLY
+    return request_profile(request)
+
+
 def guard(root):
     env = os.environ
     for key, value in {"GITHUB_EVENT_NAME": "push", "GITHUB_REPOSITORY": "yangerstar1/task-workbench",
@@ -128,7 +144,7 @@ def guard(root):
     source = env.get("GITHUB_SHA", "")
     require(HEX40.fullmatch(source) and source == git(root, "rev-parse", "HEAD"), "Source commit mismatch")
     request = read_diagnostic_request(root / REQUEST)
-    request_profile(request)
+    profile = request_execution_profile(request)
     require(request["purpose"] == SCOPE, "Request is not a diagnostic visual candidate")
     require(re.fullmatch(r"lottery-visual-[0-9]{8}-[0-9]{2,3}", request["requestId"]), "Invalid request identity")
     require(HEX40.fullmatch(request["sourceCommit"]) and request["sourceCommit"] == git(root, "rev-parse", "HEAD^"), "Trigger must directly follow the separately reviewed candidate source")
@@ -146,9 +162,13 @@ def guard(root):
     identity = {"scope": SCOPE, "sourceCommit": source, "reviewedCandidateCommit": request["sourceCommit"],
                 "requestId": request["requestId"], "runId": env["GITHUB_RUN_ID"], "runAttempt": env["GITHUB_RUN_ATTEMPT"],
                 "deviceQa": "NOT_RUN", "g3Gate": "NOT_EVALUATED", "sourceApproval": "FIXED_ACTOR_ATTESTED_INDEPENDENT_DIAGNOSTIC_REVIEW_NOT_CRYPTOGRAPHIC_SIGNATURE", "sourceReview": review}
+    if profile == ART_ONLY:
+        identity.update(executionProfile=ART_ONLY, regressionPlan="NOT_REQUESTED_ART_ONLY_DIAGNOSTIC",
+                        priorRegressionFailures="UNCHANGED_NOT_SUPERSEDED")
     write(outdir(root) / "source-receipt.json", identity)
     if env.get("GITHUB_OUTPUT"):
         with open(env["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
+            output.write("execution_profile=" + profile + "\n")
             output.write("android_requested=" + ("true" if request["schemaVersion"] == 3 else "false") + "\n")
     return identity
 
@@ -170,6 +190,20 @@ def snapshot(root, after=False):
         require(path.is_file() and not path.is_symlink(), "Committed source input is not a regular file")
         records.append({"path": name, "sha256": sha(path), "bytes": path.stat().st_size})
     payload = dict(identity(root), status="SOURCE_HASH_METADATA_ONLY", files=records)
+    if after and payload.get("executionProfile") == ART_ONLY:
+        # Actual skipped outcomes are attested separately after cleanup. Missing
+        # or rejected evidence is never interpreted as a regression pass.
+        final_path = outdir(root) / "art-only-execution.json"
+        payload["regressionExecution"] = "UNVERIFIED_SEPARATE_PROFILE_RECEIPT_REQUIRED"
+        if final_path.is_file() and not final_path.is_symlink():
+            final = read_json(final_path, 8192)
+            fields = ("sourceCommit", "reviewedCandidateCommit", "runId", "runAttempt", "requestId", "executionProfile")
+            require(all(final.get(k) == payload[k] for k in fields), "Art-only final identity mismatch")
+            require(final.get("status") == "ART_ONLY_DIAGNOSTIC_REGRESSIONS_NOT_RUN" and
+                    all(final.get(k) == "NOT_RUN" for k in ("regressionEdit", "regressionPlayCore", "regressionPlayWorld", "fullG3", "androidBuild")) and
+                    final.get("g3Gate") == "NOT_EVALUATED", "Art-only final scope mismatch")
+            payload["regressionExecution"] = "NOT_RUN"
+            payload["artOnlyExecutionReceiptSha256"] = sha(final_path)
     write(outdir(root) / ("source-after.json" if after else "source-before.json"), payload)
     if after:
         before = read_json(outdir(root) / "source-before.json")
