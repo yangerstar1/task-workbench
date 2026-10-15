@@ -149,15 +149,21 @@ namespace Lottery.G3.PlayMode.Tests
                     var unloading=SceneManager.UnloadSceneAsync(scene);
                     Assert.That(unloading,Is.Not.Null,"G3 test scene unload must start");
                     var timeout=System.Diagnostics.Stopwatch.StartNew();
-                    while(!unloading.isDone && timeout.Elapsed.TotalSeconds<10) { CheckPhoneDeadline();yield return null; }
+                    // Cleanup must continue after the phone case deadline. The
+                    // existing unload bound remains; report the timing failure after cleanup.
+                    while(!unloading.isDone && timeout.Elapsed.TotalSeconds<10) { yield return null; }
                     Assert.That(unloading.isDone,Is.True,"G3 test scene unload exceeded its 10-second diagnostic bound");
                 }
                 if(directory!=null && Directory.Exists(directory)) Directory.Delete(directory,true);
-                CheckPhoneDeadline();
                 yield return null;
                 phoneCleanupComplete=true;
             }
-            finally{try{RestoreLoadedPresentations();}finally{EndPhoneDiagnostic(phoneCleanupComplete);}}
+            finally
+            {
+                bool presentationsRestored=false;
+                try{RestoreLoadedPresentations();presentationsRestored=true;}
+                finally{EndPhoneDiagnostic(phoneCleanupComplete&&presentationsRestored);}
+            }
         }
         void HidePresentation(GameObject owner)
         {

@@ -115,7 +115,11 @@ namespace Lottery.G3.PlayMode.Tests
             phoneReceipt.cleanupComplete=cleanupComplete;phoneReceipt.stage="TEARDOWN";
             phoneReceipt.deadlineExceeded|=phoneClock.Elapsed.TotalSeconds>=180;
             phoneReceipt.status=phoneReceipt.routeComplete&&cleanupComplete&&!phoneReceipt.deadlineExceeded?"FUNCTIONAL_ROUTE_AND_STATE_OBSERVED":"INCONCLUSIVE";
-            PersistPhoneDiagnostic();CheckPhoneDeadline();
+            PersistPhoneDiagnostic();
+            // If cleanup threw (or its enumerator was disposed), preserve that
+            // failure instead of replacing it with a second deadline assertion.
+            // Completed cleanup still re-raises any original 180-second overrun.
+            if(cleanupComplete)CheckPhoneDeadline();
         }
         // This diagnostic has a distinct identity and is opt-in by exact filter.
         // The original WORLD cases, their 45-second assertions and identities are unchanged.
