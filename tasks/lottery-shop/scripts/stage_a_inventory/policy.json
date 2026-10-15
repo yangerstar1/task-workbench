@@ -321,9 +321,9 @@
       "sha256": "44f33ff686f3d67ef72d9596e6fdd457fef63f128b948e518a054aa00b509e67"
     },
     {
-      "bytes": 31732,
+      "bytes": 31552,
       "path": "Assets/G3/Interaction/G3ShopEnvironment.cs",
-      "sha256": "a52c9f4c6cee2a365170c5347ace04d15a244c109adb5527a34c7193d6ece34c"
+      "sha256": "08c0023c20012d8ae2c76898d4d2b565e28cb2194960476e23291edad6be48cb"
     },
     {
       "bytes": 1560,
