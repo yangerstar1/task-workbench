@@ -331,7 +331,7 @@ namespace Lottery.G3.Editor
             // positions now use that same basis; no reflected prefab parent exists.
             if(anchors.requiresUnityXReflection)throw new InvalidOperationException("Shop manifest still requests the superseded X reflection");
             var instance=UnityEngine.Object.Instantiate(source);
-            var mirroredMeshes=new Dictionary<Mesh,Mesh>();var backwallMeshes=new List<Mesh>();
+            var mirroredMeshes=new Dictionary<Mesh,Mesh>();var backwallMeshes=new List<Mesh>();var farLeafMeshes=new List<Mesh>();
             var root=new GameObject(outputName);var groups=new Dictionary<string,List<CombineInstance>>();var materials=new Dictionary<string,Material>();int transparent=0;
             try
             {
@@ -343,6 +343,7 @@ namespace Lottery.G3.Editor
                     if(Vector3.Distance(marker.position,expected)>.015f)throw new InvalidOperationException("FBX metre/axis anchor mismatch "+anchorName+" expected="+expected.ToString("F4")+" actual="+marker.position.ToString("F4"));
                     Debug.Log("G3_SHOP_AXIS anchor="+anchorName+" actual="+marker.position.ToString("F4")+" expected="+expected.ToString("F4")+" reflectedX="+anchors.requiresUnityXReflection);
                 }
+                if(validateRoom)RefineNamedFarLeaves(instance,farLeafMeshes);
                 foreach(var filter in instance.GetComponentsInChildren<MeshFilter>())
                 {
                     var renderer=filter.GetComponent<MeshRenderer>();if(renderer==null||filter.sharedMesh==null)continue;
@@ -387,7 +388,79 @@ namespace Lottery.G3.Editor
                 RequireRendererBindings(AssetDatabase.LoadAssetAtPath<GameObject>(prefabPath),owned,trace,38);
                 Debug.Log("G3_SHOP_STATIC_BATCH opaque-by-material plus separate glass renderers="+groups.Count+"; performance on device remains NOT_RUN");
             }
-            finally{foreach(var mesh in backwallMeshes)UnityEngine.Object.DestroyImmediate(mesh);foreach(var mesh in mirroredMeshes.Values)UnityEngine.Object.DestroyImmediate(mesh);UnityEngine.Object.DestroyImmediate(instance);UnityEngine.Object.DestroyImmediate(root);}
+            finally{foreach(var mesh in farLeafMeshes)UnityEngine.Object.DestroyImmediate(mesh);foreach(var mesh in backwallMeshes)UnityEngine.Object.DestroyImmediate(mesh);foreach(var mesh in mirroredMeshes.Values)UnityEngine.Object.DestroyImmediate(mesh);UnityEngine.Object.DestroyImmediate(instance);UnityEngine.Object.DestroyImmediate(root);}
+        }
+        // Presentation geometry, independent of camera/state. Exact authored names only.
+        // These 90 far leaves are still four-triangle meshes; Counter_Pothos is excluded.
+        sealed class FarLeafShape
+        {
+            public MeshFilter filter;public Vector3[] vertices;public bool[] spine;public Vector3 root,axis,side,normal;
+            public float length,width,roll;public Matrix4x4 matrix;
+        }
+        static void RefineNamedFarLeaves(GameObject instance,List<Mesh> temporary)
+        {
+            var filters=instance.GetComponentsInChildren<MeshFilter>();
+            foreach(string prefix in new[]{"Cabinet_Plant","Desk_Corner_Plant","Window_Plant"})
+            {
+                var shapes=new List<FarLeafShape>();var before=new Bounds();bool first=true;
+                for(int index=0;index<30;index++)
+                {
+                    string exact=prefix+"_Leaf"+(index==0?"":"."+index.ToString("D3",System.Globalization.CultureInfo.InvariantCulture));
+                    var matches=filters.Where(f=>f.name==exact).ToArray();
+                    if(matches.Length!=1)throw new InvalidOperationException("Expected exactly one authored leaf: "+exact);
+                    var f=matches[0];var mesh=f.sharedMesh;var renderer=f.GetComponent<MeshRenderer>();
+                    if(mesh==null||!mesh.isReadable||mesh.subMeshCount!=1||mesh.vertexCount<5||mesh.vertexCount>12||mesh.GetTriangles(0).Length!=12||renderer==null||renderer.sharedMaterials.Length!=1||renderer.sharedMaterial.name!="Leaves_Green")
+                        throw new InvalidOperationException("Unexpected far-leaf mesh/material: "+exact);
+                    var vertices=mesh.vertices;var uv=mesh.uv;
+                    if(uv.Length!=vertices.Length)throw new InvalidOperationException("Missing authored leaf UV: "+exact);
+                    float low=uv.Min(v=>v.y),high=uv.Max(v=>v.y);
+                    // Original single tile spans .72 of a half-atlas, not the whole atlas.
+                    if(Mathf.Abs(high-low-.36f)>.001f||uv.Max(v=>v.x)-uv.Min(v=>v.x)>.32f)
+                        throw new InvalidOperationException("Unexpected single-leaf atlas UV: "+exact);
+                    var root=Vector3.zero;var tip=Vector3.zero;int roots=0,tips=0;
+                    for(int i=0;i<uv.Length;i++){if(Mathf.Abs(uv[i].y-low)<.00001f){root+=vertices[i];roots++;}if(Mathf.Abs(uv[i].y-high)<.00001f){tip+=vertices[i];tips++;}}
+                    root/=roots;tip/=tips;var axis=tip-root;float length=axis.magnitude;
+                    if(length<.001f)throw new InvalidOperationException("Degenerate leaf axis: "+exact);axis/=length;
+                    var right=Vector3.zero;int rightCount=0;float maxU=uv.Max(v=>v.x);
+                    for(int i=0;i<uv.Length;i++)if(Mathf.Abs(uv[i].x-maxU)<.00001f){right+=vertices[i];rightCount++;}
+                    var radial=right/rightCount-root;var side=radial-axis*Vector3.Dot(radial,axis);
+                    if(side.sqrMagnitude<1e-10f)throw new InvalidOperationException("Degenerate leaf width: "+exact);side.Normalize();
+                    var matrix=f.transform.localToWorldMatrix;
+                    foreach(var v in vertices){var p=matrix.MultiplyPoint3x4(v);if(first){before=new Bounds(p,Vector3.zero);first=false;}else before.Encapsulate(p);}
+                    float midU=(uv.Min(v=>v.x)+uv.Max(v=>v.x))*.5f;
+                    shapes.Add(new FarLeafShape{filter=f,vertices=vertices,spine=uv.Select(v=>Mathf.Abs(v.x-midU)<.00001f).ToArray(),root=root,axis=axis,side=side,normal=Vector3.Cross(axis,side).normalized,length=length,matrix=matrix,width=new[]{1.22f,1.28f,1.16f,1.25f,1.19f}[index%5],roll=new[]{18f,-24f,32f,-16f,27f,-30f}[index%6]});
+                }
+                Vector3[][] chosen=null;
+                foreach(float strength in new[]{1f,.75f,.5f,.25f})
+                {
+                    var trial=new Vector3[shapes.Count][];var after=new Bounds();bool initial=true;
+                    for(int n=0;n<shapes.Count;n++)
+                    {
+                        var s=shapes[n];var positions=new Vector3[s.vertices.Length];var rotation=Quaternion.AngleAxis(s.roll*strength,s.axis);
+                        float halfWidth=s.vertices.Max(v=>Mathf.Abs(Vector3.Dot(v-s.root,s.side)));
+                        for(int i=0;i<positions.Length;i++)
+                        {
+                            var d=s.vertices[i]-s.root;float across=Vector3.Dot(d,s.side);float t=Mathf.Clamp01(Vector3.Dot(d,s.axis)/s.length);
+                            // Keep centre vein/root/tip fixed; lower the two edges slightly.
+                            float fold=-.018f*s.length*strength*Mathf.Sin(Mathf.PI*t)*Mathf.Abs(across)/halfWidth;
+                            positions[i]=s.spine[i]?s.vertices[i]:s.root+rotation*(d+s.side*(across*(s.width-1)*strength)+s.normal*fold);
+                            var p=s.matrix.MultiplyPoint3x4(positions[i]);if(initial){after=new Bounds(p,Vector3.zero);initial=false;}else after.Encapsulate(p);
+                        }
+                        trial[n]=positions;
+                    }
+                    bool bounded=true;
+                    for(int k=0;k<3;k++)bounded&=after.size[k]>=before.size[k]*.9f-1e-6f&&after.size[k]<=before.size[k]*1.1f+1e-6f&&after.min[k]>=before.min[k]-before.size[k]*.05f-1e-6f&&after.max[k]<=before.max[k]+before.size[k]*.05f+1e-6f;
+                    if(bounded){chosen=trial;break;}
+                }
+                if(chosen==null)throw new InvalidOperationException("No bounded foliage shape: "+prefix);
+                for(int n=0;n<shapes.Count;n++)
+                {
+                    var clone=UnityEngine.Object.Instantiate(shapes[n].filter.sharedMesh);temporary.Add(clone);
+                    clone.name=shapes[n].filter.sharedMesh.name;clone.vertices=chosen[n];clone.RecalculateNormals();clone.RecalculateBounds();
+                    // Preserve all topology/UV and the material grouping; tangents are rebuilt by the existing combiner.
+                    shapes[n].filter.sharedMesh=clone;
+                }
+            }
         }
         // Editor-only, presentation-only addition in the measured +X rear-wall slot.
         // Reuse four existing opaque material groups, so the runtime prefab gains

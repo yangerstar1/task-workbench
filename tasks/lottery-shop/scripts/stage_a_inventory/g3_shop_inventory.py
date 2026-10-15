@@ -16,7 +16,7 @@ import sys
 
 BASE = Path(__file__).absolute().parent
 PIN = '02a6440209c26bcc94c50fdf73a87345b563b5ed'
-POLICY_SHA256 = 'c2517fcb7c1c03498b0a750412bbce7cce1f63d74af20680850cf852d2fb7928'
+POLICY_SHA256 = '62a635de2a02fe4e161ccca1d23039edeb10f3dd18f14e5e0fe5beac150962e0'
 SHOP = 'Assets/G3/Shop/Resources/G3/Shop'
 SCOPE = 'Assets/G3/Shop'
 SCHEMA = 1

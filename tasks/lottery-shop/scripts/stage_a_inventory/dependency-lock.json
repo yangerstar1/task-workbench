@@ -10,7 +10,7 @@
     },
     "inventory/g3_shop_inventory.py": {
       "path": "tasks/lottery-shop/scripts/stage_a_inventory/g3_shop_inventory.py",
-      "sha256": "3aa04b6e6a127a657e5b4f2e48da704063d3efb81402e3314a1ed71c022ce75a"
+      "sha256": "74f97d26b2c0d83e1496b72a65e1ada8b05e08ed30677b528630a54cb5f3c313"
     },
     "inventory/pinned/Textures/Pothos_v26_BaseColor.png.meta": {
       "path": "tasks/lottery-shop/scripts/stage_a_inventory/pinned/Textures/Pothos_v26_BaseColor.png.meta",
@@ -26,7 +26,7 @@
     },
     "inventory/policy.json": {
       "path": "tasks/lottery-shop/scripts/stage_a_inventory/policy.json",
-      "sha256": "c2517fcb7c1c03498b0a750412bbce7cce1f63d74af20680850cf852d2fb7928"
+      "sha256": "62a635de2a02fe4e161ccca1d23039edeb10f3dd18f14e5e0fe5beac150962e0"
     },
     "post_capture_safety.py": {
       "path": "tasks/lottery-shop/scripts/post_capture_safety.py",
