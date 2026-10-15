@@ -34,6 +34,7 @@ namespace Lottery.G3.Interaction
         static readonly string[] DisplayStockIds={"small_prize_box","inspection_lamp","large_prize_stamp"};
         readonly List<Transform> toolChipPlates=new List<Transform>();readonly List<Rect> toolChipRects=new List<Rect>();
         readonly List<Renderer> toolObjects=new List<Renderer>();readonly List<BoundedGlyphLabel> toolLabels=new List<BoundedGlyphLabel>();
+        readonly List<BoundedGlyphLabel> toolSlotCaptions=new List<BoundedGlyphLabel>();
         ConfirmedTicketSurface number,challenge;G3Presenter current;G3PanelModel panelModel;
         float settlementPulse;bool pulseReduced;int lastWidth,lastHeight,used;Rect lastSafe,headerRect,dayRect,qaRect,footerRect,footerHitRect,modalRect,evidenceBodyRect,feedbackRect;bool walking,moreVisible;
         public Camera SceneCamera {get;private set;}
@@ -70,8 +71,14 @@ namespace Lottery.G3.Interaction
         public bool PanelVisible=>current!=null&&current.Panel!=G3Panel.None;
         public string VisibleSummary=>resultText.Text;
         public string VisibleStatus=>statusText.Text;
-        // Normalize the deliberate two-line sign back to the same visible wording.
-        public string VisibleToolSlot(int slot)=>toolLabels[slot].Text.Replace("\n"," ");
+        // Preserve the diagnostic slot/name/level contract from the two visible labels.
+        // The short caption now says explicitly which configuration owns the tool.
+        public string VisibleToolSlot(int slot)
+        {
+            string caption=toolSlotCaptions[slot].Text;
+            if(string.IsNullOrEmpty(caption)||caption.StartsWith("配置待确认",StringComparison.Ordinal))return toolLabels[slot].Text;
+            return caption.Replace("生效 · 槽","").Replace("配置 · 槽","").Replace("布置 · 槽","")+" "+toolLabels[slot].Text;
+        }
         public Color VisibleToolColor(int slot)=>toolObjects[slot].sharedMaterial.color;
         public int PresentationWidth=>SceneCamera!=null&&SceneCamera.targetTexture!=null?SceneCamera.targetTexture.width:Mathf.Max(1,Screen.width);
         public int PresentationHeight=>SceneCamera!=null&&SceneCamera.targetTexture!=null?SceneCamera.targetTexture.height:Mathf.Max(1,Screen.height);
@@ -114,7 +121,12 @@ namespace Lottery.G3.Interaction
             panelTitle=Label("Panel title",hud,G3HudTheme.Card);panelBody=Label("Panel explanation",hud,G3HudTheme.Paper);panelFoot=Label("Panel status",hud,G3HudTheme.QuietInk);
             panelMeta=Label("Drawer context and currency unit",hud,G3HudTheme.QuietInk);
             for(int i=0;i<32;i++){var root=new GameObject("Routed control "+i);root.transform.SetParent(hud,false);pool.Add(new ButtonVisual{Root=root,Plate=Plate("Button surface",root.transform,G3HudTheme.Ink),Icon=G3HudIcon.Create(root.transform,flat),Label=Label("Button text",root.transform,G3HudTheme.Card,TextAnchor.MiddleCenter),Title=Label("Catalog item name",root.transform,G3HudTheme.Card,TextAnchor.UpperLeft),Detail=Label("Catalog price stock or placement",root.transform,G3HudTheme.QuietInk,TextAnchor.MiddleLeft),Availability=Label("Catalog stock status",root.transform,G3HudTheme.QuietInk,TextAnchor.MiddleRight)});}
-            for(int i=0;i<toolLabels.Count;i++){toolLabels[i].transform.SetParent(hud,false);toolLabels[i].transform.localRotation=Quaternion.identity;toolChipPlates.Add(Plate("Confirmed configuration chip "+(i+1),hud,G3HudTheme.Ink));toolChipRects.Add(new Rect());}
+            for(int i=0;i<toolLabels.Count;i++)
+            {
+                toolLabels[i].transform.SetParent(hud,false);toolLabels[i].transform.localRotation=Quaternion.identity;
+                toolSlotCaptions.Add(Label("Confirmed configuration scope and slot "+(i+1),hud,G3HudTheme.QuietInk,TextAnchor.MiddleLeft));
+                toolChipPlates.Add(Plate("Physical tool nameplate "+(i+1),hud,G3HudTheme.Ink));toolChipRects.Add(new Rect());
+            }
             walkHudActive=true;SetWalking(false);Layout();UpdateWalkHud();Physics.SyncTransforms();
         }
         T Own<T>(T item)where T:UnityEngine.Object{owned.Add(item);return item;}
@@ -143,7 +155,7 @@ namespace Lottery.G3.Interaction
                 var stand=Box("Configuration stand "+(i+1),anchor+tagOffset+new Vector3(-.053f,.001f,0),new Vector3(.004f,.002f,.022f),new Color(.48f,.48f,.38f),lit,false);
                 toolObjects.Add(stand.GetComponent<Renderer>());var display=new GameObject("Physical tool slot "+(i+1));display.transform.SetParent(transform,false);display.transform.position=anchor+Vector3.up*.0011f;
                 var visual=display.AddComponent<G3ToolDisplay>();visual.Initialize(lit);toolDisplays.Add(visual);
-                var label=Label("Current tool name "+i,transform,G3HudTheme.Card,TextAnchor.MiddleCenter);label.transform.position=anchor+tagOffset+Vector3.up*.001f;label.transform.rotation=Quaternion.Euler(90,180,0);label.SetBox(.100f,.029f,.013f,true);toolLabels.Add(label);
+                var label=Label("Current tool name "+i,transform,G3HudTheme.Card,TextAnchor.MiddleLeft);label.transform.position=anchor+tagOffset+Vector3.up*.001f;label.transform.rotation=Quaternion.Euler(90,180,0);label.SetBox(.100f,.029f,.013f,true);toolLabels.Add(label);
             }
         }
         void Target(GameObject go,G3Panel panel,bool table=false){var t=go.AddComponent<G3WorldTarget>();t.Panel=panel;t.IsTable=table;}
@@ -154,8 +166,8 @@ namespace Lottery.G3.Interaction
         {var go=new GameObject(name);go.transform.SetParent(parent,false);var label=go.AddComponent<BoundedGlyphLabel>();label.Initialize(font,fontMat,color,alignment);labels.Add(label);return label;}
         float HeightAt(float z)=>SceneCamera.orthographic?SceneCamera.orthographicSize*2:2*Mathf.Tan(SceneCamera.fieldOfView*Mathf.Deg2Rad*.5f)*z;
         Vector3 PixelPoint(float x,float y,float z){float h=HeightAt(z);return new Vector3((x/PresentationWidth-.5f)*h*SceneCamera.aspect,(y/PresentationHeight-.5f)*h,z);}
-        void PlacePlate(Transform p,Rect r,float z)
-        {p.GetComponent<G3HudSurface>().SetSortingOrder(30000);float h=HeightAt(z);p.localPosition=PixelPoint(r.center.x,r.center.y,z);p.localScale=new Vector3(r.width/PresentationHeight*h,r.height/PresentationHeight*h,1);p.GetComponent<G3HudSurface>()?.Configure(r.width,r.height,Mathf.Min(24*Safe.height/720f,r.height*.5f),Safe.height/720f);}
+        void PlacePlate(Transform p,Rect r,float z,float cornerRadius=-1)
+        {p.GetComponent<G3HudSurface>().SetSortingOrder(30000);float h=HeightAt(z);p.localPosition=PixelPoint(r.center.x,r.center.y,z);p.localScale=new Vector3(r.width/PresentationHeight*h,r.height/PresentationHeight*h,1);p.GetComponent<G3HudSurface>()?.Configure(r.width,r.height,cornerRadius<0?Mathf.Min(24*Safe.height/720f,r.height*.5f):cornerRadius,Safe.height/720f);}
         void PlaceIcon(G3HudIcon icon,Rect r,float z)
         {float h=HeightAt(z);icon.transform.localPosition=PixelPoint(r.center.x,r.center.y,z);icon.transform.localScale=Vector3.one*(r.height/PresentationHeight*h);}
         void PlaceLabel(BoundedGlyphLabel l,Rect r,float pixels,float z,bool wrap=true)
@@ -182,7 +194,25 @@ namespace Lottery.G3.Interaction
             if(!phoneOwnsCamera&&!walking)FrameTable();if(current!=null)Show(current,panelModel);
         }
         public void InvalidateTicket(){number?.Invalidate();challenge?.Invalidate();}
+        // Explicit WORLD diagnostic only. No scene text or object identity is captured.
+        public struct PhaseCostSnapshot
+        {
+            public long UpdateCalls,UpdateTicks,ShowCalls,ShowTicks;public bool Overflow;
+        }
+        static bool phaseCostEnabled;static int phaseShowDepth;static PhaseCostSnapshot phaseCost;
+        public static void BeginPhaseCostObservation(){phaseCost=default;phaseShowDepth=0;phaseCostEnabled=true;}
+        public static void EndPhaseCostObservation(){phaseCostEnabled=false;}
+        public static PhaseCostSnapshot ReadPhaseCostObservation()=>phaseCost;
+        static void AddPhaseCost(ref long target,long value)
+        {const long limit=1000000000000000L;if(value<0||value>limit||target>limit-value){target=limit;phaseCost.Overflow=true;}else target+=value;}
         public void Show(G3Presenter presenter,G3PanelModel model)
+        {
+            if(!phaseCostEnabled){ShowObserved(presenter,model);return;}
+            bool outer=phaseShowDepth++==0;long start=outer?System.Diagnostics.Stopwatch.GetTimestamp():0;
+            try{ShowObserved(presenter,model);}
+            finally{phaseShowDepth--;if(outer){AddPhaseCost(ref phaseCost.ShowCalls,1);AddPhaseCost(ref phaseCost.ShowTicks,System.Diagnostics.Stopwatch.GetTimestamp()-start);}}
+        }
+        void ShowObserved(G3Presenter presenter,G3PanelModel model)
         {
             current=presenter;panelModel=model;if(LayoutChanged){Layout();return;}InteractionRevision++;used=0;float s=lastSafe.height/720f;
             if(PanelVisible)moreVisible=false;
@@ -227,7 +257,9 @@ namespace Lottery.G3.Interaction
                 var live=t?.ConfigurationSnapshot.SingleOrDefault(x=>x.TableSlot==i);
                 string id=t==null?state.NextToolIds[i]:live?.ItemId??"";
                 int level=t==null?(string.IsNullOrEmpty(id)?0:state.Tools.Single(x=>x.ItemId==id).Level):live?.Level??0;
-                toolLabels[i].SetText(state.RecoveryRequired?"存档待恢复":(t==null?"下张":"本张")+(i+1)+(string.IsNullOrEmpty(id)?" 空位":"\n"+G3Text.Tool(id)+" "+level));
+                bool emptySlot=string.IsNullOrEmpty(id);
+                toolSlotCaptions[i].SetText(state.RecoveryRequired?"配置待确认 · 槽"+(i+1):(t==null?"下张布置":emptySlot?"本张配置":"本张生效")+" · 槽"+(i+1));
+                toolLabels[i].SetText(state.RecoveryRequired?"存档待恢复":emptySlot?"空位":G3Text.Tool(id)+" "+level);
                 toolDisplays[i].Show(state.RecoveryRequired?"":id);
                 toolObjects[i].sharedMaterial.color=state.RecoveryRequired||string.IsNullOrEmpty(id)?new Color(.48f,.48f,.38f):new Color(.78f,.65f,.30f);
             }
@@ -261,17 +293,34 @@ namespace Lottery.G3.Interaction
         void LayoutToolChips(float s)
         {
             var corners=new[]{new Uv(0,0),new Uv(0,1),new Uv(1,0),new Uv(1,1)}.Select(uv=>WorldToPresentationPoint(Surface.PaperUvToWorld(uv))).ToArray();
-            float paperLeft=corners.Min(p=>p.x),paperRight=corners.Max(p=>p.x),w=216*s;
+            float paperLeft=corners.Min(p=>p.x),paperRight=corners.Max(p=>p.x);
             for(int i=0;i<toolLabels.Count;i++)
             {
-                bool show=!walking&&!PanelVisible&&!moreVisible;toolChipPlates[i].gameObject.SetActive(show);toolLabels[i].gameObject.SetActive(show);if(!show)continue;
+                bool show=!walking&&!PanelVisible&&!moreVisible;
+                toolChipPlates[i].gameObject.SetActive(show);toolLabels[i].gameObject.SetActive(show);toolSlotCaptions[i].gameObject.SetActive(show);if(!show)continue;
+                bool emptySlot=toolLabels[i].Text=="空位",unconfirmed=current.Snapshot.RecoveryRequired;
+                bool left=i==1;float laneLeft=left?Safe.x+12*s:paperRight+12*s,laneRight=left?paperLeft-12*s:Safe.xMax-12*s;
+                // The paper owns its full projected bounds. Size to the remaining
+                // side lane rather than swapping clamp limits into the ticket.
+                float w=Mathf.Min(Mathf.Max(32*s,laneRight-laneLeft),Mathf.Max(128*s,Mathf.Max(TextWidth(toolLabels[i].Text,28*s)+36*s,TextWidth(toolSlotCaptions[i].Text,22*s)+16*s)));
+                bool wrapName=TextWidth(toolLabels[i].Text,28*s)>w-28*s,wrapCaption=TextWidth(toolSlotCaptions[i].Text,22*s)>w-8*s;
+                float h=Mathf.Max(44*s,TextHeight(toolLabels[i].Text,28*s,w-28*s)+12*s);
+                float captionHeight=Mathf.Max(26*s,TextHeight(toolSlotCaptions[i].Text,22*s,w-8*s)+2*s);
                 var p=WorldToPresentationPoint(Environment.AnchorPosition("tool_"+(i+1),Environment.TicketPosition)+Vector3.forward*.07f);
-                bool emptySlot=toolLabels[i].Text.Contains("空位");float h=(emptySlot?48:84)*s;
-                bool left=i==1;float lo=left?Safe.x+12*s:paperRight+12*s,hi=left?paperLeft-12*s-w:Safe.xMax-12*s-w;
-                float x=Mathf.Clamp(p.x-w*.5f,Mathf.Min(lo,hi),Mathf.Max(lo,hi));
-                float y=Mathf.Clamp(p.y-h*.5f,Safe.y+(i==2?120:250)*s,Safe.yMax-164*s);
-                var r=new Rect(x,y,w,h);toolChipRects[i]=r;PlacePlate(toolChipPlates[i],r,.57f);PlaceLabel(toolLabels[i],Inset(r,12*s,7*s),32*s,.47f,true);
-                toolLabels[i].SetColor(toolLabels[i].Text.Contains("空位")?G3HudTheme.QuietInk:G3HudTheme.Paper);
+                var objectBounds=ToolPresentationBounds(i);
+                // Rest the thin plaque below the actual object; only the unboxed
+                // scope caption may sit over its base. Empty trays retain anchors.
+                float desiredY=emptySlot||unconfirmed?p.y-h*.5f:objectBounds.yMin-8*s-h;
+                float x=Mathf.Clamp(p.x-w*.5f,laneLeft,Mathf.Max(laneLeft,laneRight-w));
+                float y=Mathf.Clamp(desiredY,Safe.y+120*s,Safe.yMax-164*s-h-captionHeight);
+                var r=new Rect(x,y,w,h);toolChipRects[i]=r;PlacePlate(toolChipPlates[i],r,.57f,7*s);
+                var surface=toolChipPlates[i].GetComponent<G3HudSurface>();
+                // Softened rectangular brass-edged nameplates, not action pills.
+                surface.Tint(emptySlot||unconfirmed?new Color(.055f,.085f,.070f,.48f):new Color(.055f,.085f,.070f,.82f),emptySlot||unconfirmed?new Color(.43f,.47f,.44f,.32f):new Color(.56f,.49f,.32f,.56f));
+                PlaceLabel(toolLabels[i],Inset(r,14*s,6*s),28*s,.47f,wrapName);
+                PlaceLabel(toolSlotCaptions[i],new Rect(r.x+4*s,r.yMax+4*s,r.width-8*s,captionHeight),22*s,.47f,wrapCaption);
+                toolLabels[i].SetColor(emptySlot||unconfirmed?G3HudTheme.QuietInk:G3HudTheme.Paper);
+                toolSlotCaptions[i].SetColor(emptySlot||unconfirmed?G3HudTheme.QuietInk:G3HudTheme.Paper);
             }
         }
         void SyncPhoneCamera(G3Presenter presenter,G3PanelModel model)
@@ -652,6 +701,13 @@ namespace Lottery.G3.Interaction
         public bool AllHudLabelsFit=>(Phone==null||Phone.AllLabelsFit)&&labels.Where(x=>x.gameObject.activeInHierarchy&&x.transform.IsChildOf(hud)).All(x=>x.Fits&&x.MissingGlyphCount==0);
         public void SettlementFeedback(bool reduceFlash){pulseReduced=reduceFlash;settlementPulse=reduceFlash?0:.22f;}
         void Update()
+        {
+            if(!phaseCostEnabled){UpdateObserved();return;}
+            long start=System.Diagnostics.Stopwatch.GetTimestamp();
+            try{UpdateObserved();}
+            finally{AddPhaseCost(ref phaseCost.UpdateCalls,1);AddPhaseCost(ref phaseCost.UpdateTicks,System.Diagnostics.Stopwatch.GetTimestamp()-start);}
+        }
+        void UpdateObserved()
         {
             if(footer==null)return;UpdateWalkHud();RefreshPressedState();if(!persistentFeedback&&Time.unscaledTime>=feedbackUntil){feedbackPlate.gameObject.SetActive(false);statusText.gameObject.SetActive(false);}if(settlementPulse<=0)return;settlementPulse=Mathf.Max(0,settlementPulse-Time.unscaledDeltaTime);
             var baseColor=G3HudTheme.Ink;var tint=G3HudTheme.InkLift;

@@ -95,6 +95,63 @@ namespace Lottery.G3.PlayMode.Tests
                 ") pre=("+beforeWorst.FixedValues()+") post=("+afterWorst.FixedValues()+") delta=("+afterWorst.Delta(beforeWorst)+")";
             public void End(){BoundedGlyphLabel.EndCostObservation();G3InputRouter.EndCostObservation();}
         }
+        WorldPhaseObservation activeWorldPhase;
+        // Constant-size per-route observation. Wall phases overlap runtime counters;
+        // they must not be added together as if they were exclusive CPU categories.
+        sealed class WorldPhaseObservation
+        {
+            const long Limit=1000000000000000L;
+            struct Snapshot
+            {
+                public long PumpCalls,PumpTicks,DiagnosticCalls,DiagnosticTicks,PollCalls,PollTicks,GlyphCalls,GlyphTicks,Atlas;
+                public long UpdateCalls,UpdateTicks,ShowCalls,ShowTicks,Gc0,Gc1,Gc2;public bool Overflow;
+            }
+            Snapshot before,worst;long pumpCalls,pumpTicks,diagnosticCalls,diagnosticTicks,started,resumed,worstWall,worstYield,worstResume;
+            int pendingFrame,worstFrame,intervals;bool open,overflow,worstIncomplete;
+            readonly int gcMax=System.Math.Min(2,System.GC.MaxGeneration);
+            public WorldPhaseObservation(){G3SceneView.BeginPhaseCostObservation();}
+            void Add(ref long target,long value)
+            {if(value<0||value>Limit||target>Limit-value){target=Limit;overflow=true;}else target+=value;}
+            long Bound(long value){if(value<0||value>Limit){overflow=true;return System.Math.Max(0,System.Math.Min(Limit,value));}return value;}
+            public void ObservePump(long ticks){Add(ref pumpCalls,1);Add(ref pumpTicks,ticks);}
+            public void ObserveDiagnostic(long ticks){Add(ref diagnosticCalls,1);Add(ref diagnosticTicks,ticks);}
+            Snapshot Read()
+            {
+                var glyph=BoundedGlyphLabel.CostObservation();var input=G3InputRouter.CostObservation();var scene=G3SceneView.ReadPhaseCostObservation();
+                return new Snapshot{PumpCalls=pumpCalls,PumpTicks=pumpTicks,DiagnosticCalls=diagnosticCalls,DiagnosticTicks=diagnosticTicks,PollCalls=input[0],PollTicks=input[1],GlyphCalls=glyph[0],GlyphTicks=glyph[1],Atlas=glyph[3],
+                    UpdateCalls=scene.UpdateCalls,UpdateTicks=scene.UpdateTicks,ShowCalls=scene.ShowCalls,ShowTicks=scene.ShowTicks,
+                    Gc0=System.GC.CollectionCount(0),Gc1=gcMax>=1?System.GC.CollectionCount(1):0,Gc2=gcMax>=2?System.GC.CollectionCount(2):0,
+                    Overflow=overflow||glyph[4]!=0||input[6]!=0||scene.Overflow};
+            }
+            public void BeforeYield(int frame)
+            {before=Read();pendingFrame=frame;resumed=0;started=System.Diagnostics.Stopwatch.GetTimestamp();open=true;}
+            public void AfterYield(){if(open)resumed=System.Diagnostics.Stopwatch.GetTimestamp();}
+            public void EndFrame(bool incomplete=false)
+            {
+                if(!open)return;long ended=System.Diagnostics.Stopwatch.GetTimestamp();open=false;var after=Read();
+                long wall=Bound(ended-started);intervals++;
+                if(worstFrame!=0&&wall<=worstWall)return;
+                worstFrame=pendingFrame;worstWall=wall;worstIncomplete=incomplete||resumed==0;
+                worstYield=Bound((resumed==0?ended:resumed)-started);worstResume=resumed==0?0:Bound(ended-resumed);
+                worst=new Snapshot{PumpCalls=Bound(after.PumpCalls-before.PumpCalls),PumpTicks=Bound(after.PumpTicks-before.PumpTicks),
+                    DiagnosticCalls=Bound(after.DiagnosticCalls-before.DiagnosticCalls),DiagnosticTicks=Bound(after.DiagnosticTicks-before.DiagnosticTicks),
+                    PollCalls=Bound(after.PollCalls-before.PollCalls),PollTicks=Bound(after.PollTicks-before.PollTicks),
+                    GlyphCalls=Bound(after.GlyphCalls-before.GlyphCalls),GlyphTicks=Bound(after.GlyphTicks-before.GlyphTicks),Atlas=Bound(after.Atlas-before.Atlas),
+                    UpdateCalls=Bound(after.UpdateCalls-before.UpdateCalls),UpdateTicks=Bound(after.UpdateTicks-before.UpdateTicks),
+                    ShowCalls=Bound(after.ShowCalls-before.ShowCalls),ShowTicks=Bound(after.ShowTicks-before.ShowTicks),
+                    Gc0=Bound(after.Gc0-before.Gc0),Gc1=Bound(after.Gc1-before.Gc1),Gc2=Bound(after.Gc2-before.Gc2),Overflow=before.Overflow||after.Overflow};
+            }
+            static string N(long value)=>value.ToString(System.Globalization.CultureInfo.InvariantCulture);
+            public string Summary(string segment)=>"WORLD_PHASE_V1 segment="+segment+" frequency="+N(System.Diagnostics.Stopwatch.Frequency)+
+                " intervals="+N(intervals)+" frame="+N(worstFrame)+" wallTicks="+N(worstWall)+" yieldTicks="+N(worstYield)+" resumeTicks="+N(worstResume)+
+                " pumpCalls="+N(worst.PumpCalls)+" pumpTicks="+N(worst.PumpTicks)+
+                " diagnosticCalls="+N(worst.DiagnosticCalls)+" diagnosticTicks="+N(worst.DiagnosticTicks)+" pollCalls="+N(worst.PollCalls)+" pollTicks="+N(worst.PollTicks)+
+                " glyphCalls="+N(worst.GlyphCalls)+" glyphTicks="+N(worst.GlyphTicks)+" atlasNotifications="+N(worst.Atlas)+
+                " updateCalls="+N(worst.UpdateCalls)+" updateTicks="+N(worst.UpdateTicks)+" showCalls="+N(worst.ShowCalls)+" showTicks="+N(worst.ShowTicks)+
+                " gcMax="+N(gcMax)+" gc0="+N(worst.Gc0)+" gc1="+N(worst.Gc1)+" gc2="+N(worst.Gc2)+
+                " incomplete="+(worstIncomplete?"1":"0")+" overflow="+(overflow||worst.Overflow?"1":"0");
+            public void End(){G3SceneView.EndPhaseCostObservation();}
+        }
         sealed class WorldWalkObservation
         {
             public string Segment;public Vector3 Origin,Destination,Previous;
@@ -122,8 +179,12 @@ namespace Lottery.G3.PlayMode.Tests
                 " cameraEuler="+WorldVector(app.SceneCamera.transform.eulerAngles)+" moveId="+Router.MoveTouchId+" lookId="+Router.LookTouchId+
                 " mode="+(int)Router.Mode+" focused="+Router.IsFocused+" awaitingRelease="+Router.AwaitingRelease+" cameraWrite="+P.View.Walk.CameraWriteEnabled;
         }
-        static void WriteWorldDiagnostic(string sample)
-        {G3WorldProgress.Record(sample);TestContext.Out.WriteLine(sample);}
+        void WriteWorldDiagnostic(string sample)
+        {
+            long started=activeWorldPhase!=null?System.Diagnostics.Stopwatch.GetTimestamp():0;
+            try{G3WorldProgress.Record(sample);TestContext.Out.WriteLine(sample);}
+            finally{activeWorldPhase?.ObserveDiagnostic(System.Diagnostics.Stopwatch.GetTimestamp()-started);}
+        }
         void AssertWorldRouteBudget(WorldWalkObservation sample,string phase)
         {
             float elapsed=Time.realtimeSinceStartup-sample.Started;
@@ -141,7 +202,8 @@ namespace Lottery.G3.PlayMode.Tests
             bool movedLook=false;Quaternion initialLook=app.SceneCamera.transform.rotation;
             try
             {
-                if(segment=="PHONE_TO_RETURN_AISLE")sample.Workload=new WorldWorkloadObservation();
+                if(G3WorldProgress.PhaseTimingEnabled)
+                {sample.Workload=new WorldWorkloadObservation();activeWorldPhase=new WorldPhaseObservation();}
                 while(WorldDistance(P.View.Walk.SavedPosition,destination)>.09f)
                 {
                     AssertWorldRouteBudget(sample,"STALL");
@@ -149,7 +211,9 @@ namespace Lottery.G3.PlayMode.Tests
                     Vector3 local=Quaternion.Inverse(Quaternion.Euler(0,app.SceneCamera.transform.eulerAngles.y,0))*world.normalized;
                     sample.LastCommand=new Vector2(local.x,local.z);
                     Vector2 point=move+sample.LastCommand*P.View.JoystickRect.width*.3f;
+                    activeWorldPhase?.BeforeYield(sample.Frames+1);
                     yield return null;
+                    activeWorldPhase?.AfterYield();
                     if(proveConcurrentLook&&!movedLook)
                     {
                         look+=Vector2.right*12*P.View.TouchPixelsPerDp;
@@ -160,12 +224,20 @@ namespace Lottery.G3.PlayMode.Tests
                     sample.Observe(P.View.Walk.SavedPosition);
                     if(checkpoints<8&&Time.realtimeSinceStartup-started>=(checkpoints+1)*5)
                     {checkpoints++;WriteWorldDiagnostic(WorldWalkDiagnostic(sample,"SAMPLE"));}
+                    activeWorldPhase?.EndFrame();
                 }
                 // Arrival on a slow frame does not silently bypass the same 45 s bound.
                 AssertWorldRouteBudget(sample,"ARRIVAL");
                 reached=true;
             }
-            finally{sample.Workload?.End();WriteWorldDiagnostic(WorldWalkDiagnostic(sample,reached?"REACHED":"ABORTED"));}
+            finally
+            {
+                var phases=activeWorldPhase;activeWorldPhase=null;
+                try{phases?.EndFrame(true);}
+                finally{phases?.End();sample.Workload?.End();}
+                WriteWorldDiagnostic(WorldWalkDiagnostic(sample,reached?"REACHED":"ABORTED"));
+                if(phases!=null)WriteWorldDiagnostic(phases.Summary(segment));
+            }
             WorldTouches(Finger(901,IPhase.Ended,move));if(proveConcurrentLook)WorldTouches(Finger(902,IPhase.Ended,look));
             yield return WorldNeutral();Assert.That(Vector3.Distance(P.View.Walk.SavedPosition,origin),Is.GreaterThan(.05f));
         }

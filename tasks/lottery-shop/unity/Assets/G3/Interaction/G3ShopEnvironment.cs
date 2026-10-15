@@ -196,7 +196,11 @@ namespace Lottery.G3.Interaction
             var light=go.AddComponent<Light>();light.type=LightType.Spot;light.spotAngle=115;light.innerSpotAngle=70;
             light.color=color;light.intensity=strength;light.range=range;light.shadows=shadow?LightShadows.Soft:LightShadows.None;
             light.shadowStrength=.6f;light.shadowBias=.008f;light.shadowNormalBias=.025f;
-            light.GetUniversalAdditionalLightData().usePipelineSettings=false;practicals.Add(light);
+            var additional=light.GetUniversalAdditionalLightData();additional.usePipelineSettings=false;
+            // Bound only the newly shadowed counter lamp's mobile filtering cost.
+            // This is a production tradeoff candidate, not a long-frame root-cause claim.
+            if(name=="Warm counter pendant"&&shadow)additional.softShadowQuality=SoftShadowQuality.Low;
+            practicals.Add(light);
         }
         void LoadBakedReflections()
         {

@@ -218,7 +218,12 @@ namespace Lottery.G3.PlayMode.Tests
             ",inputCount="+InputState.updateCount+","+(app?.Presenter?.Router?.DiagnosticState??"START_CHOOSER");
         void PumpInput()
         {
-            InputSystem.Update();
+            if(activeWorldPhase==null)InputSystem.Update();
+            else
+            {
+                long start=System.Diagnostics.Stopwatch.GetTimestamp();
+                try{InputSystem.Update();}finally{activeWorldPhase.ObservePump(System.Diagnostics.Stopwatch.GetTimestamp()-start);}
+            }
             Assert.That(InputState.currentUpdateType,Is.EqualTo(InputUpdateType.Manual),
                 "Simulated events must be processed in player Manual buffers. "+InputDiagnostic);
             uint count=InputState.updateCount;
