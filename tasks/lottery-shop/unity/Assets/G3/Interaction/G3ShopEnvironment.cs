@@ -284,7 +284,9 @@ namespace Lottery.G3.Interaction
         public void SetNight(bool value)
         {
             if(night==value)return;night=value;
-            daylight.transform.rotation=value?Quaternion.Euler(25,190,0):Quaternion.Euler(10,185,0);
+            // Raise only the day sun: the real front opening now reaches the walkway floor.
+            // Preserve azimuth, source energy, shadow strength, and the night recipe.
+            daylight.transform.rotation=value?Quaternion.Euler(25,190,0):Quaternion.Euler(25,185,0);
             daylight.shadowStrength=value?.55f:.65f;
             daylight.intensity=value ? .16f : DaylightStrength;daylight.color=value?new Color(.49f,.62f,.91f):new Color(1,.94f,.84f);
             RenderSettings.ambientMode=AmbientMode.Trilight;

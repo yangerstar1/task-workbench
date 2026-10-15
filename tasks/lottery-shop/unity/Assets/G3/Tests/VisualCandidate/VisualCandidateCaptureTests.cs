@@ -966,7 +966,7 @@ namespace Lottery.G3.VisualCandidate.Tests
             bool lightingNight=State.Phase==DayPhase.NIGHT_BILL||State.Phase==DayPhase.DAY_COMPLETE||State.Phase==DayPhase.RUN_FAILED;
             var directional=P.View.Environment.GetComponentsInChildren<Light>().Where(light=>light.type==LightType.Directional).ToArray();
             Assert.That(directional,Has.Length.EqualTo(1),"Exactly one owned directional source is required");
-            Assert.That(Quaternion.Angle(directional[0].transform.rotation,lightingNight?Quaternion.Euler(25,190,0):Quaternion.Euler(10,185,0)),Is.LessThan(.01f),"Actual day/night direction must match the source-owned A/B angle");
+            Assert.That(Quaternion.Angle(directional[0].transform.rotation,lightingNight?Quaternion.Euler(25,190,0):Quaternion.Euler(25,185,0)),Is.LessThan(.01f),"Actual day/night direction must match the source-owned A/B angle");
             Assert.That(directional[0].intensity,Is.EqualTo(lightingNight?.16f:.6f).Within(.00001f),"Daylight balance must preserve the explicit day/night source energy");
             var readingSource=P.View.Environment.transform.Find("Table reading pendant");
             Assert.That(readingSource,Is.Not.Null,"The authored reading source must remain present");
