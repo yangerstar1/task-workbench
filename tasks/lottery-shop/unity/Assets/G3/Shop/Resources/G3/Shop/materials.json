@@ -286,7 +286,7 @@
       ],
       "metallic": 0.0,
       "roughness": 0.8999999761581421,
-      "normalStrength": 0,
+      "normalStrength": 0.65,
       "transmission": 0.0,
       "ior": 1.4500000476837158,
       "emission": 0.0,
@@ -301,7 +301,8 @@
         1,
         1
       ],
-      "baseColorTexture": "textures/SoftPlaster_v13_BaseColor.png"
+      "baseColorTexture": "textures/SoftPlaster_v13_BaseColor.png",
+      "normalTexture": "textures/CreamPlaster_Normal.png"
     },
     {
       "name": "Dark_Green_Felt",

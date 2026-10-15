@@ -16,7 +16,7 @@ import sys
 
 BASE = Path(__file__).absolute().parent
 PIN = '02a6440209c26bcc94c50fdf73a87345b563b5ed'
-POLICY_SHA256 = '7c69a0805b0529b1a0d2c7b95aab473184d2663e4c6fd145b47585119672cc3b'
+POLICY_SHA256 = '1aa58143bf463905a7e46c975c9d25707d970d3ef61c814d2563b6e76f9c6b5c'
 SHOP = 'Assets/G3/Shop/Resources/G3/Shop'
 SCOPE = 'Assets/G3/Shop'
 SCHEMA = 1
@@ -258,6 +258,7 @@ class Policy:
                 add(SHOP+'/Materials/'+item['name']+'_MetallicSmoothness.asset', 'GENERATED_PACKED_TEXTURE')
         for name in self.outputs: add(SHOP+'/'+name+'.prefab', 'GENERATED_RUNTIME_PREFAB')
         add(SHOP+'/G3VisualPipeline.asset', 'GENERATED_PIPELINE')
+        add(SHOP+'/G3ContactRenderer.asset', 'GENERATED_RENDERER_DATA')
         for name in ('Day.exr','Night.exr'): add(SHOP+'/Reflections/'+name, 'REFLECTION_EXR')
         add(SHOP+'/Reflections/reflection-receipt.json', 'REFLECTION_RECEIPT_DIGEST_ONLY')
 

@@ -148,8 +148,8 @@ namespace Lottery.G3.VisualCandidate.Tests
                 ambientGround = RenderSettings.ambientGroundColor; ambientAlias = RenderSettings.ambientLight;
                 Require(ambientMode == AmbientMode.Trilight && !float.IsNaN(ambientIntensity) && !float.IsInfinity(ambientIntensity) &&
                     ambientIntensity >= 0 && ambientIntensity <= 8 && ambientAlias.Equals(ambientSky), "AMBIENT_BASELINE_MODE_OR_ALIAS_DRIFT");
-                Require(ambientSky.Equals(new Color(.51f, .555f, .60f)) && ambientEquator.Equals(new Color(.435f, .4275f, .3825f)) &&
-                    ambientGround.Equals(new Color(.255f, .2325f, .195f)), "AMBIENT_TRILIGHT_BASELINE_DRIFT");
+                Require(ambientSky.Equals(new Color(.612f, .666f, .72f)) && ambientEquator.Equals(new Color(.522f, .513f, .459f)) &&
+                    ambientGround.Equals(new Color(.306f, .279f, .234f)), "AMBIENT_TRILIGHT_BASELINE_DRIFT");
                 Require(Mathf.Abs(probeIntensity - .85f) < .000001f && reflectionIntensity == 1f && RenderSettings.sun == lights[0],
                     "DAY_REFLECTION_BASELINE_DRIFT");
                 renderers = env.GetComponentsInChildren<Renderer>(true).OrderBy(r => r.GetInstanceID()).ToArray();

@@ -88,6 +88,7 @@ namespace Lottery.G3.Editor
             pipeline.name="G3 original shop lighting";pipeline.shadowDistance=12;pipeline.msaaSampleCount=4;pipeline.supportsHDR=false;
             var serialized=new SerializedObject(pipeline);SetBool(serialized,"m_MainLightShadowsSupported",true);SetBool(serialized,"m_SoftShadowsSupported",true);
             SetInt(serialized,"m_MainLightShadowmapResolution",2048);SetInt(serialized,"m_ShadowCascadeCount",2);SetInt(serialized,"m_AdditionalLightsRenderingMode",(int)LightRenderingMode.PerPixel);SetInt(serialized,"m_AdditionalLightsPerObjectLimit",8);SetBool(serialized,"m_AdditionalLightShadowsSupported",true);SetInt(serialized,"m_AdditionalLightsShadowmapResolution",2048);SetBool(serialized,"m_ReflectionProbeBoxProjection",true);serialized.ApplyModifiedPropertiesWithoutUndo();
+            ConfigureContactOcclusion(pipeline);
             GraphicsSettings.defaultRenderPipeline=pipeline;int original=QualitySettings.GetQualityLevel();for(int i=0;i<QualitySettings.names.Length;i++){QualitySettings.SetQualityLevel(i);QualitySettings.renderPipeline=pipeline;}QualitySettings.SetQualityLevel(original);
             EditorUtility.SetDirty(pipeline);AssetDatabase.SaveAssets();
             var loaded=AssetDatabase.LoadAssetAtPath<GameObject>(model);var renderers=loaded.GetComponentsInChildren<Renderer>();
@@ -543,9 +544,111 @@ namespace Lottery.G3.Editor
         {
             string path=Root+"/Textures/"+Path.GetFileName(file);var importer=AssetImporter.GetAtPath(path) as TextureImporter;
             if(importer==null)throw new InvalidOperationException("Missing shop texture: "+path);
-            importer.textureType=normal?TextureImporterType.NormalMap:TextureImporterType.Default;importer.sRGBTexture=!normal;importer.mipmapEnabled=true;importer.wrapMode=TextureWrapMode.Repeat;importer.maxTextureSize=2048;importer.textureCompression=TextureImporterCompression.Compressed;importer.SaveAndReimport();
+            importer.textureType=normal?TextureImporterType.NormalMap:TextureImporterType.Default;importer.sRGBTexture=!normal;importer.mipmapEnabled=true;importer.wrapMode=TextureWrapMode.Repeat;importer.maxTextureSize=normal&&Path.GetFileName(file)=="CreamPlaster_Normal.png"?512:2048;importer.textureCompression=TextureImporterCompression.Compressed;importer.SaveAndReimport();
             return AssetDatabase.LoadAssetAtPath<Texture2D>(path);
         }
+
+        // Pinned URP 17.3 serialized schema. Keep this on the normal G3 importer
+        // path, so player builds and diagnostic captures use the same renderer.
+        // Before-opaque AO is intentional: after-opaque multiplication would
+        // also darken the opaque custom HUD and approved ticket shaders.
+        static void ConfigureContactOcclusion(UniversalRenderPipelineAsset pipeline)
+        {
+            RequireContactOcclusionResources();
+            const string rendererPath=Root+"/G3ContactRenderer.asset";
+            var source=AssetDatabase.LoadAssetAtPath<UniversalRendererData>(Lottery.Probe.Editor.ProbeBuild.RendererPath);
+            if(source==null||source.rendererFeatures.Count!=0)
+                throw new InvalidOperationException("Contact renderer requires the reviewed feature-free Probe renderer");
+            var renderer=AssetDatabase.LoadAssetAtPath<UniversalRendererData>(rendererPath);
+            if(renderer==null)
+            {
+                renderer=UnityEngine.Object.Instantiate(source);
+                AssetDatabase.CreateAsset(renderer,rendererPath);
+            }
+            var existing=AssetDatabase.LoadAllAssetsAtPath(rendererPath).OfType<ScriptableRendererFeature>().ToArray();
+            if(existing.Length>1||(existing.Length==1&&!(existing[0] is Lottery.G3.Interaction.G3ContactOcclusionFeature)))
+                throw new InvalidOperationException("Unexpected feature in owned G3 contact renderer");
+            // Preserve the feature sub-asset identity across repeated preparation.
+            var feature=existing.Length==0?ScriptableObject.CreateInstance<Lottery.G3.Interaction.G3ContactOcclusionFeature>():(Lottery.G3.Interaction.G3ContactOcclusionFeature)existing[0];
+            if(existing.Length==0)AssetDatabase.AddObjectToAsset(feature,renderer);
+            EditorUtility.CopySerialized(source,renderer);
+            renderer.name="G3 bounded contact occlusion";
+            feature.name="G3 small radius contact occlusion";feature.SetActive(true);
+            var settings=new SerializedObject(feature);
+            ContactEnum(settings,"AOMethod","InterleavedGradient");
+            ContactEnum(settings,"Source","Depth");
+            ContactEnum(settings,"NormalSamples","Medium");
+            ContactEnum(settings,"Samples","Low");
+            ContactEnum(settings,"BlurQuality","Low");
+            ContactProperty(settings,"Downsample").boolValue=true;
+            ContactProperty(settings,"AfterOpaque").boolValue=false;
+            ContactProperty(settings,"Intensity").floatValue=.65f;
+            ContactProperty(settings,"Radius").floatValue=.06f;
+            ContactProperty(settings,"Falloff").floatValue=8f;
+            ContactProperty(settings,"DirectLightingStrength").floatValue=0f;
+            ContactProperty(settings,"SampleCount").intValue=-1;
+            settings.ApplyModifiedPropertiesWithoutUndo();
+            feature.Create();EditorUtility.SetDirty(feature);
+            if(!AssetDatabase.TryGetGUIDAndLocalFileIdentifier(feature,out string guid,out long localId)||localId==0)
+                throw new InvalidOperationException("Contact feature must persist as a renderer sub-asset");
+            var rendererSettings=new SerializedObject(renderer);
+            var features=rendererSettings.FindProperty("m_RendererFeatures");
+            var map=rendererSettings.FindProperty("m_RendererFeatureMap");
+            if(features==null||map==null)throw new InvalidOperationException("Unsupported pinned URP renderer feature schema");
+            features.arraySize=1;features.GetArrayElementAtIndex(0).objectReferenceValue=feature;
+            map.arraySize=1;map.GetArrayElementAtIndex(0).longValue=localId;
+            rendererSettings.ApplyModifiedPropertiesWithoutUndo();
+            renderer.SetDirty();EditorUtility.SetDirty(renderer);
+            var pipelineSettings=new SerializedObject(pipeline);
+            var renderers=pipelineSettings.FindProperty("m_RendererDataList");
+            var defaultIndex=pipelineSettings.FindProperty("m_DefaultRendererIndex");
+            if(renderers==null||defaultIndex==null||renderers.arraySize!=1||defaultIndex.intValue!=0)
+                throw new InvalidOperationException("Contact occlusion requires the reviewed single-renderer G3 pipeline");
+            renderers.GetArrayElementAtIndex(0).objectReferenceValue=renderer;
+            pipelineSettings.ApplyModifiedPropertiesWithoutUndo();
+            EditorUtility.SetDirty(pipeline);
+        }
+
+        static void RequireContactOcclusionResources()
+        {
+            // URP 17.3 loads SSAO resources lazily from registered graphics
+            // settings, not from per-feature ResourceReloader/OnValidate.
+            // Inspect only; never silently change global resources or stripping.
+            var global=GraphicsSettings.GetSettingsForRenderPipeline(typeof(UniversalRenderPipeline));
+            if(global==null)throw new InvalidOperationException("Contact SSAO requires registered URP global settings");
+            var expected=AssetDatabase.LoadAssetAtPath<Shader>("Packages/com.unity.render-pipelines.universal/Shaders/Utils/ScreenSpaceAmbientOcclusion.shader");
+            if(expected==null)throw new InvalidOperationException("Pinned URP SSAO shader is missing");
+            var settings=new SerializedObject(global);
+            var entries=settings.FindProperty("m_Settings.m_SettingsList.m_List");
+            if(entries==null||!entries.isArray)throw new InvalidOperationException("Unsupported pinned URP graphics settings schema");
+            const string resourceType="Unity.RenderPipelines.Universal.Runtime UnityEngine.Rendering.Universal.ScreenSpaceAmbientOcclusionPersistentResources";
+            int count=0;
+            for(int i=0;i<entries.arraySize;i++)
+            {
+                var entry=entries.GetArrayElementAtIndex(i);
+                if(entry.managedReferenceFullTypename!=resourceType)continue;
+                count++;
+                var shader=entry.FindPropertyRelative("m_Shader");
+                if(shader==null||shader.objectReferenceValue!=expected)
+                    throw new InvalidOperationException("Registered SSAO shader does not match the installed URP resource");
+            }
+            if(count!=1)throw new InvalidOperationException("Contact SSAO requires exactly one registered persistent resource");
+        }
+
+        static SerializedProperty ContactProperty(SerializedObject settings,string name)
+        {
+            var property=settings.FindProperty("m_Settings."+name);
+            if(property==null)throw new InvalidOperationException("Unsupported pinned SSAO field "+name);
+            return property;
+        }
+        static void ContactEnum(SerializedObject settings,string name,string value)
+        {
+            var property=ContactProperty(settings,name);
+            int index=Array.IndexOf(property.enumNames,value);
+            if(index<0)throw new InvalidOperationException("Unsupported pinned SSAO enum "+name+"."+value);
+            property.enumValueIndex=index;
+        }
+
         static void SetBool(SerializedObject target,string name,bool value){var p=target.FindProperty(name);if(p==null)throw new InvalidOperationException("Unsupported pinned URP field "+name);p.boolValue=value;}
         static void SetInt(SerializedObject target,string name,int value){var p=target.FindProperty(name);if(p==null)throw new InvalidOperationException("Unsupported pinned URP field "+name);p.intValue=value;}
     }

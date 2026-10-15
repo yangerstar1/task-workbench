@@ -76,9 +76,9 @@
       "sha256": "c079c7ab2bdd88f40a67cd68e728323d30fa51c670c0a1266c269e36168d88b1"
     },
     {
-      "bytes": 21299,
+      "bytes": 21297,
       "repositoryPath": "tasks/lottery-shop/scripts/counter_light_diagnostics/verify_and_measure.py",
-      "sha256": "1c93a2dd21a9810b3103b28d4876fca12ed0c207eaae2b251e99eed76e52f571"
+      "sha256": "bf13ccb58f549f45a28166c7bf0ca8d53325bcf6f1edad4771fcd87e0f7e3c44"
     },
     {
       "bytes": 18193,
@@ -111,9 +111,9 @@
       "sha256": "90e2583073c3e15e802960dfeae7cdab84391f9c4bf1cd69207b725d39f8e1c0"
     },
     {
-      "bytes": 49207,
+      "bytes": 49205,
       "repositoryPath": "tasks/lottery-shop/unity/Assets/G3/Tests/VisualCandidate/CounterLightDiagnosticCapture.cs",
-      "sha256": "ed3fd4b0ce6abc937432c550f64a9727fe57751bdfd64f170fe1a9fa470c1d73"
+      "sha256": "2c138e1288d02c4ea0ffea4dc0665a3ea22c5026dedc8938ae71d336ec85030b"
     },
     {
       "bytes": 60,

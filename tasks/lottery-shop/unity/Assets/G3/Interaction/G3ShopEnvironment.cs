@@ -288,9 +288,9 @@ namespace Lottery.G3.Interaction
             daylight.shadowStrength=value?.55f:.65f;
             daylight.intensity=value ? .16f : DaylightStrength;daylight.color=value?new Color(.49f,.62f,.91f):new Color(1,.94f,.84f);
             RenderSettings.ambientMode=AmbientMode.Trilight;
-            RenderSettings.ambientSkyColor=value?new Color(.30f,.34f,.43f):new Color(.51f,.555f,.60f);
-            RenderSettings.ambientEquatorColor=value?new Color(.35f,.31f,.27f):new Color(.435f,.4275f,.3825f);
-            RenderSettings.ambientGroundColor=value?new Color(.20f,.18f,.17f):new Color(.255f,.2325f,.195f);
+            RenderSettings.ambientSkyColor=value?new Color(.30f,.34f,.43f):new Color(.612f,.666f,.72f);
+            RenderSettings.ambientEquatorColor=value?new Color(.35f,.31f,.27f):new Color(.522f,.513f,.459f);
+            RenderSettings.ambientGroundColor=value?new Color(.20f,.18f,.17f):new Color(.306f,.279f,.234f);
             // Trilight derives the effective ambient probe from the three colours above.
             // Run37's manual SH-only reduction produced no visible frame improvement.
             // Retain the manual assignment unchanged; tune Trilight through its colours.

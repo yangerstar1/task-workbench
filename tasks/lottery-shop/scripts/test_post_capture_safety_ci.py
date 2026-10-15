@@ -20,8 +20,8 @@ def fixture():
  'lightPositions':[dict(x=0,y=0,z=0) for _ in range(5)],'lightRotations':[dict(x=0,y=0,z=0,w=1) for _ in range(5)],
  'lightRanges':[10,4.8,4.2,4,2],'lightSpotAngles':[115]*5,'lightInnerSpotAngles':[70]*5,'lightShadows':['Soft','Soft','Soft','None','None'],
  'lightEnabled':[True]*5,'lightCullingMasks':[-1]*5,'probeIntensity':.85,'reflectionIntensity':1,'probeTextureId':'31','probeTextureName':'Day','ambientSH':[.2]*27,
- 'ambientMode':'Trilight','ambientIntensity':1,'ambientSkyColor':dict(r=.51,g=.555,b=.60,a=1),'ambientEquatorColor':dict(r=.435,g=.4275,b=.3825,a=1),
- 'ambientGroundColor':dict(r=.255,g=.2325,b=.195,a=1),'ambientLight':dict(r=.51,g=.555,b=.60,a=1),
+ 'ambientMode':'Trilight','ambientIntensity':1,'ambientSkyColor':dict(r=.612,g=.666,b=.72,a=1),'ambientEquatorColor':dict(r=.522,g=.513,b=.459,a=1),
+ 'ambientGroundColor':dict(r=.306,g=.279,b=.234,a=1),'ambientLight':dict(r=.612,g=.666,b=.72,a=1),
  'oakShader':'Universal Render Pipeline/Lit','oakMaterialId':10,'oakKeywords':['_METALLICSPECGLOSSMAP','_NORMALMAP'],
  'oakSmoothness':1,'oakNormalStrength':.28,'oakSpecularHighlights':1,'oakBaseMapId':'21','oakBaseMapName':'Walnut_v15_BaseColor',
  'oakBaseColor':dict(r=1,g=1,b=1,a=1),'oakBaseScale':dict(x=1,y=1),'oakBaseOffset':dict(x=0,y=0),
@@ -83,6 +83,12 @@ class SafetyTests(unittest.TestCase):
  def test_previous_day_trilight_receipt_is_safe_but_semantically_rejected(self):
   d=full_receipt()
   old={'ambientSkyColor':dict(r=.68,g=.74,b=.80,a=1),'ambientEquatorColor':dict(r=.58,g=.57,b=.51,a=1),'ambientGroundColor':dict(r=.34,g=.31,b=.26,a=1),'ambientLight':dict(r=.68,g=.74,b=.80,a=1)}
+  for controls in [d['initialControls']]+[row['controls'] for row in d['cases'] if row['id']!='ambient-sh-zero']:controls.update(copy.deepcopy(old))
+  seal(d);self.assertEqual(e.receipt(encode(d),IDENT),d)
+  with self.assertRaisesRegex(ValueError,'Initial Trilight color baseline drift'):v.validate_receipt(d,'a'*64,'b'*40)
+ def test_v50_day_trilight_receipt_is_safe_but_semantically_rejected(self):
+  d=full_receipt()
+  old={'ambientSkyColor':dict(r=.51,g=.555,b=.60,a=1),'ambientEquatorColor':dict(r=.435,g=.4275,b=.3825,a=1),'ambientGroundColor':dict(r=.255,g=.2325,b=.195,a=1),'ambientLight':dict(r=.51,g=.555,b=.60,a=1)}
   for controls in [d['initialControls']]+[row['controls'] for row in d['cases'] if row['id']!='ambient-sh-zero']:controls.update(copy.deepcopy(old))
   seal(d);self.assertEqual(e.receipt(encode(d),IDENT),d)
   with self.assertRaisesRegex(ValueError,'Initial Trilight color baseline drift'):v.validate_receipt(d,'a'*64,'b'*40)

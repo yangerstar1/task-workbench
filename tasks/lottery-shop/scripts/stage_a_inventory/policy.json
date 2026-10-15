@@ -74,7 +74,8 @@
       "name": "Cream_Plaster",
       "roughnessTexture": null,
       "textures": [
-        "SoftPlaster_v13_BaseColor.png"
+        "SoftPlaster_v13_BaseColor.png",
+        "CreamPlaster_Normal.png"
       ],
       "transparent": false
     },
@@ -284,6 +285,8 @@
   "recipeSources": [
     "Assets/G3/Interaction/G3ShopEnvironment.cs",
     "Assets/G3/Editor/G3ShopReflectionBaker.cs",
+    "Assets/G3/Interaction/G3ContactOcclusionFeature.cs",
+    "Assets/G3/Interaction/G3ContactOcclusionFeature.cs.meta",
     "Assets/G3/Editor/G3ShopArtImporter.cs",
     "Assets/G3/Editor/G3Build.cs",
     "Packages/manifest.json",
@@ -298,19 +301,29 @@
       "sha256": "7b1b8b78532814cda88b72efa3e9b1769ba1d8e4a1e3ed6fa49bdedadc993fd8"
     },
     {
-      "bytes": 53374,
+      "bytes": 60572,
       "path": "Assets/G3/Editor/G3ShopArtImporter.cs",
-      "sha256": "2b652d7149b771f4694e6136b9bb6a4170f5b87d7bc89b225ebe803c8d58a582"
+      "sha256": "794076cc7878763b7c9bda6d1bf7ecf7cfab8989f97d42af7c41f4141af20f5f"
     },
     {
-      "bytes": 47274,
+      "bytes": 47411,
       "path": "Assets/G3/Editor/G3ShopReflectionBaker.cs",
-      "sha256": "2d53a3fba817002d3778aaf3776319efd335813c511cb5c3722162bec1fb6a68"
+      "sha256": "2cd0a691ed3561fee348f164125ef94b1831585b79f07798d62c2da432fc5092"
     },
     {
-      "bytes": 31554,
+      "bytes": 701,
+      "path": "Assets/G3/Interaction/G3ContactOcclusionFeature.cs",
+      "sha256": "ae000233d7315dcc3b180c199eb3294c9dd3997c5fd77b712dbd77f2c621369e"
+    },
+    {
+      "bytes": 243,
+      "path": "Assets/G3/Interaction/G3ContactOcclusionFeature.cs.meta",
+      "sha256": "44f33ff686f3d67ef72d9596e6fdd457fef63f128b948e518a054aa00b509e67"
+    },
+    {
+      "bytes": 31552,
       "path": "Assets/G3/Interaction/G3ShopEnvironment.cs",
-      "sha256": "b0a9c4b5b77764f47d3d3b2e3dedf6df0df571e6d871a13684b52655cf400879"
+      "sha256": "08c0023c20012d8ae2c76898d4d2b565e28cb2194960476e23291edad6be48cb"
     },
     {
       "bytes": 1560,
@@ -678,9 +691,9 @@
       "sha256": "6f1cdd2c21d85ee2f7ced41c7108b39bba52f39a37b7c2a6ae017238a0913f39"
     },
     {
-      "bytes": 25362,
+      "bytes": 25424,
       "path": "Assets/G3/Shop/Resources/G3/Shop/materials.json",
-      "sha256": "b03db6ee4b1a2e9db4c5ab900e668b5dd57796e115399baff44792e18bbcf132"
+      "sha256": "0b0654ca855fec669db5b5eb32f0c3542c0af69b8f554c794187c2194e475ed5"
     },
     {
       "bytes": 13688,

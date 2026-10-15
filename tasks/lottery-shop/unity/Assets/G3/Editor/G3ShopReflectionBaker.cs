@@ -23,6 +23,8 @@ namespace Lottery.G3.Editor
         const long CubeBytes=8388608,SmallBytes=16384;
         static readonly string[] RecipeSources={
             "Assets/G3/Interaction/G3ShopEnvironment.cs","Assets/G3/Editor/G3ShopReflectionBaker.cs",
+            "Assets/G3/Interaction/G3ContactOcclusionFeature.cs",
+            "Assets/G3/Interaction/G3ContactOcclusionFeature.cs.meta",
             "Assets/G3/Editor/G3ShopArtImporter.cs","Assets/G3/Editor/G3Build.cs",
             "Packages/manifest.json","Packages/packages-lock.json"};
         static readonly string[] DependencyRoots={G3ShopArtImporter.Root+"/LotteryShop_Runtime.prefab",G3ShopArtImporter.PipelinePath};
