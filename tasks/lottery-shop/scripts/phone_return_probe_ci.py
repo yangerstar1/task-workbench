@@ -113,6 +113,43 @@ def validate_observation(v, ident):
         require(v['routeComplete'] and v['cleanupComplete'] and not v['deadlineExceeded'] and v['elapsedMs']<180000 and v['stage']=='TEARDOWN', 'PHONE_COMPLETION_DEADLINE_REJECTED')
     return v
 
+def verify_preparation(root):
+    """Same-job authored assets, exact successful native prerequisite; no raw exports."""
+    import reflection_bake_ci as reflection
+    ident=identity(root)
+    native=read_json(outdir(root)/'safe-phone-return-prepare.json',65536)
+    require(all(native[k]==ident[k] for k in ('sourceCommit','reviewedCandidateCommit','runId','runAttempt')),
+            'PHONE_PREPARATION_SOURCE_REJECTED')
+    require(native['phase']=='phone-return-prepare' and native['processBudgetSeconds']==1800 and
+            native['status']=='NATIVE_SUCCEEDED' and native['nativeExitCode']==native['dockerExitCode']==0 and
+            native['nativeExitMarkerCount']==1, 'PHONE_PREPARATION_NATIVE_REQUIRED')
+    require(type(native['nativeStartedAtNs']) is int and native['nativeStartedAtNs']>0, 'PHONE_PREPARATION_START_REQUIRED')
+    source=root/TASK/'unity/Assets/G3/Shop/Resources/G3/Shop'
+    # The bake receipt is rebound to this exact run by the existing Editor baker.
+    raw=read_regular(source/'Reflections/reflection-receipt.json',reflection.TEXT_LIMIT,native['nativeStartedAtNs'])
+    receipt=reflection.validate_receipt(reflection.load_receipt(raw),ident)
+    require(reflection.source_digest(root,receipt)==receipt['sourceDigest'], 'PHONE_PREPARATION_INPUT_DRIFT')
+    prefab=read_regular(source/'LotteryShop_Runtime.prefab',8*1024*1024)
+    require(len(prefab)>0, 'PHONE_PREPARATION_PREFAB_MISSING')
+    outputs=[]
+    for key in ('day','night'):
+        item=receipt[key]
+        data=read_regular(source/'Reflections'/item['file'],reflection.EXR_LIMIT)
+        meta=read_regular(source/'Reflections'/(item['file']+'.meta'),reflection.TEXT_LIMIT)
+        require(len(data)==item['bytes'] and reflection.digest(data)==item['sha256'] and
+                len(meta)==item['metaBytes'] and reflection.digest(meta)==item['metaSha256'], 'PHONE_PREPARATION_CUBE_HASH_REJECTED')
+        require(reflection.exr_size(data)==(item['sourceWidth'],item['sourceHeight']), 'PHONE_PREPARATION_CUBE_DIMENSIONS_REJECTED')
+        reflection.validate_meta(meta)
+        require(re.findall(r'^guid: ([0-9a-f]{32})$',meta.decode('utf-8'),re.M)==[item['metaGuid']], 'PHONE_PREPARATION_CUBE_GUID_REJECTED')
+        outputs.append(dict(role=key.upper(),bytes=len(data),sha256=reflection.digest(data),metaSha256=reflection.digest(meta)))
+    summary=dict(ident,schemaVersion=1,status='AUTHORED_PREPARATION_OBSERVED_NOT_FUNCTIONAL_PASS',
+                 preparationBudgetSeconds=1800,caseBudgetSeconds=180,phoneProcessBudgetSeconds=480,
+                 prefabSha256=reflection.digest(prefab),prefabBytes=len(prefab),reflectionSourceSha256=receipt['sourceDigest'],
+                 reflectionReceiptSha256=reflection.digest(raw),cubes=outputs)
+    write(outdir(root)/'preparation-observation.json',summary)
+    return summary
+
+
 def unique_pairs(pairs):
     value={}
     for key,item in pairs:
@@ -137,6 +174,7 @@ def export(root):
     target.unlink(missing_ok=True)
     result=dict(ident, schemaVersion=1,status='INCONCLUSIVE',timing='NOT_OBSERVED',native='UNAVAILABLE',nunit='UNAVAILABLE',observation=None,segmentOutcomes=['NOT_REACHED']*4)
     try:
+        verify_preparation(root)
         native=read_json(outdir(root)/'safe-phone-return-probe.json',65536)
         require(all(native[k]==ident[k] for k in ('sourceCommit','reviewedCandidateCommit','runId','runAttempt')) and native['phase']=='phone-return-probe' and native['processBudgetSeconds']==480, 'PHONE_NATIVE_BINDING_REJECTED')
         started=native['nativeStartedAtNs'];require(type(started) is int and started>0,'PHONE_START_REJECTED')

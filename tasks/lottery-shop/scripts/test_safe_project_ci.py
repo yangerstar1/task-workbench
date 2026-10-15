@@ -30,6 +30,7 @@ class BoundaryTests(unittest.TestCase):
             if phase!='regression-edit':expected+=['-force-glcore','-screen-width','1280','-screen-height','720']
             expected+=['-job-worker-count','2','-probeCommit','1'*40,'-probeRunId','12345']
             if phase == 'capture' or phase in safe.split.PHASES.values():expected+=['-probeRunAttempt','1']
+            if phase == 'capture':expected+=['-testFilter',r'^Lottery\.G3\.VisualCandidate\.Tests\.VisualCandidateCaptureTests\.ScenarioStateCaptureRetainsTwentyThreeViewsFromRealTransactionsV2$']
             if phase in safe.split.PHASES.values():
                 shard=phase.removeprefix('regression-play-')
                 expected+=['-g3RegressionProgress','1','-probeReviewedCommit','2'*40,'-g3RegressionShard',shard,'-testFilter',safe.split.selection(shard)]

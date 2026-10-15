@@ -16,9 +16,10 @@ jobs:
       github.triggering_actor == 'yangerstar1' && github.ref == 'refs/heads/lottery-shop-g0-20261011' &&
       github.event.repository.private == false && github.event.repository.fork == false && github.event.deleted == false
     runs-on: ubuntu-24.04
-    timeout-minutes: 35
+    timeout-minutes: 80
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        timeout-minutes: 3
         with:
           persist-credentials: false
           fetch-depth: 0
@@ -31,10 +32,13 @@ jobs:
             /.github/workflows/lottery-activation-probe.yml
       - name: Require fresh independent phone-return request and exact source
         id: guard
+        timeout-minutes: 1
         run: PYTHONDONTWRITEBYTECODE=1 python3 tasks/lottery-shop/scripts/phone_return_probe_ci.py guard
       - name: Focused closed-selector and evidence rejection tests without secrets
+        timeout-minutes: 1
         run: PYTHONDONTWRITEBYTECODE=1 python3 tasks/lottery-shop/scripts/test_phone_return_probe_ci.py -v
       - name: Prepare same authorized disposable runner disk layout
+        timeout-minutes: 2
         run: |
           PYTHONDONTWRITEBYTECODE=1 python3 tasks/lottery-shop/scripts/phone_return_probe_ci.py guard
           sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/.ghcup /usr/local/lib/android /opt/hostedtoolcache/CodeQL
@@ -44,6 +48,7 @@ jobs:
               raise SystemExit('INSUFFICIENT_IMAGE_DISK_SPACE')
           PY
       - name: Read same pinned public activation and return mechanism
+        timeout-minutes: 3
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
           repository: game-ci/unity-test-runner
@@ -56,6 +61,7 @@ jobs:
             dist/unity-config
             dist/platforms/ubuntu
       - name: Verify licensed font and hash exact source metadata
+        timeout-minutes: 2
         run: PYTHONDONTWRITEBYTECODE=1 python3 tasks/lottery-shop/scripts/phone_return_probe_ci.py prepare
       - name: Activate once in this attempt's private container
         id: safestart
@@ -65,12 +71,18 @@ jobs:
           UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
           UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
         run: PYTHONDONTWRITEBYTECODE=1 python3 tasks/lottery-shop/scripts/safe_project_ci.py start --phone-return-only
+      - name: Prepare authored room and baked reflections with existing Editor implementation
+        id: phone_prepare
+        if: ${{ steps.safestart.outcome == 'success' }}
+        timeout-minutes: 32
+        run: PYTHONDONTWRITEBYTECODE=1 python3 tasks/lottery-shop/scripts/safe_project_ci.py phone-return-prepare --phone-return-only
       - name: "One exact phone return case: 180 seconds including fixture setup and cleanup, 480-second native cap"
         id: phone_return
-        if: ${{ steps.safestart.outcome == 'success' }}
+        if: ${{ steps.phone_prepare.outcome == 'success' }}
         timeout-minutes: 10
         run: PYTHONDONTWRITEBYTECODE=1 python3 tasks/lottery-shop/scripts/safe_project_ci.py phone-return-probe --phone-return-only
       - name: Export only fixed safe fields and exact one-case verdict, never raw NUnit/logs
+        timeout-minutes: 1
         if: ${{ always() && steps.guard.outcome == 'success' && steps.phone_return.outcome != 'skipped' }}
         run: PYTHONDONTWRITEBYTECODE=1 python3 tasks/lottery-shop/scripts/phone_return_probe_ci.py export
       - name: Return only this owned activation and verify container absence
@@ -78,6 +90,7 @@ jobs:
         timeout-minutes: 5
         run: PYTHONDONTWRITEBYTECODE=1 python3 tasks/lottery-shop/scripts/safe_project_ci.py finish --phone-return-only
       - name: Upload only independent phone-return diagnostic evidence
+        timeout-minutes: 1
         if: ${{ always() && steps.guard.outcome == 'success' }}
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
@@ -85,6 +98,8 @@ jobs:
           path: |
             tasks/lottery-shop/evidence/phone-return-probe/source-receipt.json
             tasks/lottery-shop/evidence/phone-return-probe/safe-start.json
+            tasks/lottery-shop/evidence/phone-return-probe/safe-phone-return-prepare.json
+            tasks/lottery-shop/evidence/phone-return-probe/preparation-observation.json
             tasks/lottery-shop/evidence/phone-return-probe/safe-phone-return-probe.json
             tasks/lottery-shop/evidence/phone-return-probe/safe-finish.json
             tasks/lottery-shop/evidence/phone-return-probe/safe-session.json

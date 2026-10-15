@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 """Focused synthetic checks: no Unity, Docker, secrets or external requests."""
 import copy
+import tempfile
+import json
+import reflection_bake_ci as reflection
 import os
 from pathlib import Path
 import re
@@ -48,13 +51,52 @@ class PhoneTests(unittest.TestCase):
             for selection in safe.split.selection(shard).split(';'):self.assertFalse(re.fullmatch(selection,phone.CASE))
     def test_fixed_native_selection_and_budget(self):
         with patch.object(safe,'PHASES',dict(safe.PHASES)),patch.object(safe,'visual',safe.visual):
-            safe.configure_phone_return();self.assertEqual(set(safe.PHASES),{'phone-return-probe'});self.assertEqual(safe.PHASES['phone-return-probe'][3],480)
+            safe.configure_phone_return();self.assertEqual(set(safe.PHASES),{'phone-return-prepare','phone-return-probe'});self.assertEqual(safe.PHASES['phone-return-probe'][3],480)
             argv=safe.project_argv('phone-return-probe',IDENT)
             self.assertEqual(argv[argv.index('-testFilter')+1],phone.FILTER);self.assertEqual(argv[argv.index('-assemblyNames')+1],'Lottery.G3.PlayMode.Tests')
             self.assertNotIn('-g3RegressionProgress',argv);self.assertNotIn('-g3PerformanceProbe',argv)
     def test_selector_requires_explicit_capability_and_rejects_mixing(self):
-        for args in [('phone-return-probe',),('regression-play-world','--phone-return-only'),('start','--phone-return-only','--performance-only'),('start','--phone-return-only','--counter-light-diagnostic')]:
+        for args in [('phone-return-prepare',),('phone-return-probe',),('regression-play-world','--phone-return-only'),('start','--phone-return-only','--performance-only'),('start','--phone-return-only','--counter-light-diagnostic')]:
             with self.subTest(args=args),patch.object(sys,'argv',['safe_project_ci.py',*args]):self.assertEqual(safe.main(),1)
+    def test_preparation_argv_is_fixed_and_never_runs_tests(self):
+        with patch.object(safe,'PHASES',dict(safe.PHASES)),patch.object(safe,'visual',safe.visual):
+            safe.configure_phone_return();self.assertEqual(safe.PHASES['phone-return-prepare'][3],1800)
+            argv=safe.project_argv('phone-return-prepare',IDENT)
+            self.assertEqual(argv[argv.index('-executeMethod')+1],'Lottery.G3.Editor.G3Build.Prepare')
+            for flag in ('-runTests','-testFilter','-assemblyNames'):self.assertNotIn(flag,argv)
+            self.assertIn('-quit',argv);self.assertEqual(argv[argv.index('-probeRunAttempt')+1],'1')
+    def test_failed_or_foreign_preparation_never_qualifies(self):
+        base=dict(IDENT,phase='phone-return-prepare',processBudgetSeconds=1800,status='NATIVE_SUCCEEDED',nativeExitCode=0,dockerExitCode=0,nativeExitMarkerCount=1,nativeStartedAtNs=123)
+        for field,value in [('status','NATIVE_FAILED'),('status','PROCESS_TIMEOUT'),('sourceCommit','3'*40),('runId','999'),('nativeExitCode',1),('nativeExitMarkerCount',0),('processBudgetSeconds',1801),('nativeStartedAtNs',None)]:
+            bad=dict(base);bad[field]=value
+            with self.subTest(field=field,value=value),patch.object(phone,'identity',return_value=IDENT),patch.object(phone,'read_json',return_value=bad),patch.object(phone,'read_regular') as read:
+                with self.assertRaises((ValueError,AssertionError)):phone.verify_preparation(Path('/unused'))
+                read.assert_not_called()
+    def test_preparation_rejects_missing_stale_and_wrong_source_reflections(self):
+        native=dict(IDENT,phase='phone-return-prepare',processBudgetSeconds=1800,status='NATIVE_SUCCEEDED',nativeExitCode=0,dockerExitCode=0,nativeExitMarkerCount=1,nativeStartedAtNs=123)
+        with tempfile.TemporaryDirectory() as folder:
+            root=Path(folder);path=root/phone.TASK/'unity/Assets/G3/Shop/Resources/G3/Shop/Reflections/reflection-receipt.json'
+            with patch.object(phone,'identity',return_value=IDENT),patch.object(phone,'read_json',return_value=native):
+                with self.assertRaises((ValueError,AssertionError)):phone.verify_preparation(root)
+                path.parent.mkdir(parents=True);path.write_text('{}');os.utime(path,ns=(1,1))
+                with self.assertRaises((ValueError,AssertionError)):phone.verify_preparation(root)
+                receipt=dict(schemaVersion=1,status='COMPLETE_BAKED_STATIC_REFLECTIONS',recipe=reflection.RECIPE,sourceDigest='a'*64,
+                             sourceCommit='9'*40,runId=IDENT['runId'],runAttempt='1',unityVersion='6000.3.19f1',day={},night={},
+                             colorSpace='Gamma',runtimeDependencyHash='b'*32,pipelineDependencyHash='c'*32,captureRenderers=1,captureTriangles=1)
+                path.write_text(json.dumps(receipt))
+                with self.assertRaises((ValueError,AssertionError)):phone.verify_preparation(root)
+    def test_export_requires_preparation_even_if_probe_result_claims_success(self):
+        with patch.object(phone,'identity',return_value=IDENT),patch.object(phone,'verify_preparation',side_effect=ValueError('blocked')),patch.object(Path,'unlink'),patch.object(phone,'write') as write:
+            with self.assertRaises((ValueError,AssertionError)):phone.export(Path('/unused'))
+            self.assertEqual(write.call_args.args[1]['status'],'INCONCLUSIVE')
+            self.assertIsNone(write.call_args.args[1]['observation'])
+    def test_capture_filter_is_exact_under_normal_and_counterlight_profiles(self):
+        case='Lottery.G3.VisualCandidate.Tests.VisualCandidateCaptureTests.ScenarioStateCaptureRetainsTwentyThreeViewsFromRealTransactionsV2'
+        for enabled in (False,True):
+            with patch.object(safe,'COUNTER_LIGHT_DIAGNOSTIC',enabled):
+                argv=safe.project_argv('capture',IDENT);selection=argv[argv.index('-testFilter')+1]
+                self.assertTrue(re.fullmatch(selection,case));self.assertFalse(re.fullmatch(selection,case+'Extra'))
+                self.assertFalse(re.fullmatch(selection,'Lottery.G3.VisualCandidate.Tests.LoanLabelTests.EmptyLoanHasNoDueDate'))
     def test_xml_exact_identity_and_no_raw_export(self):
         xml=f'<test-run result="Passed" total="1" passed="1" failed="0" skipped="0" inconclusive="0"><test-suite type="Assembly" name="{phone.ASSEMBLY}" result="Passed"><test-case fullname="{phone.CASE}" result="Passed"><output>DO_NOT_EXPORT_RAW_TEXT</output></test-case></test-suite></test-run>'.encode()
         self.assertEqual(phone.test_summary(xml),'EXACT_CASE_PASSED')

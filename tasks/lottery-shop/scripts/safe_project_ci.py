@@ -241,6 +241,14 @@ def native(ident, command, seconds, record, compiler_files=()):
 
 
 def project_argv(phase, ident):
+    if phase == 'phone-return-prepare':
+        # Existing Editor preparation only; no tests, capture or fallback scene.
+        return ['unity-editor', '-batchmode', '-quit', '-logFile', '/dev/stdout',
+                '-projectPath', '/github/workspace/' + private.TASK + '/unity',
+                '-executeMethod', 'Lottery.G3.Editor.G3Build.Prepare',
+                '-force-glcore', '-screen-width', '1280', '-screen-height', '720', '-job-worker-count', '2',
+                '-probeCommit', ident['sourceCommit'], '-probeReviewedCommit', ident['reviewedCandidateCommit'],
+                '-probeRunId', ident['runId'], '-probeRunAttempt', ident['runAttempt']]
     platform, folder, assemblies, _ = PHASES[phase]
     argv = ['unity-editor', '-batchmode', '-logFile', '/dev/stdout', '-projectPath', '/github/workspace/' + private.TASK + '/unity',
             '-coverageResultsPath', '/github/workspace/CodeCoverage', '-runTests', '-testPlatform', platform,
@@ -258,6 +266,8 @@ def project_argv(phase, ident):
         argv += ['-g3PhoneReturnDiagnostic', '1', '-probeReviewedCommit', ident['reviewedCandidateCommit'],
                  '-probeRunAttempt', ident['runAttempt'], '-testFilter', phone.FILTER]
     if phase == 'performance-probe': argv += ['-g3PerformanceProbe', '1', '-probeReviewedCommit', ident['reviewedCandidateCommit']]
+    if phase == 'capture':
+        argv += ['-testFilter', r'^Lottery\.G3\.VisualCandidate\.Tests\.VisualCandidateCaptureTests\.ScenarioStateCaptureRetainsTwentyThreeViewsFromRealTransactionsV2$']
     if phase == 'capture' and COUNTER_LIGHT_DIAGNOSTIC:
         argv += ['-counterLightDiagnostic', '1']
         if COUNTER_LIGHT_DIAGNOSTIC_FAULT:
@@ -335,6 +345,7 @@ def test(root, phase):
             for progress in outputs:
                 if progress.exists(): progress.unlink()
         if phase == 'phone-return-probe':
+            visual.verify_preparation(root)
             for receipt in (artifacts / 'phone-return.json', artifacts / 'phone-return.json.tmp'):
                 private.require(not receipt.is_symlink(), 'PHONE_RECEIPT_LINK_REJECTED')
                 if receipt.exists(): receipt.unlink()
@@ -397,23 +408,24 @@ def configure_phone_return():
     global visual, PHASES
     import phone_return_probe_ci
     visual = phone_return_probe_ci
-    PHASES = {"phone-return-probe": ("playmode", "phone-return-probe", "Lottery.G3.PlayMode.Tests", 480)}
+    PHASES = {"phone-return-prepare": ("editmode", "phone-return-preparation", "", 1800),
+              "phone-return-probe": ("playmode", "phone-return-probe", "Lottery.G3.PlayMode.Tests", 480)}
 
 
 def main():
     global COUNTER_LIGHT_DIAGNOSTIC, COUNTER_LIGHT_DIAGNOSTIC_FAULT
     parser = argparse.ArgumentParser()
-    parser.add_argument('phase', choices=('start', *PHASES, 'performance-probe', 'phone-return-probe', 'finish'))
+    parser.add_argument('phase', choices=('start', *PHASES, 'performance-probe', 'phone-return-prepare', 'phone-return-probe', 'finish'))
     parser.add_argument('--performance-only', action='store_true')
     parser.add_argument('--phone-return-only', action='store_true')
     parser.add_argument('--counter-light-diagnostic', action='store_true')
     parser.add_argument('--counter-light-diagnostic-fault', default='')
     args = parser.parse_args()
     if args.phone_return_only:
-        if args.performance_only or args.counter_light_diagnostic or args.counter_light_diagnostic_fault or args.phase not in ('start', 'phone-return-probe', 'finish'):
+        if args.performance_only or args.counter_light_diagnostic or args.counter_light_diagnostic_fault or args.phase not in ('start', 'phone-return-prepare', 'phone-return-probe', 'finish'):
             print('SAFE_PROJECT_PROFILE_REJECTED'); return 1
         configure_phone_return()
-    elif args.phase == 'phone-return-probe':
+    elif args.phase in ('phone-return-prepare', 'phone-return-probe'):
         print('SAFE_PROJECT_PROFILE_REJECTED'); return 1
     if args.counter_light_diagnostic or args.counter_light_diagnostic_fault:
         if args.phase != 'capture' or args.performance_only or not args.counter_light_diagnostic:
