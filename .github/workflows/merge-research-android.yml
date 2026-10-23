@@ -29,14 +29,14 @@ jobs:
           trap cleanup EXIT
           { uname -m; nproc; free -m; df -h /; ls -l /dev/kvm; } > "$OUT/runner.txt"
           test -c /dev/kvm
-          getfacl /dev/kvm > "$WORK/kvm.acl"
+          getfacl -p /dev/kvm > "$WORK/kvm.acl"
           sudo setfacl -m "u:$(id -un):rw" /dev/kvm
           test -r /dev/kvm && test -w /dev/kvm
           SDK="${ANDROID_SDK_ROOT:-${ANDROID_HOME:?Android SDK missing}}"
           export PATH="$SDK/platform-tools:$SDK/emulator:$SDK/cmdline-tools/latest/bin:$PATH"
+          timeout 600 sdkmanager 'platform-tools' 'emulator' 'system-images;android-30;google_apis;x86_64' </dev/null > "$OUT/sdk-install.txt" 2>&1
           emulator -version > "$OUT/emulator-version.txt" 2>&1
           emulator -accel-check > "$OUT/acceleration.txt" 2>&1
-          timeout 600 sdkmanager 'system-images;android-30;google_apis;x86_64' </dev/null > "$OUT/sdk-install.txt" 2>&1
           cp "$SDK/system-images/android-30/google_apis/x86_64/source.properties" "$OUT/image-source.properties"
           export ANDROID_AVD_HOME="$WORK/avd"
           mkdir -p "$ANDROID_AVD_HOME"
@@ -93,3 +93,4 @@ jobs:
           path: merge-research-evidence/
           retention-days: 1
           if-no-files-found: warn
+
