@@ -77,16 +77,16 @@ jobs:
           if command -v ffprobe >/dev/null; then ffprobe -v error -show_format -show_streams -of json "$OUT/original-speed-no-audio.mp4" > "$OUT/video-info.json"; fi
           # A public third-party package stays only in this disposable runner.
           # Upload screenshots/logs only, never the package, credentials or a user save.
-          curl --fail --location --silent --show-error --max-time 240 'https://d.apkpure.net/b/XAPK/com.Trailmix.LoveAndPiesMerge?version=latest' -o "$WORK/love-pies.xapk"
+          curl --fail --location --silent --show-error --max-time 240 'https://d.apkpure.net/b/XAPK/io.randomco.travel?version=latest' -o "$WORK/travel-town.xapk"
           export WORK
           python3 - <<'PY'
           import os,pathlib,zipfile,json,hashlib
           root=pathlib.Path(os.environ['WORK']); out=pathlib.Path(os.environ['GITHUB_WORKSPACE'])/'merge-research-evidence'
-          src=root/'love-pies.xapk'; assert 1000000<src.stat().st_size<500000000
+          src=root/'travel-town.xapk'; assert 1000000<src.stat().st_size<500000000
           dst=root/'apks';dst.mkdir()
           with zipfile.ZipFile(src) as z:
               manifest=json.loads(z.read('manifest.json'))
-              assert manifest['package_name']=='com.Trailmix.LoveAndPiesMerge'
+              assert manifest['package_name']=='io.randomco.travel'
               entries=[i for i in z.infolist() if i.filename.endswith('.apk')]
               assert 1<=len(entries)<=16
               assert sum(i.file_size for i in entries)<800000000
@@ -96,14 +96,14 @@ jobs:
                   assert name not in names
                   names.add(name)
                   (dst/name).write_bytes(z.read(e))
-          (out/'package-identity.json').write_text(json.dumps({'source':'public APKPure download; not the archived Drive bytes','bytes':src.stat().st_size,'sha256':hashlib.file_digest(src.open('rb'),'sha256').hexdigest(),'manifest':manifest},indent=2)+'\n')
+          (out/'package-identity.json').write_text(json.dumps({'source':'public APKPure download; compare SHA256 with the archived Drive package','bytes':src.stat().st_size,'sha256':hashlib.file_digest(src.open('rb'),'sha256').hexdigest(),'manifest':manifest},indent=2)+'\n')
           PY
           AAPT=$(find "$SDK/build-tools" -name aapt -type f | sort -V | tail -n1)
           for APK in "$WORK"/apks/*.apk; do "$AAPT" dump badging "$APK"; done > "$OUT/package-badging.txt"
           adb -s emulator-5554 install-multiple -r "$WORK"/apks/*.apk > "$OUT/game-install.txt" 2>&1
-          adb -s emulator-5554 shell cmd package resolve-activity --brief com.Trailmix.LoveAndPiesMerge | tr -d '\r' > "$OUT/game-activity.txt"
+          adb -s emulator-5554 shell cmd package resolve-activity --brief io.randomco.travel | tr -d '\r' > "$OUT/game-activity.txt"
           ACTIVITY=$(tail -n1 "$OUT/game-activity.txt")
-          [[ "$ACTIVITY" =~ ^com\.Trailmix\.LoveAndPiesMerge/[A-Za-z0-9._]+$ ]]
+          [[ "$ACTIVITY" =~ ^io\.randomco\.travel/[A-Za-z0-9._]+$ ]]
           adb -s emulator-5554 logcat -c
           adb -s emulator-5554 shell screenrecord --time-limit 110 /sdcard/game-launch.mp4 > "$OUT/game-record.txt" 2>&1 &
           RECORDPID=$!
@@ -116,7 +116,7 @@ jobs:
           adb -s emulator-5554 exec-out screencap -p > "$OUT/game-90s.png"
           adb -s emulator-5554 shell uiautomator dump /sdcard/window.xml > "$OUT/ui-dump.txt" 2>&1 || true
           adb -s emulator-5554 pull /sdcard/window.xml "$OUT/game-ui.xml" || true
-          adb -s emulator-5554 shell pidof com.Trailmix.LoveAndPiesMerge > "$OUT/game-pid.txt" || true
+          adb -s emulator-5554 shell pidof io.randomco.travel > "$OUT/game-pid.txt" || true
           adb -s emulator-5554 shell dumpsys activity activities > "$OUT/game-foreground.txt"
           adb -s emulator-5554 logcat -d -v threadtime > "$OUT/game-logcat.txt"
           wait "$RECORDPID"
