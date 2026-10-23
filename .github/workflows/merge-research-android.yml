@@ -35,6 +35,9 @@ jobs:
           SDK="${ANDROID_SDK_ROOT:-${ANDROID_HOME:?Android SDK missing}}"
           export PATH="$SDK/platform-tools:$SDK/emulator:$SDK/cmdline-tools/latest/bin:$PATH"
           timeout 600 sdkmanager 'platform-tools' 'emulator' 'system-images;android-30;google_apis;x86_64' </dev/null > "$OUT/sdk-install.txt" 2>&1
+          timeout 180 sudo apt-get update > "$OUT/apt-update.txt" 2>&1
+          timeout 180 sudo apt-get install -y --no-install-recommends libpulse0 libnss3 libasound2t64 libgl1 libegl1 libx11-6 libxcb1 libxkbcommon0 libxcomposite1 libxcursor1 libxi6 libxrandr2 libxtst6 > "$OUT/apt-install.txt" 2>&1
+          ldd "$SDK/emulator/qemu/linux-x86_64/qemu-system-x86_64" > "$OUT/native-libraries.txt"
           emulator -version > "$OUT/emulator-version.txt" 2>&1
           emulator -accel-check > "$OUT/acceleration.txt" 2>&1
           cp "$SDK/system-images/android-30/google_apis/x86_64/source.properties" "$OUT/image-source.properties"
