@@ -1,0 +1,95 @@
+name: Merge research Android capability probe
+on:
+  push:
+    branches: [codex/merge-research-android]
+    paths: [.github/workflows/merge-research-android.yml]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: merge-research-android-capability
+  cancel-in-progress: false
+jobs:
+  probe:
+    if: github.repository == 'yangerstar1/task-workbench' && github.event.repository.private == false
+    runs-on: ubuntu-24.04
+    timeout-minutes: 18
+    steps:
+      - name: Verify Android acceleration and capture real input evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          OUT="$GITHUB_WORKSPACE/merge-research-evidence"
+          WORK="$RUNNER_TEMP/merge-research-probe"
+          mkdir -p "$OUT" "$WORK"
+          cleanup() {
+            adb -s emulator-5554 emu kill >/dev/null 2>&1 || true
+            if [[ -f "$WORK/kvm.acl" ]]; then sudo setfacl --restore="$WORK/kvm.acl" || true; fi
+          }
+          trap cleanup EXIT
+          { uname -m; nproc; free -m; df -h /; ls -l /dev/kvm; } > "$OUT/runner.txt"
+          test -c /dev/kvm
+          getfacl /dev/kvm > "$WORK/kvm.acl"
+          sudo setfacl -m "u:$(id -un):rw" /dev/kvm
+          test -r /dev/kvm && test -w /dev/kvm
+          SDK="${ANDROID_SDK_ROOT:-${ANDROID_HOME:?Android SDK missing}}"
+          export PATH="$SDK/platform-tools:$SDK/emulator:$SDK/cmdline-tools/latest/bin:$PATH"
+          emulator -version > "$OUT/emulator-version.txt" 2>&1
+          emulator -accel-check > "$OUT/acceleration.txt" 2>&1
+          timeout 600 sdkmanager 'system-images;android-30;google_apis;x86_64' </dev/null > "$OUT/sdk-install.txt" 2>&1
+          cp "$SDK/system-images/android-30/google_apis/x86_64/source.properties" "$OUT/image-source.properties"
+          export ANDROID_AVD_HOME="$WORK/avd"
+          mkdir -p "$ANDROID_AVD_HOME"
+          printf 'no\n' | avdmanager create avd -n merge_probe -k 'system-images;android-30;google_apis;x86_64' --force > "$OUT/avd-create.txt" 2>&1
+          emulator -avd merge_probe -port 5554 -no-window -no-audio -no-boot-anim -no-snapshot -gpu swiftshader_indirect -memory 3072 -cores 2 -camera-back none -camera-front none > "$OUT/emulator.log" 2>&1 &
+          EMUPID=$!
+          timeout 180 adb -s emulator-5554 wait-for-device
+          READY=false
+          for ((i=0;i<90;i++)); do
+            if [[ $(adb -s emulator-5554 shell getprop sys.boot_completed | tr -d '\r') == 1 ]]; then READY=true; break; fi
+            kill -0 "$EMUPID"
+            sleep 2
+          done
+          test "$READY" == true
+          adb -s emulator-5554 shell wm size 720x1280
+          adb -s emulator-5554 shell wm density 240
+          { adb -s emulator-5554 shell getprop ro.product.cpu.abilist; adb -s emulator-5554 shell getprop ro.dalvik.vm.native.bridge; adb -s emulator-5554 shell getprop ro.build.version.sdk; } > "$OUT/android-abi.txt"
+          adb -s emulator-5554 shell input keyevent KEYCODE_HOME
+          sleep 4
+          adb -s emulator-5554 exec-out screencap -p > "$OUT/01-launcher.png"
+          adb -s emulator-5554 shell screenrecord --time-limit 25 /sdcard/probe.mp4 > "$OUT/record.txt" 2>&1 &
+          RECORDPID=$!
+          adb -s emulator-5554 shell am start -W -a android.settings.SETTINGS > "$OUT/open-settings.txt"
+          sleep 5
+          adb -s emulator-5554 exec-out screencap -p > "$OUT/02-settings.png"
+          adb -s emulator-5554 shell input swipe 360 1000 360 300 500
+          sleep 3
+          adb -s emulator-5554 exec-out screencap -p > "$OUT/03-scroll.png"
+          adb -s emulator-5554 shell input keyevent KEYCODE_HOME
+          sleep 3
+          adb -s emulator-5554 exec-out screencap -p > "$OUT/04-home.png"
+          wait "$RECORDPID"
+          adb -s emulator-5554 pull /sdcard/probe.mp4 "$OUT/original-speed-no-audio.mp4"
+          adb -s emulator-5554 shell dumpsys activity activities > "$OUT/activities.txt"
+          if command -v ffprobe >/dev/null; then ffprobe -v error -show_format -show_streams -of json "$OUT/original-speed-no-audio.mp4" > "$OUT/video-info.json"; fi
+          export OUT
+          python3 - <<'PY'
+          import os,json,pathlib,hashlib,struct
+          p=pathlib.Path(os.environ['OUT'])
+          images={}
+          for f in sorted(p.glob('*.png')):
+              b=f.read_bytes()
+              assert b[:8]==b'\x89PNG\r\n\x1a\n'
+              images[f.name]={'dimensions':struct.unpack('>II',b[16:24]),'bytes':len(b)}
+          assert len(images)==4
+          files={f.name:hashlib.sha256(f.read_bytes()).hexdigest() for f in p.iterdir() if f.is_file()}
+          (p/'receipt.json').write_text(json.dumps({'status':'ENVIRONMENT_EVIDENCE_CAPTURED_NOT_GAMEPLAY_ACCEPTANCE','images':images,'sha256':files,'gamePackageInstalled':False,'audio':'not captured'},indent=2)+'\n')
+          PY
+      - name: Preserve bounded evidence including failures
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: merge-research-probe-${{ github.run_id }}
+          path: merge-research-evidence/
+          retention-days: 1
+          if-no-files-found: warn
