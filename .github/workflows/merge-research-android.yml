@@ -1,4 +1,4 @@
-name: Merge research Android capability probe
+name: Merge research observed Android session
 on:
   push:
     branches: [codex/merge-research-android]
@@ -13,7 +13,7 @@ jobs:
   probe:
     if: github.repository == 'yangerstar1/task-workbench' && github.event.repository.private == false
     runs-on: ubuntu-24.04
-    timeout-minutes: 18
+    timeout-minutes: 22
     steps:
       - name: Verify Android acceleration and capture real input evidence
         shell: bash
@@ -26,7 +26,6 @@ jobs:
             adb -s emulator-5554 emu kill >/dev/null 2>&1 || true
             if [[ -f "$WORK/kvm.acl" ]]; then sudo setfacl --restore="$WORK/kvm.acl" || true; fi
           }
-          trap cleanup EXIT
           { uname -m; nproc; free -m; df -h /; ls -l /dev/kvm; } > "$OUT/runner.txt"
           test -c /dev/kvm
           getfacl -p /dev/kvm > "$WORK/kvm.acl"
@@ -36,7 +35,7 @@ jobs:
           export PATH="$SDK/platform-tools:$SDK/emulator:$SDK/cmdline-tools/latest/bin:$PATH"
           timeout 600 sdkmanager 'platform-tools' 'emulator' 'system-images;android-30;google_apis;x86_64' </dev/null > "$OUT/sdk-install.txt" 2>&1
           timeout 180 sudo apt-get update > "$OUT/apt-update.txt" 2>&1
-          timeout 180 sudo apt-get install -y --no-install-recommends libpulse0 libnss3 libasound2t64 libgl1 libegl1 libx11-6 libxcb1 libxkbcommon0 libxcomposite1 libxcursor1 libxi6 libxrandr2 libxtst6 > "$OUT/apt-install.txt" 2>&1
+          timeout 180 sudo apt-get install -y --no-install-recommends libpulse0 libnss3 libasound2t64 libgl1 libegl1 libx11-6 libxcb1 libxkbcommon0 libxcomposite1 libxcursor1 libxi6 libxrandr2 libxtst6 python3-pil > "$OUT/apt-install.txt" 2>&1
           ldd "$SDK/emulator/qemu/linux-x86_64/qemu-system-x86_64" > "$OUT/native-libraries.txt"
           emulator -version > "$OUT/emulator-version.txt" 2>&1
           emulator -accel-check > "$OUT/acceleration.txt" 2>&1
@@ -44,8 +43,9 @@ jobs:
           export ANDROID_AVD_HOME="$WORK/avd"
           mkdir -p "$ANDROID_AVD_HOME"
           printf 'no\n' | avdmanager create avd -n merge_probe -k 'system-images;android-30;google_apis;x86_64' --force > "$OUT/avd-create.txt" 2>&1
-          emulator -avd merge_probe -port 5554 -no-window -no-audio -no-boot-anim -no-snapshot -gpu swiftshader_indirect -memory 3072 -cores 2 -camera-back none -camera-front none > "$OUT/emulator.log" 2>&1 &
+          nohup emulator -avd merge_probe -port 5554 -no-window -no-audio -no-boot-anim -no-snapshot -gpu swiftshader_indirect -memory 3072 -cores 2 -camera-back none -camera-front none > "$OUT/emulator.log" 2>&1 &
           EMUPID=$!
+          echo "$SDK/platform-tools" >> "$GITHUB_PATH"
           timeout 180 adb -s emulator-5554 wait-for-device
           READY=false
           for ((i=0;i<90;i++)); do
@@ -105,7 +105,7 @@ jobs:
           ACTIVITY=$(tail -n1 "$OUT/game-activity.txt")
           [[ "$ACTIVITY" =~ ^io\.randomco\.travel/[A-Za-z0-9._]+$ ]]
           adb -s emulator-5554 logcat -c
-          adb -s emulator-5554 shell screenrecord --time-limit 110 /sdcard/game-launch.mp4 > "$OUT/game-record.txt" 2>&1 &
+          adb -s emulator-5554 shell screenrecord --time-limit 125 /sdcard/game-launch.mp4 > "$OUT/game-record.txt" 2>&1 &
           RECORDPID=$!
           adb -s emulator-5554 shell am start -W -n "$ACTIVITY" > "$OUT/game-launch.txt"
           sleep 15
@@ -114,6 +114,21 @@ jobs:
           adb -s emulator-5554 exec-out screencap -p > "$OUT/game-45s.png"
           sleep 45
           adb -s emulator-5554 exec-out screencap -p > "$OUT/game-90s.png"
+          # User explicitly approved this game's age declaration and terms.
+          # Only click when the already-observed Confirm region matches exactly.
+          python3 - <<'PY'
+          from PIL import Image
+          import os,pathlib,hashlib,subprocess,json
+          p=pathlib.Path(os.environ['GITHUB_WORKSPACE'])/'merge-research-evidence'
+          im=Image.open(p/'game-90s.png').convert('RGB')
+          matched=im.size==(640,1280) and hashlib.sha256(im.crop((196,858,444,948)).tobytes()).hexdigest()=='8cd2d1de25e9a6f48a60bb7522909c157417fe19270047738784e502a3c35ae0'
+          (p/'consent-action.json').write_text(json.dumps({'userApproved':True,'observedRegionMatches':matched,'action':'tap Confirm at 320,900' if matched else 'no input; inspect new screenshot'}))
+          if matched:
+              subprocess.run(['adb','-s','emulator-5554','shell','input','tap','320','900'],check=True,timeout=10)
+          PY
+          sleep 15
+          adb -s emulator-5554 exec-out screencap -p > "$OUT/game-after-consent.png"
+          adb -s emulator-5554 shell wm size > "$OUT/display-size.txt"
           adb -s emulator-5554 shell uiautomator dump /sdcard/window.xml > "$OUT/ui-dump.txt" 2>&1 || true
           adb -s emulator-5554 pull /sdcard/window.xml "$OUT/game-ui.xml" || true
           adb -s emulator-5554 shell pidof io.randomco.travel > "$OUT/game-pid.txt" || true
@@ -121,8 +136,6 @@ jobs:
           adb -s emulator-5554 logcat -d -v threadtime > "$OUT/game-logcat.txt"
           wait "$RECORDPID"
           adb -s emulator-5554 pull /sdcard/game-launch.mp4 "$OUT/game-launch-original-speed-no-audio.mp4"
-          adb -s emulator-5554 emu kill
-          wait "$EMUPID" || true
           export OUT
           python3 - <<'PY'
           import os,json,pathlib,hashlib,struct
@@ -132,16 +145,139 @@ jobs:
               b=f.read_bytes()
               assert b[:8]==b'\x89PNG\r\n\x1a\n'
               images[f.name]={'dimensions':struct.unpack('>II',b[16:24]),'bytes':len(b)}
-          assert len(images)==7
-          files={f.name:hashlib.sha256(f.read_bytes()).hexdigest() for f in p.iterdir() if f.is_file()}
-          (p/'receipt.json').write_text(json.dumps({'status':'ENVIRONMENT_EVIDENCE_CAPTURED_NOT_GAMEPLAY_ACCEPTANCE','images':images,'sha256':files,'gamePackageInstalled':True,'gameplay':'launch capture only; no in-game input yet','audio':'not captured'},indent=2)+'\n')
+          assert len(images)==8
+          files={f.name:hashlib.sha256(f.read_bytes()).hexdigest() for f in p.iterdir() if f.is_file() and f.name != 'emulator.log'}
+          (p/'receipt.json').write_text(json.dumps({'status':'ENVIRONMENT_EVIDENCE_CAPTURED_NOT_GAMEPLAY_ACCEPTANCE','images':images,'sha256':files,'gamePackageInstalled':True,'gameplay':'consent only if the previously observed Confirm region matches; game actions reviewed in subsequent stages','audio':'not captured'},indent=2)+'\n')
+          PY
+          cat > "$WORK/observed_commands.py" <<'PY'
+          import base64,hashlib,json,os,pathlib,subprocess,sys,time,urllib.request,urllib.error
+          phase=int(sys.argv[1]); assert 1<=phase<=4
+          out=pathlib.Path(os.environ['GITHUB_WORKSPACE'])/f'travel-stage{phase}';out.mkdir(exist_ok=True)
+          adb=['adb','-s','emulator-5554']
+          def run(args,**kw):
+              return subprocess.run(adb+args,timeout=20,check=True,**kw)
+          def capture(name):
+              (out/name).write_bytes(subprocess.check_output(adb+['exec-out','screencap','-p'],timeout=20))
+          url='https://api.github.com/repos/yangerstar1/task-workbench/contents/research-control/travel-town.json?ref=codex/merge-research-android'
+          req=urllib.request.Request(url,headers={'Accept':'application/vnd.github+json','Authorization':'Bearer '+os.environ['GH_TOKEN'],'X-GitHub-Api-Version':'2022-11-28'})
+          command=None
+          for attempt in range(13):
+              try:
+                  with urllib.request.urlopen(req,timeout=20) as r: envelope=json.load(r)
+                  obj=json.loads(base64.b64decode(envelope['content']))
+                  if str(obj.get('runId'))==os.environ['GITHUB_RUN_ID'] and obj.get('phase')==phase:
+                      command=obj;break
+              except (urllib.error.HTTPError,urllib.error.URLError,TimeoutError,ValueError,KeyError):
+                  pass
+              if attempt<12: time.sleep(15)
+          capture('before.png')
+          if command is None:
+              (out/'status.json').write_text(json.dumps({'phase':phase,'status':'NO_MATCHING_COMMAND_NO_INPUT'}));sys.exit(0)
+          steps=command['steps'];assert isinstance(steps,list) and 1<=len(steps)<=6
+          for op in steps:
+              assert op['type'] in ('tap','swipe','wait')
+              if op['type'] in ('tap','swipe'):
+                  for k in ('x','y'):
+                      assert isinstance(op[k],int) and 0<=op[k]<(640 if k=='x' else 1280)
+              if op['type']=='swipe':
+                  assert 0<=op['toX']<640 and 0<=op['toY']<1280 and 100<=op.get('durationMs',500)<=2000
+              if op['type']=='wait': assert 0<op['seconds']<=15
+          (out/'command.json').write_text(json.dumps(command,indent=2))
+          remote=f'/sdcard/research-stage{phase}.mp4'
+          recordlog=(out/'record-log.txt').open('w')
+          rec=subprocess.Popen(adb+['shell','screenrecord','--time-limit','45',remote],stdout=recordlog,stderr=subprocess.STDOUT)
+          for i,op in enumerate(steps,1):
+              if op['type']=='tap': run(['shell','input','tap',str(op['x']),str(op['y'])])
+              elif op['type']=='swipe': run(['shell','input','swipe',str(op['x']),str(op['y']),str(op['toX']),str(op['toY']),str(op.get('durationMs',500))])
+              else: time.sleep(op['seconds'])
+              time.sleep(2);capture(f'after-{i:02d}.png')
+          time.sleep(6);capture('final.png')
+          (out/'foreground.txt').write_bytes(subprocess.check_output(adb+['shell','dumpsys','activity','activities'],timeout=20))
+          rec.wait(timeout=55);recordlog.close()
+          run(['pull',remote,str(out/'original-speed-no-audio.mp4')],stdout=subprocess.DEVNULL)
+          receipt={'phase':phase,'status':'OBSERVED_COMMANDS_EXECUTED_NOT_QUALITY_ACCEPTANCE','sha256':{f.name:hashlib.sha256(f.read_bytes()).hexdigest() for f in out.iterdir() if f.is_file()}}
+          (out/'receipt.json').write_text(json.dumps(receipt,indent=2))
           PY
       - name: Preserve bounded evidence including failures
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: merge-research-probe-${{ github.run_id }}
-          path: merge-research-evidence/
+          name: travel-town-stage0-${{ github.run_id }}
+          path: |
+            merge-research-evidence/
+            !merge-research-evidence/emulator.log
           retention-days: 1
           if-no-files-found: warn
 
+      - name: Observe and apply bounded input stage 1
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 "$RUNNER_TEMP/merge-research-probe/observed_commands.py" 1
+      - name: Preserve stage 1
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: travel-town-stage1-${{ github.run_id }}
+          path: travel-stage1/
+          retention-days: 1
+          if-no-files-found: warn
+      - name: Observe and apply bounded input stage 2
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 "$RUNNER_TEMP/merge-research-probe/observed_commands.py" 2
+      - name: Preserve stage 2
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: travel-town-stage2-${{ github.run_id }}
+          path: travel-stage2/
+          retention-days: 1
+          if-no-files-found: warn
+      - name: Observe and apply bounded input stage 3
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 "$RUNNER_TEMP/merge-research-probe/observed_commands.py" 3
+      - name: Preserve stage 3
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: travel-town-stage3-${{ github.run_id }}
+          path: travel-stage3/
+          retention-days: 1
+          if-no-files-found: warn
+      - name: Observe and apply bounded input stage 4
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 "$RUNNER_TEMP/merge-research-probe/observed_commands.py" 4
+      - name: Preserve stage 4
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: travel-town-stage4-${{ github.run_id }}
+          path: travel-stage4/
+          retention-days: 1
+          if-no-files-found: warn
+      - name: Inspect isolated guest save filenames and stop Android
+        if: always()
+        shell: bash
+        run: |
+          set +e
+          OUT="$GITHUB_WORKSPACE/travel-session-end"
+          mkdir -p "$OUT"
+          adb -s emulator-5554 shell dumpsys package io.randomco.travel | grep -E 'flags=|privateFlags=|versionName=|versionCode=' > "$OUT/package-flags.txt"
+          adb -s emulator-5554 root > "$OUT/adb-root.txt" 2>&1
+          timeout 20 adb -s emulator-5554 wait-for-device
+          adb -s emulator-5554 shell 'find /data/user/0/io.randomco.travel/files /data/user/0/io.randomco.travel/shared_prefs /data/user/0/io.randomco.travel/databases -maxdepth 2 -type f 2>/dev/null' | head -n 80 > "$OUT/app-data-filenames-only.txt"
+          adb -s emulator-5554 emu kill
+          if [[ -f "$RUNNER_TEMP/merge-research-probe/kvm.acl" ]]; then sudo setfacl --restore="$RUNNER_TEMP/merge-research-probe/kvm.acl"; fi
+      - name: Preserve session metadata
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: travel-town-session-end-${{ github.run_id }}
+          path: travel-session-end/
+          retention-days: 1
