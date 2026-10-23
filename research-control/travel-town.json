@@ -1,1 +1,1 @@
-{"phase":1,"basis":"Current stage0 screenshot shows the approved Travel Town Confirm button","runId":"39932139586","steps":[{"y":900,"type":"tap","x":320},{"seconds":10,"type":"wait"}]}
+{"basis":"The last frame showed loading at 82 percent; wait and inspect, without guessing game buttons","runId":"39932139586","phase":2,"steps":[{"seconds":1,"type":"wait"}]}
