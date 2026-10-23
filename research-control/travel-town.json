@@ -1,1 +1,1 @@
-{"basis":"The last frame showed loading at 82 percent; wait and inspect, without guessing game buttons","runId":"39932139586","phase":2,"steps":[{"seconds":1,"type":"wait"}]}
+{"runId":"39932139586","basis":"Stage2 final screenshot shows the first tutorial asking to merge two dirty buckets at row5 columns3 and4","phase":3,"steps":[{"y":737,"toX":320,"x":229,"type":"swipe","toY":737,"durationMs":650}]}
