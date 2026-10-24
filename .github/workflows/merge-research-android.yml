@@ -1,4 +1,4 @@
-name: Merge research observed merge verification
+name: Merge research Love 085 ARM64 launch
 on:
   push:
     branches: [codex/merge-research-android]
@@ -15,7 +15,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 12
     steps:
-      - name: Verify Android acceleration and capture real input evidence
+      - name: Verify same-version ARM64 source and capture launch evidence
         shell: bash
         run: |
           set -euo pipefail
@@ -57,88 +57,102 @@ jobs:
           adb -s emulator-5554 shell wm size 720x1280
           adb -s emulator-5554 shell wm density 240
           { adb -s emulator-5554 shell getprop ro.product.cpu.abilist; adb -s emulator-5554 shell getprop ro.dalvik.vm.native.bridge; adb -s emulator-5554 shell getprop ro.build.version.sdk; } > "$OUT/android-abi.txt"
-          # A public third-party package stays only in this disposable runner.
-          # Upload screenshots/logs only, never the package, credentials or a user save.
-          curl --fail --location --silent --show-error --max-time 240 'https://d.apkpure.net/b/XAPK/io.randomco.travel?version=latest' -o "$WORK/travel-town.xapk"
-          export WORK
-          python3 - <<'PY'
-          import os,pathlib,zipfile,json,hashlib
-          root=pathlib.Path(os.environ['WORK']); out=pathlib.Path(os.environ['GITHUB_WORKSPACE'])/'merge-research-evidence'
-          src=root/'travel-town.xapk'; assert 1000000<src.stat().st_size<500000000
-          dst=root/'apks';dst.mkdir()
-          with zipfile.ZipFile(src) as z:
-              manifest=json.loads(z.read('manifest.json'))
-              assert manifest['package_name']=='io.randomco.travel'
-              entries=[i for i in z.infolist() if i.filename.endswith('.apk')]
-              assert 1<=len(entries)<=16
-              assert sum(i.file_size for i in entries)<800000000
-              names=set()
-              for e in entries:
-                  name=pathlib.PurePosixPath(e.filename).name
-                  assert name not in names
-                  names.add(name)
-                  (dst/name).write_bytes(z.read(e))
-          (out/'package-identity.json').write_text(json.dumps({'source':'public APKPure download; compare SHA256 with the archived Drive package','bytes':src.stat().st_size,'sha256':hashlib.file_digest(src.open('rb'),'sha256').hexdigest(),'manifest':manifest},indent=2)+'\n')
-          PY
+          # Public, same-version architecture experiment only. No account or consent input.
+          curl --fail --location --silent --show-error --max-time 150 --max-filesize 300000000 'https://d.apkpure.net/b/XAPK/com.Trailmix.LoveAndPiesMerge?versionCode=7850&nc=armeabi-v7a&sv=24' -o "$WORK/love32.xapk"
+          curl --fail --location --silent --show-error --max-time 150 --max-filesize 300000000 'https://d.apkpure.net/b/XAPK/com.Trailmix.LoveAndPiesMerge?versionCode=7850&nc=arm64-v8a&sv=24' -o "$WORK/love64.xapk"
+          export WORK OUT
           AAPT=$(find "$SDK/build-tools" -name aapt -type f | sort -V | tail -n1)
-          for APK in "$WORK"/apks/*.apk; do "$AAPT" dump badging "$APK"; done > "$OUT/package-badging.txt"
-          adb -s emulator-5554 install-multiple -r "$WORK"/apks/*.apk > "$OUT/game-install.txt" 2>&1
-          adb -s emulator-5554 shell cmd package resolve-activity --brief io.randomco.travel | tr -d '\r' > "$OUT/game-activity.txt"
-          ACTIVITY=$(tail -n1 "$OUT/game-activity.txt")
-          [[ "$ACTIVITY" =~ ^io\.randomco\.travel/[A-Za-z0-9._]+$ ]]
-          adb -s emulator-5554 logcat -c
-          adb -s emulator-5554 shell am start -W -n "$ACTIVITY" > "$OUT/game-launch.txt"
+          APKSIGNER=$(find "$SDK/build-tools" -name apksigner -type f | sort -V | tail -n1)
+          test -x "$AAPT" && test -x "$APKSIGNER"
+          export AAPT APKSIGNER
           python3 - <<'PY'
-          import hashlib,io,json,os,pathlib,subprocess,time,xml.etree.ElementTree as ET
-          from PIL import Image
-          out=pathlib.Path(os.environ['GITHUB_WORKSPACE'])/'merge-research-evidence'
-          adb=['adb','-s','emulator-5554']
-          refs={'terms': {'box': [80, 400, 560, 810], 'bits': '001101100001001101011010110010010101101001100001010011010001000101101001010100010110010100001001011101100100000101100100011001010101110101100101'}, 'tutorial': {'box': [70, 864, 481, 987], 'bits': '000000000000000100000100000000101101110001010010101101001001010010110001001000011000100100101000101011010101000000100000010000000000000000000001'}}
+          import os,pathlib,zipfile,json,hashlib,subprocess,re
+          root=pathlib.Path(os.environ['WORK']);out=pathlib.Path(os.environ['OUT'])
+          package='com.Trailmix.LoveAndPiesMerge'
+          digest=lambda p:hashlib.file_digest(p.open('rb'),'sha256').hexdigest()
+          receipt={'purpose':'Same 0.85.0 ARM64 launch experiment; not gameplay or quality acceptance','packages':{},'noAccountOrConsentInput':True}
+          for arch,split in [('32','config.armeabi_v7a.apk'),('64','config.arm64_v8a.apk')]:
+              src=root/('love'+arch+'.xapk');assert 1000000<src.stat().st_size<300000000
+              dst=root/('apks'+arch);dst.mkdir()
+              with zipfile.ZipFile(src) as z:
+                  m=json.loads(z.read('manifest.json'))
+                  assert m['package_name']==package and str(m['version_code'])=='7850' and m['version_name']=='0.85.0',m
+                  apks=[e for e in z.infolist() if e.filename.endswith('.apk')]
+                  assert {e.filename for e in apks}=={package+'.apk',split}
+                  assert sum(e.file_size for e in apks)<300000000
+                  for e in apks:(dst/e.filename).write_bytes(z.read(e))
+              receipt['packages'][arch]={'bytes':src.stat().st_size,'sha256':digest(src),'manifest':m,'files':{p.name:{'bytes':p.stat().st_size,'sha256':digest(p)} for p in dst.iterdir()}}
+          oldbase=root/'apks32'/(package+'.apk');newbase=root/'apks64'/(package+'.apk')
+          assert digest(oldbase)=='aad54118f941be30304700710766cb1da5d6a4b60d1d4602053891ab7f64b1b1','Archived base identity mismatch'
+          signers=[]
+          for label,p in [('archived32-base',oldbase),('arm64-base',newbase),('arm64-split',root/'apks64/config.arm64_v8a.apk')]:
+              r=subprocess.run([os.environ['APKSIGNER'],'verify','--verbose','--print-certs',str(p)],capture_output=True,text=True,timeout=30)
+              (out/(label+'-signature.txt')).write_text(r.stdout+r.stderr)
+              assert r.returncode==0,'APK signature verification failed'
+              certs=re.findall(r'^Signer #\d+ certificate SHA-256 digest: (\S+)',r.stdout,re.M)
+              assert len(certs)==1,'Expected one verified signer'
+              signers.append(certs[0])
+          assert len(set(signers))==1,'Signer differs from archived original'
+          receipt['verifiedSignerSha256']=signers[0]
+          expected={'assets/aa/Android/meta_popup_assets_all.bundle':'7a0e9593ad27c0d57b9e6b1c14feab3f14d22040802aeb737d1e5e84bc583229','assets/aa/Android/core_assets_all.bundle':'630c2c3c2ce4bd063a8fe8d13a7d98bb46ca7a7cd1c9182f1a816fb45eb35e09'}
+          receipt['selectedOriginalAssetHashes']={}
+          with zipfile.ZipFile(oldbase) as a,zipfile.ZipFile(newbase) as b:
+              for name,want in expected.items():
+                  hashes=[hashlib.sha256(z.read(name)).hexdigest() for z in [a,b]]
+                  receipt['selectedOriginalAssetHashes'][name]={'archived32':hashes[0],'arm64':hashes[1],'expected':want,'equal':hashes==[want,want]}
+              inventory={}
+              for label,z in [('archived32',a),('arm64',b)]:
+                  inventory[label]={i.filename:(i.file_size,i.CRC) for i in z.infolist() if i.filename.startswith('assets/aa/Android/') and i.filename.endswith('.bundle')}
+              names=set(inventory['archived32'])|set(inventory['arm64'])
+              changed=[n for n in sorted(names) if inventory['archived32'].get(n)!=inventory['arm64'].get(n)]
+              receipt['bundleInventory']={'counts':{k:len(v) for k,v in inventory.items()},'differentSizeOrCrcCount':len(changed),'differentNamesFirst30':changed[:30]}
+          (out/'package-identity.json').write_text(json.dumps(receipt,indent=2)+'\n')
+          assert all(v['equal'] for v in receipt['selectedOriginalAssetHashes'].values()),'Selected source UI differs; stop before launch'
+          badging=subprocess.run([os.environ['AAPT'],'dump','badging',str(newbase)],capture_output=True,text=True,check=True,timeout=20).stdout
+          (out/'package-badging.txt').write_text(badging)
+          assert "package: name='"+package+"'" in badging and "versionCode='7850'" in badging and "versionName='0.85.0'" in badging
+          PY
+          adb -s emulator-5554 install-multiple -r "$WORK"/apks64/*.apk > "$OUT/game-install.txt" 2>&1
+          adb -s emulator-5554 shell cmd package resolve-activity --brief com.Trailmix.LoveAndPiesMerge | tr -d '\r' > "$OUT/game-activity.txt"
+          ACTIVITY=$(tail -n1 "$OUT/game-activity.txt")
+          [[ "$ACTIVITY" =~ ^com\.Trailmix\.LoveAndPiesMerge/[A-Za-z0-9._]+$ ]]
+          export ACTIVITY
+          python3 - <<'PY'
+          import json,os,pathlib,subprocess,time
+          out=pathlib.Path(os.environ['OUT']);adb=['adb','-s','emulator-5554']
+          package='com.Trailmix.LoveAndPiesMerge'
           def run(args,timeout=20,check=True):
               return subprocess.run(adb+args,capture_output=True,timeout=timeout,check=check)
-          def capture(name):
-              b=run(['exec-out','screencap','-p']).stdout
-              (out/name).write_bytes(b);return Image.open(io.BytesIO(b))
-          def match(im,kind):
-              if im.size!=(640,1280):return False
-              ref=refs[kind];v=list(im.crop(ref['box']).convert('L').resize((17,9)).getdata())
-              bits=''.join('1' if v[y*17+x]>v[y*17+x+1] else '0' for y in range(9) for x in range(16))
-              return sum(a!=b for a,b in zip(bits,ref['bits']))<=6
-          events=[];terms_done=False;board_seen=False
-          for attempt in range(48):
-              im=capture('latest.png')
-              if not terms_done and match(im,'terms'):
-                  (out/'terms-before-confirm.png').write_bytes((out/'latest.png').read_bytes())
-                  run(['shell','input','tap','320','900'])
-                  terms_done=True;events.append({'action':'accept user-approved terms','elapsedSecondsApprox':attempt*5})
-              elif match(im,'tutorial'):
-                  board_seen=True;break
-              time.sleep(5)
-          (out/'before-merge.png').write_bytes((out/'latest.png').read_bytes())
-          if board_seen:
-              rec=subprocess.Popen(adb+['shell','screenrecord','--time-limit','25','/sdcard/actual-merge.mp4'],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
-              time.sleep(1)
-              run(['shell','input','swipe','229','737','320','737','650'])
-              events.append({'action':'drag observed left dirty bucket onto right dirty bucket','from':[229,737],'to':[320,737],'durationMs':650})
-              time.sleep(2);capture('after-merge-2s.png')
-              time.sleep(6);capture('after-merge-8s.png')
-              rec.wait(timeout=35)
-              run(['pull','/sdcard/actual-merge.mp4',str(out/'actual-merge-original-speed-no-audio.mp4')])
-          (out/'input-events.json').write_text(json.dumps({'termsAccepted':terms_done,'tutorialImageMatched':board_seen,'events':events,'qualityAcceptance':False},indent=2))
-          (out/'foreground.txt').write_bytes(run(['shell','dumpsys','activity','activities']).stdout)
-          (out/'display-size.txt').write_bytes(run(['shell','wm','size']).stdout)
-          (out/'package-flags.txt').write_bytes(run(['shell',"dumpsys package io.randomco.travel | grep -E 'flags=|privateFlags=|versionName=|versionCode='"]).stdout)
-          (out/'adb-root.txt').write_bytes(run(['root'],check=False).stdout)
-          run(['wait-for-device'],timeout=25)
-          for filename in ['io.randomco.travel.v2.playerprefs.xml','DEBUG_PREF.xml']:
-              # Only preference names leave the disposable device; never output values.
-              command='sed -n \'s/.*name="\\([^" ]*\\)".*/\\1/p\' /data/user/0/io.randomco.travel/shared_prefs/'+filename
-              result=run(['shell',command],check=False)
-              names=result.stdout.decode('utf-8','replace').splitlines()[:150]
-              (out/(filename+'.names.json')).write_text(json.dumps(names,indent=2))
+          run(['logcat','-c'])
+          rec=subprocess.Popen(adb+['shell','screenrecord','--bit-rate','2000000','--time-limit','100','/sdcard/love64-launch.mp4'],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
+          time.sleep(.5);start=time.monotonic()
+          launch=run(['shell','am','start','-W','-n',os.environ['ACTIVITY']])
+          (out/'game-launch.txt').write_bytes(launch.stdout+launch.stderr)
+          checkpoints=[];last=0
+          for target in [5,15,30,60,90]:
+              time.sleep(max(0,target-(time.monotonic()-start)))
+              elapsed=time.monotonic()-start
+              p=run(['shell','pidof',package],check=False)
+              screen=run(['exec-out','screencap','-p']).stdout
+              assert screen.startswith(b'\x89PNG\r\n\x1a\n')
+              (out/('game-'+str(target)+'s.png')).write_bytes(screen)
+              foreground=run(['shell',"dumpsys activity activities | grep -E 'mResumedActivity|topResumedActivity'"],check=False).stdout.decode('utf8','replace')
+              checkpoints.append({'targetSeconds':target,'actualSeconds':round(elapsed,3),'processPresent':p.returncode==0 and bool(p.stdout.strip()),'foreground':foreground.strip()})
+              if not checkpoints[-1]['processPresent']:break
+          pid=run(['shell','pidof','screenrecord'],check=False).stdout.decode().strip()
+          if pid and all(c.isdigit() or c==' ' for c in pid):run(['shell','kill','-2',*pid.split()],check=False)
+          try:rec.wait(timeout=15)
+          except subprocess.TimeoutExpired:rec.terminate();rec.wait(timeout=5)
+          pull=run(['pull','/sdcard/love64-launch.mp4',str(out/'love64-launch-original-speed-no-audio.mp4')],check=False)
+          (out/'video-transfer.txt').write_bytes(pull.stdout+pull.stderr)
+          crash=run(['logcat','-b','crash','-d','-v','threadtime'],check=False).stdout
+          (out/'crash-buffer.txt').write_bytes(crash)
+          logs=run(['logcat','-d','-v','brief'],check=False).stdout.decode('utf8','replace').splitlines()
+          terms=('Built from','Initialize engine','GfxDevice','Renderer:','Fatal signal','SIGSEGV','FATAL EXCEPTION','Unable to load library','Unity version')
+          safe=[line for line in logs if any(s in line for s in terms) and 'http' not in line.lower()]
+          (out/'runtime-filtered.txt').write_text('\n'.join(safe[:160])+'\n')
+          (out/'launch-observation.json').write_text(json.dumps({'checkpoints':checkpoints,'inputEvents':[],'noAccountOrConsentInput':True,'gameplayAccepted':False,'wholeGameAccepted':False,'requiresScreenshotReview':True},indent=2)+'\n')
           run(['emu','kill'],check=False)
-          files={f.name:hashlib.sha256(f.read_bytes()).hexdigest() for f in out.iterdir() if f.is_file() and f.name not in ('emulator.log','receipt.json')}
-          (out/'receipt.json').write_text(json.dumps({'status':'OBSERVED_MERGE_ATTEMPT_REQUIRES_SCREEN_REVIEW','sha256':files,'boardSeen':board_seen},indent=2))
           PY
       - name: Stop temporary Android and restore KVM permissions
         if: always()
@@ -146,11 +160,22 @@ jobs:
         run: |
           adb -s emulator-5554 emu kill >/dev/null 2>&1 || true
           if [[ -f "$RUNNER_TEMP/merge-research-probe/kvm.acl" ]]; then sudo setfacl --restore="$RUNNER_TEMP/merge-research-probe/kvm.acl"; fi
-      - name: Preserve merge input evidence
+      - name: Hash stable evidence after Android has stopped
+        if: always()
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import pathlib,hashlib,json
+          root=pathlib.Path('merge-research-evidence')
+          if root.is_dir():
+              files={p.name:hashlib.sha256(p.read_bytes()).hexdigest() for p in sorted(root.iterdir()) if p.is_file() and p.name not in ['emulator.log','receipt.json']}
+              (root/'receipt.json').write_text(json.dumps({'status':'CAPTURE_PROCEDURE_ONLY_REQUIRES_REVIEW','sha256':files,'wholeGameAccepted':False},indent=2)+'\n')
+          PY
+      - name: Preserve Love ARM64 launch evidence
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: travel-town-merge-${{ github.run_id }}
+          name: love-pies-arm64-${{ github.run_id }}
           path: |
             merge-research-evidence/
             !merge-research-evidence/emulator.log
