@@ -89,7 +89,7 @@ jobs:
               r=subprocess.run([os.environ['APKSIGNER'],'verify','--verbose','--print-certs',str(p)],capture_output=True,text=True,timeout=30)
               (out/(label+'-signature.txt')).write_text(r.stdout+r.stderr)
               assert r.returncode==0,'APK signature verification failed'
-              certs=re.findall(r'^Signer #\d+ certificate SHA-256 digest: (\S+)',r.stdout,re.M)
+              certs=re.findall(r'^(?:Signer #\d+ |V3\.0 Signer: )certificate SHA-256 digest: (\S+)',r.stdout,re.M)
               assert len(certs)==1,'Expected one verified signer'
               signers.append(certs[0])
           assert len(set(signers))==1,'Signer differs from archived original'
